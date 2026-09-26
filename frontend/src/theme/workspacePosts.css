@@ -1,13 +1,58 @@
 .workspace-posts .mod-status::before { content: none; }
-.workspace-post-status { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+.workspace-posts .mod-status { border-radius: 5px; }
+.workspace-post-status { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .workspace-posts .mod-status.post-hidden { color: #626c7d; background: #e9edf3; }
-.workspace-post-visibility-note { color: #61738b; font-size: 13px; line-height: 1.7; }
-.workspace-post-visibility-form label { display: block; margin: 15px 0 8px; }
-.workspace-post-required { color: #75859a; font-size: 11px; font-weight: 400; }
-.workspace-post-reason-count { display: block; margin-top: 5px; color: #75859a; text-align: right; font-size: 10px; }
-.workspace-post-hidden-reason { margin-top: 14px; padding: 12px; border: 1px solid #e7c5ce; border-radius: 7px; color: #954158; background: #fff6f8; }
-.workspace-post-matches { margin-top: 20px; padding-top: 17px; border-top: 1px solid #d4e0ec; }
-.workspace-post-matches-heading { display: flex; justify-content: space-between; margin-bottom: 10px; }
-.workspace-post-matches ul { display: grid; gap: 10px; padding: 0; list-style: none; }
-.workspace-post-matches li { padding: 13px; border: 1px solid #dce5ef; border-radius: 8px; background: #f8fbfe; }
-.workspace-post-match-heading, .workspace-post-match-actions { display: flex; justify-content: space-between; gap: 10px; }
+.workspace-post-visibility-note { color: #61738b; font-size: 15px; line-height: 1.8; }
+.workspace-post-visibility-form label { display: block; margin: 18px 0 9px; font-size: 15px; }
+.workspace-post-required { color: #75859a; font-size: 13px; font-weight: 400; }
+.workspace-post-visibility-form textarea { font-size: 15px; line-height: 1.7; }
+.workspace-post-reason-count { display: block; margin-top: 6px; text-align: right; color: #75859a; font-size: 12px; }
+.workspace-post-hidden-reason { padding: 14px 16px; margin-top: 18px; border: 1px solid #e7c5ce; border-radius: 8px; background: #fff6f8; color: #954158; font-size: 15px; line-height: 1.7; }
+.workspace-post-hidden-reason p { white-space: pre-wrap; overflow-wrap: anywhere; margin: 5px 0 0; }
+.workspace-posts .mod-table-container { border-color: #b4c6db; }
+.workspace-posts .mod-table th { border-bottom-color: #c2d1e2; }
+.workspace-posts .mod-table td { border-bottom-color: #d5e0ec; }
+.workspace-posts .mod-table { font-size: 12px; min-width: 1000px; }
+.workspace-posts .mod-table th { font-size: 12px; }
+.workspace-posts .mod-post-title { font-size: 13px; }
+.workspace-posts .mod-type, .workspace-posts .mod-status { font-size: 11px; }
+.workspace-posts .mod-all-table th:first-child { padding-left: 10px; text-align: left; }
+.workspace-posts .workspace-post-code { padding-left: 10px; color: #1a528e; font-size: 11px; font-weight: 600; text-align: left; white-space: nowrap; }
+.workspace-posts .mod-stats { flex-wrap: nowrap; gap: 6px; font-size: 12px; white-space: nowrap; }
+.workspace-posts .mod-stats span { flex-shrink: 0; gap: 3px; }
+.workspace-posts .mod-stats svg { width: 13px; height: 13px; }
+.workspace-posts .mod-post-date { font-size: 12px; }
+.workspace-posts .mod-post-location { font-size: 11px; }
+.workspace-posts .mod-filters label { font-size: 13px; }
+.workspace-posts .mod-filters :is(input, select) { font-size: 14px; }
+.workspace-posts .mod-filters .mod-search-filter input::placeholder { font-size: 13px; }
+.workspace-posts :is(.mod-button, .mod-pagination, .mod-icon-button) { font-size: 13px; }
+.workspace-posts .mod-result-summary { font-size: 14px; }
+.workspace-posts .mod-result-summary > span + span { font-size: 13px; }
+.workspace-posts .mod-result-summary strong { font-size: 17px; }
+.workspace-posts .mod-dialog { width: min(760px, calc(var(--screen-w) - 32px)); }
+.workspace-posts .mod-dialog h2 { font-size: 18px; }
+.workspace-posts .mod-detail-title { font-size: 21px; }
+.workspace-posts :is(.mod-detail-list > div, .mod-description, .mod-edit-title, .mod-status-options legend, .mod-dialog h4) { font-size: 15px; }
+.workspace-post-matches { margin-top: 24px; border-top: 1px solid #d4e0ec; padding-top: 20px; }
+.workspace-post-matches-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.workspace-posts .workspace-post-matches-heading h4 { margin: 0; font-size: 17px; }
+.workspace-post-matches-heading > span { color: #71859c; font-size: 14px; }
+.workspace-post-matches ul { display: grid; gap: 14px; list-style: none; padding: 0; margin: 0; }
+.workspace-post-matches li { padding: 18px; border: 1px solid #b8cde2; border-radius: 9px; background: #f8fbfe; min-width: 0; }
+.workspace-post-match-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.workspace-post-match-id { margin-left: 10px; color: #71859c; font-size: 13px; }
+.workspace-post-match-score { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+.workspace-post-match-score strong { font-size: 25px; line-height: 1.1; color: #1a639e; }
+.workspace-post-match-score span { font-size: 12px; color: #71859c; }
+.workspace-post-match-author { font-size: 13px; color: #71859c; margin: 6px 0; overflow-wrap: anywhere; }
+.workspace-post-match-description { color: #4e647c; font-size: 14px; line-height: 1.75; margin: 12px 0 16px; overflow-wrap: anywhere; }
+.workspace-post-match-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.workspace-post-match-actions .mod-button { min-height: 35px; font-size: 13px; }
+.workspace-post-matches-empty { padding: 20px; margin: 0; text-align: center; color: #71859c; font-size: 14px; background: #f5f8fc; border-radius: 8px; }
+@media (max-width: 600px) {
+  .workspace-posts .mod-dialog-body { padding: 18px; }
+  .workspace-posts .mod-dialog :is(header, footer) { padding: 16px 18px; }
+  .workspace-posts .mod-detail-list > div { grid-template-columns: 90px minmax(0, 1fr); gap: 10px; }
+  .workspace-post-matches li { padding: 14px; }
+}

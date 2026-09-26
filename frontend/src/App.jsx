@@ -125,7 +125,7 @@ function StarterPage() {
 function App() {
   return <Routes>
     <Route path="/" element={<StarterPage />} />
-    <Route path="/moderator" element={<ModeratorPostsPage />} />
+    <Route path="/moderator/*" element={<ModeratorPostsPage />} />
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>
 }
