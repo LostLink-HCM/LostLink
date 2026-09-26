@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { Link, Navigate, Route, Routes } from 'react-router-dom'
 import heroImg from './assets/hero.png'
 import reactLogo from './assets/react.svg'
 import viteLogo from './assets/vite.svg'
 import './App.css'
+import ModeratorPostsPage from './pages/moderator/ModeratorPostsPage.jsx'
 
-function App() {
+function StarterPage() {
   const [count, setCount] = useState(0)
 
   return (
@@ -28,6 +30,7 @@ function App() {
         >
           Count is {count}
         </button>
+        <p><Link to="/moderator">Mở trang Moderator · Bài đăng</Link></p>
       </section>
 
       <div className="ticks"></div>
@@ -117,6 +120,14 @@ function App() {
       <section id="spacer"></section>
     </>
   )
+}
+
+function App() {
+  return <Routes>
+    <Route path="/" element={<StarterPage />} />
+    <Route path="/moderator" element={<ModeratorPostsPage />} />
+    <Route path="*" element={<Navigate to="/" replace />} />
+  </Routes>
 }
 
 export default App
