@@ -1,6 +1,6 @@
 const { connectDatabase, disconnectDatabase } = require('../config/database')
 
-// Register seeders here in dependency order, e.g. [seedCategories, seedUsers, seedPosts].
+// Khai báo seeder theo thứ tự phụ thuộc, vd [seedCategories, seedUsers, seedPosts]
 const seeders = []
 
 async function run() {

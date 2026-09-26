@@ -1,6 +1,8 @@
 const { Router } = require('express')
 const mongoose = require('mongoose')
 
+const authRoutes = require('./authRoutes')
+
 const router = Router()
 
 router.get('/health', (req, res) => {
@@ -11,5 +13,7 @@ router.get('/health', (req, res) => {
     uptime: process.uptime(),
   })
 })
+
+router.use('/auth', authRoutes)
 
 module.exports = router
