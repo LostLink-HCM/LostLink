@@ -1,4 +1,5 @@
 import { moderatorPosts } from './moderatorPosts.js'
+import { reviewPosts } from './reviewPosts.js'
 
 export const workspacePostMatches = [
   { id: 'M-101', postLost: 1, postFound: 101, score: .94 },
@@ -15,7 +16,7 @@ const matchingPosts = [
 ]
 
 export function createWorkspacePosts() {
-  const posts = [...moderatorPosts, ...matchingPosts]
+  const posts = [...moderatorPosts, ...reviewPosts.map((post) => ({ ...post, status: 'pending', views: 0, comments: 0 })), ...matchingPosts]
   const sequenceByDate = new Map()
   const postCodes = new Map()
   const chronologicalPosts = [...posts].sort((a, b) => {

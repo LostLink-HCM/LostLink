@@ -70,6 +70,9 @@
 .mod-post-title:hover { color: var(--mod-blue); }
 .mod-category { display: inline-block; background: #f0f3f7; color: #697b91; padding: 3px 7px; border-radius: 4px; font-size: 11px; margin-top: 7px; }
 .mod-review-table .mod-category { font-weight: 600; }
+.mod-review-table { min-width: 800px; }
+.mod-review-table .mod-review-code { color: #1a528e; font-size: 11px; font-weight: 600; text-align: left; white-space: nowrap; }
+.mod-review-table .mod-type { font-size: inherit; }
 .mod-review-table .mod-category[data-category="Đồ điện tử"] { color: #1a528e; background: #e6f0fa; }
 .mod-review-table .mod-category[data-category="Ví / Giấy tờ"] { color: #6d43a6; background: #f0e8fa; }
 .mod-review-table .mod-category[data-category="Thú cưng"] { color: #087454; background: #dff7ed; }

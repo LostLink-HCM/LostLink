@@ -4,6 +4,7 @@ import Logo from '../../components/Logo'
 import ModIcon from '../../components/moderator/ModIcon'
 import { createWorkspacePosts, workspacePostMatches } from '../../data/workspacePosts'
 import Posts from './Posts'
+import Review from './Review'
 import '../../theme/moderator.css'
 
 const navigation = [
@@ -58,7 +59,7 @@ export default function ModeratorPostsPage() {
           <div className="mod-header-date"><ModIcon name="calendar" size={16} /><time dateTime={new Date().toLocaleDateString('en-CA')}>{new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</time></div>
         </header>
         <main className="mod-main-content">
-          {active.path === '' ? <Posts posts={posts} setPosts={setPosts} matchPairs={workspacePostMatches} /> : <div className="mod-page-placeholder">Chưa cập nhật</div>}
+          {active.path === '' ? <Posts posts={posts} setPosts={setPosts} matchPairs={workspacePostMatches} /> : active.path === '/review' ? <Review posts={posts} setPosts={setPosts} /> : <div className="mod-page-placeholder">Chưa cập nhật</div>}
         </main>
       </div>
     </div>
