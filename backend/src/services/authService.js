@@ -6,6 +6,8 @@ const { generateOtp, hashToken, matchesHash } = require('../utils/crypto')
 const emailService = require('./emailService')
 
 const OTP_TTL_MINUTES = 10
+// Mỗi lần gửi lại sẽ xoá mã cũ
+const RESEND_COOLDOWN_SECONDS = 45
 const MAX_OTP_ATTEMPTS = 5
 const BCRYPT_ROUNDS = 10
 
@@ -23,11 +25,17 @@ const publicUser = (user) => ({
   createdAt: user.createdAt,
 })
 
-// TTL index chỉ dọn khoảng mỗi phút một lần nên truy vấn phải tự kiểm tra hạn
 const findActiveCode = (user) =>
   EmailToken.findOne({ user: user._id, purpose: 'verify', expiresAt: { $gt: new Date() } })
 
 const hasActiveCode = async (user) => Boolean(await findActiveCode(user))
+
+// Trả kèm các mốc thời gian
+const codeTiming = (email) => ({
+  email,
+  expiresInMinutes: OTP_TTL_MINUTES,
+  resendAfterSeconds: RESEND_COOLDOWN_SECONDS,
+})
 
 const issueVerificationOtp = async (user) => {
   await EmailToken.deleteMany({ user: user._id, purpose: 'verify' })
@@ -40,7 +48,6 @@ const issueVerificationOtp = async (user) => {
     expiresAt: new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000),
   })
 
-  // Không await để SMTP chậm không làm treo response, người dùng có thể yêu cầu gửi lại
   emailService
     .sendVerificationCode({ to: user.email, code, minutes: OTP_TTL_MINUTES })
     .catch((err) => console.error('Failed to send verification email:', err.message))
@@ -50,8 +57,7 @@ const register = async ({ username, email, password, emailOptIn = true }) => {
   const existing = await User.findOne({ email })
   if (existing?.emailVerifiedAt) throw ApiError.conflict('Email này đã được đăng ký.')
 
-  // Khi mã còn hạn thì không cho đăng ký lại, tránh việc người khác thay mật khẩu của họ
-  // rồi chủ email vô tình xác thực bằng mã gửi tới hộp thư của mình
+  // Khi mã còn hạn thì không cho đăng ký lại
   if (existing && (await hasActiveCode(existing))) {
     throw ApiError.conflict(
       'Email đang chờ xác thực. Vui lòng kiểm tra email hoặc yêu cầu gửi lại mã.'
@@ -70,13 +76,12 @@ const register = async ({ username, email, password, emailOptIn = true }) => {
   await user.save()
 
   await issueVerificationOtp(user)
-  return { email: user.email }
+  return codeTiming(user.email)
 }
 
 const verifyEmail = async ({ email, code }) => {
   const user = await User.findOne({ email })
   if (!user) throw ApiError.badRequest(INVALID_CODE)
-  // Không trả dữ liệu user vì với tài khoản đã xác thực thì mã không được kiểm tra
   if (user.emailVerifiedAt) throw ApiError.conflict('Email này đã được xác thực.')
 
   const record = await findActiveCode(user)
@@ -99,11 +104,15 @@ const verifyEmail = async ({ email, code }) => {
   return { user: publicUser(user) }
 }
 
-// Trả cùng một kết quả dù email có tồn tại hay không để không dò được tài khoản
 const resendCode = async ({ email }) => {
   const user = await User.findOne({ email })
-  if (user && !user.emailVerifiedAt) await issueVerificationOtp(user)
-  return { email }
+  if (user && !user.emailVerifiedAt) {
+    const current = await findActiveCode(user)
+    const cooledDown =
+      !current || Date.now() - current.createdAt.getTime() >= RESEND_COOLDOWN_SECONDS * 1000
+    if (cooledDown) await issueVerificationOtp(user)
+  }
+  return codeTiming(email)
 }
 
 module.exports = { publicUser, register, verifyEmail, resendCode }
