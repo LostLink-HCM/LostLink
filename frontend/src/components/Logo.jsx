@@ -1,20 +1,19 @@
 export default function Logo({ size = 42, animated = true }) {
   const originCenter = { transformBox: 'view-box', transformOrigin: '32px 32px' }
-  const magStyle = animated ? { ...originCenter, animation: 'lg-mag 3s cubic-bezier(.16,.84,.28,1) infinite' } : undefined
-  const pinStyle = animated ? { ...originCenter, animation: 'lg-pin 3s cubic-bezier(.16,.84,.28,1) infinite' } : undefined
+  const magClass = animated ? 'motion-safe:animate-logo-mag' : ''
+  const pinClass = animated ? 'motion-safe:animate-logo-pin' : ''
 
   return (
     <span
-      className="lg-anim relative inline-flex flex-shrink-0 items-center justify-center"
+      className="relative inline-flex flex-shrink-0 items-center justify-center"
       style={{ width: size, height: size }}
     >
       {animated && (
         <span
-          className="pointer-events-none absolute rounded-full"
+          className="pointer-events-none absolute rounded-full motion-safe:animate-logo-glow"
           style={{
             inset: -size * 0.3,
             background: 'radial-gradient(circle, rgba(46,109,180,0.24), rgba(46,109,180,0) 68%)',
-            animation: 'lg-glow 5s ease-in-out infinite',
           }}
         />
       )}
@@ -27,7 +26,7 @@ export default function Logo({ size = 42, animated = true }) {
           </linearGradient>
         </defs>
 
-        <g style={magStyle}>
+        <g className={magClass} style={animated ? originCenter : undefined}>
           <path d="M43 42 L55 54" stroke="#1B3358" strokeWidth="7" strokeLinecap="round" />
           <path d="M45.3 35.6 A18 18 0 1 1 34.6 10.9" stroke="#1B3358" strokeWidth="5" strokeLinecap="round" />
           <path d="M34.6 10.9 A18 18 0 0 1 45.3 35.6" stroke="#9AA7BA" strokeWidth="5" strokeLinecap="round" />
@@ -39,10 +38,11 @@ export default function Logo({ size = 42, animated = true }) {
           cy="28"
           r="9"
           fill="rgba(142,192,242,0.9)"
-          style={{ transformBox: 'fill-box', transformOrigin: 'center', opacity: 0, ...(animated ? { animation: 'lg-snap 3s ease-out infinite' } : {}) }}
+          className={animated ? 'motion-safe:animate-logo-snap' : ''}
+          style={{ transformBox: 'fill-box', transformOrigin: 'center', opacity: 0 }}
         />
 
-        <g style={pinStyle}>
+        <g className={pinClass} style={animated ? originCenter : undefined}>
           <path d="M29 14.5 C23.8 14.5 19.6 18.7 19.6 23.9 C19.6 31 29 40.2 29 40.2 C29 40.2 38.4 31 38.4 23.9 C38.4 18.7 34.2 14.5 29 14.5 Z" fill="url(#llHeadG)" />
           <circle cx="29" cy="23.7" r="4.1" fill="#fff" />
         </g>

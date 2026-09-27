@@ -29,6 +29,10 @@
   --animate-ll-pin-in: ll-pin-in 2.6s cubic-bezier(0.16, 0.84, 0.28, 1) infinite;
   --animate-ll-pulse: ll-pulse 3s ease-out infinite;
   --animate-ll-fade: ll-fade 0.35s ease both;
+  --animate-logo-glow: logo-glow 5s ease-in-out infinite;
+  --animate-logo-mag: logo-mag 3s cubic-bezier(.16,.84,.28,1) infinite;
+  --animate-logo-pin: logo-pin 3s cubic-bezier(.16,.84,.28,1) infinite;
+  --animate-logo-snap: logo-snap 3s ease-out infinite;
 
   @keyframes ll-glow {
     0%,
@@ -174,6 +178,25 @@
       opacity: 1;
       transform: none;
     }
+  }
+  @keyframes logo-glow {
+    0%, 100% { opacity: .3; }
+    50% { opacity: .65; }
+  }
+  @keyframes logo-mag {
+    0%, 100% { transform: translate(-15px, 9px) scale(.72) rotate(-12deg); opacity: 0; }
+    22%, 84% { transform: none; opacity: 1; }
+  }
+  @keyframes logo-pin {
+    0%, 100% { transform: translate(15px, -16px) scale(.5); opacity: 0; }
+    26%, 84% { transform: none; opacity: 1; }
+    32% { transform: translateY(-3px) scale(1.08); }
+    40% { transform: none; }
+  }
+  @keyframes logo-snap {
+    0%, 24% { transform: scale(.2); opacity: 0; }
+    33% { transform: scale(1); opacity: .85; }
+    48%, 100% { transform: scale(1.7); opacity: 0; }
   }
 }
 
