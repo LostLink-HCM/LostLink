@@ -1,5 +1,3 @@
-/* Không import preflight để không reset style của các trang đang dùng CSS thường (moderator)
-   Utilities không đặt trong layer để thắng các selector thẻ trong index.css (h1, h2...) */
 @import 'tailwindcss/theme.css' layer(theme);
 @import 'tailwindcss/utilities.css';
 
@@ -200,14 +198,12 @@
   }
 }
 
-/* Reset tối thiểu chỉ trong khung auth vì không dùng preflight */
 .auth-root,
 .auth-root *,
 .auth-root ::before,
 .auth-root ::after {
   box-sizing: border-box;
 }
-/* Chỉ kế thừa font chữ, không dùng `font: inherit` vì sẽ ghi đè cỡ chữ của class Tailwind */
 .auth-root :where(input, button) {
   font-family: inherit;
 }
