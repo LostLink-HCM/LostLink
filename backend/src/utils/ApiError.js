@@ -1,8 +1,9 @@
 class ApiError extends Error {
-  constructor(statusCode, message, details) {
+  constructor(statusCode, message, details, errorCode) {
     super(message)
     this.statusCode = statusCode
     this.details = details
+    this.errorCode = errorCode
   }
 
   static badRequest(message = 'Bad request', details) {
@@ -13,8 +14,8 @@ class ApiError extends Error {
     return new ApiError(401, message)
   }
 
-  static forbidden(message = 'Forbidden') {
-    return new ApiError(403, message)
+  static forbidden(message = 'Forbidden', errorCode) {
+    return new ApiError(403, message, undefined, errorCode)
   }
 
   static notFound(message = 'Not found') {

@@ -9,8 +9,7 @@ const email = () =>
     .withMessage('Email không hợp lệ.')
     .toLowerCase()
 
-// Chỉ cho ký tự ASCII in được: chữ có dấu có thể được mã hoá khác nhau giữa các thiết bị
-// và bộ gõ, khiến cùng một mật khẩu gõ vào lại không khớp với bcrypt hash
+// Chỉ cho ký tự ASCII in được, chữ có dấu có thể được mã hoá khác nhau giữa các thiết bị
 const password = () =>
   body('password')
     .isString()
@@ -59,4 +58,15 @@ const verifyRules = [
 
 const resendRules = [email()]
 
-module.exports = { registerRules, verifyRules, resendRules }
+// Không kiểm tra độ mạnh mật khẩu khi đăng nhập
+const loginRules = [
+  email(),
+  body('password')
+    .notEmpty()
+    .withMessage('Vui lòng nhập mật khẩu.')
+    .bail()
+    .isString()
+    .withMessage('Mật khẩu không hợp lệ.'),
+]
+
+module.exports = { registerRules, verifyRules, resendRules, loginRules }
