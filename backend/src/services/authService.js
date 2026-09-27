@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs')
 const { User, EmailToken } = require('../models')
 const ApiError = require('../utils/ApiError')
 const { generateOtp, hashToken, matchesHash } = require('../utils/crypto')
+const { issueTokens } = require('../utils/token')
 const emailService = require('./emailService')
 
 const OTP_TTL_MINUTES = 10
@@ -12,6 +13,10 @@ const MAX_OTP_ATTEMPTS = 5
 const BCRYPT_ROUNDS = 10
 
 const INVALID_CODE = 'Mã xác thực không đúng hoặc đã hết hạn.'
+const INVALID_CREDENTIALS = 'Email hoặc mật khẩu không đúng.'
+
+// không tiết lộ email đã đăng ký hay chưa
+const DUMMY_HASH = bcrypt.hashSync('lostlink-dummy-password', BCRYPT_ROUNDS)
 
 const publicUser = (user) => ({
   id: user._id,
@@ -30,7 +35,6 @@ const findActiveCode = (user) =>
 
 const hasActiveCode = async (user) => Boolean(await findActiveCode(user))
 
-// Trả kèm các mốc thời gian
 const codeTiming = (email) => ({
   email,
   expiresInMinutes: OTP_TTL_MINUTES,
@@ -101,7 +105,8 @@ const verifyEmail = async ({ email, code }) => {
   await user.save()
   await EmailToken.deleteMany({ user: user._id, purpose: 'verify' })
 
-  return { user: publicUser(user) }
+  // Nhập đúng mã chứng minh sở hữu email, cho đăng nhập luôn
+  return { user: publicUser(user), ...issueTokens(user) }
 }
 
 const resendCode = async ({ email }) => {
@@ -115,4 +120,20 @@ const resendCode = async ({ email }) => {
   return codeTiming(email)
 }
 
-module.exports = { publicUser, register, verifyEmail, resendCode }
+const login = async ({ email, password }) => {
+  const user = await User.findOne({ email }).select('+passwordHash')
+
+  // Tài khoản chỉ đăng nhập bằng Google không có passwordHash
+  const matched = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH)
+  if (!user?.passwordHash || !matched) throw ApiError.unauthorized(INVALID_CREDENTIALS)
+
+  if (user.status === 'locked') throw ApiError.forbidden('Tài khoản đã bị khoá.', 'ACCOUNT_LOCKED')
+
+  if (!user.emailVerifiedAt) {
+    throw ApiError.forbidden('Email chưa được xác thực.', 'EMAIL_NOT_VERIFIED')
+  }
+
+  return { user: publicUser(user), ...issueTokens(user) }
+}
+
+module.exports = { publicUser, register, verifyEmail, resendCode, login }

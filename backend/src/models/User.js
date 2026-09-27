@@ -47,6 +47,8 @@ const userSchema = new Schema(
 
     emailVerifiedAt: { type: Date, default: null },
 
+    tokenVersion: { type: Number, default: 0 },
+
     badges: [userBadgeSchema],
   },
   { timestamps: true }

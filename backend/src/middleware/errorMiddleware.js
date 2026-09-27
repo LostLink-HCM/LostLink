@@ -4,9 +4,7 @@ const env = require('../config/env')
 function notFound(req, res, next) {
   next(ApiError.notFound(`Route not found: ${req.method} ${req.originalUrl}`))
 }
-
-// eslint-disable-next-line no-unused-vars
-function errorHandler(err, req, res, next) {
+function errorHandler(err, req, res, _next) {
   let statusCode = err.statusCode || 500
   let message = err.message || 'Internal server error'
 
@@ -25,6 +23,7 @@ function errorHandler(err, req, res, next) {
   res.status(statusCode).json({
     success: false,
     message: statusCode >= 500 && env.nodeEnv === 'production' ? 'Internal server error' : message,
+    ...(err.errorCode && { code: err.errorCode }),
     ...(err.details && { details: err.details }),
     ...(env.nodeEnv !== 'production' && statusCode >= 500 && { stack: err.stack }),
   })

@@ -7,6 +7,7 @@ const {
   registerRules,
   verifyRules,
   resendRules,
+  loginRules,
 } = require('../middleware/validation/authValidation')
 
 const router = Router()
@@ -14,5 +15,6 @@ const router = Router()
 router.post('/register', authLimiter, registerRules, validate, ctrl.register)
 router.post('/verify-email', authLimiter, verifyRules, validate, ctrl.verifyEmail)
 router.post('/resend-code', authLimiter, resendRules, validate, ctrl.resendCode)
+router.post('/login', authLimiter, loginRules, validate, ctrl.login)
 
 module.exports = router
