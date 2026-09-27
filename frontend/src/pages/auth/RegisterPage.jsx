@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import * as authApi from '../../api/auth'
 import AuthLayout from '../../components/auth/AuthLayout'
+import AuthTabs from '../../components/auth/AuthTabs'
 import {
   Alert,
   Field,
@@ -53,9 +54,8 @@ export default function RegisterPage() {
 
   return (
     <AuthLayout>
-      <h1 className="mb-1 mt-0 font-sans text-[26px] font-bold leading-tight tracking-[-.4px] text-au-ink">
-        Đăng ký
-      </h1>
+      <h1 className="sr-only">Đăng ký</h1>
+      <AuthTabs />
       <p className="mb-4 text-[12.5px] leading-[1.6] text-au-ink/60">
         Đăng tin và nhận gợi ý ghép cặp cho món đồ thất lạc.
       </p>

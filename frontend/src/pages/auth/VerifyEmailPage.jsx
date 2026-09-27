@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import * as authApi from '../../api/auth'
 import AuthLayout from '../../components/auth/AuthLayout'
 import { Alert, Field, OtpBox, PrimaryButton, TextLink } from '../../components/auth/AuthControls'
+import { homePathFor, setSession } from '../../lib/session'
 
 const CODE_LENGTH = 6
 const emptyCode = () => Array(CODE_LENGTH).fill('')
@@ -20,7 +21,8 @@ export default function VerifyEmailPage() {
   const [cooldown, setCooldown] = useState(justSent ? (location.state?.resendAfterSeconds ?? 0) : 0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
+  // Trang login chuyển sang đây kèm lời nhắc khi email chưa xác thực
+  const [notice, setNotice] = useState(location.state?.notice ?? '')
   const [emailError, setEmailError] = useState('')
   const [verifiedUser, setVerifiedUser] = useState(null)
   const boxes = useRef([])
@@ -80,6 +82,8 @@ export default function VerifyEmailPage() {
     setLoading(true)
     try {
       const res = await authApi.verifyEmail({ email, code })
+      // Backend tự đăng nhập sau khi xác thực, trả accessToken và đặt cookie refresh
+      setSession(res.data)
       setVerifiedUser(res.data.user)
     } catch (err) {
       if (err.fieldErrors?.email) setEmailError(err.fieldErrors.email)
@@ -110,7 +114,10 @@ export default function VerifyEmailPage() {
   if (verifiedUser) {
     return (
       <AuthLayout>
-        <VerifiedView user={verifiedUser} onEnter={() => navigate('/')} />
+        <VerifiedView
+          user={verifiedUser}
+          onEnter={() => navigate(homePathFor(verifiedUser), { replace: true })}
+        />
       </AuthLayout>
     )
   }

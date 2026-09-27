@@ -36,12 +36,14 @@ export function Field({ id, label, error, hint, trailing, className = '', ...pro
   )
 }
 
-export function PasswordField(props) {
+export function PasswordField({ className = '', ...props }) {
   const [visible, setVisible] = useState(false)
 
   return (
     <Field
       {...props}
+      // Ẩn nút xem mật khẩu có sẵn của Edge để không bị trùng với nút bên dưới
+      className={`[&::-ms-reveal]:hidden ${className}`}
       type={visible ? 'text' : 'password'}
       trailing={
         <button

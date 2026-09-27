@@ -5,6 +5,7 @@ import reactLogo from './assets/react.svg'
 import viteLogo from './assets/vite.svg'
 import './App.css'
 import ModeratorPostsPage from './pages/moderator/ModeratorPostsPage.jsx'
+import LoginPage from './pages/auth/LoginPage.jsx'
 import RegisterPage from './pages/auth/RegisterPage.jsx'
 import VerifyEmailPage from './pages/auth/VerifyEmailPage.jsx'
 
@@ -128,6 +129,7 @@ function App() {
   return <Routes>
     <Route path="/" element={<StarterPage />} />
     <Route path="/moderator/*" element={<ModeratorPostsPage />} />
+    <Route path="/login" element={<LoginPage />} />
     <Route path="/register" element={<RegisterPage />} />
     <Route path="/verify-email" element={<VerifyEmailPage />} />
     <Route path="*" element={<Navigate to="/" replace />} />
