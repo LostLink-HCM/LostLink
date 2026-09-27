@@ -1,0 +1,190 @@
+/* Không import preflight để không reset style của các trang đang dùng CSS thường (moderator)
+   Utilities không đặt trong layer để thắng các selector thẻ trong index.css (h1, h2...) */
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css';
+
+@theme {
+  --font-sans: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --color-au-bg: #050b16;
+  --color-au-bg-deep: #0b1727;
+  --color-au-ink: #eaf1fb;
+  --color-au-accent: #6ea8ff;
+  --color-au-link: #8fbbff;
+  --color-au-link-hover: #c8deff;
+  --color-au-star: #a9ccff;
+  --color-au-danger: #e96060;
+  --color-au-success: #4cbe8b;
+
+  --animate-ll-glow-slow: ll-glow 9s ease-in-out infinite;
+  --animate-ll-glow-fast: ll-glow 5s ease-in-out infinite;
+  --animate-ll-drift: ll-drift 24s ease-in-out infinite;
+  --animate-ll-twinkle: ll-twinkle 4s ease-in-out infinite;
+  --animate-ll-burst: ll-burst 2.6s cubic-bezier(0.2, 0.7, 0.3, 1) infinite;
+  --animate-ll-sweep: ll-sweep 6s linear infinite;
+  --animate-ll-tether: ll-tether 2.6s cubic-bezier(0.16, 0.84, 0.28, 1) infinite;
+  --animate-ll-snap: ll-snap 2.6s ease-out infinite;
+  --animate-ll-lens-in: ll-lens-in 2.6s cubic-bezier(0.16, 0.84, 0.28, 1) infinite;
+  --animate-ll-trace: ll-trace 2.6s cubic-bezier(0.16, 0.84, 0.28, 1) infinite;
+  --animate-ll-pin-in: ll-pin-in 2.6s cubic-bezier(0.16, 0.84, 0.28, 1) infinite;
+  --animate-ll-pulse: ll-pulse 3s ease-out infinite;
+  --animate-ll-fade: ll-fade 0.35s ease both;
+
+  @keyframes ll-glow {
+    0%,
+    100% {
+      opacity: 0.4;
+    }
+    50% {
+      opacity: 0.8;
+    }
+  }
+  @keyframes ll-drift {
+    0%,
+    100% {
+      transform: translate(0, 0);
+    }
+    50% {
+      transform: translate(-18px, 22px);
+    }
+  }
+  @keyframes ll-twinkle {
+    0%,
+    100% {
+      opacity: 0.25;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+  @keyframes ll-burst {
+    0%,
+    26% {
+      transform: scale(0.55);
+      opacity: 0;
+    }
+    34% {
+      opacity: 0.7;
+    }
+    100% {
+      transform: scale(2.3);
+      opacity: 0;
+    }
+  }
+  @keyframes ll-sweep {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @keyframes ll-tether {
+    0% {
+      transform: rotate(var(--a)) scaleX(1);
+      opacity: 0.6;
+    }
+    24% {
+      opacity: 0.9;
+    }
+    30%,
+    82% {
+      transform: rotate(var(--a)) scaleX(0);
+      opacity: 0;
+    }
+    100% {
+      transform: rotate(var(--a)) scaleX(1);
+      opacity: 0.6;
+    }
+  }
+  @keyframes ll-snap {
+    0%,
+    27% {
+      transform: scale(0.2);
+      opacity: 0;
+    }
+    33% {
+      transform: scale(1);
+      opacity: 0.9;
+    }
+    46%,
+    100% {
+      transform: scale(1.5);
+      opacity: 0;
+    }
+  }
+  @keyframes ll-lens-in {
+    0%,
+    100% {
+      transform: translate(-96px, 34px) scale(0.62) rotate(-26deg);
+      opacity: 0;
+      filter: blur(3px);
+    }
+    26%,
+    82% {
+      transform: translate(0, 0) scale(1) rotate(0deg);
+      opacity: 1;
+      filter: blur(0);
+    }
+  }
+  @keyframes ll-trace {
+    0%,
+    100% {
+      stroke-dashoffset: 300;
+    }
+    26%,
+    82% {
+      stroke-dashoffset: 0;
+    }
+  }
+  @keyframes ll-pin-in {
+    0%,
+    100% {
+      transform: translate(112px, -46px) scale(0.5);
+      opacity: 0;
+      filter: blur(3px);
+    }
+    30% {
+      transform: translate(0, 0) scale(1);
+      opacity: 1;
+      filter: blur(0);
+    }
+    36% {
+      transform: translate(0, -5px) scale(1.06);
+    }
+    42%,
+    82% {
+      transform: translate(0, 0) scale(1);
+      opacity: 1;
+    }
+  }
+  @keyframes ll-pulse {
+    0% {
+      transform: scale(0.7);
+      opacity: 0.55;
+    }
+    100% {
+      transform: scale(2.1);
+      opacity: 0;
+    }
+  }
+  @keyframes ll-fade {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+/* Reset tối thiểu chỉ trong khung auth vì không dùng preflight */
+.auth-root,
+.auth-root *,
+.auth-root ::before,
+.auth-root ::after {
+  box-sizing: border-box;
+}
+/* Chỉ kế thừa font chữ, không dùng `font: inherit` vì sẽ ghi đè cỡ chữ của class Tailwind */
+.auth-root :where(input, button) {
+  font-family: inherit;
+}

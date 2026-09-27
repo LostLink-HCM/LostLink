@@ -5,6 +5,8 @@ import reactLogo from './assets/react.svg'
 import viteLogo from './assets/vite.svg'
 import './App.css'
 import ModeratorPostsPage from './pages/moderator/ModeratorPostsPage.jsx'
+import RegisterPage from './pages/auth/RegisterPage.jsx'
+import VerifyEmailPage from './pages/auth/VerifyEmailPage.jsx'
 
 function StarterPage() {
   const [count, setCount] = useState(0)
@@ -126,6 +128,8 @@ function App() {
   return <Routes>
     <Route path="/" element={<StarterPage />} />
     <Route path="/moderator/*" element={<ModeratorPostsPage />} />
+    <Route path="/register" element={<RegisterPage />} />
+    <Route path="/verify-email" element={<VerifyEmailPage />} />
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>
 }
