@@ -120,8 +120,8 @@ export default function Posts({ posts, setPosts, pendingOnly = false, matchPairs
         </ModDateRange>
       </section>
       <div className="mt-[22px] mb-[12px] flex flex-wrap items-center justify-between gap-[8px] text-[14px] text-[#64748b] [&_strong]:px-[3px] [&_strong]:text-[17px] [&_strong]:text-[#1a528e] [&>span+span]:text-[13px] [&>span+span]:text-[#1a528e]" aria-live="polite"><span>Số lượng: <strong>{filtered.length}</strong> bài đăng</span><span>{notice}</span></div>
-      <div className="overflow-auto rounded-[11px] border border-solid border-[#b4c6db] bg-white">
-        <table className="w-full min-w-[1000px] table-fixed border-collapse text-left text-[12px]">
+      <div className="overflow-x-hidden overflow-y-visible rounded-[11px] border border-solid border-[#b4c6db] bg-white">
+        <table className="w-full min-w-0 table-fixed border-collapse text-left text-[12px]">
           <caption className="sr-only">Danh sách bài đăng của cộng đồng</caption>
           <colgroup><col className="w-[8%]" /><col className="w-[25%]" /><col className="w-[12%]" /><col className="w-[18%]" /><col className="w-[13%]" /><col className="w-[11%]" /><col className="w-[13%]" /></colgroup>
           <thead><tr>{['ID', 'Thông tin bài đăng', 'Phân loại', 'Thời gian & Vị trí', 'Thống kê', 'Trạng thái', 'Thao tác'].map((title) => <th className={postUi.tableHead} key={title} scope="col">{title}</th>)}</tr></thead>
