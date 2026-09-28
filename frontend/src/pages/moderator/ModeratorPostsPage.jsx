@@ -4,9 +4,11 @@ import Logo from '../../components/Logo'
 import ModIcon from '../../components/moderator/ModIcon'
 import { createWorkspacePosts, workspacePostMatches } from '../../data/workspacePosts'
 import { moderatorReports } from '../../data/moderatorReports'
+import { createEscalationLogs, createEscalationState } from '../../data/escalations'
 import Posts from './Posts'
 import Review from './Review'
 import Reports from './Reports'
+import Escalations from './Escalations'
 import { moderatorShellUi } from '../../components/moderator/moderatorShellStyles'
 
 const navigation = [
@@ -25,6 +27,10 @@ export default function ModeratorPostsPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [posts, setPosts] = useState(createWorkspacePosts)
   const [reports, setReports] = useState(moderatorReports)
+  const [escalationState, setEscalationState] = useState(() => {
+    const state = createEscalationState()
+    return { ...state, logs: createEscalationLogs(state.tickets) }
+  })
   const active = navigation.find((item) => pathname === `/moderator${item.path}`) || navigation[1]
 
   useLayoutEffect(() => {
@@ -68,7 +74,7 @@ export default function ModeratorPostsPage() {
           <div className={moderatorShellUi.headerDate}><ModIcon name="calendar" size={16} /><time dateTime={new Date().toLocaleDateString('en-CA')}>{new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</time></div>
         </header>
         <main className={moderatorShellUi.content}>
-          {active.path === '' ? <Posts posts={posts} setPosts={setPosts} matchPairs={workspacePostMatches} /> : active.path === '/review' ? <Review posts={posts} setPosts={setPosts} /> : active.path === '/reports' ? <Reports reports={reports} setReports={setReports} posts={posts} /> : <div className={moderatorShellUi.placeholder}>Chưa cập nhật</div>}
+          {active.path === '' ? <Posts posts={posts} setPosts={setPosts} matchPairs={workspacePostMatches} /> : active.path === '/review' ? <Review posts={posts} setPosts={setPosts} /> : active.path === '/reports' ? <Reports reports={reports} setReports={setReports} posts={posts} /> : active.path === '/escalations' ? <Escalations escalationState={escalationState} setEscalationState={setEscalationState} /> : <div className={moderatorShellUi.placeholder}>Chưa cập nhật</div>}
         </main>
       </div>
     </div>
