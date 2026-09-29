@@ -1,15 +1,25 @@
 import { useState } from 'react'
-import ModIcon from '../../components/ui/Icon'
-import ModDialog from '../../components/moderator/ModDialog'
-import { QueueToolbar, QueueSummary, QueuePagination, QueueEmpty } from '../../components/moderator/QueueControls'
+import Badge from '../../components/ui/Badge'
+import Button from '../../components/ui/Button'
+import DateRange from '../../components/ui/DateRange'
+import Dialog from '../../components/ui/Dialog'
+import EmptyState from '../../components/ui/EmptyState'
+import Field, { Input, Select } from '../../components/ui/Field'
+import Icon from '../../components/ui/Icon'
+import IconButton from '../../components/ui/IconButton'
+import Notice from '../../components/ui/Notice'
+import Pagination from '../../components/ui/Pagination'
 import { REPORT_ACTIONS, SEVERITY_LABELS, violationHistory, resolveReport, downloadCsv, filterModeratorReports } from '../../lib/moderation'
-import { reportDialogClasses, reportQueueClasses, reportSeverityClasses, reportUi } from '../../components/moderator/reportStyles'
 
 const PAGE_SIZE = 6
 const EMPTY_FILTERS = { targetType: 'account', severity: '', from: '', to: '', query: '' }
 
+const SEVERITY_TONES = { high: 'danger', medium: 'warning', low: 'success' }
+
+const cell = 'border-b border-line px-2.5 py-3 align-middle [overflow-wrap:anywhere]'
+
 function Severity({ value }) {
-  return <span className={`${reportUi.severity} ${reportSeverityClasses[value]}`}>{SEVERITY_LABELS[value]}</span>
+  return <Badge tone={SEVERITY_TONES[value]}>{SEVERITY_LABELS[value]}</Badge>
 }
 
 function getDisplayCode(report, posts) {
@@ -20,23 +30,57 @@ function getDisplayCode(report, posts) {
   return `#${report.id}`
 }
 
-function ReportActions({ report, onAction, compact = false, code, wrapperClass = reportUi.reportActions }) {
-  const actionClass = { warning: reportUi.warningAction, danger: reportUi.dangerAction, success: reportUi.successAction }
-  return <div className={wrapperClass}>{Object.entries(REPORT_ACTIONS).map(([action, settings]) => <button key={action}
-    className={compact ? actionClass[settings.tone] : settings.tone === 'danger' ? reportUi.dangerButton : settings.tone === 'success' ? reportUi.successButton : reportUi.warningButton}
-    title={action === 'hide' && report.targetType !== 'post' ? 'Chỉ áp dụng cho report bài đăng' : settings.label}
-    aria-label={`${settings.label} · ${report.targetType === 'post' ? 'bài' : 'report'} ${code || `#${report.id}`}`}
-    disabled={action === 'hide' && report.targetType !== 'post'}
-    onClick={() => onAction(action)}><ModIcon name={settings.icon} />{!compact && settings.label}</button>)}</div>
+// Ẩn bài chỉ áp dụng cho report bài đăng
+const canApply = (report, action) => action !== 'hide' || report.targetType === 'post'
+const actionLabel = (report, settings, code) => `${settings.label} · ${report.targetType === 'post' ? 'bài' : 'report'} ${code || `#${report.id}`}`
+
+function ReportActions({ report, onAction, code }) {
+  return Object.entries(REPORT_ACTIONS).map(([action, settings]) => (
+    <Button key={action} variant={settings.tone} aria-label={actionLabel(report, settings, code)} title={canApply(report, action) ? settings.label : 'Chỉ áp dụng cho report bài đăng'} disabled={!canApply(report, action)} onClick={() => onAction(action)}>
+      <Icon name={settings.icon} />{settings.label}
+    </Button>
+  ))
 }
 
 function History({ report }) {
-  const history = violationHistory(report)
-  return <span className={`${reportUi.reputation} ${history.length ? reportUi.reputationDanger : reportUi.reputationSuccess}`}><ModIcon name={history.length ? 'warning' : 'check'} size={14} />{history.length ? `${history.length} cảnh báo cũ` : 'Chưa có vi phạm'}</span>
+  const count = violationHistory(report).length
+  return (
+    <span className={`mt-1.5 flex items-center gap-1 text-caption font-medium ${count ? 'text-danger-ink' : 'text-success'}`}>
+      <Icon name={count ? 'warning' : 'check'} size={14} />
+      {count ? `${count} cảnh báo cũ` : 'Chưa có vi phạm'}
+    </span>
+  )
 }
 
 function RelatedReportHistory({ reports }) {
-  return <div className={reportUi.historyList}>{reports.length ? reports.map((entry) => <article className={reportUi.historyArticle} key={entry.id}><div className={reportUi.historyMeta}><strong className={reportUi.historyId}>#{entry.displayId || entry.id}</strong><span className={reportUi.historyTime}>{entry.time}</span><Severity value={entry.severity} /></div><p className={reportUi.historyReason}>{entry.reason}</p><small className={reportUi.historyReporter}>Người gửi: @{entry.reporter}{entry.resolution ? ` · Đã xử lý: ${REPORT_ACTIONS[entry.resolution]?.label || entry.resolution}` : ' · Đang mở'}</small></article>) : <p>Chưa có report nào trước đó.</p>}</div>
+  if (!reports.length) return <p className="text-small text-ink-muted">Chưa có report nào trước đó.</p>
+  return (
+    <div className="grid gap-2">
+      {reports.map((entry) => (
+        <article key={entry.id} className="rounded-lg border border-line bg-surface-muted px-3 py-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <strong className="text-caption font-semibold text-primary">#{entry.displayId || entry.id}</strong>
+            <span className="text-caption text-ink-muted">{entry.time}</span>
+            <Severity value={entry.severity} />
+          </div>
+          <p className="my-1.5 text-small leading-relaxed text-ink-secondary">{entry.reason}</p>
+          <small className="text-caption text-ink-subtle">Người gửi: @{entry.reporter}{entry.resolution ? ` · Đã xử lý: ${REPORT_ACTIONS[entry.resolution]?.label || entry.resolution}` : ' · Đang mở'}</small>
+        </article>
+      ))}
+    </div>
+  )
+}
+
+function DetailList({ rows }) {
+  return (
+    <dl className="mb-3">
+      {rows.map(([term, value]) => (
+        <div key={term} className="grid grid-cols-[120px_1fr] gap-3 border-b border-line-subtle py-2 text-small max-sm:grid-cols-[90px_minmax(0,1fr)]">
+          <dt className="text-ink-subtle">{term}</dt><dd className="font-medium [overflow-wrap:anywhere]">{value}</dd>
+        </div>
+      ))}
+    </dl>
+  )
 }
 
 export default function Reports({ reports, setReports, posts = [] }) {
@@ -69,39 +113,92 @@ export default function Reports({ reports, setReports, posts = [] }) {
     ])
     setNotice(`Đã xuất ${filtered.length} report ra CSV.`)
   }
-  return <div className={reportUi.root}>
-    <QueueToolbar classes={reportQueueClasses} onReset={() => { setFilters(EMPTY_FILTERS); setPage(1) }} onExport={exportCsv} empty={!filtered.length} dateFilters={filters} onDateChange={changeFilter}>
-      <label className={reportUi.label}>Tìm kiếm<input className={reportUi.input} type="search" value={filters.query} onChange={(e) => changeFilter('query', e.target.value)} placeholder="Report, bài đăng, tài khoản…" /></label>
-      <label className={reportUi.label}>Loại Report<select className={reportUi.input} value={filters.targetType} onChange={(e) => changeFilter('targetType', e.target.value)}><option value="">Tất cả đối tượng</option><option value="post">Bài viết</option><option value="account">Tài khoản</option></select></label>
-      <label className={reportUi.label}>Mức độ nghiêm trọng<select className={reportUi.input} value={filters.severity} onChange={(e) => changeFilter('severity', e.target.value)}><option value="">Tất cả mức độ</option>{Object.entries(SEVERITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-    </QueueToolbar>
-    <QueueSummary classes={reportUi} count={filtered.length} noun="report" notice={notice} />
-    <div className={reportUi.tableContainer}>
-      <table className={reportUi.table}>
+
+  return <div className="px-6 py-5 text-small text-ink max-xl:px-5 max-sm:px-4 max-sm:py-4">
+    <section aria-label="Bộ lọc hàng đợi" className="rounded-xl border border-line bg-surface p-4 shadow-card">
+      <div className="grid grid-cols-[minmax(205px,1.4fr)_repeat(2,minmax(0,1fr))] gap-3 max-sm:grid-cols-2">
+        <Field label="Tìm kiếm">{(a) => <Input {...a} type="search" value={filters.query} onChange={(e) => changeFilter('query', e.target.value)} placeholder="Report, bài đăng, tài khoản…" />}</Field>
+        <Field label="Loại Report">{(a) => <Select {...a} value={filters.targetType} onChange={(e) => changeFilter('targetType', e.target.value)}><option value="">Tất cả đối tượng</option><option value="post">Bài viết</option><option value="account">Tài khoản</option></Select>}</Field>
+        <Field label="Mức độ nghiêm trọng">{(a) => <Select {...a} value={filters.severity} onChange={(e) => changeFilter('severity', e.target.value)}><option value="">Tất cả mức độ</option>{Object.entries(SEVERITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select>}</Field>
+      </div>
+      <DateRange from={filters.from} to={filters.to} onChange={changeFilter}>
+        <div className="ml-auto flex gap-2 max-sm:basis-full max-sm:justify-end">
+          <IconButton icon="reset" label="Đặt lại bộ lọc" bordered size={36} onClick={() => { setFilters(EMPTY_FILTERS); setPage(1) }} />
+          <Button variant="primary" onClick={exportCsv} disabled={!filtered.length}><Icon name="download" />Xuất CSV</Button>
+        </div>
+      </DateRange>
+    </section>
+
+    <p className="mt-4 mb-2.5 text-small text-ink-muted">Số lượng: <strong className="px-1 text-lead text-primary">{filtered.length}</strong> report</p>
+    {notice && <Notice>{notice}</Notice>}
+
+    <div className="overflow-auto rounded-xl border border-line-strong bg-surface shadow-card">
+      <table className="w-full min-w-[900px] table-fixed border-collapse text-left">
         <caption className="sr-only">Hàng đợi report cần xử lý</caption>
         <colgroup><col className="w-[16%]" /><col className="w-[23%]" /><col className="w-[20%]" /><col className="w-[24%]" /><col className="w-[17%]" /></colgroup>
-        <thead><tr>{['Thời gian', 'Đối tượng', 'Tài khoản', 'Lý do & Mức độ', 'Thao tác'].map((label) => <th className={reportUi.tableHead} key={label} scope="col">{label}</th>)}</tr></thead>
-        <tbody className="[&_tr:last-child_td]:border-b-0">{visible.map((report) => (
-          <tr className="hover:bg-[#f9fbfe]" key={report.id}>
-            <td className={reportUi.tableCell}><strong className={reportUi.code}>{getDisplayCode(report, posts)}</strong><div className={reportUi.location}><ModIcon name="calendar" size={13} />{report.time}</div></td>
-            <td className={reportUi.tableCell}><button className={reportUi.title} onClick={() => setModal({ id: report.id, kind: 'detail' })}>{report.targetTitle}</button><span className={report.targetType === 'post' ? reportUi.typePost : reportUi.typeAccount}>{report.targetType === 'post' ? 'Bài đăng' : 'Tài khoản'}</span></td>
-            <td className={reportUi.tableCell}><strong className={reportUi.author}>@{report.reportedUser}</strong><History report={report} /></td>
-            <td className={reportUi.tableCell}><p className={reportUi.reason}>{report.reason}</p><Severity value={report.severity} /></td>
-            <td className={reportUi.tableCell}><div className={reportUi.tableActions}><button className={reportUi.viewAction} aria-label={`Xem ${report.targetType === 'post' ? 'bài' : 'report'} ${getDisplayCode(report, posts)}`} title="Xem chi tiết" onClick={() => setModal({ id: report.id, kind: 'detail' })}><ModIcon name="eye" /></button><ReportActions compact wrapperClass="contents" report={report} code={getDisplayCode(report, posts)} onAction={(nextAction) => confirmAction(report.id, nextAction)} /></div></td>
+        <thead><tr>{['Thời gian', 'Đối tượng', 'Tài khoản', 'Lý do & Mức độ', 'Thao tác'].map((label) => <th key={label} scope="col" className="border-b border-line-strong bg-surface-muted px-2.5 py-3 text-caption font-semibold text-ink-muted">{label}</th>)}</tr></thead>
+        <tbody className="[&_tr:last-child_td]:border-b-0">{visible.map((report) => {
+          const code = getDisplayCode(report, posts)
+          return <tr key={report.id} className="hover:bg-surface-muted">
+            <td className={cell}>
+              <strong className="text-caption font-semibold text-primary">{code}</strong>
+              <div className="mt-1.5 flex items-center gap-1 text-caption text-ink-muted"><Icon name="calendar" size={13} />{report.time}</div>
+            </td>
+            <td className={cell}>
+              <button type="button" className="mb-1.5 block cursor-pointer text-left text-small font-semibold leading-relaxed text-ink hover:text-primary" onClick={() => setModal({ id: report.id, kind: 'detail' })}>{report.targetTitle}</button>
+              <Badge tone={report.targetType === 'post' ? 'primary' : 'info'}>{report.targetType === 'post' ? 'Bài đăng' : 'Tài khoản'}</Badge>
+            </td>
+            <td className={cell}><strong className="block text-small font-semibold">@{report.reportedUser}</strong><History report={report} /></td>
+            <td className={cell}><p className="mb-1.5 text-small font-medium leading-relaxed">{report.reason}</p><Severity value={report.severity} /></td>
+            <td className={cell}>
+              <div className="mx-auto grid max-w-[120px] grid-cols-3 place-items-center gap-1.5">
+                <IconButton icon="eye" tone="view" label={`Xem ${report.targetType === 'post' ? 'bài' : 'report'} ${code}`} onClick={() => setModal({ id: report.id, kind: 'detail' })} />
+                {Object.entries(REPORT_ACTIONS).map(([key, settings]) => (
+                  <IconButton key={key} icon={settings.icon} tone={settings.tone} label={actionLabel(report, settings, code)} disabled={!canApply(report, key)} onClick={() => confirmAction(report.id, key)} />
+                ))}
+              </div>
+            </td>
           </tr>
-        ))}</tbody>
+        })}</tbody>
       </table>
-      {!visible.length && <QueueEmpty classes={reportUi}>Không có report nào cần xử lý trong danh sách này.</QueueEmpty>}
+      {!visible.length && <EmptyState title="Không có report nào cần xử lý trong danh sách này." description="Thử thay đổi bộ lọc để xem các kết quả khác." />}
     </div>
-    <QueuePagination classes={reportUi} page={currentPage} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage} noun="report" />
-    {selected && modal.kind === 'detail' && <ModDialog classes={reportDialogClasses} key="detail" title="Chi tiết Report" onClose={() => setModal(null)} footer={<><button className={reportUi.button} onClick={() => setModal(null)}>Đóng</button><ReportActions report={selected} code={selectedCode} onAction={(nextAction) => confirmAction(selected.id, nextAction)} /></>}>
-      <dl className={reportUi.detailList}><div><dt>{selected.targetType === 'post' ? 'Mã bài đăng' : 'Mã Report'}</dt><dd>{selectedCode}</dd></div><div><dt>Thời gian</dt><dd>{selected.time}</dd></div><div><dt>Đối tượng</dt><dd>{selected.targetTitle}</dd></div><div><dt>Người bị Report</dt><dd>@{selected.reportedUser}</dd></div><div><dt>Lý do Report</dt><dd>{selected.reason}</dd></div><div><dt>Mức độ</dt><dd><Severity value={selected.severity} /></dd></div><div><dt>Người gửi</dt><dd>@{selected.reporter}</dd></div></dl>
-      <h4 className={reportUi.heading}>Nội dung giải trình / bằng chứng từ người Report</h4><p className={reportUi.evidence}>{selected.content}</p>
-      {(oldWarningsWithoutReport.length > 0 || historyReports.length > 0) && <><h4 className={reportUi.heading}>Lịch sử</h4>{oldWarningsWithoutReport.length > 0 && <RelatedReportHistory reports={oldWarningsWithoutReport} />}{historyReports.length > 0 && <RelatedReportHistory reports={historyReports} />}</>}
-    </ModDialog>}
-    {selected && modal.kind === 'confirm' && <ModDialog classes={reportDialogClasses} key="confirm" title="Xác nhận thao tác" onClose={() => setModal(null)} footer={<><button className={reportUi.button} onClick={() => setModal(null)}>Hủy</button><button className={action.tone === 'danger' ? reportUi.dangerButton : action.tone === 'success' ? reportUi.successButton : reportUi.warningButton} onClick={executeAction}>Xác nhận {action.label.toLowerCase()}</button></>}>
-      <p className={reportUi.editTitle}>{action.description}</p><dl className={reportUi.detailList}><div><dt>{selected.targetType === 'post' ? 'Bài đăng' : 'Report'}</dt><dd>{selectedCode} · {selected.targetTitle}</dd></div><div><dt>Tài khoản</dt><dd>@{selected.reportedUser}</dd></div></dl>
-      <p className={reportUi.hint}>Thao tác sẽ được ghi nhận và report sẽ rời hàng đợi sau khi xác nhận.</p>
-    </ModDialog>}
+    <Pagination page={currentPage} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage} noun="report" />
+
+    {selected && modal.kind === 'detail' && <Dialog key="detail" size="lg" title="Chi tiết Report" onClose={() => setModal(null)} footer={<>
+      <Button onClick={() => setModal(null)}>Đóng</Button>
+      <ReportActions report={selected} code={selectedCode} onAction={(nextAction) => confirmAction(selected.id, nextAction)} />
+    </>}>
+      <DetailList rows={[
+        [selected.targetType === 'post' ? 'Mã bài đăng' : 'Mã Report', selectedCode],
+        ['Thời gian', selected.time],
+        ['Đối tượng', selected.targetTitle],
+        ['Người bị Report', `@${selected.reportedUser}`],
+        ['Lý do Report', selected.reason],
+        ['Mức độ', <Severity key="severity" value={selected.severity} />],
+        ['Người gửi', `@${selected.reporter}`],
+      ]} />
+      <h4 className="mt-3.5 mb-2 text-small font-semibold">Nội dung giải trình / bằng chứng từ người Report</h4>
+      <p className="rounded-lg border border-danger-soft bg-danger-soft/50 px-3.5 py-3 text-small leading-relaxed text-danger-ink [overflow-wrap:anywhere]">{selected.content}</p>
+      {(oldWarningsWithoutReport.length > 0 || historyReports.length > 0) && <>
+        <h4 className="mt-3.5 mb-2 text-small font-semibold">Lịch sử</h4>
+        <div className="grid gap-2">
+          {oldWarningsWithoutReport.length > 0 && <RelatedReportHistory reports={oldWarningsWithoutReport} />}
+          {historyReports.length > 0 && <RelatedReportHistory reports={historyReports} />}
+        </div>
+      </>}
+    </Dialog>}
+
+    {selected && modal.kind === 'confirm' && <Dialog key="confirm" size="sm" title="Xác nhận thao tác" onClose={() => setModal(null)} footer={<>
+      <Button onClick={() => setModal(null)}>Hủy</Button>
+      <Button variant={action.tone} onClick={executeAction}>Xác nhận {action.label.toLowerCase()}</Button>
+    </>}>
+      <p className="mb-2 text-lead font-semibold leading-relaxed">{action.description}</p>
+      <DetailList rows={[
+        [selected.targetType === 'post' ? 'Bài đăng' : 'Report', `${selectedCode} · ${selected.targetTitle}`],
+        ['Tài khoản', `@${selected.reportedUser}`],
+      ]} />
+      <p className="text-caption leading-relaxed text-ink-muted">Thao tác sẽ được ghi nhận và report sẽ rời hàng đợi sau khi xác nhận.</p>
+    </Dialog>}
   </div>
 }

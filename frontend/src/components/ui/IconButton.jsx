@@ -6,6 +6,7 @@ const tones = {
   neutral: 'hover:bg-primary-subtle hover:text-primary',
   view: 'hover:bg-primary-soft hover:text-primary',
   edit: 'hover:bg-warning-soft hover:text-warning',
+  warning: 'hover:bg-warning-soft hover:text-warning',
   danger: 'hover:bg-danger-soft hover:text-danger',
   success: 'hover:bg-success-soft hover:text-success',
 }
