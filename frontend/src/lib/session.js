@@ -1,16 +1,12 @@
-let session = { user: null, accessToken: null }
+// Access token chỉ giữ trong bộ nhớ (không localStorage) để JS lạ không đọc được qua XSS.
+// Tải lại trang thì mất, AuthProvider gọi /auth/refresh bằng cookie httpOnly để lấy lại.
+let accessToken = null
 
-export const setSession = ({ user, accessToken }) => {
-  session = { user, accessToken }
+export const getAccessToken = () => accessToken
+
+export const setAccessToken = (token) => {
+  accessToken = token
 }
-
-export const clearSession = () => {
-  session = { user: null, accessToken: null }
-}
-
-export const getAccessToken = () => session.accessToken
-
-export const getUser = () => session.user
 
 export const homePathFor = (user) =>
   ['moderator', 'admin'].includes(user?.role) ? '/moderator' : '/'

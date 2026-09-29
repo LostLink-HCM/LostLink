@@ -3,7 +3,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import * as authApi from '../../api/auth'
 import AuthLayout from '../../components/auth/AuthLayout'
 import { Alert, Field, OtpBox, PrimaryButton, TextLink } from '../../components/auth/AuthControls'
-import { homePathFor, setSession } from '../../lib/session'
+import { useAuth } from '../../auth/AuthContext'
+import { homePathFor } from '../../lib/session'
 
 const CODE_LENGTH = 6
 const emptyCode = () => Array(CODE_LENGTH).fill('')
@@ -11,6 +12,7 @@ const emptyCode = () => Array(CODE_LENGTH).fill('')
 export default function VerifyEmailPage() {
   const location = useLocation()
   const navigate = useNavigate()
+  const { signIn } = useAuth()
   // justSent: vừa đăng ký xong nên email cố định và mã vừa được gửi
   const justSent = Boolean(location.state?.justSent)
   // Thời hạn mã và thời gian chờ gửi lại lấy từ response của backend
@@ -83,7 +85,7 @@ export default function VerifyEmailPage() {
     try {
       const res = await authApi.verifyEmail({ email, code })
       // Backend tự đăng nhập sau khi xác thực, trả accessToken và đặt cookie refresh
-      setSession(res.data)
+      signIn(res.data)
       setVerifiedUser(res.data.user)
     } catch (err) {
       if (err.fieldErrors?.email) setEmailError(err.fieldErrors.email)
