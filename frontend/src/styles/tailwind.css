@@ -1,5 +1,4 @@
-@import 'tailwindcss/theme.css' layer(theme);
-@import 'tailwindcss/utilities.css';
+@import 'tailwindcss';
 
 @theme {
   --font-sans: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -196,14 +195,4 @@
     33% { transform: scale(1); opacity: .85; }
     48%, 100% { transform: scale(1.7); opacity: 0; }
   }
-}
-
-.auth-root,
-.auth-root *,
-.auth-root ::before,
-.auth-root ::after {
-  box-sizing: border-box;
-}
-.auth-root :where(input, button) {
-  font-family: inherit;
 }

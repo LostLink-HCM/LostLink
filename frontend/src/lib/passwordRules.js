@@ -1,5 +1,5 @@
 // Chữ có dấu (ngoài bảng ASCII) như ă, ê, đ, ậ
-const hasAccent = (p) => /[^\x00-\x7F]/.test(p)
+const hasAccent = (p) => /\P{ASCII}/u.test(p)
 
 // Phải khớp với quy tắc mật khẩu ở backend (authValidation.js)
 export const PASSWORD_RULES = [

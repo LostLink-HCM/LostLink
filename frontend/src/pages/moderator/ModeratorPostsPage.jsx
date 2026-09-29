@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState } from 'react'
+import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import Logo from '../../components/Logo'
 import ModIcon from '../../components/moderator/ModIcon'
@@ -32,13 +32,6 @@ export default function ModeratorPostsPage() {
     return { ...state, logs: createEscalationLogs(state.tickets) }
   })
   const active = navigation.find((item) => pathname === `/moderator${item.path}`) || navigation[1]
-
-  useLayoutEffect(() => {
-    const root = document.getElementById('root')
-    const rootClasses = ['!m-0', '!block', '!min-h-screen', '!w-full', '!max-w-none', '!border-0', '!text-left', '[color-scheme:light]']
-    root?.classList.add(...rootClasses)
-    return () => root?.classList.remove(...rootClasses)
-  }, [])
 
   return (
     <div className={moderatorShellUi.app}>
