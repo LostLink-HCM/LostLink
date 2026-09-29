@@ -57,31 +57,31 @@ Permissions are inherited (each higher role includes the lower ones):
 
 ## Tech stack
 
-- **Frontend** (`FE/`) — React 19 + Vite, React Router.
-- **Backend** (`BE/`) — Node.js + Express, MongoDB (Mongoose), JWT authentication.
+- **Frontend** (`frontend/`) — React 19 + Vite, React Router, Tailwind CSS.
+- **Backend** (`backend/`) — Node.js + Express, MongoDB (Mongoose), JWT authentication.
 
 ## Project structure
 
 ```
-Project/
-├─ FE/   # React + Vite web client
-└─ BE/   # Express + MongoDB API
+LostLink/
+├─ frontend/   # React + Vite web client
+└─ backend/    # Express + MongoDB API
 ```
 
 ## Getting started
 
-Requires Node.js 18+ and MongoDB.
+Requires Node.js 24 (same as CI) and MongoDB.
 
 ```bash
 # Backend
-cd BE
+cd backend
 npm install
 copy .env.example .env   # (macOS/Linux: cp)
 npm run seed       
 npm run dev           
 
-# Frontend
-cd FE
+# Frontend (in a new terminal)
+cd frontend
 npm install
 npm run dev          
 ```
