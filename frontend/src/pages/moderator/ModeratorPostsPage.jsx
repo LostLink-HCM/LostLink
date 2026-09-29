@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../auth/AuthContext'
 import Logo from '../../components/Logo'
 import ModIcon from '../../components/moderator/ModIcon'
 import { createWorkspacePosts, workspacePostMatches } from '../../data/workspacePosts'
@@ -23,6 +24,8 @@ const navigation = [
 
 export default function ModeratorPostsPage() {
   const { pathname } = useLocation()
+  const navigate = useNavigate()
+  const { user, signOut } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [posts, setPosts] = useState(createWorkspacePosts)
@@ -56,9 +59,9 @@ export default function ModeratorPostsPage() {
           ))}
         </nav>
         <div className={`${moderatorShellUi.user} ${sidebarCollapsed ? 'is-collapsed' : ''}`}>
-          <div className={moderatorShellUi.avatar}>MO</div>
-          <div className={`${moderatorShellUi.userInfo} ${sidebarCollapsed ? 'is-collapsed' : ''}`}><strong className={moderatorShellUi.userName}>Moderator</strong></div>
-          <button className={moderatorShellUi.logout} aria-label="Đăng xuất" title="Đăng xuất" onClick={() => window.location.assign('/')}><ModIcon name="logout" size={20} /></button>
+          <div className={moderatorShellUi.avatar}>{user.username.slice(0, 2).toUpperCase()}</div>
+          <div className={`${moderatorShellUi.userInfo} ${sidebarCollapsed ? 'is-collapsed' : ''}`}><strong className={moderatorShellUi.userName}>{user.username}</strong></div>
+          <button className={moderatorShellUi.logout} aria-label="Đăng xuất" title="Đăng xuất" onClick={async () => { await signOut(); navigate('/login', { replace: true }) }}><ModIcon name="logout" size={20} /></button>
         </div>
       </aside>
       <div className={moderatorShellUi.main}>

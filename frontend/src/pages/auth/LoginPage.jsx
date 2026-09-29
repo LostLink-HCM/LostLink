@@ -10,10 +10,12 @@ import {
   PrimaryButton,
   TextLink,
 } from '../../components/auth/AuthControls'
-import { homePathFor, setSession } from '../../lib/session'
+import { useAuth } from '../../auth/AuthContext'
+import { homePathFor } from '../../lib/session'
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const { signIn } = useAuth()
   const location = useLocation()
   const [form, setForm] = useState({ email: location.state?.email ?? '', password: '' })
   const [loading, setLoading] = useState(false)
@@ -32,8 +34,9 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const res = await authApi.login(form)
-      setSession(res.data)
-      navigate(homePathFor(res.data.user), { replace: true })
+      signIn(res.data)
+      // Bị guard chặn thì quay lại đúng trang đó, không thì về trang theo role
+      navigate(location.state?.from ?? homePathFor(res.data.user), { replace: true })
     } catch (err) {
       // Đúng mật khẩu nhưng chưa xác thực: chuyển sang nhập mã, backend không tự gửi mã mới
       if (err.code === 'EMAIL_NOT_VERIFIED') {

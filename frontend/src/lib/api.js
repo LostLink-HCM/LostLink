@@ -1,4 +1,4 @@
-import { getAccessToken } from './session'
+import { getAccessToken, setAccessToken } from './session'
 
 const BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
@@ -19,8 +19,12 @@ export class ApiError extends Error {
   }
 }
 
-async function request(path, { method = 'GET', body } = {}) {
-  const token = getAccessToken()
+// Phát khi refresh thất bại để AuthProvider đưa người dùng về trạng thái chưa đăng nhập
+export const SESSION_EXPIRED_EVENT = 'auth:session-expired'
+
+// auth: false cho các API công khai (login, register...), không gửi token và không tự refresh
+async function send(path, { method = 'GET', body, auth = true } = {}) {
+  const token = auth ? getAccessToken() : null
   let res
   try {
     res = await fetch(BASE + path, {
@@ -48,7 +52,39 @@ async function request(path, { method = 'GET', body } = {}) {
   return data
 }
 
+// Nhiều request cùng gặp 401 (hoặc StrictMode gọi effect 2 lần) chỉ gửi một lần refresh
+let refreshing = null
+
+export function refreshSession() {
+  refreshing ??= send('/auth/refresh', { method: 'POST', auth: false })
+    .then((res) => {
+      setAccessToken(res.data.accessToken)
+      return res.data
+    })
+    .finally(() => {
+      refreshing = null
+    })
+  return refreshing
+}
+
+async function request(path, options = {}) {
+  try {
+    return await send(path, options)
+  } catch (err) {
+    // Access token hết hạn: refresh một lần rồi gửi lại đúng request đó
+    if (err.status !== 401 || options.auth === false || !getAccessToken()) throw err
+    try {
+      await refreshSession()
+    } catch {
+      setAccessToken(null)
+      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT))
+      throw err
+    }
+    return send(path, options)
+  }
+}
+
 export const api = {
-  get: (path) => request(path),
-  post: (path, body) => request(path, { method: 'POST', body }),
+  get: (path, options) => request(path, options),
+  post: (path, body, options) => request(path, { ...options, method: 'POST', body }),
 }
