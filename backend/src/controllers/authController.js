@@ -1,22 +1,29 @@
 const jwt = require('jsonwebtoken')
 
 const env = require('../config/env')
+const ApiError = require('../utils/ApiError')
 const asyncHandler = require('../utils/asyncHandler')
 const authService = require('../services/authService')
 
 const REFRESH_COOKIE = 'refreshToken'
 
-// Refresh token nằm trong cookie httpOnly để JS phía FE không đọc được (chống XSS),
-// chỉ gửi kèm các request tới /api/auth
+// Refresh token nằm trong cookie httpOnly để JS phía FE không đọc được
+const REFRESH_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: env.nodeEnv === 'production',
+  sameSite: 'strict',
+  path: '/api/auth',
+}
+
 const setRefreshCookie = (res, refreshToken) => {
   res.cookie(REFRESH_COOKIE, refreshToken, {
-    httpOnly: true,
-    secure: env.nodeEnv === 'production',
-    sameSite: 'strict',
-    path: '/api/auth',
+    ...REFRESH_COOKIE_OPTIONS,
     expires: new Date(jwt.decode(refreshToken).exp * 1000),
   })
 }
+
+// Phải trùng path/options lúc set thì trình duyệt mới xoá
+const clearRefreshCookie = (res) => res.clearCookie(REFRESH_COOKIE, REFRESH_COOKIE_OPTIONS)
 
 // Chỉ trả accessToken trong body, refreshToken đã nằm trong cookie
 const sendSession = (res, { refreshToken, ...data }, message) => {
@@ -51,4 +58,25 @@ const login = asyncHandler(async (req, res) => {
   sendSession(res, data, 'Đăng nhập thành công.')
 })
 
-module.exports = { register, verifyEmail, resendCode, login }
+// FE gọi khi mở app để khôi phục phiên và khi access token hết hạn
+const refresh = asyncHandler(async (req, res) => {
+  try {
+    const data = await authService.refreshSession(req.cookies[REFRESH_COOKIE])
+    sendSession(res, data, 'Đã làm mới phiên đăng nhập.')
+  } catch (err) {
+    if (err instanceof ApiError) clearRefreshCookie(res)
+    throw err
+  }
+})
+
+const logout = asyncHandler(async (req, res) => {
+  await authService.logout(req.cookies[REFRESH_COOKIE])
+  clearRefreshCookie(res)
+  res.json({ success: true, message: 'Đã đăng xuất.' })
+})
+
+const me = (req, res) => {
+  res.json({ success: true, data: { user: authService.publicUser(req.user) } })
+}
+
+module.exports = { register, verifyEmail, resendCode, login, refresh, logout, me }

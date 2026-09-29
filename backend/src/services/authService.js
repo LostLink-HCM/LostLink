@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs')
 const { User, EmailToken } = require('../models')
 const ApiError = require('../utils/ApiError')
 const { generateOtp, hashToken, matchesHash } = require('../utils/crypto')
-const { issueTokens } = require('../utils/token')
+const { issueTokens, isRevoked, verifyRefreshToken } = require('../utils/token')
 const emailService = require('./emailService')
 
 const OTP_TTL_MINUTES = 10
@@ -14,6 +14,7 @@ const BCRYPT_ROUNDS = 10
 
 const INVALID_CODE = 'Mã xác thực không đúng hoặc đã hết hạn.'
 const INVALID_CREDENTIALS = 'Email hoặc mật khẩu không đúng.'
+const SESSION_EXPIRED = 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.'
 
 // không tiết lộ email đã đăng ký hay chưa
 const DUMMY_HASH = bcrypt.hashSync('lostlink-dummy-password', BCRYPT_ROUNDS)
@@ -136,4 +137,49 @@ const login = async ({ email, password }) => {
   return { user: publicUser(user), ...issueTokens(user) }
 }
 
-module.exports = { publicUser, register, verifyEmail, resendCode, login }
+// Chữ ký đúng chưa đủ: phải đối chiếu DB để token bị thu hồi hoặc tài khoản bị khoá mất hiệu lực ngay
+const findSessionUser = async (payload) => {
+  const user = await User.findById(payload.sub)
+  if (!user || isRevoked(payload, user)) throw ApiError.unauthorized(SESSION_EXPIRED)
+  if (user.status === 'locked') throw ApiError.forbidden('Tài khoản đã bị khoá.', 'ACCOUNT_LOCKED')
+  return user
+}
+
+const readRefreshToken = (refreshToken) => {
+  if (!refreshToken) return null
+  try {
+    return verifyRefreshToken(refreshToken)
+  } catch {
+    return null
+  }
+}
+
+// Mỗi lần refresh cấp cả refresh token mới, phiên kéo dài khi người dùng còn hoạt động
+const refreshSession = async (refreshToken) => {
+  const payload = readRefreshToken(refreshToken)
+  if (!payload) throw ApiError.unauthorized(SESSION_EXPIRED)
+
+  const user = await findSessionUser(payload)
+  return { user: publicUser(user), ...issueTokens(user) }
+}
+
+// Tăng tokenVersion thu hồi mọi token đã cấp của user, trên mọi thiết bị
+const logout = async (refreshToken) => {
+  const payload = readRefreshToken(refreshToken)
+  if (!payload) return
+  await User.updateOne(
+    { _id: payload.sub, tokenVersion: payload.ver ?? 0 },
+    { $inc: { tokenVersion: 1 } }
+  )
+}
+
+module.exports = {
+  publicUser,
+  register,
+  verifyEmail,
+  resendCode,
+  login,
+  findSessionUser,
+  refreshSession,
+  logout,
+}

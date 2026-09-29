@@ -15,9 +15,22 @@ const signRefreshToken = (user) =>
     expiresIn: jwtConfig.refreshExpire,
   })
 
+const verifyAccessToken = (token) => jwt.verify(token, jwtConfig.secret)
+
+const verifyRefreshToken = (token) => jwt.verify(token, jwtConfig.refreshSecret)
+
+const isRevoked = (payload, user) => (payload.ver ?? 0) !== (user.tokenVersion ?? 0)
+
 const issueTokens = (user) => ({
   accessToken: signAccessToken(user),
   refreshToken: signRefreshToken(user),
 })
 
-module.exports = { signAccessToken, signRefreshToken, issueTokens }
+module.exports = {
+  signAccessToken,
+  signRefreshToken,
+  verifyAccessToken,
+  verifyRefreshToken,
+  isRevoked,
+  issueTokens,
+}
