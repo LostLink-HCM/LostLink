@@ -4,7 +4,7 @@ import Starfield from './Starfield'
 
 export default function AuthLayout({ children }) {
   return (
-    <div className="auth-root fixed inset-0 flex flex-col overflow-y-auto overflow-x-hidden bg-au-bg bg-[linear-gradient(160deg,var(--color-au-bg-deep)_0%,var(--color-au-bg)_100%)] text-left font-sans text-au-ink">
+    <div className="fixed inset-0 flex flex-col overflow-y-auto overflow-x-hidden bg-au-bg bg-[linear-gradient(160deg,var(--color-au-bg-deep)_0%,var(--color-au-bg)_100%)] text-left font-sans text-au-ink">
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 overflow-hidden">
         <Starfield />
         <div className="absolute inset-0 bg-[radial-gradient(70%_60%_at_26%_44%,rgba(78,139,224,.28),rgba(5,11,22,0)_70%)] motion-safe:animate-ll-glow-slow" />
