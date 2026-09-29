@@ -1,18 +1,45 @@
 import { useState } from 'react'
-import ModIcon from '../../components/moderator/ModIcon'
-import ModDialog from '../../components/moderator/ModDialog'
-import { QueueToolbar, QueueSummary, QueuePagination, QueueEmpty } from '../../components/moderator/QueueControls'
+import Badge from '../../components/ui/Badge'
+import Button from '../../components/ui/Button'
+import DateRange from '../../components/ui/DateRange'
+import Dialog from '../../components/ui/Dialog'
+import EmptyState from '../../components/ui/EmptyState'
+import Field, { Input, Select, Textarea } from '../../components/ui/Field'
+import Icon from '../../components/ui/Icon'
+import IconButton from '../../components/ui/IconButton'
+import Notice from '../../components/ui/Notice'
+import Pagination from '../../components/ui/Pagination'
 import { filterModeratorPosts } from '../../lib/moderatorPosts'
 import { REJECT_REASONS, reviewPost, downloadCsv } from '../../lib/moderation'
-import { reviewUi, reviewCategoryColors, reviewDialogClasses, reviewQueueClasses } from '../../components/moderator/reviewStyles'
 
 const EMPTY_FILTERS = { category: '', type: '', district: '', from: '', to: '', query: '' }
 const PAGE_SIZE = 8
 
+const CATEGORY_TONES = { 'Đồ điện tử': 'primary', 'Ví / Giấy tờ': 'info', 'Thú cưng': 'success', 'Chìa khóa': 'warning' }
+
+const cell = 'border-b border-line px-2.5 py-3 align-middle [overflow-wrap:anywhere]'
+
+function TypeBadge({ type }) {
+  return <Badge tone={type === 'lost' ? 'danger' : 'primary'}>{type === 'lost' ? 'Mất đồ' : 'Nhặt được'}</Badge>
+}
+
 function Reputation({ score }) {
-  const tone = score < 0 ? 'danger' : score >= 100 ? 'success' : 'neutral'
-  const toneClass = tone === 'danger' ? reviewUi.reputationDanger : tone === 'success' ? reviewUi.reputationSuccess : reviewUi.reputationNeutral
-  return <span className={`${reviewUi.reputation} ${toneClass}`}><ModIcon name={score < 0 ? 'warning' : score >= 100 ? 'star' : 'user'} size={14} />{score == null ? 'Chưa có điểm uy tín' : `Điểm: ${score}`}</span>
+  const tone = score < 0 ? 'text-danger-ink' : score >= 100 ? 'text-success' : 'text-ink-muted'
+  return (
+    <span className={`mt-1.5 flex items-center gap-1 text-caption font-medium ${tone}`}>
+      <Icon name={score < 0 ? 'warning' : score >= 100 ? 'star' : 'user'} size={14} />
+      {score == null ? 'Chưa có điểm uy tín' : `Điểm: ${score}`}
+    </span>
+  )
+}
+
+function Meta({ icon, children }) {
+  return (
+    <div className="mt-1.5 flex items-start gap-1 text-caption text-ink-muted">
+      <Icon name={icon} size={13} />
+      <span className="min-w-0">{children}</span>
+    </div>
+  )
 }
 
 export default function Review({ posts, setPosts }) {
@@ -52,48 +79,101 @@ export default function Review({ posts, setPosts }) {
     setNotice(`Đã xuất ${filtered.length} bài đăng chờ duyệt ra CSV.`)
   }
 
-  return <div className={reviewUi.root}>
-    <QueueToolbar classes={reviewQueueClasses} onReset={() => { setFilters(EMPTY_FILTERS); setPage(1) }} onExport={exportCsv} empty={!filtered.length} dateFilters={filters} onDateChange={changeFilter}>
-      <label className={reviewUi.label}>Tìm kiếm<input className={reviewUi.input} type="search" value={filters.query} onChange={(e) => changeFilter('query', e.target.value)} placeholder="Tiêu đề, người đăng, khu vực…" /></label>
-      <label className={reviewUi.label}>Danh mục<select className={reviewUi.input} value={filters.category} onChange={(e) => changeFilter('category', e.target.value)}><option value="">Tất cả danh mục</option>{[...new Set(posts.map((post) => post.category))].map((category) => <option key={category}>{category}</option>)}</select></label>
-      <label className={reviewUi.label}>Loại bài đăng<select className={reviewUi.input} value={filters.type} onChange={(e) => changeFilter('type', e.target.value)}><option value="">Tất cả loại tin</option><option value="lost">Mất đồ</option><option value="found">Nhặt được</option></select></label>
-      <label className={reviewUi.label}>Khu vực<select className={reviewUi.input} value={filters.district} onChange={(e) => changeFilter('district', e.target.value)}><option value="">Tất cả khu vực</option>{[...new Set(posts.map((post) => post.district))].map((district) => <option key={district}>{district}</option>)}</select></label>
-    </QueueToolbar>
-    <QueueSummary classes={reviewUi} count={filtered.length} notice={notice} />
-    <div className={reviewUi.tableContainer}>
-      <table className={reviewUi.table}>
+  return <div className="px-6 py-5 text-small text-ink max-xl:px-5 max-sm:px-4 max-sm:py-4">
+    <section aria-label="Bộ lọc hàng đợi" className="rounded-xl border border-line bg-surface p-4 shadow-card">
+      <div className="grid grid-cols-[minmax(205px,1.4fr)_repeat(3,minmax(0,1fr))] gap-3 max-sm:grid-cols-2">
+        <Field label="Tìm kiếm">{(a) => <Input {...a} type="search" value={filters.query} onChange={(e) => changeFilter('query', e.target.value)} placeholder="Tiêu đề, người đăng, khu vực…" />}</Field>
+        <Field label="Danh mục">{(a) => <Select {...a} value={filters.category} onChange={(e) => changeFilter('category', e.target.value)}><option value="">Tất cả danh mục</option>{[...new Set(posts.map((post) => post.category))].map((category) => <option key={category}>{category}</option>)}</Select>}</Field>
+        <Field label="Loại bài đăng">{(a) => <Select {...a} value={filters.type} onChange={(e) => changeFilter('type', e.target.value)}><option value="">Tất cả loại tin</option><option value="lost">Mất đồ</option><option value="found">Nhặt được</option></Select>}</Field>
+        <Field label="Khu vực">{(a) => <Select {...a} value={filters.district} onChange={(e) => changeFilter('district', e.target.value)}><option value="">Tất cả khu vực</option>{[...new Set(posts.map((post) => post.district))].map((district) => <option key={district}>{district}</option>)}</Select>}</Field>
+      </div>
+      <DateRange from={filters.from} to={filters.to} onChange={changeFilter}>
+        <div className="ml-auto flex gap-2 max-sm:basis-full max-sm:justify-end">
+          <IconButton icon="reset" label="Đặt lại bộ lọc" bordered size={36} onClick={() => { setFilters(EMPTY_FILTERS); setPage(1) }} />
+          <Button variant="primary" onClick={exportCsv} disabled={!filtered.length}><Icon name="download" />Xuất CSV</Button>
+        </div>
+      </DateRange>
+    </section>
+
+    <p className="mt-4 mb-2.5 text-small text-ink-muted">Số lượng: <strong className="px-1 text-lead text-primary">{filtered.length}</strong> bài đăng</p>
+    {notice && <Notice>{notice}</Notice>}
+
+    <div className="overflow-auto rounded-xl border border-line-strong bg-surface shadow-card">
+      <table className="w-full min-w-[800px] table-fixed border-collapse text-left">
         <caption className="sr-only">Bài đăng chờ kiểm duyệt</caption>
         <colgroup><col className="w-[12%]" /><col className="w-[28%]" /><col className="w-[20%]" /><col className="w-[23%]" /><col className="w-[17%]" /></colgroup>
-        <thead><tr>{['ID', 'Bài đăng chờ duyệt', 'Người đăng', 'Danh mục & Vị trí', 'Thao tác'].map((label) => <th className={reviewUi.tableHead} key={label} scope="col">{label}</th>)}</tr></thead>
-        <tbody className="[&_tr:last-child_td]:border-b-0">{visible.map((post) => <tr key={post.id} className="hover:bg-[#f9fbfe]">
-          <td className={reviewUi.tableCell}><span className={reviewUi.code}>{post.postCode || post.id}</span></td>
-          <td className={reviewUi.tableCell}><button className={reviewUi.title} onClick={() => setModal({ id: post.id, kind: 'detail' })}>{post.title}</button><span className={post.type === 'lost' ? reviewUi.typeLost : reviewUi.typeFound}>{post.type === 'lost' ? 'Mất đồ' : 'Nhặt được'}</span></td>
-          <td className={reviewUi.tableCell}><strong className={reviewUi.author}>@{post.author}</strong><Reputation score={post.reputation} /></td>
-          <td className={reviewUi.tableCell}><span className={`${reviewUi.category} ${reviewCategoryColors[post.category] || reviewUi.categoryDefault}`}>{post.category}</span><div className={reviewUi.location}><ModIcon name="calendar" size={13} />{post.dateTime}</div><div className={reviewUi.location}><ModIcon name="pin" size={13} />{post.location}</div></td>
-          <td className={reviewUi.tableCell}><div className={reviewUi.actions}><button className={reviewUi.viewAction} title="Đọc bài đăng" aria-label={`Đọc bài ${post.postCode || post.id}`} onClick={() => setModal({ id: post.id, kind: 'detail' })}><ModIcon name="eye" /></button><button className={reviewUi.approveAction} title="Duyệt xuất bản" aria-label={`Duyệt bài ${post.postCode || post.id}`} onClick={() => openApprove(post.id)}><ModIcon name="check" /></button><button className={reviewUi.rejectAction} title="Từ chối bài" aria-label={`Từ chối bài ${post.postCode || post.id}`} onClick={() => openReject(post.id)}><ModIcon name="close" /></button></div></td>
-        </tr>)}</tbody>
+        <thead><tr>{['ID', 'Bài đăng chờ duyệt', 'Người đăng', 'Danh mục & Vị trí', 'Thao tác'].map((label) => <th key={label} scope="col" className="border-b border-line-strong bg-surface-muted px-2.5 py-3 text-caption font-semibold text-ink-muted">{label}</th>)}</tr></thead>
+        <tbody className="[&_tr:last-child_td]:border-b-0">{visible.map((post) => {
+          const code = post.postCode || post.id
+          return <tr key={post.id} className="hover:bg-surface-muted">
+            <td className={cell}><span className="whitespace-nowrap text-caption font-semibold text-primary">{code}</span></td>
+            <td className={cell}>
+              <button type="button" className="mb-1.5 block cursor-pointer text-left text-small font-semibold leading-relaxed text-ink hover:text-primary" onClick={() => setModal({ id: post.id, kind: 'detail' })}>{post.title}</button>
+              <TypeBadge type={post.type} />
+            </td>
+            <td className={cell}><strong className="block text-small font-semibold">@{post.author}</strong><Reputation score={post.reputation} /></td>
+            <td className={cell}>
+              <Badge tone={CATEGORY_TONES[post.category] ?? 'neutral'}>{post.category}</Badge>
+              <Meta icon="calendar">{post.dateTime}</Meta>
+              <Meta icon="pin">{post.location}</Meta>
+            </td>
+            <td className={cell}>
+              <div className="flex flex-wrap gap-1.5">
+                <IconButton icon="eye" tone="view" label={`Đọc bài ${code}`} onClick={() => setModal({ id: post.id, kind: 'detail' })} />
+                <IconButton icon="check" tone="success" label={`Duyệt bài ${code}`} onClick={() => openApprove(post.id)} />
+                <IconButton icon="close" tone="danger" label={`Từ chối bài ${code}`} onClick={() => openReject(post.id)} />
+              </div>
+            </td>
+          </tr>
+        })}</tbody>
       </table>
-      {!visible.length && <QueueEmpty classes={reviewUi}>Không có bài đăng nào cần duyệt trong danh sách này.</QueueEmpty>}
+      {!visible.length && <EmptyState title="Không có bài đăng nào cần duyệt trong danh sách này." description="Thử thay đổi bộ lọc để xem các kết quả khác." />}
     </div>
-    <QueuePagination classes={reviewUi} page={currentPage} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage} />
-    {selected && modal.kind === 'detail' && <ModDialog classes={reviewDialogClasses} key="detail" title="Đọc và duyệt bài đăng" onClose={() => setModal(null)} footer={<><button className={reviewUi.button} onClick={() => setModal(null)}>Đóng xem trước</button><button className={reviewUi.dangerButton} onClick={() => openReject(selected.id)}><ModIcon name="close" />Từ chối bài</button><button className={reviewUi.successButton} onClick={() => openApprove(selected.id, true)}><ModIcon name="check" />Duyệt xuất bản</button></>}>
-      <h3 className={reviewUi.detailTitle}>{selected.title}</h3>
-      <dl className={reviewUi.detailList}><div><dt>Người đăng</dt><dd>@{selected.author}<Reputation score={selected.reputation} /></dd></div><div><dt>Loại tin</dt><dd>{selected.type === 'lost' ? 'Mất đồ' : 'Nhặt được'}</dd></div><div><dt>Danh mục</dt><dd>{selected.category}</dd></div><div><dt>Ngày đăng</dt><dd>{selected.dateTime}</dd></div><div><dt>Vị trí</dt><dd>{selected.location}</dd></div></dl>
-      <h4 className={reviewUi.heading}>Nội dung do người dùng đăng</h4><p className={reviewUi.description}>{selected.desc}</p>
-      {!!selected.images?.length && <><h4 className={reviewUi.heading}>Hình ảnh đính kèm</h4><div className={reviewUi.images}>{selected.images.map((src, index) => <img key={src} src={src} alt={`Ảnh minh họa ${index + 1} của bài ${selected.title}`} loading="lazy" />)}</div></>}
-    </ModDialog>}
-    {selected && modal.kind === 'approve' && <ModDialog classes={reviewDialogClasses} key="approve" title="Xác nhận duyệt bài đăng" onClose={cancelApprove} footer={<><button className={reviewUi.button} autoFocus onClick={cancelApprove}>Hủy</button><button className={reviewUi.successButton} onClick={() => approve(selected.id)}><ModIcon name="check" />Xác nhận duyệt</button></>}>
-      <p className={reviewUi.editTitle}>{selected.postCode || selected.id} · {selected.title}</p>
-      <p className={reviewUi.description}>Bạn có chắc muốn duyệt xuất bản bài đăng này? Sau khi duyệt, bài đăng sẽ chuyển sang trạng thái Đang tìm và rời hàng đợi kiểm duyệt.</p>
-    </ModDialog>}
-    {selected && modal.kind === 'reject' && <ModDialog classes={reviewDialogClasses} key="reject" title="Từ chối bài đăng" onClose={() => setModal(null)} footer={<><button className={reviewUi.button} onClick={() => setModal(null)}>Hủy</button><button className={reviewUi.dangerButton} type="submit" form="mod-reject-form">Xác nhận từ chối</button></>}>
-      <p className={reviewUi.editTitle}>{selected.title}</p>
-      <form id="mod-reject-form" className={reviewUi.form} onSubmit={reject}>
-        <label>Lý do từ chối<select value={reason} onChange={(e) => { setReason(e.target.value); setError('') }}>{REJECT_REASONS.map((label) => <option key={label}>{label}</option>)}<option value="other">Lý do khác</option></select></label>
-        {reason === 'other' && <label>Lý do cụ thể<textarea value={customReason} onChange={(e) => { setCustomReason(e.target.value); setError('') }} maxLength={1000} aria-invalid={Boolean(error)} aria-describedby={error ? 'mod-reject-error' : undefined} placeholder="Nhập lý do không duyệt bài đăng…" /></label>}
-        {error && <p className={reviewUi.error} id="mod-reject-error" role="alert">{error}</p>}
-        <p className={reviewUi.hint}>Bài đăng sẽ rời hàng đợi sau khi xác nhận từ chối.</p>
+    <Pagination page={currentPage} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage} noun="bài đăng" />
+
+    {selected && modal.kind === 'detail' && <Dialog key="detail" size="md" title="Đọc và duyệt bài đăng" onClose={() => setModal(null)} footer={<>
+      <Button onClick={() => setModal(null)}>Đóng xem trước</Button>
+      <Button variant="danger" onClick={() => openReject(selected.id)}><Icon name="close" />Từ chối bài</Button>
+      <Button variant="success" onClick={() => openApprove(selected.id, true)}><Icon name="check" />Duyệt xuất bản</Button>
+    </>}>
+      <h3 className="mb-1 text-lead font-bold leading-snug text-primary [overflow-wrap:anywhere]">{selected.title}</h3>
+      <dl className="mb-3">
+        {[
+          ['Người đăng', <>@{selected.author}<Reputation score={selected.reputation} /></>],
+          ['Loại tin', selected.type === 'lost' ? 'Mất đồ' : 'Nhặt được'],
+          ['Danh mục', selected.category],
+          ['Ngày đăng', selected.dateTime],
+          ['Vị trí', selected.location],
+        ].map(([term, value]) => <div key={term} className="grid grid-cols-[110px_1fr] gap-3 border-b border-line-subtle py-2 text-small max-sm:grid-cols-[90px_minmax(0,1fr)]">
+          <dt className="text-ink-subtle">{term}</dt><dd className="font-medium [overflow-wrap:anywhere]">{value}</dd>
+        </div>)}
+      </dl>
+      <h4 className="mt-3.5 mb-2 text-small font-semibold">Nội dung do người dùng đăng</h4>
+      <p className="rounded-lg border border-primary-soft bg-primary-subtle px-3.5 py-3 text-small leading-relaxed [overflow-wrap:anywhere]">{selected.desc}</p>
+      {!!selected.images?.length && <>
+        <h4 className="mt-3.5 mb-2 text-small font-semibold">Hình ảnh đính kèm</h4>
+        <div className="flex flex-wrap gap-3">{selected.images.map((src, index) => <img key={src} src={src} alt={`Ảnh minh họa ${index + 1} của bài ${selected.title}`} loading="lazy" className="size-28 rounded-lg object-cover" />)}</div>
+      </>}
+    </Dialog>}
+
+    {selected && modal.kind === 'approve' && <Dialog key="approve" size="sm" title="Xác nhận duyệt bài đăng" onClose={cancelApprove} footer={<>
+      <Button data-autofocus onClick={cancelApprove}>Hủy</Button>
+      <Button variant="success" onClick={() => approve(selected.id)}><Icon name="check" />Xác nhận duyệt</Button>
+    </>}>
+      <p className="mb-4 text-lead font-semibold leading-relaxed [overflow-wrap:anywhere]">{selected.postCode || selected.id} · {selected.title}</p>
+      <p className="rounded-lg border border-primary-soft bg-primary-subtle p-4 text-body leading-relaxed">Bạn có chắc muốn duyệt xuất bản bài đăng này? Sau khi duyệt, bài đăng sẽ chuyển sang trạng thái Đang tìm và rời hàng đợi kiểm duyệt.</p>
+    </Dialog>}
+
+    {selected && modal.kind === 'reject' && <Dialog key="reject" size="sm" title="Từ chối bài đăng" onClose={() => setModal(null)} footer={<>
+      <Button onClick={() => setModal(null)}>Hủy</Button>
+      <Button variant="danger" type="submit" form="mod-reject-form">Xác nhận từ chối</Button>
+    </>}>
+      <p className="mb-4 text-lead font-semibold leading-relaxed [overflow-wrap:anywhere]">{selected.title}</p>
+      <form id="mod-reject-form" className="flex flex-col gap-4" onSubmit={reject} noValidate>
+        <Field label="Lý do từ chối">{(a) => <Select {...a} value={reason} onChange={(e) => { setReason(e.target.value); setError('') }}>{REJECT_REASONS.map((label) => <option key={label}>{label}</option>)}<option value="other">Lý do khác</option></Select>}</Field>
+        {reason === 'other' && <Field label="Lý do cụ thể" error={error}>{(a) => <Textarea {...a} value={customReason} onChange={(e) => { setCustomReason(e.target.value); setError('') }} maxLength={1000} placeholder="Nhập lý do không duyệt bài đăng…" />}</Field>}
+        <p className="text-caption leading-relaxed text-ink-muted">Bài đăng sẽ rời hàng đợi sau khi xác nhận từ chối.</p>
       </form>
-    </ModDialog>}
+    </Dialog>}
   </div>
 }

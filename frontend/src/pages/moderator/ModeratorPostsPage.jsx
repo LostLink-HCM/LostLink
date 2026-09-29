@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
-import Logo from '../../components/Logo'
-import ModIcon from '../../components/moderator/ModIcon'
+import Logo from '../../components/ui/Logo'
+import ModIcon from '../../components/ui/Icon'
 import { createWorkspacePosts, workspacePostMatches } from '../../data/workspacePosts'
 import { moderatorReports } from '../../data/moderatorReports'
 import { createEscalationLogs, createEscalationState } from '../../data/escalations'
@@ -42,7 +42,7 @@ export default function ModeratorPostsPage() {
       <aside id="moderator-sidebar" className={`${moderatorShellUi.sidebar} ${sidebarOpen ? moderatorShellUi.sidebarOpen : ''} ${sidebarCollapsed ? moderatorShellUi.sidebarCollapsed : moderatorShellUi.sidebarExpanded}`}>
         <div className={`${moderatorShellUi.sidebarHeader} ${sidebarCollapsed ? 'is-collapsed' : ''}`}>
           <NavLink to="/moderator" className={`${moderatorShellUi.brand} ${sidebarCollapsed ? 'is-collapsed' : ''}`} aria-label="LostLink - Bài đăng" onClick={() => setSidebarOpen(false)}>
-            <span className={moderatorShellUi.brandMark}><Logo size={36} /></span>
+            <span className={moderatorShellUi.brandMark}><Logo size={32} animated /></span>
             <div className={`${moderatorShellUi.brandText} ${sidebarCollapsed ? 'is-collapsed' : ''}`}>LostLink</div>
           </NavLink>
           <button className={moderatorShellUi.collapseButton} aria-label={sidebarCollapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'} title={sidebarCollapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'} aria-expanded={!sidebarCollapsed} aria-controls="moderator-sidebar" onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}>
