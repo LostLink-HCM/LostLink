@@ -5,6 +5,7 @@ const variants = {
   secondary: 'border-line bg-surface text-primary hover:bg-primary-subtle',
   danger: 'border-danger bg-danger text-white hover:brightness-95',
   success: 'border-success bg-success text-white hover:brightness-95',
+  warning: 'border-warning bg-warning text-white hover:brightness-95',
   ghost: 'border-transparent bg-transparent text-ink-muted hover:bg-primary-subtle hover:text-primary',
 }
 
