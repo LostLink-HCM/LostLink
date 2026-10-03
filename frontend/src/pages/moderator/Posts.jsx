@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import ModIcon from '../../components/moderator/ModIcon'
+import ModIcon from '../../components/ui/Icon'
 import ModDialog from '../../components/moderator/ModDialog'
 import ModDateRange from '../../components/moderator/ModDateRange'
 import { EMPTY_FILTERS, STATUS_LABELS, filterModeratorPosts, hasInvalidRange, postsToCsv, setPostHidden, validateHideReason } from '../../lib/moderatorPosts'

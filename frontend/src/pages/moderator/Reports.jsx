@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import ModIcon from '../../components/moderator/ModIcon'
+import ModIcon from '../../components/ui/Icon'
 import ModDialog from '../../components/moderator/ModDialog'
 import { QueueToolbar, QueueSummary, QueuePagination, QueueEmpty } from '../../components/moderator/QueueControls'
 import { REPORT_ACTIONS, SEVERITY_LABELS, violationHistory, resolveReport, downloadCsv, filterModeratorReports } from '../../lib/moderation'

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import ModIcon from '../../components/moderator/ModIcon'
+import ModIcon from '../../components/ui/Icon'
 import ModDialog from '../../components/moderator/ModDialog'
 import EscalationActionDialog from '../../components/moderator/EscalationActionDialog'
 import { QueuePagination, QueueSummary } from '../../components/moderator/QueueControls'

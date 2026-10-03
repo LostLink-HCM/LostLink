@@ -13,6 +13,61 @@
   --color-au-danger: #e96060;
   --color-au-success: #4cbe8b;
 
+  /* Token theo ngữ nghĩa, giá trị mặc định là khu quản trị (moderator/admin).
+     Khu khác muốn màu chủ đạo riêng thì ghi đè biến ở layout của khu đó. */
+  --color-primary: #1a528e;
+  --color-primary-hover: #144073;
+  --color-primary-soft: #e6f0fa;
+  --color-primary-subtle: #edf4fb;
+  --color-focus: #60a5fa;
+
+  --color-canvas: #f0f4f8;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f8fafc;
+  --color-line: #dce4ed;
+  --color-line-strong: #cbd5e1;
+  --color-line-subtle: #edf1f5;
+
+  --color-ink: #16233a;
+  --color-ink-secondary: #43536b;
+  --color-ink-muted: #64748b;
+  --color-ink-subtle: #8494a8;
+
+  --color-danger: #c73352;
+  --color-danger-ink: #bd2a49;
+  --color-danger-soft: #fdecef;
+  --color-success: #078361;
+  --color-success-soft: #dff7ed;
+  --color-warning: #b76a05;
+  --color-warning-soft: #fff4da;
+  --color-info: #6051cc;
+  --color-info-soft: #eeebff;
+  --color-neutral: #626c7d;
+  --color-neutral-soft: #e9edf3;
+
+  --color-sidebar: #0b1930;
+  --color-sidebar-ink: #a3b2c8;
+
+  /* Thang cỡ chữ, nhỏ nhất 12px để bảng vẫn dễ đọc */
+  --text-caption: 12px;
+  --text-caption--line-height: 1.5;
+  --text-small: 13px;
+  --text-small--line-height: 1.55;
+  --text-body: 14px;
+  --text-body--line-height: 1.6;
+  --text-lead: 15px;
+  --text-lead--line-height: 1.6;
+  --text-title: 18px;
+  --text-title--line-height: 1.35;
+  --text-heading: 24px;
+  --text-heading--line-height: 1.25;
+  --text-display: 28px;
+  --text-display--line-height: 1.2;
+
+  /* Bo góc dùng thang mặc định của Tailwind: md 6px, lg 8px, xl 12px, 2xl 16px */
+  --shadow-card: 0 2px 6px rgb(22 35 58 / 0.04);
+  --shadow-dialog: 0 24px 100px rgb(11 25 48 / 0.25);
+
   --animate-ll-glow-slow: ll-glow 9s ease-in-out infinite;
   --animate-ll-glow-fast: ll-glow 5s ease-in-out infinite;
   --animate-ll-drift: ll-drift 24s ease-in-out infinite;

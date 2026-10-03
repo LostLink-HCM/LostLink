@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import ModIcon from './ModIcon'
+import ModIcon from '../ui/Icon'
 
 export default function ModDialog({ title, children, footer, onClose, classes = {} }) {
   const ref = useRef(null)

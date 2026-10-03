@@ -1,4 +1,4 @@
-import ModIcon from './ModIcon'
+import ModIcon from '../ui/Icon'
 import ModDateRange from './ModDateRange'
 
 export function QueueToolbar({ children, onReset, onExport, empty, dateFilters, onDateChange, classes = {} }) {
