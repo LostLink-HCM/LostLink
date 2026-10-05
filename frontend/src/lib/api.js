@@ -46,7 +46,7 @@ async function send(path, { method = 'GET', body, auth = true } = {}) {
       data?.message || 'Có lỗi xảy ra, vui lòng thử lại.',
       res.status,
       data?.details || [],
-      data?.code,
+      data?.code
     )
   }
   return data

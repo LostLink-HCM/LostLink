@@ -20,7 +20,10 @@ export default function AuthLayout({ children }) {
 
       <main className="relative z-10 mx-auto flex w-full max-w-[1040px] flex-1 flex-col items-center justify-center gap-2 px-[clamp(16px,4vw,40px)] py-6 lg:flex-row lg:justify-between lg:gap-10 lg:py-5">
         {/* Ẩn hình minh hoạ trên màn hình quá thấp (điện thoại xoay ngang) để form không bị đẩy xuống */}
-        <div aria-hidden="true" className="flex justify-center [@media(max-height:560px)]:hidden lg:flex-[0_1_380px] lg:[@media(max-height:560px)]:flex">
+        <div
+          aria-hidden="true"
+          className="flex justify-center [@media(max-height:560px)]:hidden lg:flex-[0_1_380px] lg:[@media(max-height:560px)]:flex"
+        >
           <div className="-my-12 origin-center scale-[0.6] sm:-my-8 sm:scale-70 lg:my-0 lg:scale-80">
             <AuthArt />
           </div>

@@ -9,12 +9,15 @@ export function RequireAuth({ children }) {
 
   if (!ready) return null
   // Lưu trang đang muốn vào để đăng nhập xong quay lại
-  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
+  if (!user)
+    return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
   return children
 }
 
 export function RequireRole({ roles, children }) {
   const { user } = useAuth()
 
-  return <RequireAuth>{user && !roles.includes(user.role) ? <ForbiddenPage /> : children}</RequireAuth>
+  return (
+    <RequireAuth>{user && !roles.includes(user.role) ? <ForbiddenPage /> : children}</RequireAuth>
+  )
 }

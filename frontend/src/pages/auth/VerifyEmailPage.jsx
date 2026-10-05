@@ -128,8 +128,22 @@ export default function VerifyEmailPage() {
     <AuthLayout>
       <div className="mb-3.5 flex size-10 items-center justify-center rounded-[11px] border border-[rgba(110,168,255,.3)] bg-[rgba(110,168,255,.16)]">
         <svg width="21" height="21" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <rect x="2.6" y="4.6" width="18.8" height="14.8" rx="3" stroke="#A9CCFF" strokeWidth="1.8" />
-          <path d="M3.6 7 12 13l8.4-6" stroke="#A9CCFF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          <rect
+            x="2.6"
+            y="4.6"
+            width="18.8"
+            height="14.8"
+            rx="3"
+            stroke="#A9CCFF"
+            strokeWidth="1.8"
+          />
+          <path
+            d="M3.6 7 12 13l8.4-6"
+            stroke="#A9CCFF"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       </div>
 
@@ -227,7 +241,13 @@ function VerifiedView({ user, onEnter }) {
       <div className="relative mx-auto mb-5 flex size-[62px] items-center justify-center rounded-full border border-[rgba(110,168,255,.3)] bg-[rgba(110,168,255,.16)]">
         <div className="absolute inset-0 rounded-full border border-[rgba(110,168,255,.6)] motion-safe:animate-ll-pulse" />
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M5 12.8 10 17.6 19.2 7" stroke="#A9CCFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="M5 12.8 10 17.6 19.2 7"
+            stroke="#A9CCFF"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       </div>
 
