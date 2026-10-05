@@ -1,4 +1,4 @@
-import Icon from './Icon'
+import Icon from '../common/Icon'
 
 export default function EmptyState({ icon = 'check', title, description }) {
   return (

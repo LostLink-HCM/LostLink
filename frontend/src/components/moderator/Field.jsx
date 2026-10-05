@@ -19,9 +19,15 @@ export default function Field({ label, hint, error, required, className, childre
       )}
       {children({ id, 'aria-describedby': describedBy, 'aria-invalid': error ? true : undefined })}
       {error ? (
-        <p id={`${id}-error`} role="alert" className="text-caption text-danger-ink">{error}</p>
+        <p id={`${id}-error`} role="alert" className="text-caption text-danger-ink">
+          {error}
+        </p>
       ) : (
-        hint && <p id={`${id}-hint`} className="text-caption text-ink-muted">{hint}</p>
+        hint && (
+          <p id={`${id}-hint`} className="text-caption text-ink-muted">
+            {hint}
+          </p>
+        )
       )}
     </div>
   )
@@ -32,9 +38,18 @@ export function Input({ className, ...props }) {
 }
 
 export function Select({ className, children, ...props }) {
-  return <select className={cx(control, 'h-9 cursor-pointer px-3', focusRing, className)} {...props}>{children}</select>
+  return (
+    <select className={cx(control, 'h-9 cursor-pointer px-3', focusRing, className)} {...props}>
+      {children}
+    </select>
+  )
 }
 
 export function Textarea({ className, ...props }) {
-  return <textarea className={cx(control, 'min-h-24 resize-y px-3 py-2 leading-relaxed', focusRing, className)} {...props} />
+  return (
+    <textarea
+      className={cx(control, 'min-h-24 resize-y px-3 py-2 leading-relaxed', focusRing, className)}
+      {...props}
+    />
+  )
 }

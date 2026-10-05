@@ -1,4 +1,4 @@
-import Icon from './Icon'
+import Icon from '../common/Icon'
 import { cx, focusRing } from './classes'
 
 // Màu khi hover báo trước tính chất hành động: xem, sửa, nguy hiểm, khôi phục
@@ -12,7 +12,15 @@ const tones = {
 }
 
 // label bắt buộc: nút chỉ có icon cần aria-label cho trình đọc màn hình
-export default function IconButton({ icon, label, tone = 'neutral', size = 32, bordered = false, className, ...props }) {
+export default function IconButton({
+  icon,
+  label,
+  tone = 'neutral',
+  size = 32,
+  bordered = false,
+  className,
+  ...props
+}) {
   return (
     <button
       type="button"
@@ -23,7 +31,7 @@ export default function IconButton({ icon, label, tone = 'neutral', size = 32, b
         bordered ? 'border-line bg-surface' : 'border-transparent bg-transparent',
         tones[tone],
         focusRing,
-        className,
+        className
       )}
       style={{ width: size, height: size }}
       {...props}

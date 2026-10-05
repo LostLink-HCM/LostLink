@@ -6,7 +6,8 @@ const variants = {
   danger: 'border-danger bg-danger text-white hover:brightness-95',
   success: 'border-success bg-success text-white hover:brightness-95',
   warning: 'border-warning bg-warning text-white hover:brightness-95',
-  ghost: 'border-transparent bg-transparent text-ink-muted hover:bg-primary-subtle hover:text-primary',
+  ghost:
+    'border-transparent bg-transparent text-ink-muted hover:bg-primary-subtle hover:text-primary',
 }
 
 const sizes = {
@@ -14,7 +15,14 @@ const sizes = {
   sm: 'h-8 px-2.5 text-caption',
 }
 
-export default function Button({ variant = 'secondary', size = 'md', type = 'button', className, children, ...props }) {
+export default function Button({
+  variant = 'secondary',
+  size = 'md',
+  type = 'button',
+  className,
+  children,
+  ...props
+}) {
   return (
     <button
       type={type}
@@ -23,7 +31,7 @@ export default function Button({ variant = 'secondary', size = 'md', type = 'but
         variants[variant],
         sizes[size],
         focusRing,
-        className,
+        className
       )}
       {...props}
     >
