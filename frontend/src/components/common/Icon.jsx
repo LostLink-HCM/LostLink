@@ -1,7 +1,9 @@
 const paths = {
-  unlock: 'M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2ZM7 11V7a5 5 0 0 1 9.5-2',
+  unlock:
+    'M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2ZM7 11V7a5 5 0 0 1 9.5-2',
   shieldOff: 'm3 3 18 18M4 4v8c0 6 8 10 8 10s3-1.5 5.4-4M20 13V5l-8-3-3 1',
-  users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0M20 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
+  users:
+    'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0M20 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
   category: 'M3 3h7v7H3V3Zm11 0h7v7h-7V3ZM3 14h7v7H3v-7Zm14 0v7m-3-3.5h7',
   settings: 'M4 7h16M4 17h16M8 4v6m8 4v6',
   trendUp: 'm3 17 6-6 4 4 8-10M15 5h6v6',
@@ -9,16 +11,19 @@ const paths = {
   activity: 'M2 12h4l3-8 6 16 3-8h4',
   external: 'M15 3h6v6m0-6L10 14M9 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4',
   search: 'M16 10a6 6 0 1 1-12 0 6 6 0 0 1 12 0Zm-2 4 7 7',
-  compose: 'M12 5H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M18 2l4 4-10 10-5 1 1-5L18 2Z',
+  compose:
+    'M12 5H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M18 2l4 4-10 10-5 1 1-5L18 2Z',
   info: 'M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0ZM12 11v6m0-10h.01',
   reply: 'm9 5-7 7 7 7M2 12h11a8 8 0 0 1 8 8v-3a9 9 0 0 0-9-9',
   send: 'm22 2-7 20-4-9-9-4L22 2ZM11 13 22 2',
   mail: 'M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm-2 2 10 7L22 6',
   history: 'M3 3v6h6M3 9a9 9 0 1 1-.5 7M12 7v5l3 2',
-  warning: 'M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0ZM12 9v4m0 4h.01',
+  warning:
+    'M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0ZM12 9v4m0 4h.01',
   star: 'm12 2 3.1 6.3L22 9.3l-5 4.9 1.2 6.9-6.2-3.3-6.2 3.3L7 14.2 2 9.3l6.9-1L12 2Z',
   user: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
-  eyeOff: 'M3 3 21 21M10.6 4.1 12 4c7 0 11 8 11 8a19 19 0 0 1-3 4M6.5 6.5C3 9 1 12 1 12s4 8 11 8a12 12 0 0 0 5.5-1.5M9.9 9.9a3 3 0 0 0 4.2 4.2',
+  eyeOff:
+    'M3 3 21 21M10.6 4.1 12 4c7 0 11 8 11 8a19 19 0 0 1-3 4M6.5 6.5C3 9 1 12 1 12s4 8 11 8a12 12 0 0 0 5.5-1.5M9.9 9.9a3 3 0 0 0 4.2 4.2',
   lock: 'M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2ZM7 11V7a5 5 0 0 1 10 0v4',
   dashboard: 'M3 3h7v9H3V3Zm11 0h7v5h-7V3Zm0 9h7v9h-7v-9ZM3 16h7v5H3v-5Z',
   list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
@@ -28,7 +33,8 @@ const paths = {
   chat: 'M21 11.5a8.5 8.5 0 0 1-12 7.7L3 21l1.8-6A8.5 8.5 0 1 1 21 11.5Z',
   bell: 'M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M10 21h4',
   logout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 12 5-5-5-5M21 12H9',
-  calendar: 'M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z',
+  calendar:
+    'M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z',
   reset: 'M21 4v6h-6M3 20v-6h6M4 9a8 8 0 0 1 13-5l4 6M3 14l4 6a8 8 0 0 0 13-5',
   download: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4m4-5 5 5 5-5M12 15V3',
   eye: 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12Z M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0',
@@ -43,5 +49,19 @@ const paths = {
 }
 
 export default function Icon({ name, size = 18 }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name] || paths.list} /></svg>
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d={paths[name] || paths.list} />
+    </svg>
+  )
 }

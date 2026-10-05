@@ -24,17 +24,39 @@ export default function Logo({ size = 40, animated = false, className = '' }) {
         />
       )}
 
-      <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true" className="relative block">
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 64 64"
+        fill="none"
+        aria-hidden="true"
+        className="relative block"
+      >
         <defs>
-          <linearGradient id={gradientId} x1="312" y1="233" x2="614" y2="643" gradientUnits="userSpaceOnUse">
+          <linearGradient
+            id={gradientId}
+            x1="312"
+            y1="233"
+            x2="614"
+            y2="643"
+            gradientUnits="userSpaceOnUse"
+          >
             <stop stopColor="#3E86D6" />
             <stop offset="1" stopColor="#2F6FB8" />
           </linearGradient>
         </defs>
 
-        <g className={animated ? 'motion-safe:animate-logo-mag' : undefined} style={animated ? CENTER : undefined}>
+        <g
+          className={animated ? 'motion-safe:animate-logo-mag' : undefined}
+          style={animated ? CENTER : undefined}
+        >
           <g transform={FIT}>
-            <path d="M682.2 667.2 L879 863" stroke="#1B3358" strokeWidth="112" strokeLinecap="round" />
+            <path
+              d="M682.2 667.2 L879 863"
+              stroke="#1B3358"
+              strokeWidth="112"
+              strokeLinecap="round"
+            />
             <circle cx="463" cy="448" r="288" stroke="#1B3358" strokeWidth="80" />
             <path d="M556.8 175.7 A288 288 0 0 1 722.9 572" stroke="#9AA7BA" strokeWidth="80" />
           </g>
@@ -51,7 +73,10 @@ export default function Logo({ size = 40, animated = false, className = '' }) {
           />
         )}
 
-        <g className={animated ? 'motion-safe:animate-logo-pin' : undefined} style={animated ? CENTER : undefined}>
+        <g
+          className={animated ? 'motion-safe:animate-logo-pin' : undefined}
+          style={animated ? CENTER : undefined}
+        >
           <g transform={FIT}>
             <path
               d="M463 643 C430 606 312 488 312 384 A151 151 0 0 1 614 384 C614 488 496 606 463 643 Z"

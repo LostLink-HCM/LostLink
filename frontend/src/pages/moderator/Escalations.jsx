@@ -1,44 +1,220 @@
 import { useState } from 'react'
-import ModIcon from '../../components/ui/Icon'
-import ModDialog from '../../components/moderator/ModDialog'
+import { useOutletContext } from 'react-router-dom'
+import Badge from '../../components/moderator/Badge'
+import Button from '../../components/moderator/Button'
+import DataTable, { cell } from '../../components/moderator/DataTable'
+import DetailList from '../../components/moderator/DetailList'
+import Dialog from '../../components/moderator/Dialog'
+import EmptyState from '../../components/moderator/EmptyState'
+import Field, { Input, Select } from '../../components/moderator/Field'
+import Icon from '../../components/common/Icon'
+import IconButton from '../../components/moderator/IconButton'
+import Notice from '../../components/moderator/Notice'
+import Pagination from '../../components/moderator/Pagination'
+import { cx, focusRing } from '../../components/moderator/classes'
 import EscalationActionDialog from '../../components/moderator/EscalationActionDialog'
-import { QueuePagination, QueueSummary } from '../../components/moderator/QueueControls'
-import { ESCALATION_ACTIONS, elapsedDays, escalationGroup, actionUnavailable, filterEscalations, applyEscalationAction } from '../../lib/escalations'
-import { escalationDialogClasses, escalationUi } from '../../components/moderator/escalationStyles'
+import {
+  ESCALATION_ACTIONS,
+  elapsedDays,
+  escalationGroup,
+  actionUnavailable,
+  filterEscalations,
+  applyEscalationAction,
+} from '../../lib/escalations'
 
 const EMPTY_FILTERS = { group: '', state: 'open', chat: '', query: '' }
 const PAGE_SIZE = 6
 const GROUP_LABELS = { stale: 'Match STALE >3 ngày', overdue: 'Giao dịch >30 ngày' }
-const formatDate = (date) => date ? new Date(date).toLocaleString('vi-VN') : 'Chưa có'
+const GROUP_TONES = { stale: 'warning', overdue: 'primary' }
+// Thao tác "view" không phải hành động nguy hiểm nên dùng nút thường
+const BUTTON_VARIANTS = { view: 'secondary', success: 'success', danger: 'danger' }
+
+const STATS = [
+  {
+    group: 'stale',
+    label: 'Match STALE',
+    description: '>3 ngày chưa có tiến triển',
+    icon: 'warning',
+    tone: 'bg-warning-soft text-warning',
+  },
+  {
+    group: 'overdue',
+    label: 'Chờ xác nhận trao trả',
+    description: '>30 ngày chưa đủ xác nhận',
+    icon: 'calendar',
+    tone: 'bg-primary-soft text-primary',
+  },
+  {
+    group: 'resolved',
+    label: 'Đã xử lý',
+    description: 'Đã trao trả hoặc không chính xác',
+    icon: 'check',
+    tone: 'bg-success-soft text-success',
+  },
+]
+
+const linkButton =
+  'block cursor-pointer text-left text-small font-semibold leading-relaxed text-ink hover:text-primary'
+const hint = 'mt-3 text-caption leading-relaxed text-ink-muted'
+const heading = 'mt-3.5 mb-2 text-small font-semibold'
+
+const formatDate = (date) => (date ? new Date(date).toLocaleString('vi-VN') : 'Chưa có')
+
+function ticketStatus(ticket) {
+  if (ticket.resolution === 'returned') return { tone: 'success', label: 'Đã trao trả' }
+  if (ticket.resolution === 'incorrect') return { tone: 'danger', label: 'Không chính xác' }
+  if (ticket.state === 'reminded') return { tone: 'primary', label: 'Đã nhắc' }
+  return { tone: 'warning', label: 'Chờ xử lý' }
+}
 
 function TicketStatus({ ticket }) {
-  const status = ticket.resolution === 'returned' ? 'completed' : ticket.resolution === 'incorrect' ? 'rejected' : ticket.state === 'reminded' ? 'contacted' : 'pending'
-  const label = ticket.resolution === 'returned' ? 'Đã trao trả' : ticket.resolution === 'incorrect' ? 'Không chính xác' : ticket.state === 'reminded' ? 'Đã nhắc' : 'Chờ xử lý'
-  const statusClass = { completed: escalationUi.statusCompleted, rejected: escalationUi.statusRejected, contacted: escalationUi.statusContacted, pending: escalationUi.statusPending }[status]
-  return <div className={escalationUi.statusStack}><span className={`${escalationUi.status} ${statusClass}`}>{label}</span>{ticket.verified && <span className={escalationUi.verified}><ModIcon name="shield" size={13} />Đã xác minh</span>}{(ticket.lost.hidden || ticket.found.hidden) && <span className={escalationUi.hidden}>Có bài đã ẩn</span>}</div>
+  const { tone, label } = ticketStatus(ticket)
+  return (
+    <div className="flex flex-col items-start gap-1.5">
+      <Badge tone={tone}>{label}</Badge>
+      {ticket.verified && (
+        <span className="inline-flex items-center gap-1 text-caption text-success">
+          <Icon name="shield" size={13} />
+          Đã xác minh
+        </span>
+      )}
+      {(ticket.lost.hidden || ticket.found.hidden) && (
+        <span className="text-caption text-danger-ink">Có bài đã ẩn</span>
+      )}
+    </div>
+  )
+}
+
+function postStatusLabel(status) {
+  if (status === 'returned') return 'Đã trao trả'
+  if (status === 'contacted') return 'Đã liên hệ'
+  return 'Đang tìm'
 }
 
 function Party({ ticket, side, detailed = false }) {
   const party = ticket[side]
-  return <div className={`${escalationUi.party} ${side === 'lost' ? escalationUi.partyLost : escalationUi.partyFound}`}><span className={escalationUi.partySide}>{side === 'lost' ? 'BÊN MẤT' : 'BÊN NHẶT'}</span><strong className={escalationUi.partyName}>{party.name}</strong><span className={escalationUi.partyEmail}>{party.email}</span>{detailed && <><p className="my-[8px] leading-[1.7] text-[#334155]"><strong>{party.postId}</strong> · {party.title}</p><span className="text-[10px] text-[#738298]">Trạng thái bài: {party.postStatus === 'returned' ? 'Đã trao trả' : party.postStatus === 'contacted' ? 'Đã liên hệ' : 'Đang tìm'}{party.hidden ? ' · Đã ẩn' : ''}</span></>}<small className={`${escalationUi.partyConfirm} ${party.confirmed ? escalationUi.partyConfirmed : ''}`}>{party.confirmed ? 'Đã xác nhận trao trả' : 'Chưa xác nhận trao trả'}</small></div>
+  return (
+    <div className="flex min-w-0 flex-col items-start gap-0.5 py-2 [overflow-wrap:anywhere] first:pt-0 last:pb-0">
+      <span
+        className={cx(
+          'text-caption font-bold tracking-wide',
+          side === 'lost' ? 'text-danger-ink' : 'text-primary'
+        )}
+      >
+        {side === 'lost' ? 'BÊN MẤT' : 'BÊN NHẶT'}
+      </span>
+      <strong className="text-small font-semibold text-ink">{party.name}</strong>
+      <span className="text-caption text-ink-muted">{party.email}</span>
+      {detailed && (
+        <>
+          <p className="my-2 text-small leading-relaxed text-ink-secondary">
+            <strong>{party.postId}</strong> · {party.title}
+          </p>
+          <span className="text-caption text-ink-muted">
+            Trạng thái bài: {postStatusLabel(party.postStatus)}
+            {party.hidden ? ' · Đã ẩn' : ''}
+          </span>
+        </>
+      )}
+      <small className={cx('text-caption', party.confirmed ? 'text-success' : 'text-ink-subtle')}>
+        {party.confirmed ? 'Đã xác nhận trao trả' : 'Chưa xác nhận trao trả'}
+      </small>
+    </div>
+  )
 }
 
-function TicketActions({ ticket, onAction, now, compact = false, wrapperClass }) {
-  const actionClass = { view: compact ? escalationUi.compactViewAction : escalationUi.viewAction, success: compact ? escalationUi.compactSuccessAction : escalationUi.successAction, danger: compact ? escalationUi.compactDangerAction : escalationUi.dangerAction }
-  return <div className={wrapperClass || (compact ? escalationUi.actions : 'flex flex-wrap gap-[8px]')}>{Object.entries(ESCALATION_ACTIONS).map(([action, settings]) => { const disabledReason = actionUnavailable(ticket, action, now); return <button key={action} className={compact ? actionClass[settings.tone] : `${buttonFor(settings.tone)}`} disabled={Boolean(disabledReason)} title={disabledReason || settings.label} aria-label={`${settings.label} · hồ sơ #${ticket.id}`} onClick={() => onAction(action)}><ModIcon name={settings.icon} size={17} />{!compact && settings.label}</button> })}</div>
+function TicketActions({ ticket, onAction, now }) {
+  return Object.entries(ESCALATION_ACTIONS).map(([action, settings]) => {
+    const disabledReason = actionUnavailable(ticket, action, now)
+    return (
+      <Button
+        key={action}
+        variant={BUTTON_VARIANTS[settings.tone]}
+        disabled={Boolean(disabledReason)}
+        title={disabledReason || settings.label}
+        aria-label={`${settings.label} · hồ sơ #${ticket.id}`}
+        onClick={() => onAction(action)}
+      >
+        <Icon name={settings.icon} />
+        {settings.label}
+      </Button>
+    )
+  })
 }
 
-function buttonFor(tone) {
-  if (tone === 'danger') return escalationUi.dangerButton
-  if (tone === 'success') return escalationUi.primaryButton
-  return escalationUi.button
+function Summary({ count, noun }) {
+  return (
+    <p className="mt-4 mb-2.5 text-small text-ink-muted">
+      Số lượng: <strong className="px-1 text-lead text-primary">{count}</strong> {noun}
+    </p>
+  )
 }
 
 function AuditRows({ logs, onView }) {
-  return <div className={escalationUi.tableContainer}><table className="w-full min-w-0 table-fixed border-collapse text-left text-[11px]"><caption className="sr-only">Nhật ký thao tác Escalation</caption><colgroup><col className="w-[18%]" /><col className="w-[16%]" /><col className="w-[18%]" /><col className="w-[18%]" /><col className="w-[30%]" /></colgroup><thead><tr>{['Thời gian', 'Người thực hiện', 'Cặp ghép', 'Thao tác', 'Lý do / căn cứ'].map((label) => <th className={escalationUi.tableHead} key={label} scope="col">{label}</th>)}</tr></thead><tbody className="[&_tr:last-child_td]:border-b-0">{logs.map((log) => <tr key={log.id} className="hover:bg-[#f9fbfe]"><td className={escalationUi.tableCell}>{formatDate(log.createdAt)}</td><td className={escalationUi.tableCell}>{log.actor}</td><td className={escalationUi.tableCell}><button className={escalationUi.title} onClick={() => onView(log.id)}>#{log.entityId}</button></td><td className={escalationUi.tableCell}>{ESCALATION_ACTIONS[log.action].label}{log.action === 'remind' && <small className={escalationUi.smallNote}>Email nhắc</small>}</td><td className={escalationUi.tableCell}><button className={escalationUi.logDetail} title="Xem chi tiết nhật ký" onClick={() => onView(log.id)}>{log.detail.reason}<span className={escalationUi.logLink}>Xem chi tiết <ModIcon name="next" size={12} /></span></button></td></tr>)}</tbody></table>{!logs.length && <div className="flex flex-col items-center px-[20px] py-[54px] text-center text-[#8494a8]"><ModIcon name="history" size={32} /><h3 className="mt-[18px] mb-[8px] text-[16px] font-semibold text-[#334155]">Chưa có thao tác được ghi nhận</h3><p className="text-[12px]">Nhật ký sẽ xuất hiện sau khi moderator xác nhận một thao tác.</p></div>}</div>
+  return (
+    <DataTable
+      caption="Nhật ký thao tác Escalation"
+      minWidth="min-w-[760px]"
+      columns={[
+        ['Thời gian', 'w-[18%]'],
+        ['Người thực hiện', 'w-[16%]'],
+        ['Cặp ghép', 'w-[18%]'],
+        ['Thao tác', 'w-[18%]'],
+        ['Lý do / căn cứ', 'w-[30%]'],
+      ]}
+      empty={
+        !logs.length && (
+          <EmptyState
+            icon="history"
+            title="Chưa có thao tác được ghi nhận"
+            description="Nhật ký sẽ xuất hiện sau khi moderator xác nhận một thao tác."
+          />
+        )
+      }
+    >
+      {logs.map((log) => (
+        <tr key={log.id} className="hover:bg-surface-muted">
+          <td className={cell}>{formatDate(log.createdAt)}</td>
+          <td className={cell}>{log.actor}</td>
+          <td className={cell}>
+            <button
+              type="button"
+              className={cx(linkButton, focusRing)}
+              onClick={() => onView(log.id)}
+            >
+              #{log.entityId}
+            </button>
+          </td>
+          <td className={cell}>
+            {ESCALATION_ACTIONS[log.action].label}
+            {log.action === 'remind' && (
+              <small className="mt-1 block text-caption text-ink-subtle">Email nhắc</small>
+            )}
+          </td>
+          <td className={cell}>
+            <button
+              type="button"
+              title="Xem chi tiết nhật ký"
+              className={cx(
+                'block w-full cursor-pointer text-left text-small leading-relaxed text-ink-secondary hover:text-primary',
+                focusRing
+              )}
+              onClick={() => onView(log.id)}
+            >
+              {log.detail.reason}
+              <span className="mt-1 flex items-center gap-1 text-caption text-primary">
+                Xem chi tiết <Icon name="next" size={12} />
+              </span>
+            </button>
+          </td>
+        </tr>
+      ))}
+    </DataTable>
+  )
 }
 
-export default function Escalations({ escalationState, setEscalationState }) {
+export default function Escalations() {
+  const { escalationState, setEscalationState } = useOutletContext()
   const [tab, setTab] = useState('queue')
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [page, setPage] = useState(1)
@@ -54,26 +230,455 @@ export default function Escalations({ escalationState, setEscalationState }) {
   const selected = modal?.ticketId ? tickets.find((ticket) => ticket.id === modal.ticketId) : null
   const selectedLog = modal?.logId ? logs.find((log) => log.id === modal.logId) : null
   const pending = tickets.filter((ticket) => !ticket.resolution)
-  const setFilter = (key, value) => { setFilters((previous) => ({ ...previous, [key]: value })); setPage(1) }
+  const closeModal = () => setModal(null)
+  const openDetail = (ticketId) => setModal({ kind: 'detail', ticketId })
+  const openAction = (ticketId, action) => setModal({ kind: 'action', ticketId, action })
+  const setFilter = (key, value) => {
+    setFilters((previous) => ({ ...previous, [key]: value }))
+    setPage(1)
+  }
+  const statCount = (group) =>
+    group === 'resolved'
+      ? tickets.filter((ticket) => ticket.resolution).length
+      : pending.filter((ticket) => escalationGroup(ticket, now) === group).length
   const handleAction = (payload) => {
-    const next = applyEscalationAction(escalationState, { ...payload, actor: 'Moderator', now: Date.now() })
+    const next = applyEscalationAction(escalationState, {
+      ...payload,
+      actor: 'Moderator',
+      now: Date.now(),
+    })
     setEscalationState(next)
     setModal(null)
-    setNotice(payload.action === 'remind' ? `Đã ghi nhận email nhắc cho hồ sơ #${payload.id}.` : `Đã ghi nhận “${ESCALATION_ACTIONS[payload.action].label}” cho hồ sơ #${payload.id} và lưu nhật ký.`)
+    setNotice(
+      payload.action === 'remind'
+        ? `Đã ghi nhận email nhắc cho hồ sơ #${payload.id}.`
+        : `Đã ghi nhận “${ESCALATION_ACTIONS[payload.action].label}” cho hồ sơ #${payload.id} và lưu nhật ký.`
+    )
   }
+  const tabClass = (value) =>
+    cx(
+      '-mb-px inline-flex cursor-pointer items-center gap-2 border-b-2 px-4 py-3 text-small font-semibold transition-colors',
+      tab === value
+        ? 'border-primary text-primary'
+        : 'border-transparent text-ink-muted hover:text-primary',
+      focusRing
+    )
 
-  return <div className={escalationUi.root}>
-    <div className={escalationUi.stats}>{[['stale', 'Match STALE', '>3 ngày chưa có tiến triển', 'warning'], ['overdue', 'Chờ xác nhận trao trả', '>30 ngày chưa đủ xác nhận', 'calendar'], ['resolved', 'Đã xử lý', 'Đã trao trả hoặc không chính xác', 'check']].map(([group, label, description, icon]) => <button key={group} className={escalationUi.stat} onClick={() => { setTab('queue'); setPage(1); setFilters({ ...EMPTY_FILTERS, group: group === 'resolved' ? '' : group, state: group === 'resolved' ? 'resolved' : 'open' }) }}><span className={`${escalationUi.statIcon} ${group === 'overdue' ? escalationUi.statOverdue : group === 'resolved' ? escalationUi.statResolved : ''}`}><ModIcon name={icon} size={20} /></span><span className="min-w-0"><span className={escalationUi.statLabel}>{label}</span><strong className={escalationUi.statValue}>{group === 'resolved' ? tickets.filter((ticket) => ticket.resolution).length : pending.filter((ticket) => escalationGroup(ticket, now) === group).length}</strong><small className={escalationUi.statDescription}>{description}</small></span></button>)}</div>
-    <div className={escalationUi.tabs} role="group" aria-label="Nội dung Escalation"><button className={`${escalationUi.tab} ${tab === 'queue' ? escalationUi.tabActive : ''}`} aria-pressed={tab === 'queue'} onClick={() => setTab('queue')}><ModIcon name="list" />Hàng đợi xử lý <span className={escalationUi.tabCount}>{pending.length}</span></button><button className={`${escalationUi.tab} ${tab === 'logs' ? escalationUi.tabActive : ''}`} aria-pressed={tab === 'logs'} onClick={() => setTab('logs')}><ModIcon name="history" />Nhật ký thao tác <span className={escalationUi.tabCount}>{logs.length}</span></button></div>
-    {notice && <p className={escalationUi.notice} role="status">{notice}</p>}
-    {tab === 'queue' ? <>
-      <section className={escalationUi.filterSection} aria-label="Bộ lọc Escalation"><div className={escalationUi.filterGrid}><label className={escalationUi.label}>Tìm kiếm<input className={escalationUi.input} type="search" value={filters.query} placeholder="Mã match, đồ vật, tên hai bên…" onChange={(event) => setFilter('query', event.target.value)} /></label><label className={escalationUi.label}>Nhóm hồ sơ<select className={escalationUi.input} value={filters.group} onChange={(event) => setFilter('group', event.target.value)}><option value="">Tất cả nhóm</option><option value="stale">Match STALE &gt;3 ngày</option><option value="overdue">Giao dịch &gt;30 ngày</option></select></label><label className={escalationUi.label}>Trạng thái chat<select className={escalationUi.input} value={filters.chat} onChange={(event) => setFilter('chat', event.target.value)}><option value="">Tất cả</option><option value="opened">Đã mở chat</option><option value="unopened">Chưa mở chat</option></select></label><label className={escalationUi.label}>Xử lý<select className={escalationUi.input} value={filters.state} onChange={(event) => setFilter('state', event.target.value)}><option value="open">Chưa xử lý xong</option><option value="resolved">Đã xử lý</option><option value="">Tất cả trạng thái</option></select></label><button className={escalationUi.resetButton} title="Đặt lại bộ lọc" aria-label="Đặt lại bộ lọc" onClick={() => { setFilters(EMPTY_FILTERS); setPage(1) }}><ModIcon name="reset" /></button></div></section>
-      <QueueSummary classes={escalationUi} count={filtered.length} noun="hồ sơ" />
-      <div className={escalationUi.tableContainer}><table className={escalationUi.table}><caption className="sr-only">Match treo và giao dịch chưa xác nhận</caption><colgroup><col className="w-[21%]" /><col className="w-[23%]" /><col className="w-[16%]" /><col className="w-[10%]" /><col className="w-[13%]" /><col className="w-[17%]" /></colgroup><thead><tr>{['Cặp ghép', 'Thông tin hai bên', 'Chat & Hẹn gặp', 'Thời gian chờ', 'Trạng thái', 'Thao tác'].map((label) => <th className={escalationUi.tableHead} key={label} scope="col">{label}</th>)}</tr></thead><tbody className="[&_tr:last-child_td]:border-b-0">{visible.map((ticket) => { const group = ticket.queueGroup || escalationGroup(ticket, now); return <tr key={ticket.id} className="hover:bg-[#f9fbfe]"><td className={escalationUi.tableCell}><button className={escalationUi.code} onClick={() => setModal({ kind: 'detail', ticketId: ticket.id })}>#{ticket.id}</button><button className={escalationUi.title} onClick={() => setModal({ kind: 'detail', ticketId: ticket.id })}>{ticket.item}</button><span className={group === 'overdue' ? escalationUi.groupOverdue : escalationUi.groupStale}>{GROUP_LABELS[group]}</span><span className={escalationUi.category}>{ticket.category}</span></td><td className={escalationUi.tableCell}><Party ticket={ticket} side="lost" /><Party ticket={ticket} side="found" /></td><td className={escalationUi.tableCell}><span className={ticket.chatOpenedAt ? escalationUi.chatOpened : escalationUi.chatClosed}><ModIcon name="chat" size={14} />{ticket.chatOpenedAt ? 'Đã mở chat' : 'Chưa mở chat'}</span><p className={escalationUi.meeting}>{ticket.meetingPoint ? `Đã hẹn: ${ticket.meetingPoint}` : 'Chưa ghi nhận hẹn gặp'}</p></td><td className={escalationUi.tableCell}><strong className={escalationUi.age}>{elapsedDays(group === 'overdue' ? ticket.transactionStartedAt : ticket.lastActivityAt, now)} ngày</strong><small className={escalationUi.smallNote}>{group === 'overdue' ? 'Từ khi giao dịch mở' : 'Từ hoạt động cuối'}</small>{ticket.reminderCount > 0 && <small className={escalationUi.smallNote}>Đã nhắc {ticket.reminderCount} lần</small>}</td><td className={escalationUi.tableCell}><TicketStatus ticket={ticket} /></td><td className={escalationUi.tableCell}><div className={escalationUi.actions}><button className={escalationUi.compactViewAction} title="Chi tiết hồ sơ" aria-label={`Xem hồ sơ #${ticket.id}`} onClick={() => setModal({ kind: 'detail', ticketId: ticket.id })}><ModIcon name="eye" size={15} /></button><TicketActions compact wrapperClass="contents" ticket={ticket} now={now} onAction={(action) => setModal({ kind: 'action', ticketId: ticket.id, action })} /></div></td></tr> })}</tbody></table>{!visible.length && <div className="flex flex-col items-center px-[20px] py-[54px] text-center text-[#8494a8]"><ModIcon name="check" size={32} /><h3 className="mt-[18px] mb-[8px] text-[16px] font-semibold text-[#334155]">Không có hồ sơ phù hợp</h3><p className="text-[12px]">Thay đổi bộ lọc hoặc xem mục Đã xử lý.</p></div>}</div>
-      <QueuePagination classes={escalationUi} page={currentPage} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage} noun="hồ sơ" />
-    </> : <><QueueSummary classes={escalationUi} count={logs.length} noun="thao tác" /><AuditRows logs={logs.slice((currentLogPage - 1) * PAGE_SIZE, currentLogPage * PAGE_SIZE)} onView={(id) => setModal({ kind: 'log', logId: id })} /><QueuePagination classes={escalationUi} page={currentLogPage} total={logs.length} pageSize={PAGE_SIZE} onChange={setLogPage} noun="thao tác" /></>}
-    {selected && modal.kind === 'detail' && <ModDialog classes={escalationDialogClasses} title={`Hồ sơ #${selected.id}`} onClose={() => setModal(null)} footer={<TicketActions ticket={selected} now={now} onAction={(action) => setModal({ kind: 'action', ticketId: selected.id, action })} />}><h3 className={escalationUi.detailTitle}>{selected.item}</h3><TicketStatus ticket={selected} /><div className={escalationUi.parties}><div className={escalationUi.partyCard}><Party detailed ticket={selected} side="lost" /></div><div className={escalationUi.partyCard}><Party detailed ticket={selected} side="found" /></div></div><dl className={escalationUi.detailList}><div><dt>Nhóm hồ sơ</dt><dd>{GROUP_LABELS[selected.queueGroup || escalationGroup(selected, now)]}</dd></div><div><dt>Hoạt động cuối</dt><dd>{formatDate(selected.lastActivityAt)}</dd></div><div><dt>Bắt đầu giao dịch</dt><dd>{formatDate(selected.transactionStartedAt)}</dd></div><div><dt>Mở chat</dt><dd>{selected.chatOpenedAt ? formatDate(selected.chatOpenedAt) : 'Chưa mở chat'}</dd></div><div><dt>Hẹn gặp</dt><dd>{selected.meetingPoint || 'Chưa ghi nhận'}</dd></div><div><dt>Email nhắc</dt><dd>{selected.reminderCount} lần{selected.lastRemindedAt ? ` · Gần nhất ${formatDate(selected.lastRemindedAt)}` : ''}</dd></div></dl>{actionUnavailable(selected, 'returned', now) && <p className={escalationUi.hint}>{actionUnavailable(selected, 'returned', now)}</p>}<h4 className={escalationUi.heading}>Nhật ký hồ sơ</h4><div className={escalationUi.timeline}>{logs.filter((log) => log.entityId === selected.id).map((log) => <button className={escalationUi.timelineItem} key={log.id} onClick={() => setModal({ kind: 'log', logId: log.id })}><strong className={escalationUi.timelineAction}>{ESCALATION_ACTIONS[log.action].label}</strong><span className={escalationUi.timelineMeta}>{log.actor} · {formatDate(log.createdAt)}</span><p className={escalationUi.timelineReason}>{log.detail.reason}</p></button>)}{!logs.some((log) => log.entityId === selected.id) && <p className={escalationUi.hint}>Chưa có thao tác.</p>}</div></ModDialog>}
-    {selected && modal.kind === 'action' && <EscalationActionDialog key={`${selected.id}-${modal.action}`} ticket={selected} action={modal.action} onClose={() => setModal(null)} onSubmit={handleAction} />}
-    {selectedLog && <ModDialog classes={escalationDialogClasses} title={`Nhật ký · Hồ sơ #${selectedLog.entityId}`} onClose={() => setModal(null)}><dl className={escalationUi.detailList}><div><dt>Thao tác</dt><dd>{ESCALATION_ACTIONS[selectedLog.action].label}</dd></div><div><dt>Người thực hiện</dt><dd>{selectedLog.actor}</dd></div><div><dt>Thời gian</dt><dd>{formatDate(selectedLog.createdAt)}</dd></div><div><dt>Hồ sơ</dt><dd>#{selectedLog.entityId}</dd></div><div><dt>Trước thao tác</dt><dd><TicketStatus ticket={selectedLog.before} /></dd></div><div><dt>Sau thao tác</dt><dd><TicketStatus ticket={selectedLog.after} /></dd></div></dl><h4 className={escalationUi.heading}>Lý do / căn cứ</h4><p className={escalationUi.description}>{selectedLog.detail.reason}</p>{selectedLog.detail.offlineConfirmed && <p className={escalationUi.hint}>Moderator đã kiểm tra việc trao trả offline (Ca A).</p>}{selectedLog.action === 'hide' && <p className={escalationUi.hint}>Bài đã ẩn: {selectedLog.detail.targets.map((side) => `${selectedLog.before[side].postId} (${side === 'lost' ? 'bên mất' : 'bên nhặt'})`).join(', ')}</p>}{selectedLog.action === 'remind' && <><h4 className={escalationUi.heading}>Email nhắc</h4><p className={escalationUi.hint}>Người nhận: {selectedLog.detail.recipients.join(', ')}</p><p className={escalationUi.description}>{selectedLog.detail.message}</p></>}</ModDialog>}
-  </div>
+  return (
+    <div className="px-6 py-5 text-small text-ink max-xl:px-5 max-sm:px-4 max-sm:py-4">
+      <div className="mb-5 grid grid-cols-3 gap-4 max-lg:grid-cols-1 max-sm:gap-2.5">
+        {STATS.map((stat) => (
+          <button
+            key={stat.group}
+            type="button"
+            className={cx(
+              'flex cursor-pointer items-start gap-3.5 rounded-xl border border-line bg-surface p-5 text-left shadow-card transition-colors hover:border-primary/40 max-xl:gap-2.5 max-xl:p-4 max-sm:items-center',
+              focusRing
+            )}
+            onClick={() => {
+              setTab('queue')
+              setPage(1)
+              setFilters({
+                ...EMPTY_FILTERS,
+                group: stat.group === 'resolved' ? '' : stat.group,
+                state: stat.group === 'resolved' ? 'resolved' : 'open',
+              })
+            }}
+          >
+            <span className={cx('flex shrink-0 rounded-lg p-2.5 max-xl:p-2', stat.tone)}>
+              <Icon name={stat.icon} size={20} />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-small font-semibold text-ink-secondary">
+                {stat.label}
+              </span>
+              <strong className="my-1.5 block text-display font-bold text-ink">
+                {statCount(stat.group)}
+              </strong>
+              <small className="block text-caption text-ink-muted">{stat.description}</small>
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <div
+        role="group"
+        aria-label="Nội dung Escalation"
+        className="mb-5 flex flex-wrap gap-1.5 border-b border-line"
+      >
+        <button
+          type="button"
+          aria-pressed={tab === 'queue'}
+          className={tabClass('queue')}
+          onClick={() => setTab('queue')}
+        >
+          <Icon name="list" />
+          Hàng đợi xử lý <Badge>{pending.length}</Badge>
+        </button>
+        <button
+          type="button"
+          aria-pressed={tab === 'logs'}
+          className={tabClass('logs')}
+          onClick={() => setTab('logs')}
+        >
+          <Icon name="history" />
+          Nhật ký thao tác <Badge>{logs.length}</Badge>
+        </button>
+      </div>
+
+      {notice && <Notice>{notice}</Notice>}
+
+      {tab === 'queue' ? (
+        <>
+          <section
+            aria-label="Bộ lọc Escalation"
+            className="rounded-xl border border-line bg-surface p-4 shadow-card"
+          >
+            <div className="grid grid-cols-[minmax(205px,1.5fr)_repeat(3,minmax(0,1fr))_auto] items-end gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1">
+              <Field label="Tìm kiếm">
+                {(a) => (
+                  <Input
+                    {...a}
+                    type="search"
+                    value={filters.query}
+                    placeholder="Mã match, đồ vật, tên hai bên…"
+                    onChange={(e) => setFilter('query', e.target.value)}
+                  />
+                )}
+              </Field>
+              <Field label="Nhóm hồ sơ">
+                {(a) => (
+                  <Select
+                    {...a}
+                    value={filters.group}
+                    onChange={(e) => setFilter('group', e.target.value)}
+                  >
+                    <option value="">Tất cả nhóm</option>
+                    <option value="stale">{GROUP_LABELS.stale}</option>
+                    <option value="overdue">{GROUP_LABELS.overdue}</option>
+                  </Select>
+                )}
+              </Field>
+              <Field label="Trạng thái chat">
+                {(a) => (
+                  <Select
+                    {...a}
+                    value={filters.chat}
+                    onChange={(e) => setFilter('chat', e.target.value)}
+                  >
+                    <option value="">Tất cả</option>
+                    <option value="opened">Đã mở chat</option>
+                    <option value="unopened">Chưa mở chat</option>
+                  </Select>
+                )}
+              </Field>
+              <Field label="Xử lý">
+                {(a) => (
+                  <Select
+                    {...a}
+                    value={filters.state}
+                    onChange={(e) => setFilter('state', e.target.value)}
+                  >
+                    <option value="open">Chưa xử lý xong</option>
+                    <option value="resolved">Đã xử lý</option>
+                    <option value="">Tất cả trạng thái</option>
+                  </Select>
+                )}
+              </Field>
+              <IconButton
+                icon="reset"
+                label="Đặt lại bộ lọc"
+                bordered
+                size={36}
+                onClick={() => {
+                  setFilters(EMPTY_FILTERS)
+                  setPage(1)
+                }}
+              />
+            </div>
+          </section>
+
+          <Summary count={filtered.length} noun="hồ sơ" />
+
+          <DataTable
+            caption="Match treo và giao dịch chưa xác nhận"
+            minWidth="min-w-[960px]"
+            columns={[
+              ['Cặp ghép', 'w-[21%]'],
+              ['Thông tin hai bên', 'w-[23%]'],
+              ['Chat & Hẹn gặp', 'w-[16%]'],
+              ['Thời gian chờ', 'w-[11%]'],
+              ['Trạng thái', 'w-[13%]'],
+              ['Thao tác', 'w-[16%]'],
+            ]}
+            empty={
+              !visible.length && (
+                <EmptyState
+                  title="Không có hồ sơ phù hợp"
+                  description="Thay đổi bộ lọc hoặc xem mục Đã xử lý."
+                />
+              )
+            }
+          >
+            {visible.map((ticket) => {
+              const group = ticket.queueGroup || escalationGroup(ticket, now)
+              return (
+                <tr key={ticket.id} className="hover:bg-surface-muted">
+                  <td className={cell}>
+                    <button
+                      type="button"
+                      className={cx(
+                        'mb-1.5 block cursor-pointer text-caption font-semibold text-primary',
+                        focusRing
+                      )}
+                      onClick={() => openDetail(ticket.id)}
+                    >
+                      #{ticket.id}
+                    </button>
+                    <button
+                      type="button"
+                      className={cx(linkButton, focusRing)}
+                      onClick={() => openDetail(ticket.id)}
+                    >
+                      {ticket.item}
+                    </button>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <Badge tone={GROUP_TONES[group]}>{GROUP_LABELS[group]}</Badge>
+                      <Badge>{ticket.category}</Badge>
+                    </div>
+                  </td>
+                  <td className={cell}>
+                    <div className="divide-y divide-line-subtle">
+                      <Party ticket={ticket} side="lost" />
+                      <Party ticket={ticket} side="found" />
+                    </div>
+                  </td>
+                  <td className={cell}>
+                    <span
+                      className={cx(
+                        'inline-flex items-center gap-1.5 text-caption',
+                        ticket.chatOpenedAt ? 'text-primary' : 'text-ink-subtle'
+                      )}
+                    >
+                      <Icon name="chat" size={14} />
+                      {ticket.chatOpenedAt ? 'Đã mở chat' : 'Chưa mở chat'}
+                    </span>
+                    <p className="mt-2 text-caption leading-relaxed text-ink-muted">
+                      {ticket.meetingPoint
+                        ? `Đã hẹn: ${ticket.meetingPoint}`
+                        : 'Chưa ghi nhận hẹn gặp'}
+                    </p>
+                  </td>
+                  <td className={cell}>
+                    <strong className="block whitespace-nowrap text-small text-ink">
+                      {elapsedDays(
+                        group === 'overdue' ? ticket.transactionStartedAt : ticket.lastActivityAt,
+                        now
+                      )}{' '}
+                      ngày
+                    </strong>
+                    <small className="mt-1 block text-caption text-ink-subtle">
+                      {group === 'overdue' ? 'Từ khi giao dịch mở' : 'Từ hoạt động cuối'}
+                    </small>
+                    {ticket.reminderCount > 0 && (
+                      <small className="mt-1 block text-caption text-ink-subtle">
+                        Đã nhắc {ticket.reminderCount} lần
+                      </small>
+                    )}
+                  </td>
+                  <td className={cell}>
+                    <TicketStatus ticket={ticket} />
+                  </td>
+                  <td className={cell}>
+                    <div className="mx-auto grid max-w-[120px] grid-cols-3 place-items-center gap-1.5">
+                      <IconButton
+                        icon="eye"
+                        tone="view"
+                        label={`Xem hồ sơ #${ticket.id}`}
+                        onClick={() => openDetail(ticket.id)}
+                      />
+                      {Object.entries(ESCALATION_ACTIONS).map(([action, settings]) => {
+                        const disabledReason = actionUnavailable(ticket, action, now)
+                        return (
+                          <IconButton
+                            key={action}
+                            icon={settings.icon}
+                            tone={settings.tone}
+                            label={`${settings.label} · hồ sơ #${ticket.id}`}
+                            title={disabledReason || settings.label}
+                            disabled={Boolean(disabledReason)}
+                            onClick={() => openAction(ticket.id, action)}
+                          />
+                        )
+                      })}
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
+          </DataTable>
+          <Pagination
+            page={currentPage}
+            total={filtered.length}
+            pageSize={PAGE_SIZE}
+            onChange={setPage}
+            noun="hồ sơ"
+          />
+        </>
+      ) : (
+        <>
+          <Summary count={logs.length} noun="thao tác" />
+          <AuditRows
+            logs={logs.slice((currentLogPage - 1) * PAGE_SIZE, currentLogPage * PAGE_SIZE)}
+            onView={(logId) => setModal({ kind: 'log', logId })}
+          />
+          <Pagination
+            page={currentLogPage}
+            total={logs.length}
+            pageSize={PAGE_SIZE}
+            onChange={setLogPage}
+            noun="thao tác"
+          />
+        </>
+      )}
+
+      {selected && modal.kind === 'detail' && (
+        <Dialog
+          key="detail"
+          size="lg"
+          title={`Hồ sơ #${selected.id}`}
+          onClose={closeModal}
+          footer={
+            <>
+              <Button onClick={closeModal}>Đóng</Button>
+              <TicketActions
+                ticket={selected}
+                now={now}
+                onAction={(action) => openAction(selected.id, action)}
+              />
+            </>
+          }
+        >
+          <h3 className="mb-3 text-title font-bold text-primary [overflow-wrap:anywhere]">
+            {selected.item}
+          </h3>
+          <TicketStatus ticket={selected} />
+          <div className="my-4 grid grid-cols-2 gap-3 max-sm:grid-cols-1">
+            {['lost', 'found'].map((side) => (
+              <div key={side} className="rounded-lg border border-line p-3.5">
+                <Party detailed ticket={selected} side={side} />
+              </div>
+            ))}
+          </div>
+          <DetailList
+            rows={[
+              ['Nhóm hồ sơ', GROUP_LABELS[selected.queueGroup || escalationGroup(selected, now)]],
+              ['Hoạt động cuối', formatDate(selected.lastActivityAt)],
+              ['Bắt đầu giao dịch', formatDate(selected.transactionStartedAt)],
+              [
+                'Mở chat',
+                selected.chatOpenedAt ? formatDate(selected.chatOpenedAt) : 'Chưa mở chat',
+              ],
+              ['Hẹn gặp', selected.meetingPoint || 'Chưa ghi nhận'],
+              [
+                'Email nhắc',
+                `${selected.reminderCount} lần${selected.lastRemindedAt ? ` · Gần nhất ${formatDate(selected.lastRemindedAt)}` : ''}`,
+              ],
+            ]}
+          />
+          {actionUnavailable(selected, 'returned', now) && (
+            <p className={hint}>{actionUnavailable(selected, 'returned', now)}</p>
+          )}
+          <h4 className={heading}>Nhật ký hồ sơ</h4>
+          <div className="flex flex-col gap-3">
+            {logs
+              .filter((log) => log.entityId === selected.id)
+              .map((log) => (
+                <button
+                  key={log.id}
+                  type="button"
+                  className={cx(
+                    'block w-full cursor-pointer rounded-md border border-l-3 border-line border-l-primary/40 bg-surface-muted p-3 text-left hover:bg-primary-subtle',
+                    focusRing
+                  )}
+                  onClick={() => setModal({ kind: 'log', logId: log.id })}
+                >
+                  <strong className="block text-small font-semibold text-primary">
+                    {ESCALATION_ACTIONS[log.action].label}
+                  </strong>
+                  <span className="my-1 block text-caption text-ink-muted">
+                    {log.actor} · {formatDate(log.createdAt)}
+                  </span>
+                  <p className="text-small leading-relaxed text-ink-secondary [overflow-wrap:anywhere]">
+                    {log.detail.reason}
+                  </p>
+                </button>
+              ))}
+            {!logs.some((log) => log.entityId === selected.id) && (
+              <p className="text-caption text-ink-muted">Chưa có thao tác.</p>
+            )}
+          </div>
+        </Dialog>
+      )}
+
+      {selected && modal.kind === 'action' && (
+        <EscalationActionDialog
+          key={`${selected.id}-${modal.action}`}
+          ticket={selected}
+          action={modal.action}
+          onClose={closeModal}
+          onSubmit={handleAction}
+        />
+      )}
+
+      {selectedLog && (
+        <Dialog
+          key="log"
+          title={`Nhật ký · Hồ sơ #${selectedLog.entityId}`}
+          onClose={closeModal}
+          footer={<Button onClick={closeModal}>Đóng</Button>}
+        >
+          <DetailList
+            rows={[
+              ['Thao tác', ESCALATION_ACTIONS[selectedLog.action].label],
+              ['Người thực hiện', selectedLog.actor],
+              ['Thời gian', formatDate(selectedLog.createdAt)],
+              ['Hồ sơ', `#${selectedLog.entityId}`],
+              ['Trước thao tác', <TicketStatus key="before" ticket={selectedLog.before} />],
+              ['Sau thao tác', <TicketStatus key="after" ticket={selectedLog.after} />],
+            ]}
+          />
+          <h4 className={heading}>Lý do / căn cứ</h4>
+          <p className="rounded-lg border border-primary-soft bg-primary-subtle px-3.5 py-3 text-small leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">
+            {selectedLog.detail.reason}
+          </p>
+          {selectedLog.detail.offlineConfirmed && (
+            <p className={hint}>Moderator đã kiểm tra việc trao trả offline (Ca A).</p>
+          )}
+          {selectedLog.action === 'hide' && (
+            <p className={hint}>
+              Bài đã ẩn:{' '}
+              {selectedLog.detail.targets
+                .map(
+                  (side) =>
+                    `${selectedLog.before[side].postId} (${side === 'lost' ? 'bên mất' : 'bên nhặt'})`
+                )
+                .join(', ')}
+            </p>
+          )}
+          {selectedLog.action === 'remind' && (
+            <>
+              <h4 className={heading}>Email nhắc</h4>
+              <p className="mb-2 text-caption text-ink-muted">
+                Người nhận: {selectedLog.detail.recipients.join(', ')}
+              </p>
+              <p className="rounded-lg border border-primary-soft bg-primary-subtle px-3.5 py-3 text-small leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">
+                {selectedLog.detail.message}
+              </p>
+            </>
+          )}
+        </Dialog>
+      )}
+    </div>
+  )
 }
