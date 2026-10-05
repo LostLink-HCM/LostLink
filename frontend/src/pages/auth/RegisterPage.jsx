@@ -40,13 +40,12 @@ export default function RegisterPage() {
 
     setLoading(true)
     try {
-      const res = await authApi.register({ ...form, emailOptIn })
-      // res.data gồm email và các mốc thời gian của mã do backend quyết định
+      const res = await authApi.register({ ...form, emailOptIn }) 
       navigate('/verify-email', { state: { ...res.data, justSent: true } })
     } catch (err) {
       setFieldErrors(err.fieldErrors ?? {})
       if (!err.details?.length) setError(err.message)
-      if (err.status === 409 && /chờ xác thực/.test(err.message)) setPendingEmail(form.email)
+      if (err.code === 'EMAIL_PENDING_VERIFICATION') setPendingEmail(form.email)
     } finally {
       setLoading(false)
     }

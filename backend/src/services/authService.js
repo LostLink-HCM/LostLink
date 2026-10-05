@@ -65,7 +65,8 @@ const register = async ({ username, email, password, emailOptIn = true }) => {
   // Khi mã còn hạn thì không cho đăng ký lại
   if (existing && (await hasActiveCode(existing))) {
     throw ApiError.conflict(
-      'Email đang chờ xác thực. Vui lòng kiểm tra email hoặc yêu cầu gửi lại mã.'
+      'Email đang chờ xác thực. Vui lòng kiểm tra email hoặc yêu cầu gửi lại mã.',
+      'EMAIL_PENDING_VERIFICATION'
     )
   }
 
