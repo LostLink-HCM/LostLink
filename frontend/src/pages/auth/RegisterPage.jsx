@@ -40,7 +40,7 @@ export default function RegisterPage() {
 
     setLoading(true)
     try {
-      const res = await authApi.register({ ...form, emailOptIn }) 
+      const res = await authApi.register({ ...form, emailOptIn })
       navigate('/verify-email', { state: { ...res.data, justSent: true } })
     } catch (err) {
       setFieldErrors(err.fieldErrors ?? {})
