@@ -22,8 +22,8 @@ class ApiError extends Error {
     return new ApiError(404, message)
   }
 
-  static conflict(message = 'Conflict') {
-    return new ApiError(409, message)
+  static conflict(message = 'Conflict', errorCode) {
+    return new ApiError(409, message, undefined, errorCode)
   }
 }
 

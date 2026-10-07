@@ -14,8 +14,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  format:
+    name: Format (prettier)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm run format:check
+
   backend:
-    name: Backend (lint + format)
+    name: Backend (lint)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -24,13 +37,11 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          # Trùng với máy dev: lock file tạo bằng npm 11, npm 10 (Node 20) báo lệch lock
-          node-version: 24
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
       - run: npm run lint
-      - run: npm run format:check
 
   frontend:
     name: Frontend (lint + build)
@@ -42,7 +53,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci

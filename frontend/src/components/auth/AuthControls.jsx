@@ -19,7 +19,9 @@ export function Field({ id, label, error, hint, trailing, className = '', ...pro
           className={`${inputClass} ${trailing ? 'pr-10' : ''} ${className}`}
           {...props}
         />
-        {trailing && <div className="absolute inset-y-0 right-0 flex items-center pr-1">{trailing}</div>}
+        {trailing && (
+          <div className="absolute inset-y-0 right-0 flex items-center pr-1">{trailing}</div>
+        )}
       </div>
       {error ? (
         <span id={`${id}-error`} className="text-[11px] leading-[1.45] text-[#ffb4b4]">
@@ -53,7 +55,17 @@ export function PasswordField({ className = '', ...props }) {
           aria-pressed={visible}
           className="flex size-8 cursor-pointer items-center justify-center rounded-md border-0 bg-transparent p-0 text-au-ink/55 transition-colors hover:text-au-ink focus-visible:outline-2 focus-visible:outline-au-accent"
         >
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg
+            width="17"
+            height="17"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
             <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" />
             <circle cx="12" cy="12" r="3" />
             {visible && <path d="M3 3l18 18" />}
