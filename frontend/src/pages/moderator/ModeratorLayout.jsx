@@ -8,6 +8,7 @@ import { cx, focusRing } from '../../components/moderator/classes'
 import { createWorkspacePosts, workspacePostMatches } from '../../data/workspacePosts'
 import { moderatorReports } from '../../data/moderatorReports'
 import { createEscalationLogs, createEscalationState } from '../../data/escalations'
+import { createModeratorMessages } from '../../data/moderatorMessages'
 
 const navigation = [
   { path: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -35,6 +36,7 @@ export default function ModeratorLayout() {
     const state = createEscalationState()
     return { ...state, logs: createEscalationLogs(state.tickets) }
   })
+  const [messageState, setMessageState] = useState(createModeratorMessages)
   const pendingCount = posts.filter((post) => post.status === 'pending').length
   const currentPath = pathname.replace(/\/$/, '')
   const active =
@@ -201,6 +203,8 @@ export default function ModeratorLayout() {
               setReports,
               escalationState,
               setEscalationState,
+              messageState,
+              setMessageState,
             }}
           />
         </main>

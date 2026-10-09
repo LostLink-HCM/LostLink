@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { RequireRole } from './auth/guards.jsx'
 import HomePage from './pages/HomePage.jsx'
 import LoginPage from './pages/auth/LoginPage.jsx'
+import Messages from './pages/moderator/Messages.jsx'
 import RegisterPage from './pages/auth/RegisterPage.jsx'
 import VerifyEmailPage from './pages/auth/VerifyEmailPage.jsx'
 import ComingSoon from './pages/moderator/ComingSoon.jsx'
@@ -28,7 +29,7 @@ function App() {
         <Route path="reports" element={<Reports />} />
         <Route path="escalations" element={<Escalations />} />
         <Route path="dashboard" element={<ComingSoon />} />
-        <Route path="messages" element={<ComingSoon />} />
+        <Route path="messages" element={<Messages />} />
         <Route path="notifications" element={<ComingSoon />} />
         <Route path="*" element={<Navigate to="/moderator" replace />} />
       </Route>
