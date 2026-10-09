@@ -4,7 +4,8 @@
   "license": "UNLICENSED",
   "scripts": {
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "ci": "npm run format:check && npm --prefix backend run lint && npm --prefix frontend run lint && npm --prefix frontend run build"
   },
   "engines": {
     "node": ">=24",
