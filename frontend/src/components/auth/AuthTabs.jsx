@@ -13,7 +13,7 @@ export default function AuthTabs() {
           to={to}
           replace
           className={({ isActive }) =>
-            `-mb-px border-b-2 pb-2.5 text-[15px] font-semibold no-underline transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-au-accent ${
+            `-mb-px border-b-2 pb-2.5 text-lead leading-normal font-semibold no-underline transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-au-accent ${
               isActive
                 ? 'border-au-accent text-au-ink'
                 : 'border-transparent text-au-ink/50 hover:text-au-ink/80'

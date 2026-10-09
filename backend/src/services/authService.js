@@ -1,13 +1,15 @@
 const bcrypt = require('bcryptjs')
 
+const env = require('../config/env')
 const { User, EmailToken } = require('../models')
 const ApiError = require('../utils/ApiError')
-const { generateOtp, hashToken, matchesHash } = require('../utils/crypto')
+const { generateOtp, generateResetToken, hashToken, matchesHash } = require('../utils/crypto')
 const { issueTokens, isRevoked, verifyRefreshToken } = require('../utils/token')
 const emailService = require('./emailService')
 
 const OTP_TTL_MINUTES = 10
-// Mỗi lần gửi lại sẽ xoá mã cũ
+const RESET_TTL_MINUTES = 10
+// Áp dụng cho cả gửi lại OTP lẫn link đặt lại mật khẩu, mỗi lần gửi lại sẽ xoá mã cũ
 const RESEND_COOLDOWN_SECONDS = 45
 const MAX_OTP_ATTEMPTS = 5
 const BCRYPT_ROUNDS = 10
@@ -15,6 +17,7 @@ const BCRYPT_ROUNDS = 10
 const INVALID_CODE = 'Mã xác thực không đúng hoặc đã hết hạn.'
 const INVALID_CREDENTIALS = 'Email hoặc mật khẩu không đúng.'
 const SESSION_EXPIRED = 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.'
+const INVALID_RESET_LINK = 'Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.'
 
 // không tiết lộ email đã đăng ký hay chưa
 const DUMMY_HASH = bcrypt.hashSync('lostlink-dummy-password', BCRYPT_ROUNDS)
@@ -31,10 +34,14 @@ const publicUser = (user) => ({
   createdAt: user.createdAt,
 })
 
-const findActiveCode = (user) =>
-  EmailToken.findOne({ user: user._id, purpose: 'verify', expiresAt: { $gt: new Date() } })
+const findActiveCode = (user, purpose = 'verify') =>
+  EmailToken.findOne({ user: user._id, purpose, expiresAt: { $gt: new Date() } })
 
 const hasActiveCode = async (user) => Boolean(await findActiveCode(user))
+
+// Chặn spam email vào hộp thư của người khác khi bị gửi lại liên tục
+const canResend = (record) =>
+  !record || Date.now() - record.createdAt.getTime() >= RESEND_COOLDOWN_SECONDS * 1000
 
 const codeTiming = (email) => ({
   email,
@@ -113,11 +120,8 @@ const verifyEmail = async ({ email, code }) => {
 
 const resendCode = async ({ email }) => {
   const user = await User.findOne({ email })
-  if (user && !user.emailVerifiedAt) {
-    const current = await findActiveCode(user)
-    const cooledDown =
-      !current || Date.now() - current.createdAt.getTime() >= RESEND_COOLDOWN_SECONDS * 1000
-    if (cooledDown) await issueVerificationOtp(user)
+  if (user && !user.emailVerifiedAt && canResend(await findActiveCode(user))) {
+    await issueVerificationOtp(user)
   }
   return codeTiming(email)
 }
@@ -138,7 +142,56 @@ const login = async ({ email, password }) => {
   return { user: publicUser(user), ...issueTokens(user) }
 }
 
-// Chữ ký đúng chưa đủ: phải đối chiếu DB để token bị thu hồi hoặc tài khoản bị khoá mất hiệu lực ngay
+const issueResetLink = async (user) => {
+  await EmailToken.deleteMany({ user: user._id, purpose: 'reset' })
+
+  const token = generateResetToken()
+  await EmailToken.create({
+    user: user._id,
+    purpose: 'reset',
+    codeHash: hashToken(token),
+    expiresAt: new Date(Date.now() + RESET_TTL_MINUTES * 60 * 1000),
+  })
+
+  const resetUrl = `${env.clientUrl}/reset-password?token=${token}`
+  emailService
+    .sendResetLink({ to: user.email, resetUrl, minutes: RESET_TTL_MINUTES })
+    .catch((err) => console.error('Failed to send reset password email:', err.message))
+}
+
+// Luôn trả cùng một kết quả để không lộ email nào đã đăng ký
+const forgotPassword = async ({ email }) => {
+  const user = await User.findOne({ email })
+  if (user && canResend(await findActiveCode(user, 'reset'))) await issueResetLink(user)
+
+  return {
+    email,
+    expiresInMinutes: RESET_TTL_MINUTES,
+    resendAfterSeconds: RESEND_COOLDOWN_SECONDS,
+  }
+}
+
+const resetPassword = async ({ token, password }) => {
+  // Xoá ngay khi tìm thấy để link chỉ dùng được một lần, kể cả khi bấm gửi hai lần cùng lúc
+  const record = await EmailToken.findOneAndDelete({
+    purpose: 'reset',
+    codeHash: hashToken(token),
+    expiresAt: { $gt: new Date() },
+  })
+  const user = record && (await User.findById(record.user))
+  if (!user) throw ApiError.badRequest(INVALID_RESET_LINK)
+
+  user.passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS)
+  // Mở được link gửi qua email cũng chứng minh sở hữu email đó
+  user.emailVerifiedAt ??= new Date()
+  // Thu hồi mọi phiên đang đăng nhập, kể cả của người đã biết mật khẩu cũ
+  user.tokenVersion += 1
+  await user.save()
+  await EmailToken.deleteMany({ user: user._id })
+
+  return { email: user.email }
+}
+
 const findSessionUser = async (payload) => {
   const user = await User.findById(payload.sub)
   if (!user || isRevoked(payload, user)) throw ApiError.unauthorized(SESSION_EXPIRED)
@@ -180,6 +233,8 @@ module.exports = {
   verifyEmail,
   resendCode,
   login,
+  forgotPassword,
+  resetPassword,
   findSessionUser,
   refreshSession,
   logout,

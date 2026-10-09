@@ -2,7 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import * as authApi from '../../api/auth'
 import AuthLayout from '../../components/auth/AuthLayout'
-import { Alert, Field, OtpBox, PrimaryButton, TextLink } from '../../components/auth/AuthControls'
+import {
+  Alert,
+  AuthHeading,
+  Field,
+  FieldLegend,
+  Note,
+  OtpBox,
+  PrimaryButton,
+  TextLink,
+} from '../../components/auth/AuthControls'
 import { useAuth } from '../../auth/AuthContext'
 import { homePathFor } from '../../lib/session'
 
@@ -126,20 +135,27 @@ export default function VerifyEmailPage() {
 
   return (
     <AuthLayout>
-      <div className="mb-3.5 flex size-10 items-center justify-center rounded-[11px] border border-[rgba(110,168,255,.3)] bg-[rgba(110,168,255,.16)]">
-        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <div className="mb-3.5 flex size-10 items-center justify-center rounded-xl border border-au-accent/30 bg-au-accent/16">
+        <svg
+          width="21"
+          height="21"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+          className="text-au-star"
+        >
           <rect
             x="2.6"
             y="4.6"
             width="18.8"
             height="14.8"
             rx="3"
-            stroke="#A9CCFF"
+            stroke="currentColor"
             strokeWidth="1.8"
           />
           <path
             d="M3.6 7 12 13l8.4-6"
-            stroke="#A9CCFF"
+            stroke="currentColor"
             strokeWidth="1.8"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -147,11 +163,9 @@ export default function VerifyEmailPage() {
         </svg>
       </div>
 
-      <h1 className="mb-1 mt-0 font-sans text-[26px] font-bold leading-tight tracking-[-.4px] text-au-ink">
-        Xác thực email
-      </h1>
+      <AuthHeading>Xác thực email</AuthHeading>
       {justSent ? (
-        <p className="mb-4 text-[12.5px] leading-[1.6] text-au-ink/60">
+        <p className="mb-4 text-au-body text-au-ink/60">
           Mã xác thực đã gửi tới <strong className="break-all text-au-ink">{email}</strong>
           {expiresInMinutes && (
             <>
@@ -161,7 +175,7 @@ export default function VerifyEmailPage() {
           )}
         </p>
       ) : (
-        <p className="mb-4 text-[12.5px] leading-[1.6] text-au-ink/60">
+        <p className="mb-4 text-au-body text-au-ink/60">
           Nhập email đã đăng ký và mã 6 số trong email xác thực.
         </p>
       )}
@@ -188,9 +202,7 @@ export default function VerifyEmailPage() {
         )}
 
         <fieldset className="m-0 border-0 p-0">
-          <legend className="mb-1 p-0 text-[10.5px] font-semibold tracking-[.06em] text-au-ink/60">
-            MÃ XÁC THỰC
-          </legend>
+          <FieldLegend>MÃ XÁC THỰC</FieldLegend>
           <div className="grid grid-cols-6 gap-1.5 min-[360px]:gap-2">
             {digits.map((digit, i) => (
               <OtpBox
@@ -214,18 +226,16 @@ export default function VerifyEmailPage() {
         </PrimaryButton>
       </form>
 
-      <p className="mb-0 mt-3.5 text-[12px] text-au-ink/60" aria-live="polite">
+      <p className="mb-0 mt-3.5 text-caption text-au-ink/60" aria-live="polite">
         {cooldown > 0 ? `Chưa nhận được mã? Gửi lại sau ${cooldown}s. ` : 'Chưa nhận được mã? '}
         <TextLink type="button" onClick={onResend} disabled={cooldown > 0 || !email}>
           Gửi lại mã
         </TextLink>
       </p>
 
-      <div className="mt-3.5 rounded-[9px] bg-white/5 px-3 py-2 text-[11.5px] leading-[1.6] text-au-ink/55">
-        Không thấy email? Hãy kiểm tra thư mục Spam.
-      </div>
+      <Note className="mt-3.5">Không thấy email? Hãy kiểm tra thư mục Spam.</Note>
 
-      <p className="mb-0 mt-3.5 text-[12px] text-au-ink/55">
+      <p className="mb-0 mt-3.5 text-caption text-au-ink/55">
         Nhập nhầm email?{' '}
         <TextLink as={Link} to="/register">
           Quay lại đăng ký
@@ -238,12 +248,19 @@ export default function VerifyEmailPage() {
 function VerifiedView({ user, onEnter }) {
   return (
     <div className="py-1.5 text-center">
-      <div className="relative mx-auto mb-5 flex size-[62px] items-center justify-center rounded-full border border-[rgba(110,168,255,.3)] bg-[rgba(110,168,255,.16)]">
-        <div className="absolute inset-0 rounded-full border border-[rgba(110,168,255,.6)] motion-safe:animate-ll-pulse" />
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <div className="relative mx-auto mb-5 flex size-15.5 items-center justify-center rounded-full border border-au-accent/30 bg-au-accent/16">
+        <div className="absolute inset-0 rounded-full border border-au-accent/60 motion-safe:animate-ll-pulse" />
+        <svg
+          width="28"
+          height="28"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+          className="text-au-star"
+        >
           <path
             d="M5 12.8 10 17.6 19.2 7"
-            stroke="#A9CCFF"
+            stroke="currentColor"
             strokeWidth="2.2"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -251,13 +268,11 @@ function VerifiedView({ user, onEnter }) {
         </svg>
       </div>
 
-      <h1 className="mb-1.5 mt-0 font-sans text-[26px] font-bold leading-tight tracking-[-.4px] text-au-ink">
-        Tài khoản đã kích hoạt
-      </h1>
-      <p className="mb-2 text-[12.5px] leading-[1.6] text-au-ink/60">
+      <AuthHeading className="mb-1.5">Tài khoản đã kích hoạt</AuthHeading>
+      <p className="mb-2 text-au-body text-au-ink/60">
         Email <strong className="break-all text-au-ink">{user.email}</strong> đã được xác thực.
       </p>
-      <p className="mb-6 text-[12.5px] leading-[1.6] text-au-ink/50">
+      <p className="mb-6 text-au-body text-au-ink/50">
         {user.emailOptIn
           ? 'Đã bật email thông báo khi có thông tin liên quan, bạn có thể tắt trong Cài đặt.'
           : 'Email thông báo đang tắt, bạn có thể bật lại bất cứ lúc nào trong Cài đặt.'}
