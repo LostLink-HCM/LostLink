@@ -10,6 +10,7 @@ import ResetPasswordPage from './pages/auth/ResetPasswordPage.jsx'
 import ComingSoon from './pages/moderator/ComingSoon.jsx'
 import Escalations from './pages/moderator/Escalations.jsx'
 import ModeratorLayout from './pages/moderator/ModeratorLayout.jsx'
+import Notifications from './pages/moderator/Notifications.jsx'
 import Posts from './pages/moderator/Posts.jsx'
 import Reports from './pages/moderator/Reports.jsx'
 import Review from './pages/moderator/Review.jsx'
@@ -32,7 +33,7 @@ function App() {
         <Route path="escalations" element={<Escalations />} />
         <Route path="dashboard" element={<ComingSoon />} />
         <Route path="messages" element={<Messages />} />
-        <Route path="notifications" element={<ComingSoon />} />
+        <Route path="notifications" element={<Notifications />} />
         <Route path="*" element={<Navigate to="/moderator" replace />} />
       </Route>
       <Route path="/login" element={<LoginPage />} />
