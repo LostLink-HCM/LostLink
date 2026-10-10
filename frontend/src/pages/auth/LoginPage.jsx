@@ -20,6 +20,8 @@ export default function LoginPage() {
   const [form, setForm] = useState({ email: location.state?.email ?? '', password: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  // Trang đặt lại mật khẩu chuyển sang đây kèm thông báo thành công
+  const [notice, setNotice] = useState(location.state?.notice ?? '')
   const [fieldErrors, setFieldErrors] = useState({})
 
   const onChange = (e) => {
@@ -31,6 +33,7 @@ export default function LoginPage() {
   const onSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    setNotice('')
     setLoading(true)
     try {
       const res = await authApi.login(form)
@@ -58,11 +61,10 @@ export default function LoginPage() {
     <AuthLayout>
       <h1 className="sr-only">Đăng nhập</h1>
       <AuthTabs />
-      <p className="mb-4 text-[12.5px] leading-[1.6] text-au-ink/60">
-        Chào mừng bạn trở lại LostLink.
-      </p>
+      <p className="mb-4 text-au-body text-au-ink/60">Chào mừng bạn trở lại LostLink.</p>
 
       {error && <Alert>{error}</Alert>}
+      {notice && <Alert tone="info">{notice}</Alert>}
 
       <form noValidate onSubmit={onSubmit} className="flex flex-col gap-2.5">
         <Field
@@ -86,19 +88,30 @@ export default function LoginPage() {
           error={fieldErrors.password}
         />
 
+        <div className="-mt-1 flex justify-end">
+          <TextLink
+            as={Link}
+            to="/forgot-password"
+            state={{ email: form.email.trim() }}
+            className="text-caption"
+          >
+            Quên mật khẩu?
+          </TextLink>
+        </div>
+
         <PrimaryButton type="submit" className="mt-1.5" disabled={loading}>
           {loading ? 'Đang đăng nhập…' : 'Đăng nhập'}
         </PrimaryButton>
       </form>
 
-      <p className="mb-0 mt-3.5 text-[12px] text-au-ink/60">
+      <p className="mb-0 mt-3.5 text-caption text-au-ink/60">
         Chưa có tài khoản?{' '}
         <TextLink as={Link} to="/register" replace>
           Đăng ký
         </TextLink>
       </p>
 
-      <p className="mb-0 mt-3.5 text-center text-[12px]">
+      <p className="mb-0 mt-3.5 text-center text-caption">
         <Link to="/" className="text-au-ink/55 no-underline hover:text-au-link">
           Xem tin công khai mà không cần đăng nhập →
         </Link>

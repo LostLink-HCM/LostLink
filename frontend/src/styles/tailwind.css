@@ -12,6 +12,30 @@
   --color-au-star: #a9ccff;
   --color-au-danger: #e96060;
   --color-au-success: #4cbe8b;
+  --color-au-danger-ink: #ffb4b4;
+  --color-au-primary: #3b76d6;
+  --color-au-primary-light: #4c86e0;
+  --color-au-primary-dark: #2b5fae;
+
+  /* Thang chữ riêng của khu auth (form nhỏ gọn trên nền tối) */
+  --text-au-label: 10.5px;
+  --text-au-label--letter-spacing: 0.06em;
+  --text-au-hint: 11px;
+  --text-au-hint--line-height: 1.45;
+  --text-au-note: 11.5px;
+  --text-au-note--line-height: 1.6;
+  --text-au-body: 12.5px;
+  --text-au-body--line-height: 1.6;
+  --text-au-button: 13.5px;
+  --text-au-title: 26px;
+  --text-au-title--line-height: 1.25;
+  --text-au-title--letter-spacing: -0.4px;
+
+  --radius-au-control: 9px;
+  --radius-au-card: 18px;
+
+  --shadow-au-button: 0 10px 24px -10px rgb(59 118 214 / 0.9);
+  --shadow-au-card: 0 30px 80px -24px rgb(4 12 24 / 0.7), inset 0 1px 0 rgb(255 255 255 / 0.14);
 
   /* Token theo ngữ nghĩa, giá trị mặc định là khu quản trị (moderator/admin).
      Khu khác muốn màu chủ đạo riêng thì ghi đè biến ở layout của khu đó. */

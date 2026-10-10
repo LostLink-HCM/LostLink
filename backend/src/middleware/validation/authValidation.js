@@ -69,4 +69,22 @@ const loginRules = [
     .withMessage('Mật khẩu không hợp lệ.'),
 ]
 
-module.exports = { registerRules, verifyRules, resendRules, loginRules }
+const forgotRules = [email()]
+
+const resetRules = [
+  body('token')
+    .isString()
+    .bail()
+    .matches(/^[a-f0-9]{64}$/)
+    .withMessage('Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.'),
+  password(),
+]
+
+module.exports = {
+  registerRules,
+  verifyRules,
+  resendRules,
+  loginRules,
+  forgotRules,
+  resetRules,
+}

@@ -18,5 +18,7 @@ const emailTokenSchema = new Schema(
 )
 
 emailTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 })
+// Link đặt lại mật khẩu chỉ chứa token, tra theo hash của token
+emailTokenSchema.index({ codeHash: 1 })
 
 module.exports = mongoose.model('EmailToken', emailTokenSchema)

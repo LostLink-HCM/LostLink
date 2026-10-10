@@ -58,6 +58,23 @@ const login = asyncHandler(async (req, res) => {
   sendSession(res, data, 'Đăng nhập thành công.')
 })
 
+const forgotPassword = asyncHandler(async (req, res) => {
+  const data = await authService.forgotPassword({ email: req.body.email })
+  res.json({
+    success: true,
+    message: 'Nếu email đã được đăng ký, liên kết đặt lại mật khẩu đã được gửi.',
+    data,
+  })
+})
+
+const resetPassword = asyncHandler(async (req, res) => {
+  const { token, password } = req.body
+  const data = await authService.resetPassword({ token, password })
+  // Phiên trên trình duyệt này cũng đã bị thu hồi nên xoá luôn cookie
+  clearRefreshCookie(res)
+  res.json({ success: true, message: 'Đặt lại mật khẩu thành công.', data })
+})
+
 // FE gọi khi mở app để khôi phục phiên và khi access token hết hạn
 const refresh = asyncHandler(async (req, res) => {
   try {
@@ -79,4 +96,14 @@ const me = (req, res) => {
   res.json({ success: true, data: { user: authService.publicUser(req.user) } })
 }
 
-module.exports = { register, verifyEmail, resendCode, login, refresh, logout, me }
+module.exports = {
+  register,
+  verifyEmail,
+  resendCode,
+  login,
+  forgotPassword,
+  resetPassword,
+  refresh,
+  logout,
+  me,
+}

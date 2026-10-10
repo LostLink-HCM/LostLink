@@ -14,8 +14,6 @@ const getTransporter = () => {
   return transporter
 }
 
-// Thiếu cấu hình SMTP thì in email ra console để vẫn chạy được khi dev,
-// còn production thì báo lỗi vì in ra sẽ làm lộ mã vào log
 const sendMail = async ({ to, subject, text, html }) => {
   const tx = getTransporter()
   if (!tx) {
@@ -40,4 +38,18 @@ const sendVerificationCode = ({ to, code, minutes }) =>
       </div>`,
   })
 
-module.exports = { sendVerificationCode }
+const sendResetLink = ({ to, resetUrl, minutes }) =>
+  sendMail({
+    to,
+    subject: 'Đặt lại mật khẩu LostLink',
+    text: `Mở liên kết sau để đặt lại mật khẩu: ${resetUrl} (hiệu lực ${minutes} phút).`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto">
+        <h2>Đặt lại mật khẩu LostLink</h2>
+        <p>Bấm vào nút bên dưới để chọn mật khẩu mới:</p>
+        <p><a href="${resetUrl}" style="display:inline-block;padding:12px 20px;background:#3B76D6;color:#fff;border-radius:8px;text-decoration:none">Đặt lại mật khẩu</a></p>
+        <p style="color:#666">Liên kết có hiệu lực trong ${minutes} phút. Nếu bạn không yêu cầu, hãy bỏ qua email này.</p>
+      </div>`,
+  })
+
+module.exports = { sendVerificationCode, sendResetLink }

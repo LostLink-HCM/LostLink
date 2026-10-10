@@ -1,14 +1,16 @@
 import { useState } from 'react'
 
 const inputClass =
-  'h-[38px] w-full rounded-[9px] border border-white/16 bg-white/6 px-3 text-[13px] text-au-ink outline-none transition-[border-color,box-shadow,background-color] duration-150 placeholder:text-au-ink/40 focus:border-au-accent focus:bg-white/10 focus:shadow-[0_0_0_3px_rgba(110,168,255,.16)] aria-invalid:border-au-danger aria-invalid:focus:shadow-[0_0_0_3px_rgba(233,96,96,.2)] disabled:opacity-60'
+  'h-9.5 w-full rounded-au-control border border-white/16 bg-white/6 px-3 text-small text-au-ink outline-none transition placeholder:text-au-ink/40 focus:border-au-accent focus:bg-white/10 focus:ring-3 focus:ring-au-accent/16 aria-invalid:border-au-danger aria-invalid:focus:ring-au-danger/20 disabled:opacity-60'
+
+const labelClass = 'text-au-label font-semibold text-au-ink/60'
 
 export function Field({ id, label, error, hint, trailing, className = '', ...props }) {
   const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined
 
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-[10.5px] font-semibold tracking-[.06em] text-au-ink/60">
+      <label htmlFor={id} className={labelClass}>
         {label}
       </label>
       <div className="relative">
@@ -24,12 +26,12 @@ export function Field({ id, label, error, hint, trailing, className = '', ...pro
         )}
       </div>
       {error ? (
-        <span id={`${id}-error`} className="text-[11px] leading-[1.45] text-[#ffb4b4]">
+        <span id={`${id}-error`} className="text-au-hint text-au-danger-ink">
           {error}
         </span>
       ) : (
         hint && (
-          <span id={`${id}-hint`} className="text-[11px] leading-[1.45] text-au-ink/55">
+          <span id={`${id}-hint`} className="text-au-hint text-au-ink/55">
             {hint}
           </span>
         )
@@ -81,7 +83,7 @@ export function OtpBox(props) {
     <input
       type="text"
       inputMode="numeric"
-      className={`${inputClass} h-[44px] min-w-0 px-0 text-center text-[18px] font-semibold`}
+      className={`${inputClass} h-11 min-w-0 px-0 text-center text-title font-semibold`}
       {...props}
     />
   )
@@ -90,7 +92,7 @@ export function OtpBox(props) {
 export function PrimaryButton({ children, className = '', ...props }) {
   return (
     <button
-      className={`h-[40px] w-full cursor-pointer rounded-[9px] border-0 bg-[linear-gradient(180deg,#4c86e0,#2b5fae)] text-[13.5px] font-semibold text-white shadow-[0_10px_24px_-10px_rgba(59,118,214,.9)] transition-[filter,transform] duration-150 hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-au-accent active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:brightness-100 ${className}`}
+      className={`h-10 w-full cursor-pointer rounded-au-control border-0 bg-linear-to-b from-au-primary-light to-au-primary-dark text-au-button font-semibold text-white shadow-au-button transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-au-accent active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:brightness-100 ${className}`}
       {...props}
     >
       {children}
@@ -100,14 +102,14 @@ export function PrimaryButton({ children, className = '', ...props }) {
 
 export function Alert({ tone = 'error', children }) {
   const tones = {
-    error: 'border-au-danger/35 bg-au-danger/12 text-[#ffbcbc]',
+    error: 'border-au-danger/35 bg-au-danger/12 text-au-danger-ink',
     info: 'border-au-accent/35 bg-au-accent/12 text-au-link-hover',
   }
 
   return (
     <div
       role={tone === 'error' ? 'alert' : 'status'}
-      className={`mb-3.5 rounded-[9px] border px-3 py-2 text-[12px] leading-[1.5] ${tones[tone]}`}
+      className={`mb-3.5 rounded-au-control border px-3 py-2 text-caption ${tones[tone]}`}
     >
       {children}
     </div>
@@ -120,5 +122,27 @@ export function TextLink({ as: Component = 'button', className = '', ...props })
       className={`cursor-pointer border-0 bg-transparent p-0 font-semibold text-au-link no-underline hover:text-au-link-hover disabled:cursor-default disabled:text-au-ink/35 ${className}`}
       {...props}
     />
+  )
+}
+
+// Tiêu đề chính của các trang auth, margin dưới truyền qua className
+export function AuthHeading({ className = 'mb-1', ...props }) {
+  return (
+    <h1 className={`mt-0 font-sans text-au-title font-bold text-au-ink ${className}`} {...props} />
+  )
+}
+
+export function FieldLegend({ children }) {
+  return <legend className={`mb-1 p-0 ${labelClass}`}>{children}</legend>
+}
+
+// Khung ghi chú phụ, ví dụ nhắc kiểm tra thư mục Spam
+export function Note({ className = '', children }) {
+  return (
+    <div
+      className={`rounded-au-control bg-white/5 px-3 py-2 text-au-note text-au-ink/55 ${className}`}
+    >
+      {children}
+    </div>
   )
 }

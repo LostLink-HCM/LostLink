@@ -55,7 +55,7 @@ export default function RegisterPage() {
     <AuthLayout>
       <h1 className="sr-only">Đăng ký</h1>
       <AuthTabs />
-      <p className="mb-4 text-[12.5px] leading-[1.6] text-au-ink/60">
+      <p className="mb-4 text-au-body text-au-ink/60">
         Đăng tin và nhận gợi ý ghép cặp cho món đồ thất lạc.
       </p>
 
@@ -109,29 +109,27 @@ export default function RegisterPage() {
         </div>
 
         <label
-          className={`flex cursor-pointer gap-2 rounded-[10px] border px-3 py-2 transition-colors ${
-            emailOptIn
-              ? 'border-[rgba(110,168,255,.34)] bg-[rgba(110,168,255,.1)]'
-              : 'border-white/14 bg-white/4'
+          className={`flex cursor-pointer gap-2 rounded-au-control border px-3 py-2 transition-colors ${
+            emailOptIn ? 'border-au-accent/34 bg-au-accent/10' : 'border-white/14 bg-white/4'
           }`}
         >
           <input
             type="checkbox"
             checked={emailOptIn}
             onChange={(e) => setEmailOptIn(e.target.checked)}
-            className="mt-px size-3.5 flex-none cursor-pointer accent-[#3B76D6]"
+            className="mt-px size-3.5 flex-none cursor-pointer accent-au-primary"
           />
-          <span className="self-center text-[12px] font-medium leading-[1.5]">
+          <span className="self-center text-caption font-medium">
             Nhận email khi có tin liên quan đến món đồ của bạn
           </span>
         </label>
 
-        <label className="flex cursor-pointer items-start gap-2 text-[11.5px] leading-[1.5] text-au-ink/60">
+        <label className="flex cursor-pointer items-start gap-2 text-au-note leading-normal text-au-ink/60">
           <input
             type="checkbox"
             checked={agreed}
             onChange={(e) => setAgreed(e.target.checked)}
-            className="mt-px size-3.5 flex-none cursor-pointer accent-[#3B76D6]"
+            className="mt-px size-3.5 flex-none cursor-pointer accent-au-primary"
           />
           <span>Tôi đồng ý với Điều khoản sử dụng và Chính sách bảo mật</span>
         </label>
@@ -141,7 +139,7 @@ export default function RegisterPage() {
         </PrimaryButton>
       </form>
 
-      <p className="mb-0 mt-3.5 text-center text-[12px]">
+      <p className="mb-0 mt-3.5 text-center text-caption">
         <Link to="/" className="text-au-ink/55 no-underline hover:text-au-link">
           Xem tin công khai mà không cần đăng nhập →
         </Link>

@@ -5,6 +5,8 @@ import LoginPage from './pages/auth/LoginPage.jsx'
 import Messages from './pages/moderator/Messages.jsx'
 import RegisterPage from './pages/auth/RegisterPage.jsx'
 import VerifyEmailPage from './pages/auth/VerifyEmailPage.jsx'
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage.jsx'
+import ResetPasswordPage from './pages/auth/ResetPasswordPage.jsx'
 import ComingSoon from './pages/moderator/ComingSoon.jsx'
 import Escalations from './pages/moderator/Escalations.jsx'
 import ModeratorLayout from './pages/moderator/ModeratorLayout.jsx'
@@ -36,6 +38,8 @@ function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
