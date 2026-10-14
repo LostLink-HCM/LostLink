@@ -14,6 +14,8 @@ import Notifications from './pages/moderator/Notifications.jsx'
 import Posts from './pages/moderator/Posts.jsx'
 import Reports from './pages/moderator/Reports.jsx'
 import Review from './pages/moderator/Review.jsx'
+import AdminLayout from './pages/admin/AdminLayout.jsx'
+import AdminDashboard from './pages/admin/Dashboard.jsx'
 
 function App() {
   return (
@@ -35,6 +37,18 @@ function App() {
         <Route path="messages" element={<Messages />} />
         <Route path="notifications" element={<Notifications />} />
         <Route path="*" element={<Navigate to="/moderator" replace />} />
+      </Route>
+      <Route
+        path="/admin"
+        element={
+          <RequireRole roles={['admin']}>
+            <AdminLayout />
+          </RequireRole>
+        }
+      >
+        <Route index element={<Navigate to="/admin/dashboard" replace />} />
+        <Route path="dashboard" element={<AdminDashboard />} />
+        <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
       </Route>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
