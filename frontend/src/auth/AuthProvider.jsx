@@ -6,10 +6,10 @@ import { AuthContext } from './AuthContext'
 
 export default function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
-  // false cho tới khi biết người dùng có phiên cũ hay không, tránh guard đẩy về /login quá sớm
+  // false cho tới khi biết người dùng có phiên cũ hay không
   const [ready, setReady] = useState(false)
 
-  // Khôi phục phiên khi mở app; guest không có cookie nên nhận 401 là bình thường
+  // Khôi phục phiên khi mở app
   useEffect(() => {
     refreshSession()
       .then((data) => setUser(data.user))
@@ -23,7 +23,7 @@ export default function AuthProvider({ children }) {
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired)
   }, [])
 
-  // Nhận { user, accessToken } từ login hoặc verify-email
+  // Nhận { user, accessToken } từ login, login Google hoặc verify-email
   const signIn = useCallback(({ user: nextUser, accessToken }) => {
     setAccessToken(accessToken)
     setUser(nextUser)

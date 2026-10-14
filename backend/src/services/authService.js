@@ -6,6 +6,7 @@ const ApiError = require('../utils/ApiError')
 const { generateOtp, generateResetToken, hashToken, matchesHash } = require('../utils/crypto')
 const { issueTokens, isRevoked, verifyRefreshToken } = require('../utils/token')
 const emailService = require('./emailService')
+const { verifyGoogleIdToken } = require('./googleService')
 
 const OTP_TTL_MINUTES = 10
 const RESET_TTL_MINUTES = 10
@@ -142,6 +143,73 @@ const login = async ({ email, password }) => {
   return { user: publicUser(user), ...issueTokens(user) }
 }
 
+const USERNAME_BASE_MAX = 24
+
+// Lấy phần trước @ của email làm username, trùng thì thêm số
+const deriveUsername = async (email) => {
+  let base = email
+    .split('@')[0]
+    .replace(/[^a-zA-Z0-9._]/g, '')
+    .slice(0, USERNAME_BASE_MAX)
+  // Thêm tiền tố thay vì hậu tố để không ghép thành từ lạ, vd "ab" + "user" = "abuser"
+  if (base.length < 3) base = base ? `user_${base}` : 'user'
+
+  let candidate = base
+  for (let n = 1; await User.exists({ username: candidate }); n += 1) {
+    candidate = `${base}${n}`
+  }
+  return candidate
+}
+
+// Gắn Google vào tài khoản đăng ký bằng mật khẩu có cùng email
+const linkGoogleAccount = async (user, googleId) => {
+  if (user.googleId && user.googleId !== googleId) {
+    throw ApiError.conflict('Email này đã được liên kết với một tài khoản Google khác.')
+  }
+  if (user.status === 'locked') return user
+
+  if (!user.emailVerifiedAt) {
+    user.passwordHash = undefined
+    user.emailVerifiedAt = new Date()
+    await EmailToken.deleteMany({ user: user._id, purpose: 'verify' })
+  }
+  user.googleId = googleId
+  return user.save()
+}
+
+const createGoogleUser = async ({ googleId, email }) => {
+  try {
+    return await User.create({
+      username: await deriveUsername(email),
+      email,
+      googleId,
+      emailVerifiedAt: new Date(),
+    })
+  } catch (err) {
+    if (err.code === 11000) {
+      const user = await User.findOne({ googleId })
+      if (user) return user
+    }
+    throw err
+  }
+}
+
+const googleLogin = async ({ idToken }) => {
+  const profile = await verifyGoogleIdToken(idToken)
+
+  let user = await User.findOne({ googleId: profile.googleId })
+  if (!user) {
+    const byEmail = await User.findOne({ email: profile.email }).select('+passwordHash')
+    user = byEmail
+      ? await linkGoogleAccount(byEmail, profile.googleId)
+      : await createGoogleUser(profile)
+  }
+
+  if (user.status === 'locked') throw ApiError.forbidden('Tài khoản đã bị khoá.', 'ACCOUNT_LOCKED')
+
+  return { user: publicUser(user), ...issueTokens(user) }
+}
+
 const issueResetLink = async (user) => {
   await EmailToken.deleteMany({ user: user._id, purpose: 'reset' })
 
@@ -233,6 +301,7 @@ module.exports = {
   verifyEmail,
   resendCode,
   login,
+  googleLogin,
   forgotPassword,
   resetPassword,
   findSessionUser,

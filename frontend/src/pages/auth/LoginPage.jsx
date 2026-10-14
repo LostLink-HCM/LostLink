@@ -10,6 +10,7 @@ import {
   PrimaryButton,
   TextLink,
 } from '../../components/auth/AuthControls'
+import GoogleSignIn from '../../components/auth/GoogleSignIn'
 import { useAuth } from '../../auth/AuthContext'
 import { homePathFor } from '../../lib/session'
 
@@ -103,6 +104,13 @@ export default function LoginPage() {
           {loading ? 'Đang đăng nhập…' : 'Đăng nhập'}
         </PrimaryButton>
       </form>
+
+      <GoogleSignIn
+        onError={(message) => {
+          setError(message)
+          setNotice('')
+        }}
+      />
 
       <p className="mb-0 mt-3.5 text-caption text-au-ink/60">
         Chưa có tài khoản?{' '}

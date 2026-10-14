@@ -10,6 +10,7 @@ import {
   PrimaryButton,
   TextLink,
 } from '../../components/auth/AuthControls'
+import GoogleSignIn from '../../components/auth/GoogleSignIn'
 import PasswordChecklist from '../../components/auth/PasswordChecklist'
 
 export default function RegisterPage() {
@@ -138,6 +139,14 @@ export default function RegisterPage() {
           {loading ? 'Đang gửi…' : 'Gửi mã xác thực'}
         </PrimaryButton>
       </form>
+
+      <GoogleSignIn
+        text="signup_with"
+        onError={(message) => {
+          setError(message)
+          setPendingEmail('')
+        }}
+      />
 
       <p className="mb-0 mt-3.5 text-center text-caption">
         <Link to="/" className="text-au-ink/55 no-underline hover:text-au-link">
