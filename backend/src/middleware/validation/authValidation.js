@@ -69,6 +69,16 @@ const loginRules = [
     .withMessage('Mật khẩu không hợp lệ.'),
 ]
 
+// ID token là JWT vài KB, giới hạn độ dài để không gửi chuỗi quá lớn sang Google
+const googleRules = [
+  body('idToken')
+    .isString()
+    .withMessage('Thiếu thông tin đăng nhập Google.')
+    .bail()
+    .isLength({ min: 1, max: 4096 })
+    .withMessage('Thông tin đăng nhập Google không hợp lệ.'),
+]
+
 const forgotRules = [email()]
 
 const resetRules = [
@@ -85,6 +95,7 @@ module.exports = {
   verifyRules,
   resendRules,
   loginRules,
+  googleRules,
   forgotRules,
   resetRules,
 }

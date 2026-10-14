@@ -58,6 +58,11 @@ const login = asyncHandler(async (req, res) => {
   sendSession(res, data, 'Đăng nhập thành công.')
 })
 
+const googleLogin = asyncHandler(async (req, res) => {
+  const data = await authService.googleLogin({ idToken: req.body.idToken })
+  sendSession(res, data, 'Đăng nhập bằng Google thành công.')
+})
+
 const forgotPassword = asyncHandler(async (req, res) => {
   const data = await authService.forgotPassword({ email: req.body.email })
   res.json({
@@ -101,6 +106,7 @@ module.exports = {
   verifyEmail,
   resendCode,
   login,
+  googleLogin,
   forgotPassword,
   resetPassword,
   refresh,

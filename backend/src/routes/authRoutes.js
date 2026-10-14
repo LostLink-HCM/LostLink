@@ -9,6 +9,7 @@ const {
   verifyRules,
   resendRules,
   loginRules,
+  googleRules,
   forgotRules,
   resetRules,
 } = require('../middleware/validation/authValidation')
@@ -19,6 +20,7 @@ router.post('/register', authLimiter, registerRules, validate, ctrl.register)
 router.post('/verify-email', authLimiter, verifyRules, validate, ctrl.verifyEmail)
 router.post('/resend-code', authLimiter, resendRules, validate, ctrl.resendCode)
 router.post('/login', authLimiter, loginRules, validate, ctrl.login)
+router.post('/google', authLimiter, googleRules, validate, ctrl.googleLogin)
 router.post('/forgot-password', authLimiter, forgotRules, validate, ctrl.forgotPassword)
 router.post('/reset-password', authLimiter, resetRules, validate, ctrl.resetPassword)
 router.post('/refresh', ctrl.refresh)
