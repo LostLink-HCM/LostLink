@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useOutletContext } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import Icon from '../components/common/Icon'
 import EmptyState from '../components/moderator/EmptyState'
@@ -8,27 +8,13 @@ import FeedFilters from '../components/home/FeedFilters'
 import PostCard from '../components/home/PostCard'
 import RightRail from '../components/home/RightRail'
 import SearchBox from '../components/home/SearchBox'
-import SiteHeader from '../components/home/SiteHeader'
 import StickyPanel from '../components/home/StickyPanel'
-import { createFeedPosts } from '../data/homeFeed'
 import { DEFAULT_FILTERS, filterPosts, validateFilters } from '../lib/homeFeed'
 
-const userTheme = [
-  '[--color-primary:#2e6db4] [--color-primary-hover:#1e4e86] [--color-primary-soft:#e7f0fb] [--color-primary-subtle:#f1f6fc]',
-  '[--text-caption:11px] [--text-small:11.7px] [--text-body:12.6px] [--text-lead:13.5px] [--text-title:16.2px] [--text-heading:21.6px]',
-].join(' ')
-
 export default function HomePage() {
-  const navigate = useNavigate()
   const { user } = useAuth()
-  const [posts] = useState(createFeedPosts)
-  const [now] = useState(Date.now)
-  const [liked, setLiked] = useState(() => new Set())
-
-  const [searchInput, setSearchInput] = useState('')
-  const [keyword, setKeyword] = useState('')
-  const [draft, setDraft] = useState(DEFAULT_FILTERS)
-  const [applied, setApplied] = useState(DEFAULT_FILTERS)
+  const { posts, comments, now, search, keyword, filters, liked, toggleLike } = useOutletContext()
+  const { draft, setDraft, applied, setApplied } = filters
   const [filterError, setFilterError] = useState('')
   const [drawerOpen, setDrawerOpen] = useState(false)
 
@@ -36,6 +22,12 @@ export default function HomePage() {
     () => filterPosts(posts, applied, keyword, now),
     [posts, applied, keyword, now]
   )
+
+  const commentCounts = useMemo(() => {
+    const counts = {}
+    for (const item of comments) counts[item.postId] = (counts[item.postId] ?? 0) + 1
+    return counts
+  }, [comments])
 
   useEffect(() => {
     if (!drawerOpen) return
@@ -45,16 +37,6 @@ export default function HomePage() {
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [drawerOpen])
-
-  const search = {
-    value: searchInput,
-    onChange: setSearchInput,
-    onSearch: setKeyword,
-    onClear: () => {
-      setSearchInput('')
-      setKeyword('')
-    },
-  }
 
   const filterProps = {
     draft,
@@ -77,24 +59,8 @@ export default function HomePage() {
     },
   }
 
-  // Thích là chức năng của thành viên, Guest được chuyển sang đăng nhập
-  const toggleLike = (id) => {
-    if (!user) {
-      navigate('/login', { state: { from: '/' } })
-      return
-    }
-    setLiked((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
   return (
-    <div className={cx('min-h-dvh bg-canvas font-sans text-ink', userTheme)}>
-      <SiteHeader search={search} />
-
+    <>
       <div className="mx-auto max-w-360 px-4 pt-5 pb-10 sm:px-6 lg:px-10 lg:pt-7">
         <h1 className="sr-only">Bài đăng mới trên LostLink</h1>
 
@@ -130,6 +96,7 @@ export default function HomePage() {
                     key={post.id}
                     post={post}
                     now={now}
+                    commentCount={commentCounts[post.id] ?? 0}
                     liked={liked.has(post.id)}
                     onToggleLike={() => toggleLike(post.id)}
                   />
@@ -185,6 +152,6 @@ export default function HomePage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }
