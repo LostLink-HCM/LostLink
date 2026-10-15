@@ -16,6 +16,7 @@ import Reports from './pages/moderator/Reports.jsx'
 import Review from './pages/moderator/Review.jsx'
 import AdminLayout from './pages/admin/AdminLayout.jsx'
 import AdminDashboard from './pages/admin/Dashboard.jsx'
+import AdminUsers from './pages/admin/Users.jsx'
 
 function App() {
   return (
@@ -48,6 +49,7 @@ function App() {
       >
         <Route index element={<Navigate to="/admin/dashboard" replace />} />
         <Route path="dashboard" element={<AdminDashboard />} />
+        <Route path="users" element={<AdminUsers />} />
         <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
       </Route>
       <Route path="/login" element={<LoginPage />} />
