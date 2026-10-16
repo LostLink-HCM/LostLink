@@ -1,5 +1,6 @@
 import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
+import Icon from '../common/Icon'
 import Logo from '../common/Logo'
 import { cx, focusRing } from '../moderator/classes'
 import SearchBox from './SearchBox'
@@ -51,7 +52,20 @@ export default function SiteHeader({ search }) {
 
         <div className="ml-auto flex items-center gap-2 lg:ml-0">
           {user ? (
-            <UserMenu />
+            <>
+              <Link
+                to="/posts/new"
+                aria-label="Đăng bài"
+                className={cx(
+                  'inline-flex h-10 items-center gap-2 rounded-full bg-primary px-3 text-small font-semibold text-white no-underline shadow-[0_2px_10px_rgb(46_109_180/0.28)] transition-colors hover:bg-primary-hover sm:px-4',
+                  focusRing
+                )}
+              >
+                <Icon name="compose" size={16} />
+                <span className="hidden sm:inline">Đăng bài</span>
+              </Link>
+              <UserMenu />
+            </>
           ) : (
             <>
               <Link

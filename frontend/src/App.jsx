@@ -1,7 +1,9 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { RequireAuth } from './auth/guards.jsx'
 import HomePage from './pages/HomePage.jsx'
 import PostDetailPage from './pages/PostDetailPage.jsx'
+import ComposePostPage from './pages/ComposePostPage.jsx'
 import UserLayout from './pages/UserLayout.jsx'
 import LoginPage from './pages/auth/LoginPage.jsx'
 import RegisterPage from './pages/auth/RegisterPage.jsx'
@@ -28,6 +30,14 @@ function App() {
       <Routes>
         <Route path="/" element={<UserLayout />}>
           <Route index element={<HomePage />} />
+          <Route
+            path="posts/new"
+            element={
+              <RequireAuth>
+                <ComposePostPage />
+              </RequireAuth>
+            }
+          />
           <Route path="posts/:id" element={<PostDetailPage />} />
         </Route>
         <Route path="/moderator/*" element={<ModeratorRoutes />} />

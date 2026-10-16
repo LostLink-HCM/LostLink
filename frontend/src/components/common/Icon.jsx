@@ -48,6 +48,8 @@ const paths = {
   back: 'm14 6-6 6 6 6',
   next: 'm10 6 6 6-6 6',
   home: 'm3 10 9-7 9 7M5 9v12h14V9M9 21v-8h6v8',
+  plus: 'M12 5v14M5 12h14',
+  trash: 'M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6',
 }
 
 export default function Icon({ name, size = 18, className }) {
