@@ -22,7 +22,7 @@ export const AREAS = [
 
 const HOUR = 60 * 60 * 1000
 const hoursAgo = (h) => new Date(Date.now() - h * HOUR).toISOString()
-const photo = (seed) => `https://picsum.photos/seed/${seed}/480/480`
+const photo = (seed) => `https://picsum.photos/seed/${seed}/960/720`
 
 export const createFeedPosts = () => [
   {
@@ -38,9 +38,8 @@ export const createFeedPosts = () => [
     createdAt: hoursAgo(2),
     status: 'searching',
     likes: 24,
-    comments: 3,
     views: 412,
-    image: photo('lostlink-wallet'),
+    images: [photo('lostlink-wallet'), photo('lostlink-wallet-2'), photo('lostlink-wallet-3')],
   },
   {
     id: 102,
@@ -55,9 +54,8 @@ export const createFeedPosts = () => [
     createdAt: hoursAgo(5),
     status: 'searching',
     likes: 41,
-    comments: 7,
     views: 1204,
-    image: photo('lostlink-phone'),
+    images: [photo('lostlink-phone'), photo('lostlink-phone-2'), photo('lostlink-phone-3')],
   },
   {
     id: 103,
@@ -72,9 +70,8 @@ export const createFeedPosts = () => [
     createdAt: hoursAgo(8),
     status: 'contacted',
     likes: 63,
-    comments: 12,
     views: 2881,
-    image: photo('lostlink-dog'),
+    images: [photo('lostlink-dog'), photo('lostlink-dog-2'), photo('lostlink-dog-3')],
   },
   {
     id: 104,
@@ -89,9 +86,8 @@ export const createFeedPosts = () => [
     createdAt: hoursAgo(26),
     status: 'searching',
     likes: 12,
-    comments: 2,
     views: 336,
-    image: photo('lostlink-bag'),
+    images: [photo('lostlink-bag'), photo('lostlink-bag-2'), photo('lostlink-bag-3')],
   },
   {
     id: 105,
@@ -106,9 +102,8 @@ export const createFeedPosts = () => [
     createdAt: hoursAgo(30),
     status: 'searching',
     likes: 9,
-    comments: 1,
     views: 208,
-    image: photo('lostlink-keys'),
+    images: [photo('lostlink-keys'), photo('lostlink-keys-2'), photo('lostlink-keys-3')],
   },
   {
     id: 106,
@@ -123,9 +118,8 @@ export const createFeedPosts = () => [
     createdAt: hoursAgo(70),
     status: 'searching',
     likes: 5,
-    comments: 0,
     views: 97,
-    image: photo('lostlink-card'),
+    images: [photo('lostlink-card'), photo('lostlink-card-2'), photo('lostlink-card-3')],
   },
   {
     id: 107,
@@ -140,9 +134,8 @@ export const createFeedPosts = () => [
     createdAt: hoursAgo(98),
     status: 'searching',
     likes: 31,
-    comments: 4,
     views: 645,
-    image: photo('lostlink-ring'),
+    images: [photo('lostlink-ring'), photo('lostlink-ring-2'), photo('lostlink-ring-3')],
   },
   {
     id: 108,
@@ -157,9 +150,8 @@ export const createFeedPosts = () => [
     createdAt: hoursAgo(140),
     status: 'searching',
     likes: 3,
-    comments: 1,
     views: 74,
-    image: photo('lostlink-glasses'),
+    images: [photo('lostlink-glasses'), photo('lostlink-glasses-2'), photo('lostlink-glasses-3')],
   },
   {
     id: 109,
@@ -174,9 +166,8 @@ export const createFeedPosts = () => [
     createdAt: hoursAgo(290),
     status: 'searching',
     likes: 18,
-    comments: 5,
     views: 512,
-    image: photo('lostlink-airpods'),
+    images: [photo('lostlink-airpods'), photo('lostlink-airpods-2'), photo('lostlink-airpods-3')],
   },
   {
     id: 110,
@@ -191,9 +182,8 @@ export const createFeedPosts = () => [
     createdAt: hoursAgo(480),
     status: 'searching',
     likes: 52,
-    comments: 9,
     views: 1730,
-    image: photo('lostlink-cat'),
+    images: [photo('lostlink-cat'), photo('lostlink-cat-2'), photo('lostlink-cat-3')],
   },
 ]
 
@@ -210,4 +200,80 @@ export const communityStats = [
   { value: '4.037', label: 'Đồ đã trao trả', accent: true },
   { value: '32,3%', label: 'Tỷ lệ ghép cặp thành công' },
   { value: '2,1 ngày', label: 'Thời gian trao trả trung bình' },
+]
+
+// Thông tin công khai của người đăng, hiện ở cột phải trang chi tiết
+export const authors = {
+  'hoangnam.q1': { reputation: 248, returned: 24 },
+  'thuylinh.q3': { reputation: 96, returned: 9 },
+  'minhkhoi.td': { reputation: 312, returned: 31 },
+  'ducanh.bk': { reputation: 12, returned: 1 },
+  'baotran.sg': { reputation: 174, returned: 19 },
+  'vanhoa.gv': { reputation: 0, returned: 0 },
+  'thuha.q7': { reputation: 45, returned: 5 },
+  'quocbao.tb': { reputation: 8, returned: 1 },
+  'ngockhanh.q10': { reputation: 141, returned: 14 },
+  'thanhtam.q7': { reputation: 20, returned: 2 },
+}
+
+const comment = (id, postId, author, h, text) => ({
+  id,
+  postId,
+  author,
+  createdAt: hoursAgo(h),
+  text,
+})
+
+export const createFeedComments = () => [
+  comment(
+    1,
+    101,
+    'ngockhanh.q10',
+    1,
+    'Tối qua em cũng thấy một chiếc ví nâu rơi gần bùng binh, không rõ có phải cái này không ạ.'
+  ),
+  comment(
+    2,
+    101,
+    'thuylinh.q3',
+    1.5,
+    'Cảm ơn anh đã đăng tin. Mong chủ nhân sớm nhận lại được giấy tờ.'
+  ),
+  comment(
+    3,
+    101,
+    'baotran.sg',
+    1.8,
+    'Anh nên gửi tạm ở công an phường cho an toàn nhé, khu đó đông người qua lại lắm.'
+  ),
+  comment(
+    4,
+    102,
+    'minhkhoi.td',
+    3,
+    'Bạn thử gọi tổng đài xe buýt hỏi bộ phận đồ thất lạc tuyến 19 xem.'
+  ),
+  comment(5, 102, 'hoangnam.q1', 4, 'Mình chia sẻ lên nhóm cư dân Quận 3 rồi nha.'),
+  comment(6, 103, 'thuha.q7', 6, 'Bé dễ thương quá, mong sớm tìm được chủ.'),
+  comment(
+    7,
+    104,
+    'baotran.sg',
+    20,
+    'Bến xe có phòng giữ đồ thất lạc ở tầng trệt, bạn qua hỏi thử.'
+  ),
+  comment(
+    8,
+    107,
+    'ngockhanh.q10',
+    80,
+    'Rạp này có quầy giữ đồ, chủ nhân nhớ mang theo vé xem phim để đối chiếu.'
+  ),
+  comment(
+    9,
+    110,
+    'thuylinh.q3',
+    300,
+    'Khu Him Lam nhiều mèo hoang, bạn thử để thức ăn quen thuộc trước cửa vào buổi tối.'
+  ),
 ]

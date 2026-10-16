@@ -1,23 +1,20 @@
-import { formatCount, timeAgo, TYPE_LABELS } from '../../lib/homeFeed'
+import { Link } from 'react-router-dom'
+import { formatCount, timeAgo } from '../../lib/homeFeed'
 import Icon from '../common/Icon'
 import { cx, focusRing } from '../moderator/classes'
-
-const typeTones = {
-  lost: 'bg-danger-soft text-danger-ink',
-  found: 'bg-primary-soft text-primary',
-}
+import LikeButton from './LikeButton'
+import TypeTag from './TypeTag'
 
 const Dot = () => (
   <span aria-hidden="true" className="size-0.75 shrink-0 rounded-full bg-line-strong" />
 )
 
-export default function PostCard({ post, liked, onToggleLike, now }) {
-  const likes = post.likes + (liked ? 1 : 0)
-
+// Cả thẻ bấm được nhờ link ở tiêu đề phủ lên toàn thẻ, nút Thích nằm trên lớp đó
+export default function PostCard({ post, commentCount, liked, onToggleLike, now }) {
   return (
-    <article className="flex gap-3.5 rounded-2xl border border-line bg-surface p-3.5 shadow-card transition hover:border-line-strong hover:shadow-[0_10px_28px_-14px_rgb(22_35_58/0.25)] sm:gap-5 sm:p-4.5">
+    <article className="relative flex gap-3.5 rounded-2xl border border-line bg-surface p-3.5 shadow-card transition hover:border-line-strong hover:shadow-[0_10px_28px_-14px_rgb(22_35_58/0.25)] sm:gap-5 sm:p-4.5">
       <img
-        src={post.image}
+        src={post.images[0]}
         alt=""
         loading="lazy"
         className="h-28 w-24 shrink-0 rounded-xl bg-line-subtle object-cover sm:h-48 sm:w-44"
@@ -30,20 +27,19 @@ export default function PostCard({ post, liked, onToggleLike, now }) {
           <span>{post.category}</span>
           <Dot />
           <time dateTime={post.createdAt}>{timeAgo(post.createdAt, now)}</time>
-          <span className="ml-auto flex shrink-0 items-center gap-1.5">
-            <span
-              className={cx(
-                'rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wide uppercase',
-                typeTones[post.type]
-              )}
-            >
-              {TYPE_LABELS[post.type]}
-            </span>
-          </span>
+          <TypeTag type={post.type} className="ml-auto shrink-0" />
         </div>
 
         <h3 className="m-0 mb-1.5 text-lead leading-snug font-bold tracking-tight text-ink sm:text-title">
-          {post.title}
+          <Link
+            to={`/posts/${post.id}`}
+            className={cx(
+              'text-inherit no-underline after:absolute after:inset-0 after:rounded-2xl hover:text-primary',
+              focusRing
+            )}
+          >
+            {post.title}
+          </Link>
         </h3>
         <p className="m-0 mb-3 line-clamp-2 text-small text-ink-muted sm:line-clamp-3">
           {post.desc}
@@ -61,32 +57,14 @@ export default function PostCard({ post, liked, onToggleLike, now }) {
         </div>
 
         <div className="mt-auto flex items-center gap-3 border-t border-line-subtle pt-3">
-          <button
-            type="button"
-            aria-pressed={liked}
-            aria-label={liked ? 'Bỏ thích' : 'Thích'}
+          <LikeButton
+            liked={liked}
+            count={post.likes + (liked ? 1 : 0)}
             onClick={onToggleLike}
-            className={cx(
-              'inline-flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-[10.5px] font-semibold transition-colors',
-              liked
-                ? 'border-[#f3c4ce] bg-[#fdecef] text-[#d93a5b]'
-                : 'border-line bg-surface text-ink-muted hover:border-[#f3c4ce] hover:text-[#d93a5b]',
-              focusRing
-            )}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M12 21s-7.5-4.6-9.6-9.3C.9 8.3 3 4.5 6.6 4.5c2.1 0 3.6 1.1 5.4 3 1.8-1.9 3.3-3 5.4-3 3.6 0 5.7 3.8 4.2 7.2C19.5 16.4 12 21 12 21Z"
-                fill={liked ? 'currentColor' : 'none'}
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinejoin="round"
-              />
-            </svg>
-            {formatCount(likes)}
-          </button>
+            className="relative z-10"
+          />
           <span className="truncate text-[10.5px] text-ink-subtle">
-            {formatCount(post.comments)} bình luận · {formatCount(post.views)} lượt xem
+            {formatCount(commentCount)} bình luận · {formatCount(post.views)} lượt xem
           </span>
         </div>
       </div>
