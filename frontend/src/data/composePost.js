@@ -134,3 +134,76 @@ export const TIME_PRESETS = [
   { label: 'Hai tuần trước', daysAgo: 14, dayPart: '' },
   { label: 'Một tháng trước', daysAgo: 30, dayPart: '' },
 ]
+
+export const LOCATION_MODES = [
+  { value: 'gps', label: 'Dùng vị trí hiện tại' },
+  { value: 'pin', label: 'Kéo ghim trên bản đồ' },
+  { value: 'address', label: 'Gõ địa chỉ' },
+  { value: 'road', label: 'Chọn đoạn đường' },
+]
+
+// Kết quả tìm địa chỉ mẫu; x, y là vị trí (%) trên bản đồ minh họa
+export const PLACES = [
+  { label: 'Phố đi bộ Nguyễn Huệ', area: 'Quận 1', x: 54, y: 44 },
+  { label: 'Chợ Bến Thành', area: 'Quận 1', x: 46, y: 52 },
+  { label: 'Hồ Con Rùa', area: 'Quận 3', x: 40, y: 36 },
+  { label: 'Trạm xe buýt Nguyễn Thị Minh Khai', area: 'Quận 3', x: 36, y: 46 },
+  { label: 'Crescent Mall', area: 'Quận 7', x: 62, y: 72 },
+  { label: 'Đại học Bách Khoa, 268 Lý Thường Kiệt', area: 'Quận 10', x: 28, y: 54 },
+  { label: 'Landmark 81', area: 'Bình Thạnh', x: 68, y: 30 },
+  { label: 'Công viên Gia Định', area: 'Gò Vấp', x: 44, y: 18 },
+  { label: 'Sân bay Tân Sơn Nhất', area: 'Tân Bình', x: 30, y: 22 },
+  { label: 'Đại học Sư phạm Kỹ thuật, 1 Võ Văn Ngân', area: 'TP. Thủ Đức', x: 80, y: 20 },
+]
+
+// line: hai đầu đoạn đường (%) trên bản đồ minh họa
+export const ROAD_SEGMENTS = [
+  {
+    id: 'nguyen-hue',
+    road: 'Nguyễn Huệ',
+    from: 'Lê Lợi',
+    to: 'Tôn Đức Thắng',
+    area: 'Quận 1',
+    line: [50, 36, 58, 56],
+  },
+  {
+    id: 'le-loi',
+    road: 'Lê Lợi',
+    from: 'Pasteur',
+    to: 'Nam Kỳ Khởi Nghĩa',
+    area: 'Quận 1',
+    line: [38, 50, 56, 44],
+  },
+  {
+    id: 'nguyen-thi-minh-khai',
+    road: 'Nguyễn Thị Minh Khai',
+    from: 'Hai Bà Trưng',
+    to: 'Cách Mạng Tháng 8',
+    area: 'Quận 3',
+    line: [24, 52, 46, 38],
+  },
+  {
+    id: 'nguyen-van-linh',
+    road: 'Nguyễn Văn Linh',
+    from: 'Nguyễn Hữu Thọ',
+    to: 'Huỳnh Tấn Phát',
+    area: 'Quận 7',
+    line: [44, 78, 76, 70],
+  },
+  {
+    id: 'xo-viet-nghe-tinh',
+    road: 'Xô Viết Nghệ Tĩnh',
+    from: 'Điện Biên Phủ',
+    to: 'Ung Văn Khiêm',
+    area: 'Bình Thạnh',
+    line: [58, 40, 64, 18],
+  },
+  {
+    id: 'vo-van-ngan',
+    road: 'Võ Văn Ngân',
+    from: 'Đặng Văn Bi',
+    to: 'Kha Vạn Cân',
+    area: 'TP. Thủ Đức',
+    line: [70, 26, 92, 16],
+  },
+]

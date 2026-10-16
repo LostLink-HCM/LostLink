@@ -1,5 +1,5 @@
 import { CATEGORY_ATTRIBUTES } from '../../data/composePost'
-import { describeTime, getSteps } from '../../lib/composePost'
+import { describeLocation, describeTime, getSteps } from '../../lib/composePost'
 import TypeTag from '../home/TypeTag'
 import Button from '../moderator/Button'
 import Dialog from '../moderator/Dialog'
@@ -29,6 +29,7 @@ export default function ReviewDialog({ form, onEdit, onClose, onSubmit }) {
     (CATEGORY_ATTRIBUTES[form.category] ?? []).map((attr) => [attr.key, attr.label])
   )
   const attributes = Object.entries(form.attributes)
+  const { question } = form
 
   return (
     <Dialog
@@ -94,6 +95,39 @@ export default function ReviewDialog({ form, onEdit, onClose, onSubmit }) {
       <Section title="Thời gian" onEdit={() => onEdit(stepIndex('time'))}>
         <p className="m-0 text-small text-ink">{describeTime(form)}</p>
       </Section>
+
+      <Section title="Vị trí" onEdit={() => onEdit(stepIndex('location'))}>
+        <p className="m-0 text-small text-ink">{describeLocation(form.location)}</p>
+      </Section>
+
+      {form.type === 'found' && (
+        <Section title="Câu hỏi xác minh" onEdit={() => onEdit(stepIndex('question'))}>
+          {question.skipped ? (
+            <p className="m-0 text-small text-ink-secondary">
+              Không đặt câu hỏi, người muốn nhận đồ sẽ gửi yêu cầu liên hệ.
+            </p>
+          ) : (
+            <>
+              <p className="m-0 text-small font-semibold text-ink">{question.text}</p>
+              <ul className="m-0 mt-1.5 flex list-none flex-col gap-1 p-0">
+                {question.options
+                  .map((text, index) => ({ text: text.trim(), index }))
+                  .filter((option) => option.text)
+                  .map((option) => (
+                    <li key={option.index} className="text-small text-ink-secondary">
+                      {option.text}
+                      {option.index === question.correct && (
+                        <span className="ml-2 rounded-full bg-primary-soft px-2 py-0.5 text-[10.5px] font-semibold text-primary">
+                          Đáp án đúng
+                        </span>
+                      )}
+                    </li>
+                  ))}
+              </ul>
+            </>
+          )}
+        </Section>
+      )}
     </Dialog>
   )
 }

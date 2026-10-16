@@ -4,6 +4,8 @@ import { useAuth } from '../auth/AuthContext'
 import Icon from '../components/common/Icon'
 import ClassifyStep from '../components/compose/ClassifyStep'
 import ContentStep from '../components/compose/ContentStep'
+import LocationStep from '../components/compose/LocationStep'
+import QuestionStep from '../components/compose/QuestionStep'
 import ReviewDialog from '../components/compose/ReviewDialog'
 import StepIndicator from '../components/compose/StepIndicator'
 import TimeStep from '../components/compose/TimeStep'
@@ -24,6 +26,10 @@ import {
 } from '../lib/composePost'
 
 const pageClass = 'mx-auto max-w-240 px-4 pt-5 pb-10 sm:px-6 lg:pt-7'
+
+// Khoá lỗi tương ứng khi sửa một trường con
+const LOCATION_ERROR_KEYS = { area: 'area' }
+const QUESTION_ERROR_KEYS = { text: ['question'], skipped: ['question', 'options', 'correct'] }
 
 let nextImageId = 0
 
@@ -110,6 +116,16 @@ export default function ComposePostPage() {
     clearErrors(Object.keys(patch))
   }
 
+  const updateLocation = (patch) => {
+    setForm((prev) => ({ ...prev, location: { ...prev.location, ...patch } }))
+    clearErrors(Object.keys(patch).map((key) => LOCATION_ERROR_KEYS[key] ?? 'location'))
+  }
+
+  const updateQuestion = (patch) => {
+    setForm((prev) => ({ ...prev, question: { ...prev.question, ...patch } }))
+    clearErrors(Object.keys(patch).flatMap((key) => QUESTION_ERROR_KEYS[key] ?? [key]))
+  }
+
   const addImages = (files) => {
     const added = files.map((file) => ({
       id: `img-${(nextImageId += 1)}`,
@@ -143,12 +159,12 @@ export default function ComposePostPage() {
   }
 
   // Kiểm tra toàn bộ, thiếu ở đâu thì quay về bước đó (UC04 bước 11, luồng 11.a)
-  const openReview = () => {
-    const invalid = findInvalidStep(form)
+  const openReview = (target = form) => {
+    const invalid = findInvalidStep(target)
     if (invalid) {
       setStep(invalid.index)
       showErrors(invalid.errors)
-      notify(`Bước "${steps[invalid.index].label}" còn thiếu thông tin.`)
+      notify(`Bước "${getSteps(target.type)[invalid.index].label}" còn thiếu thông tin.`)
       return
     }
     setReviewing(true)
@@ -165,6 +181,14 @@ export default function ComposePostPage() {
   }
 
   const back = () => (current === 0 ? navigate('/') : goTo(current - 1))
+
+  // Bỏ qua câu hỏi thì sang xem lại luôn (UC04 luồng 9.b)
+  const skipQuestion = () => {
+    const target = { ...form, question: { ...form.question, skipped: true } }
+    setForm(target)
+    setErrors({})
+    openReview(target)
+  }
 
   // Lưu nháp ở bất kỳ bước nào rồi kết thúc (UC04 luồng 4.a)
   const handleSaveDraft = () => {
@@ -257,6 +281,22 @@ export default function ComposePostPage() {
             />
           )}
           {stepKey === 'time' && <TimeStep form={form} errors={errors} onChange={update} />}
+          {stepKey === 'location' && (
+            <LocationStep
+              type={form.type}
+              location={form.location}
+              errors={errors}
+              onChange={updateLocation}
+            />
+          )}
+          {stepKey === 'question' && (
+            <QuestionStep
+              question={form.question}
+              errors={errors}
+              onChange={updateQuestion}
+              onSkip={skipQuestion}
+            />
+          )}
         </div>
 
         <div className="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
