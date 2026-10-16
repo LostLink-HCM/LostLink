@@ -9,10 +9,9 @@ import VerifyEmailPage from './pages/auth/VerifyEmailPage.jsx'
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage.jsx'
 import ResetPasswordPage from './pages/auth/ResetPasswordPage.jsx'
 
-// Khu quản trị ít người dùng nên tách file riêng, người dùng thường không phải tải
+// Khu quản trị => người dùng thường không phải tải
 const ModeratorRoutes = lazy(() => import('./pages/moderator/ModeratorRoutes.jsx'))
 const AdminRoutes = lazy(() => import('./pages/admin/AdminRoutes.jsx'))
-
 function PageLoading() {
   return (
     <div
@@ -23,7 +22,6 @@ function PageLoading() {
     </div>
   )
 }
-
 function App() {
   return (
     <Suspense fallback={<PageLoading />}>
