@@ -4,6 +4,12 @@ module.exports = {
   EmailToken: require('./EmailToken'),
 
   Category: require('./Category'),
+  CategoryAttribute: require('./CategoryAttribute'),
+  AttributeValue: require('./AttributeValue'),
+  Alias: require('./Alias'),
+  CategoryVerificationQuestion: require('./CategoryVerificationQuestion'),
+  CategoryMatchRelation: require('./CategoryMatchRelation'),
+  CategoryMatchRelationMember: require('./CategoryMatchRelationMember'),
 
   Post: require('./Post'),
   VerificationChallenge: require('./VerificationChallenge'),

@@ -4,8 +4,18 @@ const { Schema } = mongoose
 
 const badgeSchema = new Schema(
   {
-    name: { type: String, required: true, unique: true, trim: true },
-    description: { type: String, default: '' },
+    name: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      maxlength: 100,
+    },
+    description: {
+      type: String,
+      default: '',
+      maxlength: 500,
+    },
 
     tone: {
       type: String,

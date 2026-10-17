@@ -47,6 +47,12 @@ const userSchema = new Schema(
 
     emailVerifiedAt: { type: Date, default: null },
 
+    // Thời điểm đăng nhập thành công gần nhất của tài khoản
+    lastLoginAt: { type: Date, default: null },
+
+    // Thời điểm gần nhất người dùng thực hiện hoạt động trên hệ thống.
+    lastActiveAt: { type: Date, default: null },
+
     tokenVersion: { type: Number, default: 0 },
 
     badges: [userBadgeSchema],

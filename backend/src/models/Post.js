@@ -31,7 +31,7 @@ const statusHistorySchema = new Schema(
   {
     status: {
       type: String,
-      enum: ['pending', 'searching', 'contacted', 'returned'],
+      enum: ['pending', 'rejected', 'searching', 'contacted', 'returned', 'closed'],
       required: true,
     },
     changedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null }, // null = hệ thống
@@ -70,7 +70,7 @@ const postSchema = new Schema(
 
     status: {
       type: String,
-      enum: ['pending', 'searching', 'contacted', 'returned'],
+      enum: ['pending', 'rejected', 'searching', 'contacted', 'returned', 'closed'],
       default: 'pending',
       index: true,
     },
