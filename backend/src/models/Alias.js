@@ -31,6 +31,8 @@ const aliasSchema = new Schema(
   { timestamps: true, collection: 'aliases' }
 )
 
+aliasSchema.index({ category: 1, term: 1 }, { unique: true })
+
 aliasSchema.pre('validate', function validateAlias() {
   const hasAttribute = Boolean(this.attribute)
   const hasAttributeValue = Boolean(this.attributeValue)

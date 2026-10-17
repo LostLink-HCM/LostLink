@@ -4,14 +4,6 @@ const { Schema } = mongoose
 
 const MAX_IMAGES = 9
 
-const pointSchema = new Schema(
-  {
-    type: { type: String, enum: ['Point'], default: 'Point' },
-    coordinates: { type: [Number], required: true }, // [lng, lat]
-  },
-  { _id: false }
-)
-
 const postContentSchema = new Schema(
   {
     label: { type: String, required: true },
@@ -73,15 +65,6 @@ const postSchema = new Schema(
 
     area: { type: String, default: '', trim: true },
 
-    // Chỉ lộ sau khi hai bên xác nhận trò chuyện
-    locExact: { type: pointSchema, required: true, select: false },
-
-    // Vùng mờ hiển thị công khai
-    locPublic: { type: pointSchema, required: true },
-    locPublicRadius: { type: Number, default: 300 }, // mét
-
-    priorityRadius: { type: Number, default: 400 }, // mét
-
     locType: { type: String, enum: ['point', 'road_segment'], default: 'point' },
 
     status: {
@@ -96,7 +79,18 @@ const postSchema = new Schema(
     commentCount: { type: Number, default: 0 },
 
     contents: [postContentSchema],
-    attributes: [postAttributeSchema],
+    attributes: {
+      type: [postAttributeSchema],
+      validate: {
+        validator: (attributes) => {
+          if (!attributes) return true
+
+          const attributeIds = attributes.map((item) => String(item.attribute))
+          return new Set(attributeIds).size === attributeIds.length
+        },
+        message: 'Mỗi thuộc tính chỉ được xuất hiện một lần trong bài đăng.',
+      },
+    },
     images: {
       type: [postImageSchema],
       validate: {
@@ -110,7 +104,6 @@ const postSchema = new Schema(
   { timestamps: true, collection: 'posts' }
 )
 
-postSchema.index({ locPublic: '2dsphere' })
 postSchema.index({ type: 1, status: 1, createdAt: -1 })
 postSchema.index({ status: 1, viewCount: -1, likeCount: -1 })
 postSchema.index({ title: 'text', description: 'text' })
