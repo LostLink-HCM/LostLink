@@ -4,7 +4,9 @@ const { Schema } = mongoose
 
 const auditLogSchema = new Schema(
   {
-    actor: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    // Nếu hành động do hệ thống tự động thực hiện thì actor là null, còn lại lưu UserID
+    actor: { type: Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+
     action: { type: String, required: true },
 
     entityType: { type: String, default: null },
@@ -12,7 +14,7 @@ const auditLogSchema = new Schema(
 
     detail: { type: Schema.Types.Mixed, default: {} },
   },
-  { timestamps: { createdAt: true, updatedAt: false } }
+  { timestamps: { createdAt: true, updatedAt: false }, collection: 'audit_logs' }
 )
 
 auditLogSchema.index({ createdAt: -1 })

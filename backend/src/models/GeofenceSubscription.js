@@ -14,7 +14,7 @@ const geofenceSubscriptionSchema = new Schema(
 
     active: { type: Boolean, default: true },
   },
-  { timestamps: true }
+  { timestamps: true, collection: 'geofence_subscriptions' }
 )
 
 geofenceSubscriptionSchema.index({ center: '2dsphere' })

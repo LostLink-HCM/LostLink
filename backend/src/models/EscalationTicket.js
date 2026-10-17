@@ -21,7 +21,7 @@ const escalationTicketSchema = new Schema(
 
     dueAt: { type: Date, default: null },
   },
-  { timestamps: true }
+  { timestamps: true, collection: 'escalation_tickets' }
 )
 
 module.exports = mongoose.model('EscalationTicket', escalationTicketSchema)

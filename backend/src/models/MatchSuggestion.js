@@ -24,7 +24,7 @@ const matchSuggestionSchema = new Schema(
       index: true,
     },
   },
-  { timestamps: true }
+  { timestamps: true, collection: 'match_suggestions' }
 )
 
 matchSuggestionSchema.index({ postLost: 1, postFound: 1 }, { unique: true })

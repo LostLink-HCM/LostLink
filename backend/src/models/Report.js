@@ -23,7 +23,7 @@ const reportSchema = new Schema(
       index: true,
     },
   },
-  { timestamps: true }
+  { timestamps: true, collection: 'reports' }
 )
 
 reportSchema.index({ reporter: 1, targetType: 1, targetId: 1 }, { unique: true })
