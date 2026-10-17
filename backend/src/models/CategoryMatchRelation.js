@@ -2,9 +2,16 @@ const mongoose = require('mongoose')
 
 const { Schema } = mongoose
 
-// Đại diện cho một quan hệ giao nhau giữa nhiều Category
+// Cấu hình các Category liên quan cho một Category chính.
 const categoryMatchRelationSchema = new Schema(
-  {},
+  {
+    sourceCategory: {
+      type: Schema.Types.ObjectId,
+      ref: 'Category',
+      required: true,
+      index: true,
+    }, // Category đang được cấu hình trên giao diện
+  },
   { timestamps: true, collection: 'category_match_relations' }
 )
 

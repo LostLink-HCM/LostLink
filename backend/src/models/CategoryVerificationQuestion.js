@@ -13,7 +13,7 @@ const categoryVerificationQuestionSchema = new Schema(
       index: true,
     },
 
-    question: { type: String, required: true, trim: true },
+    question: { type: String, required: true, trim: true, maxlength: 500 },
 
     createdBy: {
       type: Schema.Types.ObjectId,
@@ -27,7 +27,4 @@ const categoryVerificationQuestionSchema = new Schema(
 
 categoryVerificationQuestionSchema.index({ category: 1, question: 1 }, { unique: true })
 
-module.exports = mongoose.model(
-  'CategoryVerificationQuestion',
-  categoryVerificationQuestionSchema
-)
+module.exports = mongoose.model('CategoryVerificationQuestion', categoryVerificationQuestionSchema)

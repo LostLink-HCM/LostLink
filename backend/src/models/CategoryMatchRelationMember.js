@@ -24,7 +24,4 @@ const categoryMatchRelationMemberSchema = new Schema(
 
 categoryMatchRelationMemberSchema.index({ relation: 1, category: 1 }, { unique: true })
 
-module.exports = mongoose.model(
-  'CategoryMatchRelationMember',
-  categoryMatchRelationMemberSchema
-)
+module.exports = mongoose.model('CategoryMatchRelationMember', categoryMatchRelationMemberSchema)

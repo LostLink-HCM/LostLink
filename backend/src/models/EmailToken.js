@@ -14,7 +14,7 @@ const emailTokenSchema = new Schema(
 
     expiresAt: { type: Date, required: true },
   },
-  { timestamps: true }
+  { timestamps: true, collection: 'email_tokens' }
 )
 
 emailTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 })

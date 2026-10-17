@@ -14,7 +14,7 @@ const auditLogSchema = new Schema(
 
     detail: { type: Schema.Types.Mixed, default: {} },
   },
-  { timestamps: { createdAt: true, updatedAt: false } }
+  { timestamps: { createdAt: true, updatedAt: false }, collection: 'audit_logs' }
 )
 
 auditLogSchema.index({ createdAt: -1 })

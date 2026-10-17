@@ -19,6 +19,22 @@ const postContentSchema = new Schema(
   { _id: false }
 )
 
+const postAttributeSchema = new Schema(
+  {
+    attribute: {
+      type: Schema.Types.ObjectId,
+      ref: 'CategoryAttribute',
+      required: true,
+    },
+    attributeValue: {
+      type: Schema.Types.ObjectId,
+      ref: 'AttributeValue',
+      required: true,
+    },
+  },
+  { _id: false }
+)
+
 const postImageSchema = new Schema(
   {
     url: { type: String, required: true },
@@ -80,6 +96,7 @@ const postSchema = new Schema(
     commentCount: { type: Number, default: 0 },
 
     contents: [postContentSchema],
+    attributes: [postAttributeSchema],
     images: {
       type: [postImageSchema],
       validate: {
@@ -90,7 +107,7 @@ const postSchema = new Schema(
     tags: [{ type: String, trim: true }],
     statusHistory: [statusHistorySchema],
   },
-  { timestamps: true }
+  { timestamps: true, collection: 'posts' }
 )
 
 postSchema.index({ locPublic: '2dsphere' })

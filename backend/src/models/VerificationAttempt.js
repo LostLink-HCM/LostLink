@@ -15,7 +15,7 @@ const verificationAttemptSchema = new Schema(
     isCorrect: { type: Boolean, required: true },
     attemptedAt: { type: Date, default: Date.now },
   },
-  { timestamps: false }
+  { timestamps: false, collection: 'verification_attempts' }
 )
 
 module.exports = mongoose.model('VerificationAttempt', verificationAttemptSchema)

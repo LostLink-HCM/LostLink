@@ -7,6 +7,13 @@ const aliasSchema = new Schema(
   {
     term: { type: String, required: true, trim: true, index: true },
 
+    category: {
+      type: Schema.Types.ObjectId,
+      ref: 'Category',
+      required: true,
+      index: true,
+    },
+
     attribute: {
       type: Schema.Types.ObjectId,
       ref: 'CategoryAttribute',
@@ -24,16 +31,13 @@ const aliasSchema = new Schema(
   { timestamps: true, collection: 'aliases' }
 )
 
-aliasSchema.pre('validate', function validateAlias(next) {
+aliasSchema.pre('validate', function validateAlias() {
   const hasAttribute = Boolean(this.attribute)
   const hasAttributeValue = Boolean(this.attributeValue)
 
   if (hasAttribute === hasAttributeValue) {
-    next(new Error('Alias phải tham chiếu đúng một attribute hoặc attributeValue.'))
-    return
+    throw new Error('Alias phải tham chiếu đúng một attribute hoặc attributeValue.')
   }
-
-  next()
 })
 
 module.exports = mongoose.model('Alias', aliasSchema)

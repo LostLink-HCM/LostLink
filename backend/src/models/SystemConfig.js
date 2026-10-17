@@ -8,7 +8,7 @@ const systemConfigSchema = new Schema(
     value: { type: String, required: true }, // parse theo key khi dùng
     updatedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
   },
-  { timestamps: { createdAt: false, updatedAt: true } }
+  { timestamps: { createdAt: false, updatedAt: true }, collection: 'system_configs' }
 )
 
 module.exports = mongoose.model('SystemConfig', systemConfigSchema)

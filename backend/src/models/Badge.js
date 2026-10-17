@@ -23,7 +23,7 @@ const badgeSchema = new Schema(
       default: 'good',
     },
   },
-  { timestamps: true }
+  { timestamps: true, collection: 'badges' }
 )
 
 module.exports = mongoose.model('Badge', badgeSchema)
