@@ -16,7 +16,8 @@ export const DEFAULT_FILTERS = {
 
 export const TYPE_LABELS = { lost: 'Mất đồ', found: 'Nhặt được' }
 
-const normalize = (text) =>
+// Bỏ dấu, viết thường để so khớp từ khóa tiếng Việt
+export const normalize = (text) =>
   text
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')

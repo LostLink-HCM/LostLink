@@ -67,7 +67,7 @@ export default function ContentStep({ form, errors, onChange, onAddImages, onRem
         {found && (
           <Note icon="lock" tone="warning" className="mt-3">
             Đừng ghi những chi tiết chỉ chủ nhân mới biết (số thẻ, đồ bên trong…) vào mô tả công
-            khai.
+            khai. Hãy để dành chúng cho câu hỏi xác minh ở bước cuối.
           </Note>
         )}
       </div>

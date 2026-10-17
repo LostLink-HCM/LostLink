@@ -1,4 +1,5 @@
-import { CATEGORY_ATTRIBUTES, DAY_PARTS } from '../data/composePost'
+import { CATEGORY_ATTRIBUTES, DAY_PARTS, ROAD_SEGMENTS } from '../data/composePost'
+import { normalize } from './homeFeed'
 
 // Giới hạn tối đa 9 ảnh, mỗi ảnh không quá 5 MB
 export const MAX_IMAGES = 9
@@ -8,6 +9,8 @@ export const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
 export const TITLE_MAX = 120
 export const DESCRIPTION_MAX = 1000
+export const MIN_OPTIONS = 2
+export const MAX_OPTIONS = 5
 
 export const EMPTY_FORM = {
   type: '',
@@ -23,15 +26,21 @@ export const EMPTY_FORM = {
   dayPart: '',
   // Tên mốc gần đúng đã bấm (Sáng hôm qua…), đổi ngày hoặc buổi bằng tay thì bỏ
   timePreset: '',
+  // point: vị trí ghim (%) trên bản đồ; coords: toạ độ GPS thật
+  location: { mode: '', place: '', area: '', point: null, coords: null, roadId: '' },
+  question: { skipped: false, text: '', options: ['', '', ''], correct: null },
 }
 
-const STEPS = [
+const BASE_STEPS = [
   { key: 'classify', label: 'Phân loại' },
   { key: 'content', label: 'Nội dung' },
   { key: 'time', label: 'Thời gian' },
+  { key: 'location', label: 'Vị trí' },
 ]
 
-export const getSteps = () => STEPS
+// Bước câu hỏi xác minh chỉ có ở tin Nhặt được
+export const getSteps = (type) =>
+  type === 'found' ? [...BASE_STEPS, { key: 'question', label: 'Câu hỏi' }] : BASE_STEPS
 
 export function toDateInput(date) {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
@@ -62,7 +71,29 @@ export const applyTimePreset = (preset) => ({
 // Chỉ giữ các lỗi có nội dung
 const onlyErrors = (entries) => Object.fromEntries(Object.entries(entries).filter(([, v]) => v))
 
-// Kiểm tra từng bước: thiếu loại tin, danh mục, tiêu đề hoặc thời gian
+const locationErrors = {
+  gps: (loc) => !loc.coords && 'Chưa lấy được vị trí hiện tại.',
+  pin: (loc) => !loc.point && 'Kéo ghim tới nơi bạn mất hoặc nhặt được đồ.',
+  address: (loc) => !loc.place.trim() && 'Nhập hoặc chọn một địa chỉ.',
+  road: (loc) => !loc.roadId && 'Chọn đoạn đường.',
+}
+
+function questionErrors({ question }) {
+  if (question.skipped) return {}
+  const options = question.options.map((option) => option.trim())
+  const filled = options.filter(Boolean)
+  const duplicated = new Set(filled.map(normalize)).size !== filled.length
+  return {
+    question: !question.text.trim() && 'Nhập câu hỏi xác minh.',
+    options:
+      filled.length < MIN_OPTIONS
+        ? `Cần ít nhất ${MIN_OPTIONS} phương án.`
+        : duplicated && 'Các phương án không được trùng nhau.',
+    correct: (question.correct === null || !options[question.correct]) && 'Chọn đáp án đúng.',
+  }
+}
+
+// Kiểm tra từng bước: thiếu tiêu đề, danh mục, thời gian, vị trí hoặc đáp án đúng
 const validators = {
   classify: (form) => ({
     type: !form.type && 'Chọn loại tin: Mất đồ hay Nhặt được.',
@@ -80,6 +111,13 @@ const validators = {
       ? 'Chọn ngày mất hoặc nhặt được đồ.'
       : form.date > toDateInput(new Date()) && 'Ngày không được ở tương lai.',
   }),
+  location: ({ location }) => ({
+    location: !location.mode
+      ? 'Chọn một cách xác định vị trí.'
+      : locationErrors[location.mode](location),
+    area: !location.area && 'Chọn khu vực.',
+  }),
+  question: questionErrors,
 }
 
 export const validateStep = (key, form) => onlyErrors(validators[key](form))
@@ -151,6 +189,15 @@ export function describeTime({ date, dayPart, timePreset }) {
   return part ? `${part.label}, ${day}` : day
 }
 
+export function describeLocation(location) {
+  const road = location.mode === 'road' && ROAD_SEGMENTS.find((r) => r.id === location.roadId)
+  const place = road
+    ? `Đường ${road.road}, đoạn ${road.from} – ${road.to}`
+    : location.place.trim() ||
+      (location.mode === 'gps' ? 'Vị trí hiện tại' : 'Vị trí ghim trên bản đồ')
+  return [place, location.area].filter(Boolean).join(', ')
+}
+
 const draftKey = (userId) => `lostlink:post-draft:${userId}`
 
 export function loadDraft(userId) {
@@ -162,6 +209,8 @@ export function loadDraft(userId) {
       ...EMPTY_FORM,
       ...draft.form,
       images: [],
+      location: { ...EMPTY_FORM.location, ...draft.form.location },
+      question: { ...EMPTY_FORM.question, ...draft.form.question },
     }
     const step = Math.min(Number(draft.step) || 0, getSteps(form.type).length - 1)
     return { form, step, savedAt: draft.savedAt }
