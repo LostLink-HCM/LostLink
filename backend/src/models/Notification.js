@@ -32,7 +32,7 @@ const notificationSchema = new Schema(
 
     isRead: { type: Boolean, default: false },
   },
-  { timestamps: true }
+  { timestamps: true, collection: 'notifications' }
 )
 
 notificationSchema.index({ user: 1, isRead: 1, createdAt: -1 })

@@ -11,7 +11,7 @@ const conversationSchema = new Schema(
     confirmedLost: { type: Boolean, default: false },
     confirmedFound: { type: Boolean, default: false },
   },
-  { timestamps: true }
+  { timestamps: true, collection: 'conversations' }
 )
 
 module.exports = mongoose.model('Conversation', conversationSchema)

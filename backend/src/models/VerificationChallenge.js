@@ -22,7 +22,7 @@ const verificationChallengeSchema = new Schema(
 
     maxAttempts: { type: Number, default: 3 },
   },
-  { timestamps: true }
+  { timestamps: true, collection: 'verification_challenges' }
 )
 
 module.exports = mongoose.model('VerificationChallenge', verificationChallengeSchema)

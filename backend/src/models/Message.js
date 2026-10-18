@@ -9,7 +9,7 @@ const messageSchema = new Schema(
     body: { type: String, required: true },
     sentAt: { type: Date, default: Date.now },
   },
-  { timestamps: false }
+  { timestamps: false, collection: 'messages' }
 )
 
 messageSchema.index({ conversation: 1, sentAt: 1 })

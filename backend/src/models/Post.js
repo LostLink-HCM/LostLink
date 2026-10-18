@@ -4,17 +4,25 @@ const { Schema } = mongoose
 
 const MAX_IMAGES = 9
 
-const pointSchema = new Schema(
+const postContentSchema = new Schema(
   {
-    type: { type: String, enum: ['Point'], default: 'Point' },
-    coordinates: { type: [Number], required: true }, // [lng, lat]
+    label: { type: String, required: true },
   },
   { _id: false }
 )
 
-const postContentSchema = new Schema(
+const postAttributeSchema = new Schema(
   {
-    label: { type: String, required: true },
+    attribute: {
+      type: Schema.Types.ObjectId,
+      ref: 'CategoryAttribute',
+      required: true,
+    },
+    attributeValue: {
+      type: Schema.Types.ObjectId,
+      ref: 'AttributeValue',
+      required: true,
+    },
   },
   { _id: false }
 )
@@ -31,7 +39,7 @@ const statusHistorySchema = new Schema(
   {
     status: {
       type: String,
-      enum: ['pending', 'searching', 'contacted', 'returned'],
+      enum: ['pending', 'rejected', 'searching', 'contacted', 'returned', 'closed'],
       required: true,
     },
     changedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null }, // null = hệ thống
@@ -57,20 +65,11 @@ const postSchema = new Schema(
 
     area: { type: String, default: '', trim: true },
 
-    // Chỉ lộ sau khi hai bên xác nhận trò chuyện
-    locExact: { type: pointSchema, required: true, select: false },
-
-    // Vùng mờ hiển thị công khai
-    locPublic: { type: pointSchema, required: true },
-    locPublicRadius: { type: Number, default: 300 }, // mét
-
-    priorityRadius: { type: Number, default: 400 }, // mét
-
     locType: { type: String, enum: ['point', 'road_segment'], default: 'point' },
 
     status: {
       type: String,
-      enum: ['pending', 'searching', 'contacted', 'returned'],
+      enum: ['pending', 'rejected', 'searching', 'contacted', 'returned', 'closed'],
       default: 'pending',
       index: true,
     },
@@ -80,6 +79,18 @@ const postSchema = new Schema(
     commentCount: { type: Number, default: 0 },
 
     contents: [postContentSchema],
+    attributes: {
+      type: [postAttributeSchema],
+      validate: {
+        validator: (attributes) => {
+          if (!attributes) return true
+
+          const attributeIds = attributes.map((item) => String(item.attribute))
+          return new Set(attributeIds).size === attributeIds.length
+        },
+        message: 'Mỗi thuộc tính chỉ được xuất hiện một lần trong bài đăng.',
+      },
+    },
     images: {
       type: [postImageSchema],
       validate: {
@@ -90,10 +101,9 @@ const postSchema = new Schema(
     tags: [{ type: String, trim: true }],
     statusHistory: [statusHistorySchema],
   },
-  { timestamps: true }
+  { timestamps: true, collection: 'posts' }
 )
 
-postSchema.index({ locPublic: '2dsphere' })
 postSchema.index({ type: 1, status: 1, createdAt: -1 })
 postSchema.index({ status: 1, viewCount: -1, likeCount: -1 })
 postSchema.index({ title: 'text', description: 'text' })

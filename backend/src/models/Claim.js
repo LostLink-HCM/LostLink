@@ -18,7 +18,7 @@ const claimSchema = new Schema(
       index: true,
     },
   },
-  { timestamps: true }
+  { timestamps: true, collection: 'claims' }
 )
 
 module.exports = mongoose.model('Claim', claimSchema)
