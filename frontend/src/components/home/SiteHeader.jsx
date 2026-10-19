@@ -6,8 +6,50 @@ import { cx, focusRing } from '../moderator/classes'
 import SearchBox from './SearchBox'
 import UserMenu from './UserMenu'
 
-export default function SiteHeader({ search }) {
+function UnreadBadge({ count, className }) {
+  return (
+    <span
+      className={cx(
+        'grid h-5 min-w-5 place-items-center rounded-full bg-danger px-1.5 text-[10.5px] font-bold text-white',
+        className
+      )}
+    >
+      {count}
+    </span>
+  )
+}
+
+// Guest vẫn thấy Tin nhắn => bấm vào thì RequireAuth đưa sang đăng nhập rồi quay lại
+function NavItem({ to, end, label, badge = 0 }) {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      aria-label={badge ? `${label}, ${badge} hội thoại chưa đọc` : undefined}
+      className={({ isActive }) =>
+        cx(
+          'relative flex items-center gap-2 rounded-lg px-3.5 py-2 text-small font-medium no-underline transition-colors hover:bg-primary-subtle',
+          isActive ? 'text-primary' : 'text-ink-secondary',
+          focusRing
+        )
+      }
+    >
+      {({ isActive }) => (
+        <>
+          {label}
+          {badge > 0 && <UnreadBadge count={badge} />}
+          {isActive && (
+            <span className="absolute inset-x-3.5 -bottom-3.5 h-0.5 rounded-full bg-primary" />
+          )}
+        </>
+      )}
+    </NavLink>
+  )
+}
+
+export default function SiteHeader({ search, unreadMessages = 0 }) {
   const { user } = useAuth()
+  const unread = user ? unreadMessages : 0
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-surface/90 backdrop-blur-md">
@@ -21,27 +63,9 @@ export default function SiteHeader({ search }) {
           <span className="text-title font-bold tracking-tight text-primary">LostLink</span>
         </Link>
 
-        <nav aria-label="Điều hướng chính" className="hidden lg:block">
-          <NavLink
-            to="/"
-            end
-            className={({ isActive }) =>
-              cx(
-                'relative rounded-lg px-3.5 py-2 text-small font-medium no-underline transition-colors hover:bg-primary-subtle',
-                isActive ? 'text-primary' : 'text-ink-secondary',
-                focusRing
-              )
-            }
-          >
-            {({ isActive }) => (
-              <>
-                Trang chủ
-                {isActive && (
-                  <span className="absolute inset-x-3.5 -bottom-3.5 h-0.5 rounded-full bg-primary" />
-                )}
-              </>
-            )}
-          </NavLink>
+        <nav aria-label="Điều hướng chính" className="hidden items-center gap-1 lg:flex">
+          <NavItem to="/" end label="Trang chủ" />
+          <NavItem to="/messages" label="Tin nhắn" badge={unread} />
         </nav>
 
         <SearchBox
@@ -64,6 +88,29 @@ export default function SiteHeader({ search }) {
                 <Icon name="compose" size={16} />
                 <span className="hidden sm:inline">Đăng bài</span>
               </Link>
+              {/* Mobile chưa có thanh điều hướng nên giữ lối vào Tin nhắn bằng icon */}
+              <NavLink
+                to="/messages"
+                aria-label={unread ? `Tin nhắn, ${unread} hội thoại chưa đọc` : 'Tin nhắn'}
+                title="Tin nhắn"
+                className={({ isActive }) =>
+                  cx(
+                    'relative grid size-10 place-items-center rounded-full border transition-colors lg:hidden',
+                    isActive
+                      ? 'border-primary/40 bg-primary-soft text-primary'
+                      : 'border-line bg-surface text-ink-secondary hover:bg-primary-subtle hover:text-primary',
+                    focusRing
+                  )
+                }
+              >
+                <Icon name="chat" size={18} />
+                {unread > 0 && (
+                  <UnreadBadge
+                    count={unread}
+                    className="absolute -top-1 -right-1 h-4.5 min-w-4.5 px-1 text-[10px] ring-2 ring-surface"
+                  />
+                )}
+              </NavLink>
               <UserMenu />
             </>
           ) : (

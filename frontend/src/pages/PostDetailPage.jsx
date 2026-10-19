@@ -103,9 +103,14 @@ export default function PostDetailPage() {
   const isFollowed = followed.has(post.id)
   const claimLabel = lost ? 'Tôi đang giữ món này' : 'Đây là đồ của tôi'
 
+  const claim = () => {
+    if (!lost && post.hasQuestion) comingSoon()
+    else ctx.contactAbout(post)
+  }
+
   // Trên mobile các hành động gom vào nút ⋯ thay cho hai khối ở cột phải
   const sheetActions = [
-    { label: claimLabel, icon: 'check', tone: 'primary', onClick: comingSoon },
+    { label: claimLabel, icon: 'check', tone: 'primary', onClick: claim },
     {
       label: isSaved ? 'Bỏ lưu bài' : 'Lưu bài',
       icon: 'bookmark',
@@ -255,7 +260,7 @@ export default function PostDetailPage() {
             </p>
             <button
               type="button"
-              onClick={comingSoon}
+              onClick={claim}
               className={cx(
                 'h-11 w-full cursor-pointer rounded-full border-0 bg-primary text-small font-semibold text-white shadow-[0_6px_16px_-6px_rgb(46_109_180/0.7)] transition-colors hover:bg-primary-hover',
                 focusRing

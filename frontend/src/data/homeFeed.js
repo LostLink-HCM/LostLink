@@ -131,6 +131,7 @@ export const createFeedPosts = () => [
     address: 'Trung tâm thương mại Crescent Mall',
     timeWindow: '4 ngày trước, 20:00 – 22:30',
     author: 'thuha.q7',
+    hasQuestion: true,
     createdAt: hoursAgo(98),
     status: 'searching',
     likes: 31,
