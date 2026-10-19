@@ -4,6 +4,7 @@ import { RequireAuth } from './auth/guards.jsx'
 import HomePage from './pages/HomePage.jsx'
 import PostDetailPage from './pages/PostDetailPage.jsx'
 import ComposePostPage from './pages/ComposePostPage.jsx'
+import MessagesPage from './pages/MessagesPage.jsx'
 import UserLayout from './pages/UserLayout.jsx'
 import LoginPage from './pages/auth/LoginPage.jsx'
 import RegisterPage from './pages/auth/RegisterPage.jsx'
@@ -39,6 +40,14 @@ function App() {
             }
           />
           <Route path="posts/:id" element={<PostDetailPage />} />
+          <Route
+            path="messages"
+            element={
+              <RequireAuth>
+                <MessagesPage />
+              </RequireAuth>
+            }
+          />
         </Route>
         <Route path="/moderator/*" element={<ModeratorRoutes />} />
         <Route path="/admin/*" element={<AdminRoutes />} />
