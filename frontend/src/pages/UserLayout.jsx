@@ -4,16 +4,17 @@ import { useAuth } from '../auth/AuthContext'
 import { cx } from '../components/moderator/classes'
 import SiteHeader from '../components/home/SiteHeader'
 import { createFeedComments, createFeedPosts } from '../data/homeFeed'
+import { createUserMessages } from '../data/userMessages'
 import { DEFAULT_FILTERS } from '../lib/homeFeed'
+import { startRequest } from '../lib/userMessages'
 
 // Khu người dùng dùng xanh thương hiệu thay cho xanh đậm của khu quản trị,
-// thang chữ bằng 90% thang chung cho gọn hơn
 const userTheme = [
   '[--color-primary:#2e6db4] [--color-primary-hover:#1e4e86] [--color-primary-soft:#e7f0fb] [--color-primary-subtle:#f1f6fc]',
   '[--text-caption:11px] [--text-small:11.7px] [--text-body:12.6px] [--text-lead:13.5px] [--text-title:16.2px] [--text-heading:21.6px]',
 ].join(' ')
 
-// Chống spam bình luận (U07): mỗi người phải chờ giữa hai lần gửi
+// Chống spam bình luận
 const COMMENT_COOLDOWN_MS = 15 * 1000
 const TOAST_MS = 3000
 
@@ -37,6 +38,7 @@ export default function UserLayout() {
   const [saved, setSaved] = useState(() => new Set())
   const [followed, setFollowed] = useState(() => new Set())
   const [lastCommentAt, setLastCommentAt] = useState(0)
+  const [chat, setChat] = useState(createUserMessages)
 
   const [searchInput, setSearchInput] = useState('')
   const [keyword, setKeyword] = useState('')
@@ -88,6 +90,27 @@ export default function UserLayout() {
 
   const deleteComment = (id) => setComments((prev) => prev.filter((item) => item.id !== id))
 
+  const setPostStatus = (id, status) =>
+    setPosts((prev) => prev.map((post) => (post.id === id ? { ...post, status } : post)))
+
+  // Gửi yêu cầu liên hệ từ bài đăng
+  const contactAbout = (post) => {
+    if (!requireMember()) return
+    const peer = { name: post.author, initials: post.author.slice(0, 2).toUpperCase() }
+    const snapshot = {
+      id: post.id,
+      type: post.type,
+      title: post.title,
+      category: post.category,
+      area: post.area,
+      image: post.images[0],
+    }
+    setChat((prev) => startRequest(prev, { post: snapshot, peer }))
+    navigate('/messages', { state: { openConversation: true } })
+  }
+
+  const unreadMessages = chat.threads.reduce((count, thread) => count + thread.unread, 0)
+
   const search = {
     value: searchInput,
     onChange: setSearchInput,
@@ -104,7 +127,7 @@ export default function UserLayout() {
 
   return (
     <div className={cx('min-h-dvh bg-canvas font-sans text-ink', userTheme)}>
-      <SiteHeader search={search} />
+      <SiteHeader search={search} unreadMessages={unreadMessages} />
 
       <Outlet
         context={{
@@ -125,6 +148,10 @@ export default function UserLayout() {
           addComment,
           editComment,
           deleteComment,
+          chat,
+          setChat,
+          setPostStatus,
+          contactAbout,
           notify: setToast,
         }}
       />
