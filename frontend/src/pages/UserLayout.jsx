@@ -5,10 +5,12 @@ import { cx } from '../components/moderator/classes'
 import SiteHeader from '../components/home/SiteHeader'
 import { createFeedComments, createFeedPosts } from '../data/homeFeed'
 import { createUserMessages } from '../data/userMessages'
+import { createUserNotifications } from '../data/userNotifications'
 import { DEFAULT_FILTERS } from '../lib/homeFeed'
 import { startRequest } from '../lib/userMessages'
+import { unreadCount } from '../lib/userNotifications'
 
-// Khu người dùng dùng xanh thương hiệu thay cho xanh đậm của khu quản trị,
+// Khu người dùng dùng xanh thương hiệu thay cho xanh đậm của khu quản trị
 const userTheme = [
   '[--color-primary:#2e6db4] [--color-primary-hover:#1e4e86] [--color-primary-soft:#e7f0fb] [--color-primary-subtle:#f1f6fc]',
   '[--text-caption:11px] [--text-small:11.7px] [--text-body:12.6px] [--text-lead:13.5px] [--text-title:16.2px] [--text-heading:21.6px]',
@@ -25,7 +27,6 @@ const toggleIn = (set, id) => {
   return next
 }
 
-// Dữ liệu mẫu giữ ở layout để qua lại Trang chủ và Chi tiết không bị mất lượt thích, bộ lọc...
 export default function UserLayout() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -39,6 +40,7 @@ export default function UserLayout() {
   const [followed, setFollowed] = useState(() => new Set())
   const [lastCommentAt, setLastCommentAt] = useState(0)
   const [chat, setChat] = useState(createUserMessages)
+  const [notifications, setNotifications] = useState(createUserNotifications)
 
   const [searchInput, setSearchInput] = useState('')
   const [keyword, setKeyword] = useState('')
@@ -52,7 +54,6 @@ export default function UserLayout() {
     return () => clearTimeout(timer)
   }, [toast])
 
-  // Chức năng của thành viên: Guest được đưa sang đăng nhập rồi quay lại đúng trang
   const requireMember = () => {
     if (user) return true
     navigate('/login', { state: { from: location.pathname } })
@@ -127,7 +128,11 @@ export default function UserLayout() {
 
   return (
     <div className={cx('min-h-dvh bg-canvas font-sans text-ink', userTheme)}>
-      <SiteHeader search={search} unreadMessages={unreadMessages} />
+      <SiteHeader
+        search={search}
+        unreadMessages={unreadMessages}
+        unreadNotifications={unreadCount(notifications.items)}
+      />
 
       <Outlet
         context={{
@@ -152,6 +157,8 @@ export default function UserLayout() {
           setChat,
           setPostStatus,
           contactAbout,
+          notifications,
+          setNotifications,
           notify: setToast,
         }}
       />
