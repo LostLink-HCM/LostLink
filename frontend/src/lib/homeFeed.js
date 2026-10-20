@@ -1,3 +1,5 @@
+import { CATEGORY_ATTRIBUTES } from '../data/composePost'
+
 export const TIME_RANGES = [
   { value: '24h', label: '24 giờ qua', hours: 24 },
   { value: '7d', label: '7 ngày qua', hours: 24 * 7 },
@@ -15,6 +17,22 @@ export const DEFAULT_FILTERS = {
 }
 
 export const TYPE_LABELS = { lost: 'Mất đồ', found: 'Nhặt được' }
+
+// Đặc điểm công khai của bài. Bài Nhặt được giấu "Bên trong có" vì đó là chi tiết
+// chỉ chủ nhân biết, dùng cho câu hỏi xác minh và ghép cặp (UC08, NF01)
+export function publicTraits(post) {
+  const labels = Object.fromEntries(
+    (CATEGORY_ATTRIBUTES[post.category] ?? []).map((attr) => [attr.key, attr.label])
+  )
+  const traits = Object.entries(post.attributes ?? {}).map(([key, value]) => ({
+    label: labels[key] ?? key,
+    value,
+  }))
+  if (post.type === 'lost' && post.contents?.length) {
+    traits.push({ label: 'Bên trong có', value: post.contents.join(', ') })
+  }
+  return traits
+}
 
 // Bỏ dấu, viết thường để so khớp từ khóa tiếng Việt
 export const normalize = (text) =>

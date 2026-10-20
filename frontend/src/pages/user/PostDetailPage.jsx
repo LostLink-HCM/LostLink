@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useOutletContext, useParams } from 'react-router-dom'
+import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import Icon from '../../components/common/Icon'
 import Avatar from '../../components/user/Avatar'
@@ -13,7 +13,7 @@ import CommentSection from '../../components/user/post/CommentSection'
 import PostActionSheet from '../../components/user/post/PostActionSheet'
 import PostGallery from '../../components/user/post/PostGallery'
 import { authors } from '../../data/homeFeed'
-import { formatCount, timeAgo } from '../../lib/homeFeed'
+import { formatCount, publicTraits, timeAgo } from '../../lib/homeFeed'
 
 const COMING_SOON = 'Chức năng này đang được phát triển.'
 
@@ -41,6 +41,7 @@ const mapUrl = (place) =>
 export default function PostDetailPage() {
   const { id } = useParams()
   const { user } = useAuth()
+  const navigate = useNavigate()
   const ctx = useOutletContext()
   const { posts, comments, now, liked, saved, followed, requireMember, notify } = ctx
 
@@ -83,6 +84,7 @@ export default function PostDetailPage() {
   }
 
   const lost = post.type === 'lost'
+  const traits = publicTraits(post)
   const isLiked = liked.has(post.id)
   const author = authors[post.author]
 
@@ -96,8 +98,9 @@ export default function PostDetailPage() {
   const claimLabel = lost ? 'Tôi đang giữ món này' : 'Đây là đồ của tôi'
 
   const claim = () => {
-    if (!lost && post.hasQuestion) comingSoon()
-    else ctx.contactAbout(post)
+    if (!lost && post.question) {
+      if (requireMember()) navigate(`/posts/${post.id}/verify`)
+    } else ctx.contactAbout(post)
   }
 
   // Trên mobile các hành động gom vào nút ⋯ thay cho hai khối ở cột phải
@@ -161,6 +164,28 @@ export default function PostDetailPage() {
             <p className="m-0 mb-5 text-body leading-relaxed whitespace-pre-line text-ink-secondary">
               {post.desc}
             </p>
+
+            {traits.length > 0 && (
+              <section aria-labelledby="traits-heading" className="mb-5">
+                <h2
+                  id="traits-heading"
+                  className="m-0 mb-2 text-tiny font-semibold tracking-wide text-ink-subtle uppercase"
+                >
+                  Đặc điểm
+                </h2>
+                <dl className="m-0 flex flex-wrap gap-2">
+                  {traits.map(({ label, value }) => (
+                    <div
+                      key={label}
+                      className="flex items-center gap-1.5 rounded-full bg-line-subtle px-3 py-1.5 text-caption"
+                    >
+                      <dt className="text-ink-muted">{label}:</dt>
+                      <dd className="m-0 font-semibold text-ink">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            )}
 
             <p className="m-0 mb-3 text-small text-ink-secondary">
               {lost ? 'Thời điểm mất' : 'Thời điểm nhặt'}:{' '}

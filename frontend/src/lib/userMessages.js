@@ -2,7 +2,7 @@ import { normalize } from './homeFeed'
 
 export const MESSAGE_LIMIT = 2000
 
-// Người mất là người nhận lại đồ; người nhặt là người trao trả
+// Người mất là người nhận lại đồ
 export const isReceiver = (post) => (post.type === 'found') !== Boolean(post.mine)
 
 const PHONE = /(?:\+84|\b0)(?:[\s.-]?\d){9}\b/
@@ -65,6 +65,49 @@ export function openThread(state, threadId) {
       thread.id === threadId ? { ...thread, unread: 0 } : thread
     ),
   }
+}
+
+// Thông tin bài đăng và người đăng gắn vào hội thoại
+export const postSnapshot = (post) => ({
+  id: post.id,
+  type: post.type,
+  title: post.title,
+  category: post.category,
+  area: post.area,
+  image: post.images[0],
+})
+
+export const peerOf = (post) => ({
+  name: post.author,
+  initials: post.author.slice(0, 2).toUpperCase(),
+})
+
+// Trả lời đúng câu hỏi xác minh thì mở kênh trò chuyện ngay, không cần chờ đồng ý
+export function openVerifiedThread(state, post, now = Date.now()) {
+  const openedAt = new Date(now).toISOString()
+  const existing = state.threads.find((thread) => thread.post.id === post.id)
+  if (existing) {
+    const opened = { ...existing, status: 'open', openedBy: 'verified', openedAt }
+    return {
+      ...state,
+      activeId: existing.id,
+      threads: state.threads.map((thread) => (thread.id === existing.id ? opened : thread)),
+    }
+  }
+
+  const thread = {
+    id: `thread-post-${post.id}`,
+    peer: peerOf(post),
+    post: postSnapshot(post),
+    status: 'open',
+    openedBy: 'verified',
+    openedAt,
+    createdAt: openedAt,
+    unread: 0,
+    confirmed: { me: false, peer: false },
+    messages: [],
+  }
+  return { ...state, activeId: thread.id, threads: [thread, ...state.threads] }
 }
 
 // Mở chế độ yêu cầu trò chuyện từ bài đăng, nếu đã có hội thoại về bài này thì mở lại hội thoại cũ
