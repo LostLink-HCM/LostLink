@@ -89,6 +89,11 @@
   --text-display: 28px;
   --text-display--line-height: 1.2;
 
+  /* Cỡ chữ rất nhỏ cho nhãn phụ, thời gian, số đếm ở khu người dùng.
+     Không khai line-height để kế thừa từ phần tử cha như khi gõ text-[10.5px] */
+  --text-tiny: 10.5px;
+  --text-micro: 10px;
+
   /* Bo góc dùng thang mặc định của Tailwind: md 6px, lg 8px, xl 12px, 2xl 16px */
   --shadow-card: 0 2px 6px rgb(22 35 58 / 0.04);
   --shadow-dialog: 0 24px 100px rgb(11 25 48 / 0.25);
