@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { RequireAuth } from './auth/guards.jsx'
 import HomePage from './pages/user/HomePage.jsx'
 import PostDetailPage from './pages/user/PostDetailPage.jsx'
+import VerifyPage from './pages/user/VerifyPage.jsx'
 import ComposePostPage from './pages/user/ComposePostPage.jsx'
 import MessagesPage from './pages/user/MessagesPage.jsx'
 import NotificationsPage from './pages/user/NotificationsPage.jsx'
@@ -46,6 +47,14 @@ function App() {
             element={
               <RequireAuth>
                 <NotificationsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="posts/:id/verify"
+            element={
+              <RequireAuth>
+                <VerifyPage />
               </RequireAuth>
             }
           />

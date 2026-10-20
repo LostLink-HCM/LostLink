@@ -66,6 +66,11 @@ export default function ReviewDialog({ form, onEdit, onClose, onSubmit }) {
         {form.contents.length > 0 && (
           <p className="m-0 mt-1 text-small text-ink-secondary">
             Bên trong có: {form.contents.join(', ')}
+            {form.type === 'found' && (
+              <span className="block text-caption text-ink-muted">
+                Phần này không hiển thị công khai, chỉ dùng để ghép cặp.
+              </span>
+            )}
           </p>
         )}
       </Section>

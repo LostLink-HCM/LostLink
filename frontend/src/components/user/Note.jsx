@@ -4,9 +4,10 @@ import { cx } from './classes'
 const tones = {
   info: 'border-primary/20 bg-primary-subtle text-ink-secondary [&>svg]:text-primary',
   warning: 'border-warning/25 bg-warning-soft text-ink-secondary [&>svg]:text-warning',
+  success: 'border-success/25 bg-success-soft text-ink-secondary [&>svg]:text-success',
+  danger: 'border-danger/25 bg-danger-soft text-ink-secondary [&>svg]:text-danger',
 }
 
-// Khối ghi chú có icon: lưu ý, nhắc nhở trong form và hộp thoại
 export default function Note({ icon = 'info', tone = 'info', className, children }) {
   return (
     <div

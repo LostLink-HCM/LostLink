@@ -7,7 +7,7 @@ import { createFeedComments, createFeedPosts } from '../../data/homeFeed'
 import { createUserMessages } from '../../data/userMessages'
 import { createUserNotifications } from '../../data/userNotifications'
 import { DEFAULT_FILTERS } from '../../lib/homeFeed'
-import { startRequest } from '../../lib/userMessages'
+import { openVerifiedThread, peerOf, postSnapshot, startRequest } from '../../lib/userMessages'
 import { unreadCount } from '../../lib/userNotifications'
 
 // Khu người dùng dùng xanh thương hiệu thay cho xanh đậm của khu quản trị
@@ -41,6 +41,8 @@ export default function UserLayout() {
   const [lastCommentAt, setLastCommentAt] = useState(0)
   const [chat, setChat] = useState(createUserMessages)
   const [notifications, setNotifications] = useState(createUserNotifications)
+  // Kết quả xác minh theo bài: 'passed' | 'failed', mỗi bài chỉ được trả lời một lần
+  const [verifications, setVerifications] = useState({})
 
   const [searchInput, setSearchInput] = useState('')
   const [keyword, setKeyword] = useState('')
@@ -97,17 +99,20 @@ export default function UserLayout() {
   // Gửi yêu cầu liên hệ từ bài đăng
   const contactAbout = (post) => {
     if (!requireMember()) return
-    const peer = { name: post.author, initials: post.author.slice(0, 2).toUpperCase() }
-    const snapshot = {
-      id: post.id,
-      type: post.type,
-      title: post.title,
-      category: post.category,
-      area: post.area,
-      image: post.images[0],
-    }
-    setChat((prev) => startRequest(prev, { post: snapshot, peer }))
+    setChat((prev) => startRequest(prev, { post: postSnapshot(post), peer: peerOf(post) }))
     navigate('/messages', { state: { openConversation: true } })
+  }
+
+  // Ghi nhận câu trả lời xác minh; đúng thì mở hội thoại và chuyển bài sang Đã liên hệ
+  const answerQuestion = (post, choice) => {
+    if (verifications[post.id]) return verifications[post.id]
+    const result = choice === post.question.correct ? 'passed' : 'failed'
+    setVerifications((prev) => ({ ...prev, [post.id]: result }))
+    if (result === 'passed') {
+      setChat((prev) => openVerifiedThread(prev, post))
+      setPostStatus(post.id, 'contacted')
+    }
+    return result
   }
 
   const unreadMessages = chat.threads.reduce((count, thread) => count + thread.unread, 0)
@@ -157,6 +162,8 @@ export default function UserLayout() {
           setChat,
           setPostStatus,
           contactAbout,
+          verifications,
+          answerQuestion,
           notifications,
           setNotifications,
           notify: setToast,
