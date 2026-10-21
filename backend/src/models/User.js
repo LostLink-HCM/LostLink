@@ -68,7 +68,7 @@ const userSchema = new Schema(
 
     tokenVersion: { type: Number, default: 0 },
 
-    // Yêu cầu xoá tài khoản, xoá hẳn sau 3 ngày 
+    // Yêu cầu xoá tài khoản, xoá hẳn sau 3 ngày
     deleteRequestedAt: { type: Date, default: null },
 
     badges: [userBadgeSchema],
