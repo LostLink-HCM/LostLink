@@ -2,11 +2,16 @@ const mongoose = require('mongoose')
 
 const { Schema } = mongoose
 
+// 6 trạng thái bài đăng: chờ duyệt, bị từ chối, đang tìm, đã liên hệ, đã trao trả, đã đóng
+const POST_STATUSES = ['pending', 'rejected', 'searching', 'contacted', 'returned', 'closed']
+
 const MAX_IMAGES = 9
 
-const postContentSchema = new Schema(
+// Vị trí dạng GeoJSON: điểm (ghim, GPS, địa chỉ) hoặc đoạn đường
+const geoSchema = new Schema(
   {
-    label: { type: String, required: true },
+    type: { type: String, enum: ['Point', 'LineString'], default: 'Point' },
+    coordinates: { type: [Schema.Types.Mixed], required: true }, // [lng, lat] hoặc [[lng, lat], ...]
   },
   { _id: false }
 )
@@ -37,11 +42,7 @@ const postImageSchema = new Schema(
 
 const statusHistorySchema = new Schema(
   {
-    status: {
-      type: String,
-      enum: ['pending', 'rejected', 'searching', 'contacted', 'returned', 'closed'],
-      required: true,
-    },
+    status: { type: String, enum: POST_STATUSES, required: true },
     changedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null }, // null = hệ thống
     note: { type: String, default: '' },
     changedAt: { type: Date, default: Date.now },
@@ -49,6 +50,7 @@ const statusHistorySchema = new Schema(
   { _id: false }
 )
 
+// Bài đăng Mất đồ / Nhặt được: nội dung, thời điểm, vị trí, ảnh, thuộc tính và trạng thái
 const postSchema = new Schema(
   {
     owner: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
@@ -64,21 +66,24 @@ const postSchema = new Schema(
     timeTo: { type: Date, default: null },
 
     area: { type: String, default: '', trim: true },
+    placeName: { type: String, default: '', trim: true },
 
     locType: { type: String, enum: ['point', 'road_segment'], default: 'point' },
+    locExact: { type: geoSchema, default: null },
+    locPublic: { type: geoSchema, default: null },
 
-    status: {
-      type: String,
-      enum: ['pending', 'rejected', 'searching', 'contacted', 'returned', 'closed'],
-      default: 'pending',
-      index: true,
-    },
+    status: { type: String, enum: POST_STATUSES, default: 'pending', index: true },
+
+    // Moderator ẩn bài hoặc bài tự ẩn 7 ngày sau khi trao trả
+    isHidden: { type: Boolean, default: false, index: true },
+    hiddenReason: { type: String, default: '' },
 
     viewCount: { type: Number, default: 0 },
     likeCount: { type: Number, default: 0 },
     commentCount: { type: Number, default: 0 },
 
-    contents: [postContentSchema],
+    // Món bên trong (ví, túi)
+    contents: [{ type: String, trim: true }],
     attributes: {
       type: [postAttributeSchema],
       validate: {
@@ -107,5 +112,9 @@ const postSchema = new Schema(
 postSchema.index({ type: 1, status: 1, createdAt: -1 })
 postSchema.index({ status: 1, viewCount: -1, likeCount: -1 })
 postSchema.index({ title: 'text', description: 'text' })
+postSchema.index({ locExact: '2dsphere' })
 
-module.exports = mongoose.model('Post', postSchema)
+const Post = mongoose.model('Post', postSchema)
+Post.STATUSES = POST_STATUSES
+
+module.exports = Post

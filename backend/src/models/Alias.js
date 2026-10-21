@@ -2,7 +2,7 @@ const mongoose = require('mongoose')
 
 const { Schema } = mongoose
 
-// Từ/cụm từ người dùng có thể nhập thay cho một thuộc tính hoặc một giá trị
+// Từ đồng nghĩa người dùng hay gõ cho một danh mục, thuộc tính hoặc giá trị
 const aliasSchema = new Schema(
   {
     term: { type: String, required: true, trim: true, index: true },
@@ -37,8 +37,9 @@ aliasSchema.pre('validate', function validateAlias() {
   const hasAttribute = Boolean(this.attribute)
   const hasAttributeValue = Boolean(this.attributeValue)
 
-  if (hasAttribute === hasAttributeValue) {
-    throw new Error('Alias phải tham chiếu đúng một attribute hoặc attributeValue.')
+  // Không có cả hai: tên gọi khác của chính danh mục
+  if (hasAttribute && hasAttributeValue) {
+    throw new Error('Alias chỉ tham chiếu một attribute hoặc một attributeValue.')
   }
 })
 

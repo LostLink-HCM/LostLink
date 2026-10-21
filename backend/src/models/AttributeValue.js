@@ -2,7 +2,7 @@ const mongoose = require('mongoose')
 
 const { Schema } = mongoose
 
-// Giá trị thuộc về một CategoryAttribute, vd: đỏ, xanh
+// Một giá trị có thể chọn của thuộc tính danh mục 
 const attributeValueSchema = new Schema(
   {
     attribute: {

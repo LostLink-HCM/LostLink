@@ -2,6 +2,7 @@ const mongoose = require('mongoose')
 
 const { Schema } = mongoose
 
+// Danh mục huy hiệu, hệ thống tự cấp khi người dùng đạt điều kiện
 const badgeSchema = new Schema(
   {
     name: {

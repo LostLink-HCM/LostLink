@@ -2,7 +2,7 @@ const mongoose = require('mongoose')
 
 const { Schema } = mongoose
 
-// Cấu hình các Category liên quan cho một Category chính.
+// Nhóm các danh mục có thể ghép chéo với nhau
 const categoryMatchRelationSchema = new Schema(
   {
     sourceCategory: {
@@ -10,7 +10,7 @@ const categoryMatchRelationSchema = new Schema(
       ref: 'Category',
       required: true,
       index: true,
-    }, // Category đang được cấu hình trên giao diện
+    },
   },
   { timestamps: true, collection: 'category_match_relations' }
 )

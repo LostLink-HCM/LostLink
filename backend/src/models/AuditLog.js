@@ -2,6 +2,7 @@ const mongoose = require('mongoose')
 
 const { Schema } = mongoose
 
+// Nhật ký thao tác của Moderator/Admin: ai làm gì, trên đối tượng nào, khi nào
 const auditLogSchema = new Schema(
   {
     // Nếu hành động do hệ thống tự động thực hiện thì actor là null, còn lại lưu UserID

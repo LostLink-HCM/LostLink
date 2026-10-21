@@ -2,8 +2,7 @@ const mongoose = require('mongoose')
 
 const { Schema } = mongoose
 
-// Câu hỏi xác minh gợi ý do admin cấu hình cho từng Category
-// User có thể chọn câu hỏi trong danh sách này khi tạo câu hỏi xác minh
+// Câu hỏi xác minh gợi ý do Admin cấu hình cho từng danh mục
 const categoryVerificationQuestionSchema = new Schema(
   {
     category: {

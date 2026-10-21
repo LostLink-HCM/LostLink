@@ -2,7 +2,7 @@ const mongoose = require('mongoose')
 
 const { Schema } = mongoose
 
-// Liên kết một Category với một CategoryMatchRelation.
+// Bảng nối nhiều-nhiều: một danh mục thuộc nhóm quan hệ ghép cặp nào
 const categoryMatchRelationMemberSchema = new Schema(
   {
     relation: {

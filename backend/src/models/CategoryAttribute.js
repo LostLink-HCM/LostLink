@@ -2,7 +2,7 @@ const mongoose = require('mongoose')
 
 const { Schema } = mongoose
 
-// Thuộc tính áp dụng cho một danh mục, vd: màu sắc, chất liệu, thương hiệu.
+// Thuộc tính áp dụng cho một danh mục
 const categoryAttributeSchema = new Schema(
   {
     category: {
