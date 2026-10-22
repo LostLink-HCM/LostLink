@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useOutletContext } from 'react-router-dom'
+import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import Icon from '../../components/common/Icon'
 import Button from '../../components/user/Button'
 import Dialog from '../../components/user/Dialog'
@@ -145,7 +145,8 @@ function Conversation({ thread, now }) {
 
 export default function MessagesPage() {
   const location = useLocation()
-  const { posts, now, chat, setChat, setPostStatus, notify } = useOutletContext()
+  const navigate = useNavigate()
+  const { posts, now, chat, setChat, setPostStatus, notify, reviews } = useOutletContext()
   const [query, setQuery] = useState('')
   // Vào từ bài đăng thì mobile mở thẳng hội thoại
   const [mobileConversation, setMobileConversation] = useState(
@@ -220,7 +221,8 @@ export default function MessagesPage() {
     setDialog(null)
     if (active.confirmed.peer) {
       updatePost('returned')
-      notify('Hai bên đã xác nhận, bài đăng chuyển sang Đã trao trả.')
+      // Cả hai đã xác nhận thì chuyển sang đánh giá và gửi lời cảm ơn
+      navigate(`/messages/${active.id}/review`)
     } else {
       notify(`Đã ghi nhận, LostLink sẽ nhắc ${active.peer.name} xác nhận.`)
     }
@@ -239,7 +241,8 @@ export default function MessagesPage() {
     <TradePanel
       thread={active}
       onConfirm={() => setDialog('confirm')}
-      onReview={() => notify(COMING_SOON)}
+      reviewed={Boolean(reviews[active.id])}
+      onReview={() => navigate(`/messages/${active.id}/review`)}
       onNotMine={() => setDialog('notMine')}
     />
   )
