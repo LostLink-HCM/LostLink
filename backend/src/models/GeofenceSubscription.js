@@ -2,6 +2,7 @@ const mongoose = require('mongoose')
 
 const { Schema } = mongoose
 
+// Vùng "khu vực để ý" người dùng đăng ký: tâm trên bản đồ và bán kính
 const geofenceSubscriptionSchema = new Schema(
   {
     user: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },

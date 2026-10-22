@@ -2,6 +2,7 @@ const mongoose = require('mongoose')
 
 const { Schema } = mongoose
 
+// Gợi ý ghép cặp giữa một bài Mất đồ và một bài Nhặt được, kèm điểm khớp từng tiêu chí
 const matchSuggestionSchema = new Schema(
   {
     postLost: { type: Schema.Types.ObjectId, ref: 'Post', required: true, index: true },

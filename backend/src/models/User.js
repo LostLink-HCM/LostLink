@@ -1,5 +1,7 @@
 const mongoose = require('mongoose')
 
+const Notification = require('./Notification')
+
 const { Schema } = mongoose
 
 const userBadgeSchema = new Schema(
@@ -10,6 +12,7 @@ const userBadgeSchema = new Schema(
   { _id: false }
 )
 
+// Tài khoản người dùng
 const userSchema = new Schema(
   {
     username: {
@@ -34,9 +37,17 @@ const userSchema = new Schema(
       index: true,
     },
 
+    // Hồ sơ cá nhân (U02)
+    avatarUrl: { type: String, default: '' },
+    bio: { type: String, default: '', maxlength: 500 },
+    favoriteArea: { type: String, default: '' },
+
     reputationScore: { type: Number, default: 0 },
 
+    // Thiết lập thông báo, notificationTypes rỗng nghĩa là nhận tất cả các loại
     emailOptIn: { type: Boolean, default: true },
+    pushOptIn: { type: Boolean, default: true },
+    notificationTypes: [{ type: String, enum: Notification.TYPES }],
 
     status: {
       type: String,
@@ -45,17 +56,29 @@ const userSchema = new Schema(
       index: true,
     },
 
+    lockReason: { type: String, default: '' },
+
     emailVerifiedAt: { type: Date, default: null },
 
     // Thời điểm đăng nhập thành công gần nhất của tài khoản
     lastLoginAt: { type: Date, default: null },
 
-    // Thời điểm gần nhất người dùng thực hiện hoạt động trên hệ thống.
+    // Thời điểm gần nhất người dùng thực hiện hoạt động trên hệ thống
     lastActiveAt: { type: Date, default: null },
 
     tokenVersion: { type: Number, default: 0 },
 
+    // Yêu cầu xoá tài khoản, xoá hẳn sau 3 ngày
+    deleteRequestedAt: { type: Date, default: null },
+
     badges: [userBadgeSchema],
+
+    // Tương tác với bài đăng và người dùng khác
+    likedPosts: [{ type: Schema.Types.ObjectId, ref: 'Post' }],
+    savedPosts: [{ type: Schema.Types.ObjectId, ref: 'Post' }],
+    followedPosts: [{ type: Schema.Types.ObjectId, ref: 'Post' }],
+    followingUsers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    blockedUsers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
   },
   { timestamps: true, collection: 'users' }
 )

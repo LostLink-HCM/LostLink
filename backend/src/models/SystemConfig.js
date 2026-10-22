@@ -2,6 +2,8 @@ const mongoose = require('mongoose')
 
 const { Schema } = mongoose
 
+// Tham số hệ thống Admin chỉnh
+// cửa sổ thời gian, trọng số ghép cặp, ngưỡng xử lý report, các mốc nhắc...
 const systemConfigSchema = new Schema(
   {
     key: { type: String, required: true, unique: true },
