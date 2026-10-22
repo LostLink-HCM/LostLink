@@ -47,4 +47,14 @@ reportSchema.pre('validate', function requireTarget() {
 reportSchema.index({ targetUser: 1, createdAt: -1 })
 reportSchema.index({ reporter: 1, createdAt: -1 })
 
+// Mỗi người chỉ được báo cáo một bài đăng hoặc một người dùng một lần
+reportSchema.index(
+  { reporter: 1, targetPost: 1 },
+  { unique: true, partialFilterExpression: { targetType: 'post' } }
+)
+reportSchema.index(
+  { reporter: 1, targetUser: 1 },
+  { unique: true, partialFilterExpression: { targetType: 'user' } }
+)
+
 module.exports = mongoose.model('Report', reportSchema)
