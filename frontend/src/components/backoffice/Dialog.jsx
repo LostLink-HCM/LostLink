@@ -3,7 +3,6 @@ import IconButton from './IconButton'
 
 const widths = { sm: 'max-w-[440px]', md: 'max-w-[560px]', lg: 'max-w-[680px]' }
 
-// Dùng <dialog> gốc: có sẵn focus trap, Esc để đóng và backdrop
 export default function Dialog({ title, onClose, footer, size = 'md', children }) {
   const ref = useRef(null)
   const titleId = useId()
@@ -11,7 +10,6 @@ export default function Dialog({ title, onClose, footer, size = 'md', children }
   useEffect(() => {
     const dialog = ref.current
     dialog.showModal()
-    // autoFocus của React chạy trước khi dialog mở nên bị showModal ghi đè; dùng data-autofocus thay thế
     dialog.querySelector('[data-autofocus]')?.focus()
     return () => dialog.close()
   }, [])
@@ -24,7 +22,6 @@ export default function Dialog({ title, onClose, footer, size = 'md', children }
         event.preventDefault()
         onClose()
       }}
-      // Bấm ra vùng tối bên ngoài thì đóng
       onClick={(event) => event.target === ref.current && onClose()}
       className={`m-auto max-h-[calc(100dvh-40px)] w-[calc(100vw-32px)] ${widths[size]} overflow-y-auto rounded-2xl bg-surface p-0 text-ink shadow-dialog backdrop:bg-sidebar/45 backdrop:backdrop-blur-[3px]`}
     >

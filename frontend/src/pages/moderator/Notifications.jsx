@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import Icon from '../../components/common/Icon'
-import Button from '../../components/moderator/Button'
+import Button from '../../components/backoffice/Button'
 import DateRange from '../../components/moderator/DateRange'
-import IconButton from '../../components/moderator/IconButton'
-import { cx, focusRing } from '../../components/moderator/classes'
+import IconButton from '../../components/backoffice/IconButton'
+import { cx, focusRing } from '../../components/backoffice/classes'
 import {
   NOTIFICATION_FILTER_TYPES,
   NOTIFICATION_TYPES,

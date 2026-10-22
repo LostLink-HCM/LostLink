@@ -1,5 +1,5 @@
-import IconButton from './IconButton'
-import { cx, focusRing } from './classes'
+import IconButton from '../backoffice/IconButton'
+import { cx, focusRing } from '../backoffice/classes'
 
 export default function Pagination({ page, total, pageSize, onChange, noun = 'mục' }) {
   const pages = Math.max(1, Math.ceil(total / pageSize))

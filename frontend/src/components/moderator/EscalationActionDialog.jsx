@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import Button from './Button'
-import Dialog from './Dialog'
+import Button from '../backoffice/Button'
+import Dialog from '../backoffice/Dialog'
 import Field, { Input, Textarea } from './Field'
 import { ESCALATION_ACTIONS } from '../../lib/escalations'
 

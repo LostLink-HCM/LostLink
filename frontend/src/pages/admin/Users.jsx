@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useAuth } from '../../auth/AuthContext'
 import Icon from '../../components/common/Icon'
-import DataTable from '../../components/admin/DataTable'
-import Button from '../../components/moderator/Button'
-import { cx, focusRing } from '../../components/moderator/classes'
+import Button from '../../components/backoffice/Button'
+import DataTable from '../../components/backoffice/DataTable'
+import Dialog from '../../components/backoffice/Dialog'
+import { cx, focusRing } from '../../components/backoffice/classes'
 import { downloadCsv } from '../../lib/csv'
 import {
   applyUserAction,
@@ -141,50 +142,11 @@ function UserActions({ account, actor, onAction, expanded = false }) {
   )
 }
 
-function Modal({ title, onClose, children, footer }) {
-  return (
-    <div
-      className="fixed inset-0 z-70 flex items-center justify-center bg-sidebar/45 p-4 backdrop-blur-[3px]"
-      role="presentation"
-      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
-    >
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        className="max-h-[calc(100dvh-32px)] w-full max-w-[680px] overflow-y-auto rounded-2xl bg-surface text-ink shadow-dialog"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <header className="flex items-center justify-between gap-3 border-b border-line bg-surface-muted px-5 py-3 max-sm:px-4">
-          <h2 className="text-lead font-bold">{title}</h2>
-          <button
-            type="button"
-            aria-label="Đóng"
-            className={cx(
-              'inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-ink-muted hover:bg-primary-subtle hover:text-primary',
-              focusRing
-            )}
-            onClick={onClose}
-          >
-            <Icon name="close" size={18} />
-          </button>
-        </header>
-        <div className="px-5 py-4 max-sm:p-4">{children}</div>
-        {footer && (
-          <footer className="flex flex-wrap justify-end gap-2.5 border-t border-line px-5 py-3 max-sm:px-4">
-            {footer}
-          </footer>
-        )}
-      </section>
-    </div>
-  )
-}
-
 function UserProfile({ account, actor, logs, onClose, onAction }) {
   const protectedAccount = isCurrentUser(account, actor) || account.role === 'admin'
 
   return (
-    <Modal
+    <Dialog
       title="Hồ sơ người dùng"
       onClose={onClose}
       footer={<Button onClick={onClose}>Đóng hồ sơ</Button>}
@@ -331,7 +293,7 @@ function UserProfile({ account, actor, logs, onClose, onAction }) {
           </ol>
         </>
       )}
-    </Modal>
+    </Dialog>
   )
 }
 
@@ -350,7 +312,7 @@ function UserActionDialog({ account, actor, action, onConfirm, onClose, error })
   }
 
   return (
-    <Modal
+    <Dialog
       title={settings.label}
       onClose={onClose}
       footer={
@@ -444,7 +406,7 @@ function UserActionDialog({ account, actor, action, onConfirm, onClose, error })
           </p>
         )}
       </form>
-    </Modal>
+    </Dialog>
   )
 }
 
@@ -696,6 +658,7 @@ export default function Users() {
       </div>
 
       <DataTable
+        variant="admin"
         caption="Người dùng, vai trò, trạng thái, ngày tham gia và thao tác"
         ariaLabel="Bảng người dùng, cuộn ngang để xem thêm"
         minWidth="min-w-[1030px]"
