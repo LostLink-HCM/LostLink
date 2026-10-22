@@ -43,6 +43,8 @@ export default function UserLayout() {
   const [notifications, setNotifications] = useState(createUserNotifications)
   // Kết quả xác minh theo bài: 'passed' | 'failed', mỗi bài chỉ được trả lời một lần
   const [verifications, setVerifications] = useState({})
+  // Đánh giá đã gửi theo hội thoại, mỗi giao dịch chỉ đánh giá một lần
+  const [reviews, setReviews] = useState({})
 
   const [searchInput, setSearchInput] = useState('')
   const [keyword, setKeyword] = useState('')
@@ -104,6 +106,15 @@ export default function UserLayout() {
   }
 
   // Ghi nhận câu trả lời xác minh; đúng thì mở hội thoại và chuyển bài sang Đã liên hệ
+  const submitReview = (threadId, review) => {
+    if (reviews[threadId]) return false
+    setReviews((prev) => ({
+      ...prev,
+      [threadId]: { ...review, createdAt: new Date().toISOString() },
+    }))
+    return true
+  }
+
   const answerQuestion = (post, choice) => {
     if (verifications[post.id]) return verifications[post.id]
     const result = choice === post.question.correct ? 'passed' : 'failed'
@@ -164,6 +175,8 @@ export default function UserLayout() {
           contactAbout,
           verifications,
           answerQuestion,
+          reviews,
+          submitReview,
           notifications,
           setNotifications,
           notify: setToast,

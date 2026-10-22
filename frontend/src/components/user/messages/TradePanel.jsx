@@ -21,7 +21,7 @@ function CheckRow({ done, children }) {
   )
 }
 
-export default function TradePanel({ thread, onConfirm, onReview, onNotMine }) {
+export default function TradePanel({ thread, reviewed, onConfirm, onReview, onNotMine }) {
   const { status, peer, confirmed, post } = thread
 
   if (status === 'request' || status === 'pending') {
@@ -92,9 +92,9 @@ export default function TradePanel({ thread, onConfirm, onReview, onNotMine }) {
           </CheckRow>
         </div>
         {status === 'returned' ? (
-          <Button variant="primary" size="lg" block onClick={onReview}>
+          <Button variant={reviewed ? 'secondary' : 'primary'} size="lg" block onClick={onReview}>
             <Icon name="star" size={16} />
-            Đánh giá và gửi lời cảm ơn
+            {reviewed ? 'Xem lại lời cảm ơn đã gửi' : 'Đánh giá và gửi lời cảm ơn'}
           </Button>
         ) : (
           <Button
