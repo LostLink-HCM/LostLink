@@ -1,9 +1,11 @@
+import Icon from '../common/Icon'
 import { cx, focusRing } from './classes'
 
 const variants = {
   primary: 'border-primary bg-primary text-white hover:bg-primary-hover',
   secondary: 'border-line bg-surface text-primary hover:bg-primary-subtle',
   danger: 'border-danger bg-danger text-white hover:brightness-95',
+  'danger-subtle': 'border-[#e4bbc5] bg-[#fff7f8] text-danger-ink hover:bg-danger-soft',
   success: 'border-success bg-success text-white hover:brightness-95',
   warning: 'border-warning bg-warning text-white hover:brightness-95',
   ghost:
@@ -19,6 +21,7 @@ export default function Button({
   variant = 'secondary',
   size = 'md',
   type = 'button',
+  icon,
   className,
   children,
   ...props
@@ -35,6 +38,7 @@ export default function Button({
       )}
       {...props}
     >
+      {icon && <Icon name={icon} size={16} />}
       {children}
     </button>
   )

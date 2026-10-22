@@ -3,10 +3,10 @@ import { useOutletContext } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import Icon from '../../components/common/Icon'
 import Badge from '../../components/moderator/Badge'
-import Button from '../../components/moderator/Button'
-import Dialog from '../../components/moderator/Dialog'
-import IconButton from '../../components/moderator/IconButton'
-import { cx } from '../../components/moderator/classes'
+import Button from '../../components/backoffice/Button'
+import Dialog from '../../components/backoffice/Dialog'
+import IconButton from '../../components/backoffice/IconButton'
+import { cx } from '../../components/backoffice/classes'
 import {
   MESSAGE_LIMIT,
   filterModeratorThreads,

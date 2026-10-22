@@ -10,7 +10,7 @@ import {
   rangeError,
 } from '../../lib/adminDashboard'
 import Icon from '../../components/common/Icon'
-import { cx, focusRing } from '../../components/moderator/classes'
+import { cx, focusRing } from '../../components/backoffice/classes'
 
 const number = formatNumber
 const percent = (value) => (value === null ? '—' : `${number(value, 1)}%`)

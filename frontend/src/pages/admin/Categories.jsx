@@ -1,6 +1,9 @@
 import { useMemo, useRef, useState } from 'react'
 import Icon from '../../components/common/Icon'
-import { cx, focusRing } from '../../components/moderator/classes'
+import Button from '../../components/backoffice/Button'
+import Dialog from '../../components/backoffice/Dialog'
+import IconButton from '../../components/backoffice/IconButton'
+import { cx, focusRing } from '../../components/backoffice/classes'
 import { createAdminCategories } from '../../data/adminCategories'
 
 const EMPTY_CATEGORY = { name: '', aliases: [], radius: 400 }
@@ -10,89 +13,10 @@ const STRENGTH_LABELS = { strong: 'Mạnh', medium: 'Vừa', weak: 'Nhẹ' }
 const inputClass =
   'min-h-10 w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-body font-medium text-ink-secondary outline-none transition focus:border-primary focus:ring-3 focus:ring-primary/10'
 const labelClass = 'flex flex-col gap-2 text-small font-semibold text-ink-secondary'
-const buttonClass =
-  'inline-flex min-h-9 cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-3 text-small font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45'
 
 function makeId(prefix) {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return `${prefix}-${crypto.randomUUID()}`
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`
-}
-
-function Button({ children, icon, variant = 'secondary', className, ...props }) {
-  const variants = {
-    secondary:
-      'border-line-strong bg-surface text-ink-secondary hover:border-primary hover:bg-primary-subtle hover:text-primary',
-    primary: 'border-primary bg-primary text-white hover:bg-primary-hover',
-    danger: 'border-[#e4bbc5] bg-[#fff7f8] text-danger-ink hover:bg-danger-soft',
-  }
-  return (
-    <button
-      type="button"
-      className={cx(buttonClass, variants[variant], focusRing, className)}
-      {...props}
-    >
-      {icon && <Icon name={icon} size={16} />}
-      {children}
-    </button>
-  )
-}
-
-function IconButton({ label, icon, danger = false, className, onClick }) {
-  return (
-    <button
-      type="button"
-      title={label}
-      aria-label={label}
-      className={cx(
-        'inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-ink-subtle transition-colors hover:bg-primary-subtle hover:text-primary',
-        danger && 'text-danger-ink hover:bg-danger-soft hover:text-danger-ink',
-        className,
-        focusRing
-      )}
-      onClick={onClick}
-    >
-      <Icon name={icon} size={15} />
-    </button>
-  )
-}
-
-function Dialog({ title, onClose, children, footer }) {
-  return (
-    <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-sidebar/45 p-4 backdrop-blur-[3px]"
-      role="presentation"
-      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
-    >
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        className="max-h-[calc(100dvh-32px)] w-full max-w-[680px] overflow-y-auto rounded-2xl bg-surface text-ink shadow-dialog"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <header className="flex items-center justify-between gap-3 border-b border-line bg-surface-muted px-5 py-3 max-sm:px-4">
-          <h2 className="text-lead font-bold text-ink">{title}</h2>
-          <button
-            type="button"
-            aria-label="Đóng"
-            className={cx(
-              'inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-ink-muted hover:bg-primary-subtle hover:text-primary',
-              focusRing
-            )}
-            onClick={onClose}
-          >
-            <Icon name="close" size={18} />
-          </button>
-        </header>
-        <div className="px-5 py-4 max-sm:p-4">{children}</div>
-        {footer && (
-          <footer className="flex flex-wrap justify-end gap-2.5 border-t border-line px-5 py-3 max-sm:px-4">
-            {footer}
-          </footer>
-        )}
-      </section>
-    </div>
-  )
 }
 
 function FormError({ children, id }) {
@@ -1131,7 +1055,7 @@ export default function Categories() {
                 </Button>
                 <Button
                   className="text-caption max-sm:flex-1"
-                  variant="danger"
+                  variant="danger-subtle"
                   icon="lock"
                   disabled={categories.length <= 1}
                   onClick={() => setModal({ kind: 'delete-category', category: selected })}
@@ -1353,7 +1277,7 @@ export default function Categories() {
               <Button autoFocus onClick={() => setModal(null)}>
                 Hủy
               </Button>
-              <Button variant="danger" onClick={removeCategory}>
+              <Button variant="danger-subtle" onClick={removeCategory}>
                 Xóa danh mục
               </Button>
             </>
