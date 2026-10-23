@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import { useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import Icon from '../../components/common/Icon'
 import Avatar from '../../components/user/Avatar'
 import Button from '../../components/user/Button'
+import BackLink from '../../components/user/BackLink'
 import Card from '../../components/user/Card'
 import EmptyState from '../../components/user/EmptyState'
 import { cx, focusRing } from '../../components/user/classes'
@@ -18,21 +19,6 @@ import { formatCount, publicTraits, timeAgo } from '../../lib/homeFeed'
 const COMING_SOON = 'Chức năng này đang được phát triển.'
 
 const formatDate = (iso, options) => new Date(iso).toLocaleDateString('vi-VN', options)
-
-function BackLink() {
-  return (
-    <Link
-      to="/"
-      className={cx(
-        'mb-4 inline-flex items-center gap-1.5 rounded-lg text-caption font-medium text-ink-muted no-underline hover:text-primary',
-        focusRing
-      )}
-    >
-      <Icon name="back" size={16} />
-      Quay lại danh sách
-    </Link>
-  )
-}
 
 // Mở vị trí trên Google Maps ở tab mới
 const mapUrl = (place) =>
@@ -71,7 +57,7 @@ export default function PostDetailPage() {
   if (!post) {
     return (
       <div className="mx-auto max-w-360 px-4 pt-5 pb-10 sm:px-6 lg:px-10 lg:pt-7">
-        <BackLink />
+        <BackLink to="/">Quay lại danh sách</BackLink>
         <Card>
           <EmptyState
             icon="search"
@@ -97,6 +83,10 @@ export default function PostDetailPage() {
   const isFollowed = followed.has(post.id)
   const claimLabel = lost ? 'Tôi đang giữ món này' : 'Đây là đồ của tôi'
 
+  const report = () => {
+    if (requireMember()) navigate(`/posts/${post.id}/report`)
+  }
+
   const claim = () => {
     if (!lost && post.question) {
       if (requireMember()) navigate(`/posts/${post.id}/verify`)
@@ -116,12 +106,12 @@ export default function PostDetailPage() {
       icon: 'bell',
       onClick: () => ctx.toggleFollowed(post.id),
     },
-    { label: 'Báo cáo bài đăng này', icon: 'flag', tone: 'danger', onClick: comingSoon },
+    { label: 'Báo cáo bài đăng này', icon: 'flag', tone: 'danger', onClick: report },
   ]
 
   return (
     <div className="mx-auto max-w-360 px-4 pt-5 pb-10 sm:px-6 lg:px-10 lg:pt-7">
-      <BackLink />
+      <BackLink to="/">Quay lại danh sách</BackLink>
 
       {/* Mobile: ảnh, thông tin rồi bình luận, hành động nằm trong nút ⋯; desktop: cột phải dính bên cạnh */}
       <main className="grid grid-cols-1 items-start gap-x-6 gap-y-4 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -294,7 +284,7 @@ export default function PostDetailPage() {
             <p className="m-0 mb-3.5 text-tiny leading-relaxed text-ink-muted">
               Tin rác, đòi tiền mới trả đồ, hay ảnh không phải của người đăng, hãy báo cho LostLink.
             </p>
-            <Button variant="dangerSoft" block onClick={comingSoon}>
+            <Button variant="dangerSoft" block onClick={report}>
               <Icon name="flag" size={14} />
               Báo cáo bài đăng này
             </Button>

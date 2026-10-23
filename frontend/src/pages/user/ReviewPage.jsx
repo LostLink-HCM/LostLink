@@ -3,32 +3,17 @@ import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom
 import Icon from '../../components/common/Icon'
 import Button from '../../components/user/Button'
 import { buttonClass } from '../../components/user/buttonClass'
+import BackLink from '../../components/user/BackLink'
 import Card from '../../components/user/Card'
 import EmptyState from '../../components/user/EmptyState'
 import Note from '../../components/user/Note'
-import { cx, focusRing } from '../../components/user/classes'
+import { cx, focusRing, textareaClass } from '../../components/user/classes'
 import AttachedPost from '../../components/user/messages/AttachedPost'
 import { isReceiver } from '../../lib/userMessages'
 import { COMMENT_MAX, RATING_LABELS, praisesFor, validateReview } from '../../lib/userReviews'
 
-const COMING_SOON = 'Chức năng này đang được phát triển.'
 const pageClass = 'mx-auto max-w-260 px-4 pt-5 pb-10 sm:px-6 lg:px-10 lg:pt-7'
 const sectionTitle = 'm-0 mb-1 p-0 text-lead font-bold text-ink'
-
-function BackLink() {
-  return (
-    <Link
-      to="/messages"
-      className={cx(
-        'mb-4 inline-flex items-center gap-1.5 rounded-lg text-caption font-medium text-ink-muted no-underline hover:text-primary',
-        focusRing
-      )}
-    >
-      <Icon name="back" size={16} />
-      Quay lại tin nhắn
-    </Link>
-  )
-}
 
 function Star({ filled }) {
   return (
@@ -92,7 +77,7 @@ export default function ReviewPage() {
   if (!thread || thread.status !== 'returned') {
     return (
       <div className={pageClass}>
-        <BackLink />
+        <BackLink to="/messages">Quay lại tin nhắn</BackLink>
         <Card>
           <EmptyState
             icon="lock"
@@ -124,7 +109,7 @@ export default function ReviewPage() {
 
   return (
     <div className={pageClass}>
-      <BackLink />
+      <BackLink to="/messages">Quay lại tin nhắn</BackLink>
 
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
         <Card className="p-5 sm:p-7">
@@ -230,7 +215,7 @@ export default function ReviewPage() {
                       ? 'Cảm ơn bạn đã giữ đồ giúp mình…'
                       : 'Chúc bạn giữ đồ cẩn thận hơn nhé…'
                   }
-                  className="block w-full resize-y rounded-xl border border-line-strong bg-surface px-3.5 py-3 text-body leading-relaxed text-ink outline-none transition placeholder:text-ink-subtle focus:border-primary focus:ring-3 focus:ring-primary/12"
+                  className={textareaClass}
                 />
                 <label className="mt-3 flex cursor-pointer items-center gap-2.5 text-small text-ink-secondary">
                   <input
@@ -287,9 +272,9 @@ export default function ReviewPage() {
               Nếu buổi gặp làm bạn không thoải mái, hãy báo riêng cho LostLink. Người kia sẽ không
               biết ai báo cáo.
             </p>
-            <Button block onClick={() => notify(COMING_SOON)}>
+            <Link to={`/messages/${thread.id}/report`} className={buttonClass({ block: true })}>
               Báo cáo cho LostLink
-            </Button>
+            </Link>
           </section>
         </aside>
       </div>

@@ -4,29 +4,15 @@ import { useAuth } from '../../auth/AuthContext'
 import Icon from '../../components/common/Icon'
 import Button from '../../components/user/Button'
 import { buttonClass } from '../../components/user/buttonClass'
+import BackLink from '../../components/user/BackLink'
 import Card from '../../components/user/Card'
 import EmptyState from '../../components/user/EmptyState'
 import Note from '../../components/user/Note'
-import { cx, focusRing } from '../../components/user/classes'
+import { cx } from '../../components/user/classes'
 import AttachedPost from '../../components/user/messages/AttachedPost'
-import { openThread, postSnapshot } from '../../lib/userMessages'
+import { isClosedByMe, openThread, postSnapshot } from '../../lib/userMessages'
 
 const pageClass = 'mx-auto max-w-180 px-4 pt-5 pb-10 sm:px-6 lg:pt-7'
-
-function BackLink({ to, children }) {
-  return (
-    <Link
-      to={to}
-      className={cx(
-        'mb-4 inline-flex items-center gap-1.5 rounded-lg text-caption font-medium text-ink-muted no-underline hover:text-primary',
-        focusRing
-      )}
-    >
-      <Icon name="back" size={16} />
-      {children}
-    </Link>
-  )
-}
 
 // Không trả lời được: bài không tồn tại, không có câu hỏi, bài của mình hoặc không còn Đang tìm
 function Unavailable({ postId, title, description }) {
@@ -47,7 +33,8 @@ export default function VerifyPage() {
   const { id } = useParams()
   const { user } = useAuth()
   const navigate = useNavigate()
-  const { posts, chat, setChat, verifications, answerQuestion } = useOutletContext()
+  const { posts, chat, setChat, verifications, answerQuestion, reopenConversation } =
+    useOutletContext()
   const [choice, setChoice] = useState(null)
 
   const post = posts.find((item) => String(item.id) === id)
@@ -99,7 +86,10 @@ export default function VerifyPage() {
 
   const openChat = () => {
     const thread = chat.threads.find((item) => item.post.id === post.id)
-    if (thread) setChat((prev) => openThread(prev, thread.id))
+    if (thread) {
+      if (isClosedByMe(thread)) reopenConversation(thread)
+      setChat((prev) => openThread(prev, thread.id))
+    }
     navigate('/messages', { state: { openConversation: true } })
   }
 

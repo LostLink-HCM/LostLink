@@ -14,14 +14,16 @@ import TradePanel from '../../components/user/messages/TradePanel'
 import { checkImages } from '../../lib/composePost'
 import {
   acceptRequest,
+  closedBy,
   confirmReturn,
   dayLabel,
   declineRequest,
   filterThreads,
+  isClosedByMe,
   isSameDay,
-  markNotMine,
   openThread,
   sendMessage,
+  threadNotes,
   timeLabel,
   validateMessage,
 } from '../../lib/userMessages'
@@ -35,7 +37,13 @@ const STATUS_LINES = {
   incoming: ['Đang chờ duyệt', 'text-warning', 'bg-warning'],
   returned: ['Đã trao trả', 'text-success', 'bg-success'],
   declined: ['Hội thoại đã đóng', 'text-ink-muted', 'bg-ink-subtle'],
-  closed: ['Hội thoại đã đóng', 'text-ink-muted', 'bg-ink-subtle'],
+}
+
+const statusLine = (thread) => {
+  const closer = closedBy(thread)
+  if (!closer) return STATUS_LINES[thread.status]
+  const who = closer === 'me' ? 'Bạn' : thread.peer.name
+  return [`${who} đã đóng hội thoại`, 'text-ink-muted', 'bg-ink-subtle']
 }
 
 function SystemNote({ children, tone = 'primary' }) {
@@ -84,18 +92,15 @@ function Bubble({ message, label }) {
   )
 }
 
-function openedIndex(thread) {
-  if (!thread.openedAt) return -1
-  const index = thread.messages.findIndex((message) => message.createdAt > thread.openedAt)
-  return index === -1 ? thread.messages.length : index
-}
+// Tin nhắn và ghi chú hệ thống xếp chung theo thời gian, cùng thời điểm thì tin nhắn đứng trước
+const timeline = (thread) =>
+  [
+    ...thread.messages.map((message) => ({ at: message.createdAt, message })),
+    ...threadNotes(thread).map((note) => ({ at: note.at, note })),
+  ].sort((left, right) => Date.parse(left.at) - Date.parse(right.at))
 
 function Conversation({ thread, now }) {
-  const opened = openedIndex(thread)
-  const openedNote =
-    thread.openedBy === 'verified'
-      ? `Đã xác minh lúc ${timeLabel(thread.openedAt)} · Kênh trò chuyện đã mở`
-      : `Đã đồng ý trò chuyện lúc ${timeLabel(thread.openedAt)} · Kênh trò chuyện đã mở`
+  const items = timeline(thread)
 
   return (
     <>
@@ -109,25 +114,30 @@ function Conversation({ thread, now }) {
         </div>
       )}
 
-      {thread.messages.map((message, index) => (
-        <Fragment key={message.id}>
-          {(index === 0 || !isSameDay(thread.messages[index - 1].createdAt, message.createdAt)) && (
-            <div className="flex items-center gap-3 text-micro text-ink-subtle before:h-px before:flex-1 before:bg-line-subtle after:h-px after:flex-1 after:bg-line-subtle">
-              {dayLabel(message.createdAt, now)}
-            </div>
-          )}
-          {index === opened && <SystemNote>{openedNote}</SystemNote>}
-          <Bubble
-            message={message}
-            label={
-              index === 0 && ['incoming', 'pending'].includes(thread.status)
-                ? 'Tin nhắn giới thiệu'
-                : ''
-            }
-          />
-        </Fragment>
-      ))}
-      {opened === thread.messages.length && <SystemNote>{openedNote}</SystemNote>}
+      {items.map(({ at, message, note }, index) => {
+        const newDay = index === 0 || !isSameDay(items[index - 1].at, at)
+        return (
+          <Fragment key={message ? message.id : `${note.at}-${note.text}`}>
+            {newDay && (
+              <div className="flex items-center gap-3 text-micro text-ink-subtle before:h-px before:flex-1 before:bg-line-subtle after:h-px after:flex-1 after:bg-line-subtle">
+                {dayLabel(at, now)}
+              </div>
+            )}
+            {note ? (
+              <SystemNote tone={note.tone}>{note.text}</SystemNote>
+            ) : (
+              <Bubble
+                message={message}
+                label={
+                  message === thread.messages[0] && ['incoming', 'pending'].includes(thread.status)
+                    ? 'Tin nhắn giới thiệu'
+                    : ''
+                }
+              />
+            )}
+          </Fragment>
+        )
+      })}
 
       {thread.status === 'pending' && (
         <SystemNote tone="muted">Đã hết lượt nhắn, chờ {thread.peer.name} phản hồi</SystemNote>
@@ -135,9 +145,6 @@ function Conversation({ thread, now }) {
       {thread.status === 'returned' && <SystemNote>Cả hai đã xác nhận trao trả</SystemNote>}
       {thread.status === 'declined' && (
         <SystemNote tone="muted">Yêu cầu trò chuyện đã bị từ chối</SystemNote>
-      )}
-      {thread.status === 'closed' && (
-        <SystemNote tone="muted">Đã báo không đúng món đồ · Hội thoại đã đóng</SystemNote>
       )}
     </>
   )
@@ -147,6 +154,7 @@ export default function MessagesPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const { posts, now, chat, setChat, setPostStatus, notify, reviews } = useOutletContext()
+  const { closeConversation, reopenConversation } = useOutletContext()
   const [query, setQuery] = useState('')
   // Vào từ bài đăng thì mobile mở thẳng hội thoại
   const [mobileConversation, setMobileConversation] = useState(
@@ -158,10 +166,22 @@ export default function MessagesPage() {
   const scrollRef = useRef(null)
   const inputRef = useRef(null)
 
-  const threads = useMemo(() => filterThreads(chat.threads, query), [chat.threads, query])
   const active = chat.threads.find((thread) => thread.id === chat.activeId)
+  // Hội thoại mình đã đóng tách sang mục Đã đóng
+  const [folder, setFolder] = useState(active && isClosedByMe(active) ? 'closed' : 'open')
+  const threads = useMemo(
+    () =>
+      filterThreads(chat.threads, query).filter(
+        (thread) => isClosedByMe(thread) === (folder === 'closed')
+      ),
+    [chat.threads, query, folder]
+  )
+  const closedUnread = chat.threads.reduce(
+    (count, thread) => count + (isClosedByMe(thread) ? thread.unread : 0),
+    0
+  )
   const draft = chat.drafts[active?.id] || ''
-  const status = active && STATUS_LINES[active.status]
+  const status = active && statusLine(active)
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
@@ -228,11 +248,21 @@ export default function MessagesPage() {
     }
   }
 
-  const notMine = () => {
-    setChat((prev) => markNotMine(prev, active.id))
+  const close = () => {
+    closeConversation(active)
     setDialog(null)
-    updatePost('searching')
+    setFolder('closed')
     notify('Đã đóng hội thoại, bài đăng trở lại Đang tìm.')
+  }
+
+  const reopen = () => {
+    const available = reopenConversation(active)
+    setFolder('open')
+    notify(
+      available
+        ? 'Đã mở lại hội thoại, bài đăng chuyển lại Đã liên hệ.'
+        : 'Đã mở lại hội thoại. Bài đăng đã có người khác liên hệ nên giữ nguyên trạng thái.'
+    )
   }
 
   const linkable = (post) => post.id != null && posts.some((item) => item.id === post.id)
@@ -243,7 +273,7 @@ export default function MessagesPage() {
       onConfirm={() => setDialog('confirm')}
       reviewed={Boolean(reviews[active.id])}
       onReview={() => navigate(`/messages/${active.id}/review`)}
-      onNotMine={() => setDialog('notMine')}
+      onClose={() => setDialog('close')}
     />
   )
 
@@ -269,6 +299,9 @@ export default function MessagesPage() {
             drafts={chat.drafts}
             query={query}
             onQueryChange={setQuery}
+            folder={folder}
+            onFolderChange={setFolder}
+            closedUnread={closedUnread}
             onOpen={select}
             now={now}
           />
@@ -312,7 +345,7 @@ export default function MessagesPage() {
                   icon="flag"
                   label={`Báo cáo ${active.peer.name}`}
                   tone="danger"
-                  onClick={() => notify(COMING_SOON)}
+                  onClick={() => navigate(`/messages/${active.id}/report`)}
                 />
                 <IconButton
                   icon="info"
@@ -352,6 +385,7 @@ export default function MessagesPage() {
               onPickImage={sendImage}
               onAccept={accept}
               onDecline={decline}
+              onReopen={reopen}
             />
           </section>
         ) : (
@@ -397,24 +431,25 @@ export default function MessagesPage() {
         </Dialog>
       )}
 
-      {dialog === 'notMine' && (
+      {dialog === 'close' && (
         <Dialog
-          title="Không đúng món đồ?"
+          title="Đóng hội thoại?"
           size="sm"
           onClose={() => setDialog(null)}
           footer={
             <>
               <Button onClick={() => setDialog(null)}>Quay lại trò chuyện</Button>
-              <Button variant="danger" data-autofocus onClick={notMine}>
+              <Button variant="danger" data-autofocus onClick={close}>
                 Đóng hội thoại
               </Button>
             </>
           }
         >
-          <p className="m-0 text-small leading-relaxed text-ink-secondary">
-            Liên kết giữa hai bài sẽ đóng, bài đăng trở lại Đang tìm và hai bạn không nhắn tiếp được
-            trong hội thoại này.
-          </p>
+          <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-small leading-relaxed text-ink-secondary">
+            <li>Bài đăng trở lại Đang tìm.</li>
+            <li>{active.peer.name} vẫn nhắn được, bạn không nhận thông báo.</li>
+            <li>Mở lại bất cứ lúc nào ở mục Đã đóng.</li>
+          </ul>
         </Dialog>
       )}
     </div>
