@@ -5,6 +5,7 @@ import HomePage from './pages/user/HomePage.jsx'
 import PostDetailPage from './pages/user/PostDetailPage.jsx'
 import VerifyPage from './pages/user/VerifyPage.jsx'
 import ReviewPage from './pages/user/ReviewPage.jsx'
+import ReportPage from './pages/user/ReportPage.jsx'
 import ComposePostPage from './pages/user/ComposePostPage.jsx'
 import MessagesPage from './pages/user/MessagesPage.jsx'
 import NotificationsPage from './pages/user/NotificationsPage.jsx'
@@ -56,6 +57,22 @@ function App() {
             element={
               <RequireAuth>
                 <VerifyPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="posts/:id/report"
+            element={
+              <RequireAuth>
+                <ReportPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="messages/:threadId/report"
+            element={
+              <RequireAuth>
+                <ReportPage />
               </RequireAuth>
             }
           />

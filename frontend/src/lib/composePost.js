@@ -133,7 +133,7 @@ export function findInvalidStep(form) {
 }
 
 // Bỏ ảnh sai định dạng, quá 5 MB hoặc vượt số lượng
-export function checkImages(files, currentCount) {
+export function checkImages(files, currentCount, max = MAX_IMAGES) {
   const accepted = []
   const errors = []
   let overflow = false
@@ -142,13 +142,13 @@ export function checkImages(files, currentCount) {
       errors.push(`"${file.name}" không phải ảnh JPG, PNG hoặc WEBP.`)
     } else if (file.size > MAX_IMAGE_BYTES) {
       errors.push(`"${file.name}" lớn hơn ${MAX_IMAGE_MB} MB.`)
-    } else if (currentCount + accepted.length >= MAX_IMAGES) {
+    } else if (currentCount + accepted.length >= max) {
       overflow = true
     } else {
       accepted.push(file)
     }
   }
-  if (overflow) errors.push(`Chỉ đăng được tối đa ${MAX_IMAGES} ảnh, các ảnh thừa đã bị bỏ.`)
+  if (overflow) errors.push(`Chỉ được tối đa ${max} ảnh, các ảnh thừa đã bị bỏ.`)
   return { accepted, errors }
 }
 

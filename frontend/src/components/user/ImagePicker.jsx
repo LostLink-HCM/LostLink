@@ -1,22 +1,25 @@
 import { useId, useState } from 'react'
-import {
-  ACCEPTED_IMAGE_TYPES,
-  MAX_IMAGE_MB,
-  MAX_IMAGES,
-  checkImages,
-} from '../../../lib/composePost'
-import Icon from '../../common/Icon'
-import { cx, focusRing } from '../classes'
+import { ACCEPTED_IMAGE_TYPES, MAX_IMAGE_MB, MAX_IMAGES, checkImages } from '../../lib/composePost'
+import Icon from '../common/Icon'
+import { cx, focusRing } from './classes'
 
 // Ảnh không bắt buộc, ảnh sai định dạng, quá 5 MB hoặc thừa bị bỏ và báo lỗi
-export default function ImagePicker({ images, onAdd, onRemove }) {
+export default function ImagePicker({
+  images,
+  onAdd,
+  onRemove,
+  title = 'Hình ảnh',
+  max = MAX_IMAGES,
+  cover = true,
+  hint,
+}) {
   const inputId = useId()
   const [rejected, setRejected] = useState([])
   const [dragging, setDragging] = useState(false)
-  const full = images.length >= MAX_IMAGES
+  const full = images.length >= max
 
   const addFiles = (fileList) => {
-    const { accepted, errors } = checkImages(Array.from(fileList), images.length)
+    const { accepted, errors } = checkImages(Array.from(fileList), images.length, max)
     setRejected(errors)
     if (accepted.length) onAdd(accepted)
   }
@@ -25,10 +28,10 @@ export default function ImagePicker({ images, onAdd, onRemove }) {
     <section aria-labelledby={`${inputId}-title`}>
       <div className="mb-2 flex items-baseline justify-between gap-3">
         <h3 id={`${inputId}-title`} className="m-0 text-small font-semibold text-ink">
-          Hình ảnh <span className="font-normal text-ink-muted">· không bắt buộc</span>
+          {title} <span className="font-normal text-ink-muted">· không bắt buộc</span>
         </h3>
         <span className="text-caption text-ink-subtle">
-          {images.length}/{MAX_IMAGES}
+          {images.length}/{max}
         </span>
       </div>
 
@@ -43,7 +46,7 @@ export default function ImagePicker({ images, onAdd, onRemove }) {
               alt={`Ảnh ${index + 1}: ${image.name}`}
               className="size-full object-cover"
             />
-            {index === 0 && (
+            {cover && index === 0 && (
               <span className="absolute bottom-1.5 left-1.5 rounded-full bg-ink/75 px-2 py-0.5 text-micro font-semibold text-white">
                 Ảnh bìa
               </span>
@@ -111,8 +114,8 @@ export default function ImagePicker({ images, onAdd, onRemove }) {
       )}
 
       <p className="m-0 mt-2.5 text-caption leading-relaxed text-ink-muted">
-        Ảnh JPG, PNG hoặc WEBP, mỗi ảnh tối đa {MAX_IMAGE_MB} MB, ảnh đầu tiên làm ảnh bìa. Thêm
-        hình ảnh giúp mọi người nhận ra món đồ nhanh hơn.
+        Ảnh JPG, PNG hoặc WEBP, mỗi ảnh tối đa {MAX_IMAGE_MB} MB
+        {cover && ', ảnh đầu tiên làm ảnh bìa'}.{hint && ` ${hint}`}
       </p>
     </section>
   )

@@ -3,7 +3,7 @@ import Button from '../Button'
 import Card from '../Card'
 import { cx } from '../classes'
 import { SAFE_MEETUPS } from '../../../data/userMessages'
-import { isReceiver } from '../../../lib/userMessages'
+import { canClose, closedBy, isReceiver } from '../../../lib/userMessages'
 
 function CheckRow({ done, children }) {
   return (
@@ -21,7 +21,7 @@ function CheckRow({ done, children }) {
   )
 }
 
-export default function TradePanel({ thread, reviewed, onConfirm, onReview, onNotMine }) {
+export default function TradePanel({ thread, reviewed, onConfirm, onReview, onClose }) {
   const { status, peer, confirmed, post } = thread
 
   if (status === 'request' || status === 'pending') {
@@ -50,14 +50,19 @@ export default function TradePanel({ thread, reviewed, onConfirm, onReview, onNo
     )
   }
 
-  if (status === 'declined' || status === 'closed') {
+  const closer = closedBy(thread)
+  if (status === 'declined' || closer) {
     return (
       <Card as="section" padding="md">
-        <h2 className="m-0 mb-1.5 text-body font-bold text-ink">Hội thoại đã đóng</h2>
+        <h2 className="m-0 mb-1.5 text-body font-bold text-ink">
+          {closer === 'me' ? 'Bạn đã đóng hội thoại' : 'Hội thoại đã đóng'}
+        </h2>
         <p className="m-0 text-caption leading-relaxed text-ink-muted">
           {status === 'declined'
             ? 'Yêu cầu trò chuyện đã bị từ chối, bài đăng vẫn ở trạng thái Đang tìm.'
-            : 'Hai bên xác định không đúng món đồ. Liên kết giữa hai bài đã đóng, bài trở lại Đang tìm.'}
+            : closer === 'me'
+              ? `Bài đăng đã trở lại Đang tìm. Tin ${peer.name} gửi thêm vẫn được lưu nhưng không báo cho bạn, mở lại hội thoại để trao đổi tiếp.`
+              : `${peer.name} đã đóng hội thoại vì món đồ không khớp. Bạn vẫn nhắn tin được nhưng không xác nhận trao trả được cho tới khi ${peer.name} mở lại.`}
         </p>
       </Card>
     )
@@ -67,10 +72,10 @@ export default function TradePanel({ thread, reviewed, onConfirm, onReview, onNo
 
   return (
     <>
-      {status === 'open' && (
-        <Button variant="dangerSoft" size="lg" block onClick={onNotMine}>
+      {canClose(thread) && (
+        <Button variant="dangerSoft" size="lg" block onClick={onClose}>
           <Icon name="close" size={16} />
-          {receiver ? 'Không phải đồ của tôi' : 'Không đúng món đồ'}
+          Đóng hội thoại
         </Button>
       )}
 

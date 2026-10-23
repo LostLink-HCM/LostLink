@@ -7,7 +7,17 @@ import { createFeedComments, createFeedPosts } from '../../data/homeFeed'
 import { createUserMessages } from '../../data/userMessages'
 import { createUserNotifications } from '../../data/userNotifications'
 import { DEFAULT_FILTERS } from '../../lib/homeFeed'
-import { openVerifiedThread, peerOf, postSnapshot, startRequest } from '../../lib/userMessages'
+import { reportKey } from '../../lib/userReports'
+import {
+  closeThread,
+  inboxUnread,
+  isClosedByMe,
+  openVerifiedThread,
+  peerOf,
+  postSnapshot,
+  reopenThread,
+  startRequest,
+} from '../../lib/userMessages'
 import { unreadCount } from '../../lib/userNotifications'
 
 // Khu người dùng dùng xanh thương hiệu thay cho xanh đậm của khu quản trị
@@ -45,6 +55,8 @@ export default function UserLayout() {
   const [verifications, setVerifications] = useState({})
   // Đánh giá đã gửi theo hội thoại, mỗi giao dịch chỉ đánh giá một lần
   const [reviews, setReviews] = useState({})
+  // Báo cáo đã gửi theo đối tượng ('post:id' | 'user:tên'), mỗi đối tượng chỉ báo cáo một lần
+  const [reports, setReports] = useState({})
 
   const [searchInput, setSearchInput] = useState('')
   const [keyword, setKeyword] = useState('')
@@ -98,14 +110,30 @@ export default function UserLayout() {
   const setPostStatus = (id, status) =>
     setPosts((prev) => prev.map((post) => (post.id === id ? { ...post, status } : post)))
 
-  // Gửi yêu cầu liên hệ từ bài đăng
+  // Đóng hội thoại khi món đồ không khớp, bài đăng trở lại Đang tìm
+  const closeConversation = (thread) => {
+    setChat((prev) => closeThread(prev, thread.id))
+    setPostStatus(thread.post.id, 'searching')
+  }
+
+  // Mở lại hội thoại đã đóng; trả về false nếu bài đã có người khác liên hệ nên giữ nguyên trạng thái
+  const reopenConversation = (thread) => {
+    setChat((prev) => reopenThread(prev, thread.id))
+    const post = posts.find((item) => item.id === thread.post.id)
+    if (post && post.status !== 'searching') return false
+    setPostStatus(thread.post.id, 'contacted')
+    return true
+  }
+
+  // Gửi yêu cầu liên hệ từ bài đăng, đã đóng hội thoại về bài này thì tự mở lại
   const contactAbout = (post) => {
     if (!requireMember()) return
+    const existing = chat.threads.find((thread) => thread.post.id === post.id)
+    if (existing && isClosedByMe(existing)) reopenConversation(existing)
     setChat((prev) => startRequest(prev, { post: postSnapshot(post), peer: peerOf(post) }))
     navigate('/messages', { state: { openConversation: true } })
   }
 
-  // Ghi nhận câu trả lời xác minh; đúng thì mở hội thoại và chuyển bài sang Đã liên hệ
   const submitReview = (threadId, review) => {
     if (reviews[threadId]) return false
     setReviews((prev) => ({
@@ -115,6 +143,14 @@ export default function UserLayout() {
     return true
   }
 
+  const submitReport = (target, report) => {
+    const key = reportKey(target)
+    if (reports[key]) return false
+    setReports((prev) => ({ ...prev, [key]: { ...report, createdAt: new Date().toISOString() } }))
+    return true
+  }
+
+  // Ghi nhận câu trả lời xác minh; đúng thì mở hội thoại và chuyển bài sang Đã liên hệ
   const answerQuestion = (post, choice) => {
     if (verifications[post.id]) return verifications[post.id]
     const result = choice === post.question.correct ? 'passed' : 'failed'
@@ -126,7 +162,7 @@ export default function UserLayout() {
     return result
   }
 
-  const unreadMessages = chat.threads.reduce((count, thread) => count + thread.unread, 0)
+  const unreadMessages = inboxUnread(chat.threads)
 
   const search = {
     value: searchInput,
@@ -172,11 +208,15 @@ export default function UserLayout() {
           chat,
           setChat,
           setPostStatus,
+          closeConversation,
+          reopenConversation,
           contactAbout,
           verifications,
           answerQuestion,
           reviews,
           submitReview,
+          reports,
+          submitReport,
           notifications,
           setNotifications,
           notify: setToast,

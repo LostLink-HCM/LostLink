@@ -94,6 +94,78 @@ export function createUserMessages(now = Date.now()) {
       ],
     },
     {
+      // Bạn đã đóng vì không khớp, người kia vẫn nhắn thêm (không báo, chỉ hiện ở mục Đã đóng)
+      id: 'thread-keys',
+      peer: { name: 'baotran.sg', initials: 'BT' },
+      post: {
+        id: 105,
+        type: 'found',
+        title: 'Chùm chìa khóa xe Vision kèm móc gấu bông xám',
+        category: 'Chìa khóa & xe cộ',
+        area: 'Quận 1',
+        image: photo('lostlink-keys'),
+      },
+      status: 'open',
+      openedBy: 'accepted',
+      openedAt: ago(60 * 26),
+      unread: 1,
+      confirmed: { me: false, peer: false },
+      events: [{ type: 'closed', by: 'me', at: ago(60 * 24) }],
+      messages: [
+        {
+          id: 'k1',
+          sender: 'me',
+          text: 'Chìa khóa của mình có móc gấu bông nhưng màu nâu, bạn chụp rõ giúp mình được không?',
+          createdAt: ago(60 * 25),
+        },
+        {
+          id: 'k2',
+          sender: 'peer',
+          text: 'Móc gấu màu xám bạn ơi, chìa có tem đỏ ở đầu.',
+          createdAt: ago(60 * 24 + 10),
+        },
+        {
+          id: 'k3',
+          sender: 'peer',
+          text: 'Mình xem lại dưới đèn thì gấu hơi ngả nâu thật, bạn xem ảnh này thử nhé.',
+          createdAt: ago(60 * 3),
+        },
+      ],
+    },
+    {
+      // Người kia đã đóng vì không khớp, bạn vẫn nhắn được nhưng không xác nhận trao trả được
+      id: 'thread-ring',
+      peer: { name: 'thuha.q7', initials: 'TH' },
+      post: {
+        id: 107,
+        type: 'found',
+        title: 'Nhẫn bạc khắc chữ "M&T" rơi trong rạp chiếu phim',
+        category: 'Trang sức & phụ kiện',
+        area: 'Quận 7',
+        image: photo('lostlink-ring'),
+      },
+      status: 'open',
+      openedBy: 'accepted',
+      openedAt: ago(60 * 5),
+      unread: 0,
+      confirmed: { me: false, peer: false },
+      events: [{ type: 'closed', by: 'peer', at: ago(60 * 4) }],
+      messages: [
+        {
+          id: 'r1',
+          sender: 'me',
+          text: 'Nhẫn của mình khắc chữ M&T phía trong, size 12.',
+          createdAt: ago(60 * 5 - 5),
+        },
+        {
+          id: 'r2',
+          sender: 'peer',
+          text: 'Nhẫn mình nhặt được khắc ở mặt ngoài và nhỏ hơn size đó bạn ạ.',
+          createdAt: ago(60 * 4 + 5),
+        },
+      ],
+    },
+    {
       id: 'thread-dog',
       peer: { name: 'minhkhoi.td', initials: 'MK' },
       post: {

@@ -3,17 +3,12 @@ import Icon from '../../common/Icon'
 import Button from '../Button'
 import { cx, focusRing } from '../classes'
 import { ACCEPTED_IMAGE_TYPES } from '../../../lib/composePost'
-import { MESSAGE_LIMIT } from '../../../lib/userMessages'
+import { MESSAGE_LIMIT, isClosedByMe } from '../../../lib/userMessages'
 
 const iconButton = cx(
   'grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border-0 transition-colors disabled:cursor-not-allowed',
   focusRing
 )
-
-const LOCKED = {
-  declined: 'Yêu cầu trò chuyện đã bị từ chối.',
-  closed: 'Hội thoại đã đóng vì không đúng món đồ.',
-}
 
 export default function Composer({
   thread,
@@ -25,6 +20,7 @@ export default function Composer({
   onPickImage,
   onAccept,
   onDecline,
+  onReopen,
 }) {
   const galleryRef = useRef(null)
   const { status, peer } = thread
@@ -45,12 +41,27 @@ export default function Composer({
     )
   }
 
-  if (LOCKED[status]) {
+  if (status === 'declined') {
     return (
       <p className="m-0 flex items-center gap-2 border-t border-line bg-surface-muted px-5 py-4 text-caption text-ink-muted">
         <Icon name="lock" size={15} />
-        {LOCKED[status]}
+        Yêu cầu trò chuyện đã bị từ chối.
       </p>
+    )
+  }
+
+  // Người đóng xem được tin cũ và tin mới, muốn nhắn tiếp thì mở lại
+  if (isClosedByMe(thread)) {
+    return (
+      <div className="flex flex-wrap items-center gap-3 border-t border-line bg-surface-muted px-4 py-3.5 sm:px-5">
+        <p className="m-0 flex min-w-0 flex-1 items-center gap-2 text-caption text-ink-muted">
+          <Icon name="lock" size={15} className="shrink-0" />
+          Bạn đã đóng hội thoại này.
+        </p>
+        <Button variant="primary" onClick={onReopen}>
+          Mở lại hội thoại
+        </Button>
+      </div>
     )
   }
 
