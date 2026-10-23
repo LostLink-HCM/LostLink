@@ -1,7 +1,7 @@
 import { useId } from 'react'
 import { DESCRIPTION_MAX, TITLE_MAX } from '../../../lib/composePost'
 import { cx } from '../classes'
-import ImagePicker from './ImagePicker'
+import ImagePicker from '../ImagePicker'
 import { inputClass } from './styles'
 import Note from '../Note'
 import { FieldError, StepHeading } from './ui'
@@ -73,7 +73,12 @@ export default function ContentStep({ form, errors, onChange, onAddImages, onRem
         )}
       </div>
 
-      <ImagePicker images={form.images} onAdd={onAddImages} onRemove={onRemoveImage} />
+      <ImagePicker
+        images={form.images}
+        onAdd={onAddImages}
+        onRemove={onRemoveImage}
+        hint="Thêm hình ảnh giúp mọi người nhận ra món đồ nhanh hơn."
+      />
     </>
   )
 }
