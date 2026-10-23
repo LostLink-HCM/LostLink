@@ -174,10 +174,56 @@ export const confirmReturn = (state, threadId) =>
     return { ...thread, confirmed, status: confirmed.peer ? 'returned' : 'open' }
   })
 
-export const markNotMine = (state, threadId) =>
+export const closedBy = (thread) => {
+  const last = thread.events?.at(-1)
+  return last?.type === 'closed' ? last.by : null
+}
+
+export const isClosedByMe = (thread) => closedBy(thread) === 'me'
+export const canClose = (thread) => thread.status === 'open' && !closedBy(thread)
+
+const addEvent = (thread, type, now) => ({
+  ...thread,
+  events: [...(thread.events ?? []), { type, by: 'me', at: new Date(now).toISOString() }],
+})
+
+export const closeThread = (state, threadId, now = Date.now()) =>
   updateThread(state, threadId, (thread) =>
-    thread.status === 'open' ? { ...thread, status: 'closed' } : thread
+    canClose(thread) ? addEvent(thread, 'closed', now) : thread
   )
+
+export const reopenThread = (state, threadId, now = Date.now()) =>
+  updateThread(state, threadId, (thread) =>
+    isClosedByMe(thread) ? addEvent(thread, 'reopened', now) : thread
+  )
+export const inboxUnread = (threads) =>
+  threads.reduce((count, thread) => count + (isClosedByMe(thread) ? 0 : thread.unread), 0)
+export function threadNotes(thread) {
+  const { peer, post } = thread
+  const notes = []
+  if (thread.openedAt) {
+    const how = thread.openedBy === 'verified' ? 'Đã xác minh' : 'Đã đồng ý trò chuyện'
+    notes.push({
+      at: thread.openedAt,
+      text: `${how} lúc ${timeLabel(thread.openedAt)} · Kênh trò chuyện đã mở`,
+    })
+  }
+  for (const event of thread.events ?? []) {
+    const time = timeLabel(event.at)
+    let text
+    if (event.type === 'reopened') {
+      text = `${event.by === 'me' ? 'Bạn' : peer.name} đã mở lại hội thoại lúc ${time}`
+    } else if (event.by === 'me') {
+      text = `Bạn đã đóng hội thoại lúc ${time}`
+    } else {
+      text = isReceiver(post)
+        ? `${peer.name} cho rằng thông tin của bạn không khớp với món đồ họ đang giữ`
+        : `${peer.name} xác nhận món đồ không khớp với đồ họ đang tìm`
+    }
+    notes.push({ at: event.at, text, tone: 'muted' })
+  }
+  return notes
+}
 
 const dateKey = (value) => new Date(value).toLocaleDateString('vi-VN')
 

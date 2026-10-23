@@ -1,6 +1,7 @@
 import Icon from '../../common/Icon'
 import { cx, focusRing } from '../classes'
-import { lastActivity, previewTime, threadPreview } from '../../../lib/userMessages'
+import { closedBy, lastActivity, previewTime, threadPreview } from '../../../lib/userMessages'
+import Button from '../Button'
 import Avatar from '../Avatar'
 import CountBadge from '../CountBadge'
 
@@ -10,8 +11,18 @@ const STATUS_TAGS = {
   pending: ['Chờ đồng ý', 'bg-neutral-soft text-neutral'],
   returned: ['Đã trao trả', 'bg-success-soft text-success'],
   declined: ['Đã từ chối', 'bg-neutral-soft text-neutral'],
-  closed: ['Đã đóng', 'bg-neutral-soft text-neutral'],
 }
+
+// Mình đóng thì nằm ở mục Đã đóng, người kia đóng thì vẫn ở mục Đang mở
+const CLOSED_TAGS = {
+  me: ['Đã đóng', 'bg-neutral-soft text-neutral'],
+  peer: ['Không khớp', 'bg-neutral-soft text-neutral'],
+}
+
+const FOLDERS = [
+  ['open', 'Đang mở'],
+  ['closed', 'Đã đóng'],
+]
 
 export default function ThreadList({
   threads,
@@ -19,6 +30,9 @@ export default function ThreadList({
   drafts,
   query,
   onQueryChange,
+  folder,
+  onFolderChange,
+  closedUnread,
   onOpen,
   now,
 }) {
@@ -42,6 +56,23 @@ export default function ThreadList({
             className="h-10 w-full min-w-0 bg-transparent text-small text-ink outline-none placeholder:text-ink-subtle"
           />
         </label>
+        <div className="mt-3 flex gap-2">
+          {FOLDERS.map(([value, label]) => (
+            <Button
+              key={value}
+              size="sm"
+              pressed={folder === value}
+              onClick={() => onFolderChange(value)}
+            >
+              {label}
+              {value === 'closed' && closedUnread > 0 && (
+                <CountBadge count={closedUnread} tone="primary" size="sm">
+                  <span className="sr-only"> tin chưa đọc</span>
+                </CountBadge>
+              )}
+            </Button>
+          ))}
+        </div>
       </div>
 
       <ul
@@ -52,8 +83,9 @@ export default function ThreadList({
       >
         {threads.map((thread) => {
           const active = thread.id === activeId
-          const tag = STATUS_TAGS[thread.status]
-          const draft = thread.status === 'open' && drafts[thread.id]
+          const closer = closedBy(thread)
+          const tag = closer ? CLOSED_TAGS[closer] : STATUS_TAGS[thread.status]
+          const draft = thread.status === 'open' && closer !== 'me' && drafts[thread.id]
           return (
             <li key={thread.id}>
               <button
@@ -128,12 +160,18 @@ export default function ThreadList({
         <div className="flex flex-1 flex-col items-center px-5 py-10 text-center text-ink-subtle">
           <Icon name="chat" size={30} />
           <p className="m-0 mt-3 text-small font-semibold text-ink-secondary">
-            {query ? 'Không có hội thoại phù hợp' : 'Chưa có hội thoại nào'}
+            {query
+              ? 'Không có hội thoại phù hợp'
+              : folder === 'closed'
+                ? 'Chưa có hội thoại nào đã đóng'
+                : 'Chưa có hội thoại nào'}
           </p>
           <p className="m-0 mt-1 text-caption">
             {query
               ? 'Thử tìm bằng tên khác hoặc tiêu đề bài đăng.'
-              : 'Kênh trò chuyện mở khi bạn xác minh đúng hoặc được đồng ý liên hệ.'}
+              : folder === 'closed'
+                ? 'Hội thoại bạn đóng vì món đồ không khớp sẽ nằm ở đây.'
+                : 'Kênh trò chuyện mở khi bạn xác minh đúng hoặc được đồng ý liên hệ.'}
           </p>
         </div>
       )}

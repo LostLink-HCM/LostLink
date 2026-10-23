@@ -9,6 +9,19 @@ const participantSchema = new Schema(
     lastReadAt: { type: Date, default: null },
     markedUnread: { type: Boolean, default: false },
     isFlagged: { type: Boolean, default: false },
+    // Người này đã đóng hội thoại vì món đồ không khớp, null là đang mở.
+    // Người đóng không nhận thông báo tin mới, người kia vẫn nhắn được
+    closedAt: { type: Date, default: null },
+  },
+  { _id: false }
+)
+
+// Lịch sử đóng/mở lại hội thoại, dùng để hiện ghi chú hệ thống xen giữa tin nhắn
+const conversationEventSchema = new Schema(
+  {
+    type: { type: String, enum: ['closed', 'reopened'], required: true },
+    by: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    at: { type: Date, default: Date.now },
   },
   { _id: false }
 )
@@ -19,10 +32,10 @@ const conversationSchema = new Schema(
     // trade: hai bên trao trả đồ; support: người dùng với Moderator, Moderator với Admin
     kind: { type: String, enum: ['trade', 'support'], default: 'trade', index: true },
 
-    // closed: báo "Không phải đồ của tôi"; locked: một bên chặn người kia
+    // locked: một bên chặn người kia. Đóng vì không khớp là trạng thái riêng của từng người (participants.closedAt)
     status: {
       type: String,
-      enum: ['open', 'closed', 'locked'],
+      enum: ['open', 'locked'],
       default: 'open',
       index: true,
     },
@@ -45,6 +58,8 @@ const conversationSchema = new Schema(
     confirmedFound: { type: Boolean, default: false },
 
     lastMessageAt: { type: Date, default: null },
+
+    events: [conversationEventSchema],
   },
   { timestamps: true, collection: 'conversations' }
 )
