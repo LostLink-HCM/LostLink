@@ -5,6 +5,7 @@ import Button from './Button'
 import Dialog from './Dialog'
 import IconButton from './IconButton'
 import { cx } from './classes'
+import { DEFAULT_QUICK_REPLIES } from '../../data/backofficeQuickReplies'
 import {
   MESSAGE_LIMIT,
   filterThreads,
@@ -14,18 +15,6 @@ import {
   sendMessage,
   startThread as startThreadState,
 } from '../../lib/backofficeMessages'
-
-const QUICK_REPLIES = {
-  user: [
-    'Chào bạn, mình đã tiếp nhận yêu cầu và đang kiểm tra thông tin.',
-    'Bạn có thể bổ sung thời gian, địa điểm và các thông tin liên quan giúp mình không?',
-    'Cảm ơn bạn đã phối hợp. Nếu cần hỗ trợ thêm, bạn cứ nhắn tại đây nhé.',
-  ],
-  internal: [
-    'Mình đã tiếp nhận thông tin và sẽ kiểm tra lại hồ sơ.',
-    'Nhờ bạn hỗ trợ xem xét trường hợp này. Mình sẽ bổ sung thông tin liên quan.',
-  ],
-}
 
 const avatarColors = {
   blue: 'bg-[#dfeafa] text-[#35679e]',
@@ -633,19 +622,21 @@ export default function MessagesWorkspace({ messageState, setMessageState, works
                     bg-surface-muted p-1.5"
                   id="quick-replies"
                 >
-                  {QUICK_REPLIES[contact.role === 'user' ? 'user' : 'internal'].map((reply) => (
-                    <button
-                      type="button"
-                      key={reply}
-                      className="flex w-full items-center justify-between gap-3 rounded-md p-2
-                        text-left text-caption leading-relaxed text-ink-muted hover:bg-primary-soft
-                        hover:text-primary"
-                      onClick={() => insertReply(reply)}
-                    >
-                      {reply}
-                      <Icon name="next" size={13} />
-                    </button>
-                  ))}
+                  {DEFAULT_QUICK_REPLIES[contact.role === 'user' ? 'user' : 'internal'].map(
+                    (reply) => (
+                      <button
+                        type="button"
+                        key={reply.id}
+                        className="flex w-full items-center justify-between gap-3 rounded-md p-2
+                          text-left text-caption leading-relaxed text-ink-muted hover:bg-primary-soft
+                          hover:text-primary"
+                        onClick={() => insertReply(reply.text)}
+                      >
+                        {reply.text}
+                        <Icon name="next" size={13} />
+                      </button>
+                    )
+                  )}
                 </div>
               )}
 
