@@ -61,7 +61,7 @@ export default function TradePanel({ thread, reviewed, onConfirm, onReview, onCl
           {status === 'declined'
             ? 'Yêu cầu trò chuyện đã bị từ chối, bài đăng vẫn ở trạng thái Đang tìm.'
             : closer === 'me'
-              ? `Bài đăng đã trở lại Đang tìm. Tin ${peer.name} gửi thêm vẫn được lưu nhưng không báo cho bạn, mở lại hội thoại để trao đổi tiếp.`
+              ? `Tin ${peer.name} gửi thêm vẫn được lưu nhưng không báo cho bạn, mở lại hội thoại để trao đổi tiếp.`
               : `${peer.name} đã đóng hội thoại vì món đồ không khớp. Bạn vẫn nhắn tin được nhưng không xác nhận trao trả được cho tới khi ${peer.name} mở lại.`}
         </p>
       </Card>

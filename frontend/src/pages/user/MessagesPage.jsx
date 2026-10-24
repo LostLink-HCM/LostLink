@@ -252,16 +252,14 @@ export default function MessagesPage() {
     closeConversation(active)
     setDialog(null)
     setFolder('closed')
-    notify('Đã đóng hội thoại, bài đăng trở lại Đang tìm.')
+    notify('Đã đóng hội thoại.')
   }
 
   const reopen = () => {
     const available = reopenConversation(active)
     setFolder('open')
     notify(
-      available
-        ? 'Đã mở lại hội thoại, bài đăng chuyển lại Đã liên hệ.'
-        : 'Đã mở lại hội thoại. Bài đăng đã có người khác liên hệ nên giữ nguyên trạng thái.'
+      available ? 'Đã mở lại hội thoại, bài đăng chuyển lại Đã liên hệ.' : 'Đã mở lại hội thoại.'
     )
   }
 
@@ -446,7 +444,6 @@ export default function MessagesPage() {
           }
         >
           <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-small leading-relaxed text-ink-secondary">
-            <li>Bài đăng trở lại Đang tìm.</li>
             <li>{active.peer.name} vẫn nhắn được, bạn không nhận thông báo.</li>
             <li>Mở lại bất cứ lúc nào ở mục Đã đóng.</li>
           </ul>

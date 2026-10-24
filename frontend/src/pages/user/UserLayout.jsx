@@ -10,6 +10,7 @@ import { DEFAULT_FILTERS } from '../../lib/homeFeed'
 import { reportKey } from '../../lib/userReports'
 import {
   closeThread,
+  hasOtherOpenThread,
   inboxUnread,
   isClosedByMe,
   openVerifiedThread,
@@ -110,13 +111,13 @@ export default function UserLayout() {
   const setPostStatus = (id, status) =>
     setPosts((prev) => prev.map((post) => (post.id === id ? { ...post, status } : post)))
 
-  // Đóng hội thoại khi món đồ không khớp, bài đăng trở lại Đang tìm
+  // Đóng hội thoại khi món đồ không khớp; bài chỉ trở lại Đang tìm khi không còn hội thoại nào khác về bài đó đang mở
   const closeConversation = (thread) => {
     setChat((prev) => closeThread(prev, thread.id))
-    setPostStatus(thread.post.id, 'searching')
+    if (!hasOtherOpenThread(chat.threads, thread)) setPostStatus(thread.post.id, 'searching')
   }
 
-  // Mở lại hội thoại đã đóng; trả về false nếu bài đã có người khác liên hệ nên giữ nguyên trạng thái
+  // Mở lại hội thoại đã đóng, trả về false nếu bài không còn Đang tìm nên giữ nguyên trạng thái
   const reopenConversation = (thread) => {
     setChat((prev) => reopenThread(prev, thread.id))
     const post = posts.find((item) => item.id === thread.post.id)
