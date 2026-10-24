@@ -11,7 +11,7 @@ import Field, { Input, Select, Textarea } from '../../components/moderator/Field
 import Icon from '../../components/common/Icon'
 import IconButton from '../../components/backoffice/IconButton'
 import Notice from '../../components/moderator/Notice'
-import Pagination from '../../components/moderator/Pagination'
+import Pagination from '../../components/backoffice/Pagination'
 import TypeBadge from '../../components/moderator/TypeBadge'
 import {
   EMPTY_FILTERS,
@@ -23,6 +23,7 @@ import {
   validateHideReason,
 } from '../../lib/moderatorPosts'
 import { downloadCsv } from '../../lib/csv'
+import usePaginatedFilter from '../../hooks/usePaginatedFilter'
 
 const PAGE_SIZE = 8
 
@@ -188,17 +189,24 @@ function VisibilityDialog({ post, onSubmit, onClose }) {
 
 export default function Posts() {
   const { posts, setPosts, matchPairs } = useOutletContext()
-  const [filters, setFilters] = useState(EMPTY_FILTERS)
-  const [page, setPage] = useState(1)
   const [modal, setModal] = useState(null)
   const [nextStatus, setNextStatus] = useState('')
   const [notice, setNotice] = useState('')
+  const {
+    filters,
+    setFilter,
+    resetFilters: resetFilterState,
+    setPage,
+    currentPage,
+    filteredItems: filtered,
+    visibleItems: visible,
+  } = usePaginatedFilter({
+    items: posts,
+    initialFilters: EMPTY_FILTERS,
+    filterFn: filterModeratorPosts,
+    pageSize: PAGE_SIZE,
+  })
   const invalidRange = hasInvalidRange(filters)
-  const filtered = filterModeratorPosts(posts, filters)
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const currentPage = Math.min(page, pageCount)
-  const start = (currentPage - 1) * PAGE_SIZE
-  const visible = filtered.slice(start, start + PAGE_SIZE)
   const selected = modal && posts.find((post) => post.id === modal.id)
   const matchingPosts = selected
     ? matchPairs
@@ -215,13 +223,11 @@ export default function Posts() {
     : []
 
   const changeFilter = (key, value) => {
-    setFilters((previous) => ({ ...previous, [key]: value }))
-    setPage(1)
+    setFilter(key, value)
     setNotice('')
   }
   const resetFilters = () => {
-    setFilters(EMPTY_FILTERS)
-    setPage(1)
+    resetFilterState()
     setNotice('')
   }
   const exportCsv = () => {

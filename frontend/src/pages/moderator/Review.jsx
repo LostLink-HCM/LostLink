@@ -11,11 +11,12 @@ import Field, { Input, Select, Textarea } from '../../components/moderator/Field
 import Icon from '../../components/common/Icon'
 import IconButton from '../../components/backoffice/IconButton'
 import Notice from '../../components/moderator/Notice'
-import Pagination from '../../components/moderator/Pagination'
+import Pagination from '../../components/backoffice/Pagination'
 import TypeBadge from '../../components/moderator/TypeBadge'
 import { filterModeratorPosts } from '../../lib/moderatorPosts'
 import { REJECT_REASONS, reviewPost } from '../../lib/moderation'
 import { downloadCsv } from '../../lib/csv'
+import usePaginatedFilter from '../../hooks/usePaginatedFilter'
 
 const EMPTY_FILTERS = { category: '', type: '', district: '', from: '', to: '', query: '' }
 const PAGE_SIZE = 8
@@ -26,6 +27,9 @@ const CATEGORY_TONES = {
   'Thú cưng': 'success',
   'Chìa khóa': 'warning',
 }
+
+const filterPendingPosts = (posts, filters) =>
+  filterModeratorPosts(posts, { ...filters, status: 'pending' })
 
 function Reputation({ score }) {
   const tone = score < 0 ? 'text-danger-ink' : score >= 100 ? 'text-success' : 'text-ink-muted'
@@ -48,20 +52,28 @@ function Meta({ icon, children }) {
 
 export default function Review() {
   const { posts, setPosts } = useOutletContext()
-  const [filters, setFilters] = useState(EMPTY_FILTERS)
-  const [page, setPage] = useState(1)
   const [modal, setModal] = useState(null)
   const [reason, setReason] = useState(REJECT_REASONS[0])
   const [customReason, setCustomReason] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const filtered = filterModeratorPosts(posts, { ...filters, status: 'pending' })
-  const currentPage = Math.min(page, Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)))
-  const visible = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const {
+    filters,
+    setFilter,
+    resetFilters,
+    setPage,
+    currentPage,
+    filteredItems: filtered,
+    visibleItems: visible,
+  } = usePaginatedFilter({
+    items: posts,
+    initialFilters: EMPTY_FILTERS,
+    filterFn: filterPendingPosts,
+    pageSize: PAGE_SIZE,
+  })
   const selected = modal && posts.find((post) => post.id === modal.id && post.status === 'pending')
   const changeFilter = (key, value) => {
-    setFilters((previous) => ({ ...previous, [key]: value }))
-    setPage(1)
+    setFilter(key, value)
   }
   const openReject = (id) => {
     setReason(REJECT_REASONS[0])
@@ -174,8 +186,7 @@ export default function Review() {
               bordered
               size={36}
               onClick={() => {
-                setFilters(EMPTY_FILTERS)
-                setPage(1)
+                resetFilters()
               }}
             />
             <Button variant="primary" onClick={exportCsv} disabled={!filtered.length}>

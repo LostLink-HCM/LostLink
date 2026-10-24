@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useAuth } from '../../auth/AuthContext'
 import Icon from '../../components/common/Icon'
 import Button from '../../components/backoffice/Button'
 import DataTable from '../../components/backoffice/DataTable'
 import Dialog from '../../components/backoffice/Dialog'
+import Pagination from '../../components/backoffice/Pagination'
 import { cx, focusRing } from '../../components/backoffice/classes'
 import { downloadCsv } from '../../lib/csv'
 import {
@@ -18,6 +19,7 @@ import {
   userActionUnavailable,
 } from '../../lib/adminUsers'
 import { createAdminUsers } from '../../data/adminUsers'
+import usePaginatedFilter from '../../hooks/usePaginatedFilter'
 
 const PAGE_SIZE = 8
 const number = (value) => new Intl.NumberFormat('vi-VN').format(value)
@@ -419,16 +421,24 @@ export default function Users() {
     role: 'admin',
   }
   const [userState, setUserState] = useState(() => createAdminUsers())
-  const [filters, setFilters] = useState(USER_FILTERS)
-  const [page, setPage] = useState(1)
   const [modal, setModal] = useState(null)
   const [notice, setNotice] = useState('')
   const [actionError, setActionError] = useState('')
   const { users, logs } = userState
-  const filtered = useMemo(() => filterAdminUsers(users, filters), [users, filters])
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const currentPage = Math.min(page, pageCount)
-  const visible = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const {
+    filters,
+    setFilter,
+    resetFilters,
+    setPage,
+    currentPage,
+    filteredItems: filtered,
+    visibleItems: visible,
+  } = usePaginatedFilter({
+    items: users,
+    initialFilters: USER_FILTERS,
+    filterFn: filterAdminUsers,
+    pageSize: PAGE_SIZE,
+  })
   const selected = modal ? users.find((account) => account.id === modal.id) : null
   const counts = {
     all: users.length,
@@ -438,14 +448,12 @@ export default function Users() {
   }
 
   const changeFilter = (key, value) => {
-    setFilters((previous) => ({ ...previous, [key]: value }))
-    setPage(1)
+    setFilter(key, value)
     setNotice('')
   }
 
-  const resetFilters = () => {
-    setFilters(USER_FILTERS)
-    setPage(1)
+  const resetFiltersAndNotice = () => {
+    resetFilters()
     setNotice('')
   }
 
@@ -611,7 +619,7 @@ export default function Users() {
               'inline-flex size-9 cursor-pointer items-center justify-center rounded-lg border border-line bg-surface text-ink-muted hover:bg-primary-subtle hover:text-primary',
               focusRing
             )}
-            onClick={resetFilters}
+            onClick={resetFiltersAndNotice}
             aria-label="Đặt lại bộ lọc người dùng"
             title="Đặt lại bộ lọc"
           >
@@ -677,7 +685,7 @@ export default function Users() {
                 Không tìm thấy tài khoản phù hợp
               </h3>
               <p className="mb-4 text-caption">Thử tìm theo tên, email hoặc thay đổi bộ lọc.</p>
-              <Button onClick={resetFilters}>Xóa bộ lọc</Button>
+              <Button onClick={resetFiltersAndNotice}>Xóa bộ lọc</Button>
             </div>
           )
         }
@@ -746,59 +754,13 @@ export default function Users() {
         ))}
       </DataTable>
 
-      <nav
-        className="mt-4 flex flex-wrap items-center justify-between gap-4 text-small text-ink-subtle"
-        aria-label="Phân trang"
-      >
-        <span>
-          Hiển thị {filtered.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0}–
-          {Math.min(currentPage * PAGE_SIZE, filtered.length)} trong số {filtered.length} tài khoản
-        </span>
-        <div className="flex gap-1.5">
-          <button
-            type="button"
-            aria-label="Trang trước"
-            disabled={currentPage === 1}
-            onClick={() => setPage((value) => Math.max(1, value - 1))}
-            className={cx(
-              'inline-flex size-8 cursor-pointer items-center justify-center rounded-md border border-line bg-surface text-ink-muted hover:bg-primary-subtle hover:text-primary disabled:cursor-not-allowed disabled:opacity-40',
-              focusRing
-            )}
-          >
-            <Icon name="back" />
-          </button>
-          {Array.from({ length: pageCount }, (_, index) => index + 1).map((pageNumber) => (
-            <button
-              key={pageNumber}
-              type="button"
-              aria-label={`Trang ${pageNumber}`}
-              aria-current={currentPage === pageNumber ? 'page' : undefined}
-              onClick={() => setPage(pageNumber)}
-              className={cx(
-                'size-8 cursor-pointer rounded-md border text-small font-semibold',
-                currentPage === pageNumber
-                  ? 'border-primary bg-primary text-white'
-                  : 'border-line bg-surface text-ink-muted hover:bg-primary-subtle hover:text-primary',
-                focusRing
-              )}
-            >
-              {pageNumber}
-            </button>
-          ))}
-          <button
-            type="button"
-            aria-label="Trang sau"
-            disabled={currentPage === pageCount}
-            onClick={() => setPage((value) => Math.min(pageCount, value + 1))}
-            className={cx(
-              'inline-flex size-8 cursor-pointer items-center justify-center rounded-md border border-line bg-surface text-ink-muted hover:bg-primary-subtle hover:text-primary disabled:cursor-not-allowed disabled:opacity-40',
-              focusRing
-            )}
-          >
-            <Icon name="next" />
-          </button>
-        </div>
-      </nav>
+      <Pagination
+        page={currentPage}
+        total={filtered.length}
+        pageSize={PAGE_SIZE}
+        onChange={setPage}
+        noun="tài khoản"
+      />
 
       {selected && modal?.kind === 'profile' && (
         <UserProfile

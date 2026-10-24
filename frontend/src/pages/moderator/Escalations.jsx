@@ -10,7 +10,7 @@ import Field, { Input, Select } from '../../components/moderator/Field'
 import Icon from '../../components/common/Icon'
 import IconButton from '../../components/backoffice/IconButton'
 import Notice from '../../components/moderator/Notice'
-import Pagination from '../../components/moderator/Pagination'
+import Pagination from '../../components/backoffice/Pagination'
 import { cx, focusRing } from '../../components/backoffice/classes'
 import EscalationActionDialog from '../../components/moderator/EscalationActionDialog'
 import {
@@ -21,6 +21,7 @@ import {
   filterEscalations,
   applyEscalationAction,
 } from '../../lib/escalations'
+import usePaginatedFilter from '../../hooks/usePaginatedFilter'
 
 const EMPTY_FILTERS = { group: '', state: 'open', chat: '', query: '' }
 const PAGE_SIZE = 6
@@ -216,27 +217,33 @@ function AuditRows({ logs, onView }) {
 export default function Escalations() {
   const { escalationState, setEscalationState } = useOutletContext()
   const [tab, setTab] = useState('queue')
-  const [filters, setFilters] = useState(EMPTY_FILTERS)
-  const [page, setPage] = useState(1)
   const [logPage, setLogPage] = useState(1)
   const [modal, setModal] = useState(null)
   const [notice, setNotice] = useState('')
   const [now] = useState(() => Date.now())
   const { tickets, logs } = escalationState
-  const filtered = filterEscalations(tickets, filters, now)
-  const currentPage = Math.min(page, Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)))
+  const {
+    filters,
+    setFilters,
+    setFilter,
+    resetFilters,
+    setPage,
+    currentPage,
+    filteredItems: filtered,
+    visibleItems: visible,
+  } = usePaginatedFilter({
+    items: tickets,
+    initialFilters: EMPTY_FILTERS,
+    filterFn: (items, filterState) => filterEscalations(items, filterState, now),
+    pageSize: PAGE_SIZE,
+  })
   const currentLogPage = Math.min(logPage, Math.max(1, Math.ceil(logs.length / PAGE_SIZE)))
-  const visible = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
   const selected = modal?.ticketId ? tickets.find((ticket) => ticket.id === modal.ticketId) : null
   const selectedLog = modal?.logId ? logs.find((log) => log.id === modal.logId) : null
   const pending = tickets.filter((ticket) => !ticket.resolution)
   const closeModal = () => setModal(null)
   const openDetail = (ticketId) => setModal({ kind: 'detail', ticketId })
   const openAction = (ticketId, action) => setModal({ kind: 'action', ticketId, action })
-  const setFilter = (key, value) => {
-    setFilters((previous) => ({ ...previous, [key]: value }))
-    setPage(1)
-  }
   const statCount = (group) =>
     group === 'resolved'
       ? tickets.filter((ticket) => ticket.resolution).length
@@ -390,10 +397,7 @@ export default function Escalations() {
                 label="Đặt lại bộ lọc"
                 bordered
                 size={36}
-                onClick={() => {
-                  setFilters(EMPTY_FILTERS)
-                  setPage(1)
-                }}
+                onClick={resetFilters}
               />
             </div>
           </section>
