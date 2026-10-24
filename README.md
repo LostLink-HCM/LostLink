@@ -13,37 +13,38 @@ Matching is built on three data axes — **location**, **time**, and **item attr
 - **LOST / FOUND posts** with flexible categories, dynamic attributes, photos.
 - **Two-way matching engine** — an explainable, rule-based scorer (no ML). Hard gates on location + time + exclusive attributes narrow candidates; a weighted soft score (location, time, category, description, image) ranks the rest.
 - **Ownership verification** — a finder's security question (or a contact request) must be passed before contact details are revealed and chat opens.
-- **Chat & handover** with safe public meetup suggestions and a mutual "returned" confirmation that closes the post.
+- **Chat & handover** with safe public meetup suggestions and a mutual "returned" confirmation that marks the post as returned.
 - **Reputation & leaderboard** — trust points and badges earned from completed handovers and reviews.
 - **Area alerts (geofence)** — get notified when a new post appears in a zone you follow.
 - **Moderation & anti-fraud** — reporting, review queues, escalation for stalled deals, and automated email reminders.
 
 ## Post lifecycle
 
-A post moves through a chain of states; every transition is recorded as a milestone to build its timeline.
+A post has 6 states. Every transition is stored in the post's status history (who changed it, when, and why) to build its timeline.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Searching
-    Searching --> LeadFound: match suggested / tip comment
-    LeadFound --> Contacted: ownership verified, chat opens
-    Contacted --> Handover: both agree to meet
-    Handover --> Returned: both confirm handover
-    Returned --> [*]
+    [*] --> Pending: user submits a post
+    Pending --> Searching: moderator approves
+    Pending --> Rejected: moderator rejects
+    Searching --> Contacted: ownership verified, chat opens
+    Contacted --> Searching: all conversations closed / moderator rules it a mismatch
+    Contacted --> Returned: both confirm, or moderator confirms on their behalf
     Searching --> Closed: not found / cancelled
-    LeadFound --> Closed
     Contacted --> Closed
+    Rejected --> [*]
+    Returned --> [*]
     Closed --> [*]
 ```
 
-| State                      | Meaning                                                                                                                    |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| **Searching**              | Post is active and participates in matching.                                                                               |
-| **Lead found**             | A match has been suggested, or a comment points to the item.                                                               |
-| **Contacted**              | Both sides passed verification; the chat channel is open.                                                                  |
-| **Handover in progress**   | Both agreed to meet and are exchanging in person.                                                                          |
-| **Returned** _(closed)_    | Both sides confirm — or the system/Moderator confirms on their behalf — then the post is locked and reputation is awarded. |
-| **Closed** _(side branch)_ | The item was never found, or the post was cancelled.                                                                       |
+| State         | Meaning                                                                                                                         |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Pending**   | New post waiting for moderator review. Not public and not used for matching yet.                                                |
+| **Rejected**  | A moderator rejected the post at review, so it is not published.                                                                |
+| **Searching** | Post is public and participates in matching.                                                                                    |
+| **Contacted** | Ownership was verified and a chat is open. Goes back to Searching only when every conversation about the post has been closed.  |
+| **Returned**  | Both sides confirmed the handover (or a moderator did on their behalf). Reputation is awarded; the post is hidden after 7 days. |
+| **Closed**    | The item was never found, or the owner cancelled the post.                                                                      |
 
 ## Roles
 
@@ -87,7 +88,16 @@ npm install
 npm run dev
 ```
 
-## Test accounts
+## Staging
+
+Deployed on Render from `main` (config in [`render.yaml`](render.yaml)): https://lostlink-web.onrender.com
+
+- The test accounts below are **local only**. Staging accounts use different passwords and are not published; ask the team if you need one.
+- The backend sleeps after 15 minutes idle, so the first request can take up to a minute.
+
+## Test accounts (local only)
+
+Created by `npm run seed` in your local database. They do not work on staging.
 
 ### Role accounts (one per permission level)
 
