@@ -13,37 +13,38 @@ Việc ghép cặp dựa trên ba trục dữ liệu là **vị trí**, **thời
 - **Bài đăng MẤT / NHẶT ĐƯỢC** với danh mục linh hoạt, thuộc tính động và hình ảnh.
 - **Bộ ghép cặp hai chiều**: chấm điểm theo luật, giải thích được (không dùng ML). Các điều kiện bắt buộc về vị trí, thời gian và thuộc tính loại trừ giúp thu hẹp ứng viên; điểm mềm có trọng số (vị trí, thời gian, danh mục, mô tả, hình ảnh) dùng để xếp hạng phần còn lại.
 - **Xác minh chủ sở hữu**: phải trả lời đúng câu hỏi bảo mật của người nhặt (hoặc gửi yêu cầu liên hệ) thì mới thấy thông tin liên lạc và mở được chat.
-- **Chat và bàn giao**: gợi ý điểm hẹn công cộng an toàn, và hai bên cùng xác nhận "đã trả" để đóng bài đăng.
+- **Chat và bàn giao**: gợi ý điểm hẹn công cộng an toàn, và hai bên cùng xác nhận "đã trao trả" để chuyển bài sang trạng thái Đã trao trả.
 - **Uy tín và bảng xếp hạng**: điểm tin cậy và huy hiệu nhận được từ các lần bàn giao thành công và đánh giá.
 - **Cảnh báo theo khu vực (geofence)**: nhận thông báo khi có bài mới trong khu vực bạn theo dõi.
 - **Kiểm duyệt và chống gian lận**: báo cáo vi phạm, hàng đợi duyệt bài, chuyển cấp xử lý cho các giao dịch bị đình trệ, và email nhắc nhở tự động.
 
 ## Vòng đời bài đăng
 
-Bài đăng đi qua một chuỗi trạng thái; mỗi lần chuyển trạng thái được ghi lại thành một mốc để dựng dòng thời gian.
+Bài đăng có 6 trạng thái. Mỗi lần chuyển trạng thái được lưu vào lịch sử của bài (ai đổi, lúc nào, lý do) để dựng dòng thời gian.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Searching
-    Searching --> LeadFound: có gợi ý ghép cặp / bình luận chỉ dẫn
-    LeadFound --> Contacted: xác minh chủ sở hữu, mở chat
-    Contacted --> Handover: hai bên đồng ý gặp
-    Handover --> Returned: hai bên xác nhận đã bàn giao
-    Returned --> [*]
+    [*] --> Pending: người dùng đăng bài
+    Pending --> Searching: moderator duyệt
+    Pending --> Rejected: moderator từ chối
+    Searching --> Contacted: xác minh chủ sở hữu, mở chat
+    Contacted --> Searching: mọi hội thoại đã đóng / moderator kết luận không khớp
+    Contacted --> Returned: hai bên xác nhận, hoặc moderator xác nhận thay
     Searching --> Closed: không tìm thấy / hủy
-    LeadFound --> Closed
     Contacted --> Closed
+    Rejected --> [*]
+    Returned --> [*]
     Closed --> [*]
 ```
 
-| Trạng thái                         | Ý nghĩa                                                                                                          |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| **Đang tìm** (Searching)           | Bài đăng đang hoạt động và tham gia ghép cặp.                                                                    |
-| **Có manh mối** (Lead found)       | Hệ thống đã gợi ý một bài khớp, hoặc có bình luận chỉ ra món đồ.                                                 |
-| **Đã liên hệ** (Contacted)         | Hai bên đã qua bước xác minh; kênh chat được mở.                                                                 |
-| **Đang bàn giao** (Handover)       | Hai bên đã đồng ý gặp và đang trao đổi trực tiếp.                                                                |
-| **Đã trả** (Returned) _(đóng)_     | Hai bên cùng xác nhận (hoặc hệ thống/Moderator xác nhận thay), sau đó bài đăng bị khóa và điểm uy tín được cộng. |
-| **Đã đóng** (Closed) _(nhánh phụ)_ | Không tìm thấy món đồ, hoặc bài đăng bị hủy.                                                                     |
+| Trạng thái                  | Ý nghĩa                                                                                            |
+| --------------------------- | -------------------------------------------------------------------------------------------------- |
+| **Chờ xét duyệt** (Pending) | Bài mới đăng, đang chờ moderator duyệt. Chưa hiển thị công khai và chưa tham gia ghép cặp.         |
+| **Đã từ chối** (Rejected)   | Moderator từ chối bài khi duyệt, nên bài không được đăng.                                          |
+| **Đang tìm** (Searching)    | Bài đã công khai và tham gia ghép cặp.                                                             |
+| **Đã liên hệ** (Contacted)  | Đã xác minh chủ sở hữu và mở chat. Chỉ quay về Đang tìm khi mọi hội thoại về bài này đều đã đóng.  |
+| **Đã trao trả** (Returned)  | Hai bên cùng xác nhận (hoặc moderator xác nhận thay). Điểm uy tín được cộng, bài tự ẩn sau 7 ngày. |
+| **Đã đóng** (Closed)        | Không tìm thấy món đồ, hoặc chủ bài hủy bài đăng.                                                  |
 
 ## Vai trò
 
@@ -87,7 +88,16 @@ npm install
 npm run dev
 ```
 
-## Tài khoản thử nghiệm
+## Staging
+
+Deploy trên Render từ nhánh `main` (cấu hình trong [`render.yaml`](render.yaml)): https://lostlink-web.onrender.com
+
+- Các tài khoản thử nghiệm bên dưới **chỉ dùng ở local**. Tài khoản trên staging dùng mật khẩu khác và không công khai, cần thì liên hệ nhóm.
+- Backend sẽ ngủ sau 15 phút không có request, nên lần truy cập đầu có thể mất khoảng một phút.
+
+## Tài khoản thử nghiệm (chỉ dùng ở local)
+
+Được tạo bởi `npm run seed` trong database local. Không đăng nhập được trên staging.
 
 ### Tài khoản theo vai trò (mỗi cấp quyền một tài khoản)
 
