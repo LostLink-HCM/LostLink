@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import BackofficeLayout from '../../components/backoffice/BackofficeLayout'
+import { createAdminMessages } from '../../data/adminMessages'
 
 const navigation = [
   { path: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -13,6 +15,9 @@ const navigation = [
 ]
 
 export default function AdminLayout() {
+  const [messageState, setMessageState] = useState(createAdminMessages)
+  const unreadMessages = messageState.threads.reduce((total, thread) => total + thread.unread, 0)
+
   return (
     <BackofficeLayout
       basePath="/admin"
@@ -22,6 +27,9 @@ export default function AdminLayout() {
       sidebarLabel="Điều hướng admin"
       brandLabel="LostLink"
       brandAriaLabel="LostLink - Dashboard admin"
+      pendingPath="/messages"
+      pendingCount={unreadMessages}
+      outletContext={{ messageState, setMessageState }}
     />
   )
 }

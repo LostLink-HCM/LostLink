@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import Badge from '../../components/moderator/Badge'
+import Badge from '../../components/backoffice/Badge'
 import Button from '../../components/backoffice/Button'
 import DataTable, { cell } from '../../components/backoffice/DataTable'
 import DetailList from '../../components/moderator/DetailList'

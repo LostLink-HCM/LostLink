@@ -1,4 +1,4 @@
-import { cx } from '../backoffice/classes'
+import { cx } from './classes'
 
 const tones = {
   primary: 'bg-primary-soft text-primary',
