@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import BackofficeLayout from '../../components/backoffice/BackofficeLayout'
 import { createAdminMessages } from '../../data/adminMessages'
+import { readQuickReplies } from '../../lib/quickReplies'
 
 const navigation = [
   { path: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -16,6 +17,7 @@ const navigation = [
 
 export default function AdminLayout() {
   const [messageState, setMessageState] = useState(createAdminMessages)
+  const [quickReplies, setQuickReplies] = useState(() => readQuickReplies(window.localStorage))
   const unreadMessages = messageState.threads.reduce((total, thread) => total + thread.unread, 0)
 
   return (
@@ -29,7 +31,7 @@ export default function AdminLayout() {
       brandAriaLabel="LostLink - Dashboard admin"
       pendingPath="/messages"
       pendingCount={unreadMessages}
-      outletContext={{ messageState, setMessageState }}
+      outletContext={{ messageState, setMessageState, quickReplies, setQuickReplies }}
     />
   )
 }
