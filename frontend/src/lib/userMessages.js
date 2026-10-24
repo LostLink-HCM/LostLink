@@ -182,6 +182,17 @@ export const closedBy = (thread) => {
 export const isClosedByMe = (thread) => closedBy(thread) === 'me'
 export const canClose = (thread) => thread.status === 'open' && !closedBy(thread)
 
+// Còn hội thoại khác về cùng bài đang mở
+export const hasOtherOpenThread = (threads, thread) =>
+  thread.post.id != null &&
+  threads.some(
+    (other) =>
+      other.id !== thread.id &&
+      other.post.id === thread.post.id &&
+      other.status === 'open' &&
+      !closedBy(other)
+  )
+
 const addEvent = (thread, type, now) => ({
   ...thread,
   events: [...(thread.events ?? []), { type, by: 'me', at: new Date(now).toISOString() }],
