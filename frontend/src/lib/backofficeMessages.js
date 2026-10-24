@@ -1,10 +1,10 @@
 export const MESSAGE_LIMIT = 2000
 
-export function moderatorContactName(contact) {
+export function contactName(contact) {
   return contact?.role === 'admin' ? 'Admin' : contact?.name || 'Người dùng'
 }
 
-export function openModeratorThread(state, threadId) {
+export function openThread(state, threadId) {
   if (!state.threads.some((thread) => thread.id === threadId)) return state
   return {
     ...state,
@@ -15,7 +15,7 @@ export function openModeratorThread(state, threadId) {
   }
 }
 
-export function markModeratorThreadUnread(state, threadId) {
+export function markThreadUnread(state, threadId) {
   if (!state.threads.some((thread) => thread.id === threadId)) return state
   return {
     ...state,
@@ -25,12 +25,12 @@ export function markModeratorThreadUnread(state, threadId) {
   }
 }
 
-export function startModeratorThread(state, contactId, now = Date.now()) {
+export function startThread(state, contactId, now = Date.now()) {
   const contact = state.contacts.find((entry) => entry.id === contactId)
   if (!contact || !['user', 'admin', 'moderator'].includes(contact.role)) return state
 
   const existing = state.threads.find((thread) => thread.contactId === contactId)
-  if (existing) return openModeratorThread(state, existing.id)
+  if (existing) return openThread(state, existing.id)
 
   const thread = {
     id: `thread-${contactId}`,
@@ -46,7 +46,7 @@ export function startModeratorThread(state, contactId, now = Date.now()) {
   return { ...state, threads: [thread, ...state.threads], activeId: thread.id }
 }
 
-export function sendModeratorMessage(state, threadId, now = Date.now()) {
+export function sendMessage(state, threadId, now = Date.now()) {
   const text = (state.drafts[threadId] || '').trim()
   const thread = state.threads.find((entry) => entry.id === threadId)
   if (!text || text.length > MESSAGE_LIMIT || !thread) return state
@@ -76,7 +76,7 @@ export function sendModeratorMessage(state, threadId, now = Date.now()) {
   }
 }
 
-export function filterModeratorThreads(state, { role = '', query = '', unreadOnly = false }) {
+export function filterThreads(state, { role = '', query = '', unreadOnly = false }) {
   const needle = query.trim().toLocaleLowerCase('vi')
 
   return state.threads
@@ -88,7 +88,7 @@ export function filterModeratorThreads(state, { role = '', query = '', unreadOnl
 
       return (
         !needle ||
-        `${moderatorContactName(contact)} ${contact.email} ${thread.context?.code || ''} ${thread.context?.title || ''}`
+        `${contactName(contact)} ${contact.email} ${thread.context?.code || ''} ${thread.context?.title || ''}`
           .toLocaleLowerCase('vi')
           .includes(needle)
       )
