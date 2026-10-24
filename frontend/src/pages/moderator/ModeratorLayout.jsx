@@ -5,6 +5,7 @@ import { moderatorReports } from '../../data/moderatorReports'
 import { createEscalationLogs, createEscalationState } from '../../data/escalations'
 import { createModeratorMessages } from '../../data/moderatorMessages'
 import { createModeratorNotifications } from '../../data/moderatorNotifications'
+import { readQuickReplies } from '../../lib/quickReplies'
 
 const navigation = [
   { path: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -24,6 +25,7 @@ export default function ModeratorLayout() {
     return { ...state, logs: createEscalationLogs(state.tickets) }
   })
   const [messageState, setMessageState] = useState(createModeratorMessages)
+  const [quickReplies, setQuickReplies] = useState(() => readQuickReplies(window.localStorage))
   const [notificationState, setNotificationState] = useState(createModeratorNotifications)
   const pendingCount = posts.filter((post) => post.status === 'pending').length
 
@@ -47,6 +49,8 @@ export default function ModeratorLayout() {
         setEscalationState,
         messageState,
         setMessageState,
+        quickReplies,
+        setQuickReplies,
         notificationState,
         setNotificationState,
       }}

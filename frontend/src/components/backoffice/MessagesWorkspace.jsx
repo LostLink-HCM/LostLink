@@ -157,7 +157,13 @@ function NewConversation({ contacts, peerRoles, onSelect, onClose }) {
   )
 }
 
-export default function MessagesWorkspace({ messageState, setMessageState, workspaceRole, user }) {
+export default function MessagesWorkspace({
+  messageState,
+  setMessageState,
+  workspaceRole,
+  user,
+  quickReplies = DEFAULT_QUICK_REPLIES,
+}) {
   const peerRoles =
     workspaceRole === 'admin'
       ? [['moderator', 'Moderator']]
@@ -622,7 +628,7 @@ export default function MessagesWorkspace({ messageState, setMessageState, works
                     bg-surface-muted p-1.5"
                   id="quick-replies"
                 >
-                  {DEFAULT_QUICK_REPLIES[contact.role === 'user' ? 'user' : 'internal'].map(
+                  {(quickReplies[contact.role === 'user' ? 'user' : 'internal'] || []).map(
                     (reply) => (
                       <button
                         type="button"
