@@ -14,14 +14,33 @@ const getTransporter = () => {
   return transporter
 }
 
+// Gửi qua HTTPS
+const sendViaBrevo = async ({ to, subject, text, html }) => {
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: { 'api-key': env.email.brevoApiKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sender: { name: 'LostLink', email: env.email.from },
+      to: [{ email: to }],
+      subject,
+      textContent: text,
+      htmlContent: html,
+    }),
+    signal: AbortSignal.timeout(10_000),
+  })
+  if (!res.ok) throw new Error(`Brevo API ${res.status}: ${await res.text()}`)
+}
+
 const sendMail = async ({ to, subject, text, html }) => {
+  if (env.email.brevoApiKey) return sendViaBrevo({ to, subject, text, html })
+
   const tx = getTransporter()
   if (!tx) {
-    if (env.nodeEnv === 'production') throw new Error('SMTP is not configured')
+    if (env.nodeEnv === 'production') throw new Error('Email is not configured')
     console.log(`[email:dev] to=${to} subject="${subject}"\n${text}`)
     return
   }
-  await tx.sendMail({ from: `LostLink <${env.email.user}>`, to, subject, text, html })
+  await tx.sendMail({ from: `LostLink <${env.email.from}>`, to, subject, text, html })
 }
 
 const sendVerificationCode = ({ to, code, minutes }) =>
