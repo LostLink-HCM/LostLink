@@ -8,6 +8,7 @@ const routes = require('./routes')
 const { notFound, errorHandler } = require('./middleware/errorMiddleware')
 
 const app = express()
+app.set('trust proxy', env.trustProxy)
 
 app.use(helmet())
 app.use(cors({ origin: env.clientUrl, credentials: true }))
