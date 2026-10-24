@@ -11,7 +11,7 @@ import Field, { Input, Select } from '../../components/moderator/Field'
 import Icon from '../../components/common/Icon'
 import IconButton from '../../components/backoffice/IconButton'
 import Notice from '../../components/moderator/Notice'
-import Pagination from '../../components/moderator/Pagination'
+import Pagination from '../../components/backoffice/Pagination'
 import {
   REPORT_ACTIONS,
   SEVERITY_LABELS,
@@ -20,6 +20,7 @@ import {
   filterModeratorReports,
 } from '../../lib/moderation'
 import { downloadCsv } from '../../lib/csv'
+import usePaginatedFilter from '../../hooks/usePaginatedFilter'
 
 const PAGE_SIZE = 6
 const EMPTY_FILTERS = { targetType: 'account', severity: '', from: '', to: '', query: '' }
@@ -105,13 +106,22 @@ function RelatedReportHistory({ reports }) {
 
 export default function Reports() {
   const { reports, setReports, posts } = useOutletContext()
-  const [filters, setFilters] = useState(EMPTY_FILTERS)
-  const [page, setPage] = useState(1)
   const [modal, setModal] = useState(null)
   const [notice, setNotice] = useState('')
-  const filtered = filterModeratorReports(reports, filters)
-  const currentPage = Math.min(page, Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)))
-  const visible = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const {
+    filters,
+    setFilter,
+    resetFilters,
+    setPage,
+    currentPage,
+    filteredItems: filtered,
+    visibleItems: visible,
+  } = usePaginatedFilter({
+    items: reports,
+    initialFilters: EMPTY_FILTERS,
+    filterFn: filterModeratorReports,
+    pageSize: PAGE_SIZE,
+  })
   const selected = modal && reports.find((report) => report.id === modal.id && !report.resolution)
   const selectedCode = selected ? getDisplayCode(selected, posts) : ''
   const action = modal?.action && REPORT_ACTIONS[modal.action]
@@ -130,8 +140,7 @@ export default function Reports() {
       )
     : []
   const changeFilter = (key, value) => {
-    setFilters((previous) => ({ ...previous, [key]: value }))
-    setPage(1)
+    setFilter(key, value)
   }
   const confirmAction = (id, nextAction) => setModal({ id, kind: 'confirm', action: nextAction })
   const executeAction = () => {
@@ -224,8 +233,7 @@ export default function Reports() {
               bordered
               size={36}
               onClick={() => {
-                setFilters(EMPTY_FILTERS)
-                setPage(1)
+                resetFilters()
               }}
             />
             <Button variant="primary" onClick={exportCsv} disabled={!filtered.length}>
