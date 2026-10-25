@@ -19,6 +19,7 @@ export default function BackofficeLayout({
   brandAriaLabel,
   pendingPath,
   pendingCount = 0,
+  pendingCounts = {},
   outletContext,
 }) {
   const { pathname } = useLocation()
@@ -115,14 +116,14 @@ export default function BackofficeLayout({
             >
               <Icon name={item.icon} />
               <span className={cx('min-w-0 truncate', collapsed && 'lg:hidden')}>{item.label}</span>
-              {item.path === pendingPath && pendingCount > 0 && (
+              {(pendingCounts[item.path] ?? (item.path === pendingPath ? pendingCount : 0)) > 0 && (
                 <span
                   className={cx(
                     'ml-auto rounded-md bg-primary/60 px-1.5 text-caption text-primary-soft',
                     collapsed && 'lg:hidden'
                   )}
                 >
-                  {pendingCount}
+                  {pendingCounts[item.path] ?? (item.path === pendingPath ? pendingCount : 0)}
                 </span>
               )}
             </NavLink>
