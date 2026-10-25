@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { cx, focusRing } from '../backoffice/classes'
+import { cx, focusRing } from './classes'
 
 const control =
   'w-full min-w-0 rounded-lg border border-line-strong bg-surface text-small text-ink placeholder:text-ink-subtle disabled:cursor-default disabled:bg-surface-muted aria-invalid:border-danger'

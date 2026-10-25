@@ -1,4 +1,4 @@
-import { isWithinDateRange } from './moderatorPosts.js'
+import { isWithinDateRange } from './posts.js'
 
 export const REJECT_REASONS = [
   'Nội dung Spam / Quảng cáo',

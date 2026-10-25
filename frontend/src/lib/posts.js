@@ -44,7 +44,7 @@ export function isWithinDateRange(dateTime, filters) {
   return (!filters.from || date >= filters.from) && (!filters.to || date <= filters.to)
 }
 
-export function filterModeratorPosts(posts, filters) {
+export function filterPosts(posts, filters) {
   if (hasInvalidRange(filters)) return []
   const query = (filters.query || '').trim().toLocaleLowerCase()
   return posts.filter((post) => {
@@ -61,7 +61,7 @@ export function filterModeratorPosts(posts, filters) {
   })
 }
 
-// Dòng tiêu đề + mỗi bài một dòng, dùng với downloadCsv trong lib/csv
+// Dòng tiêu đề + mỗi bài một dòng
 export function postsToRows(posts) {
   return [
     [

@@ -4,16 +4,16 @@ import Badge from '../../components/backoffice/Badge'
 import Button from '../../components/backoffice/Button'
 import DataTable, { cell } from '../../components/backoffice/DataTable'
 import DateRange from '../../components/backoffice/DateRange'
-import DetailList from '../../components/moderator/DetailList'
+import DetailList from '../../components/backoffice/DetailList'
 import Dialog from '../../components/backoffice/Dialog'
-import EmptyState from '../../components/moderator/EmptyState'
-import Field, { Input, Select, Textarea } from '../../components/moderator/Field'
+import EmptyState from '../../components/backoffice/EmptyState'
+import Field, { Input, Select, Textarea } from '../../components/backoffice/Field'
 import Icon from '../../components/common/Icon'
 import IconButton from '../../components/backoffice/IconButton'
-import Notice from '../../components/moderator/Notice'
+import Notice from '../../components/backoffice/Notice'
 import Pagination from '../../components/backoffice/Pagination'
-import TypeBadge from '../../components/moderator/TypeBadge'
-import { filterModeratorPosts } from '../../lib/moderatorPosts'
+import TypeBadge from '../../components/backoffice/TypeBadge'
+import { filterPosts } from '../../lib/posts'
 import { REJECT_REASONS, reviewPost } from '../../lib/moderation'
 import { downloadCsv } from '../../lib/csv'
 import usePaginatedFilter from '../../hooks/usePaginatedFilter'
@@ -28,8 +28,7 @@ const CATEGORY_TONES = {
   'Chìa khóa': 'warning',
 }
 
-const filterPendingPosts = (posts, filters) =>
-  filterModeratorPosts(posts, { ...filters, status: 'pending' })
+const filterPendingPosts = (posts, filters) => filterPosts(posts, { ...filters, status: 'pending' })
 
 function Reputation({ score }) {
   const tone = score < 0 ? 'text-danger-ink' : score >= 100 ? 'text-success' : 'text-ink-muted'

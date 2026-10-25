@@ -1,4 +1,4 @@
-import Badge from '../backoffice/Badge'
+import Badge from './Badge'
 
 export default function TypeBadge({ type }) {
   return (

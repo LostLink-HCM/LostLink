@@ -7,6 +7,7 @@ import AdminCategories from './Categories.jsx'
 import AdminSettings from './Settings.jsx'
 import AdminMessages from './Messages.jsx'
 import AdminNotifications from './Notifications.jsx'
+import AdminPosts from './Posts.jsx'
 
 // Chỉ tải khi có người vào /admin
 export default function AdminRoutes() {
@@ -23,6 +24,7 @@ export default function AdminRoutes() {
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="categories" element={<AdminCategories />} />
+        <Route path="posts" element={<AdminPosts />} />
         <Route path="settings" element={<AdminSettings />} />
         <Route path="messages" element={<AdminMessages />} />
         <Route path="notifications" element={<AdminNotifications />} />
