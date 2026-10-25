@@ -8,6 +8,7 @@ import AdminSettings from './Settings.jsx'
 import AdminMessages from './Messages.jsx'
 import AdminNotifications from './Notifications.jsx'
 import AdminPosts from './Posts.jsx'
+import AdminAuditLog from './AuditLog.jsx'
 
 // Chỉ tải khi có người vào /admin
 export default function AdminRoutes() {
@@ -25,6 +26,7 @@ export default function AdminRoutes() {
         <Route path="users" element={<AdminUsers />} />
         <Route path="categories" element={<AdminCategories />} />
         <Route path="posts" element={<AdminPosts />} />
+        <Route path="audit-log" element={<AdminAuditLog />} />
         <Route path="settings" element={<AdminSettings />} />
         <Route path="messages" element={<AdminMessages />} />
         <Route path="notifications" element={<AdminNotifications />} />

@@ -1,0 +1,167 @@
+const DAY = 24 * 60 * 60 * 1000
+
+export function createAdminAudit(now = Date.now()) {
+  const ago = (days) => new Date(now - days * DAY).toISOString()
+
+  return [
+    {
+      id: 'AUD-1001',
+      actor: 'Quản trị viên',
+      actorRole: 'Admin',
+      action: 'settings',
+      entityType: 'SystemConfig',
+      entityId: '671a00000000000000000001',
+      detail: {
+        displayCode: 'reportDays',
+        summary: 'Điều chỉnh thời hạn xử lý report',
+      },
+      createdAt: ago(0.12),
+    },
+    {
+      id: 'AUD-1002',
+      actor: 'Kiểm duyệt viên',
+      actorRole: 'Moderator',
+      action: 'verify',
+      entityType: 'EscalationTicket',
+      entityId: '671b00000000000000000401',
+      detail: {
+        displayCode: 'ESC-401',
+        summary: 'Gắn nhãn đã xác minh',
+      },
+      createdAt: ago(0.45),
+    },
+    {
+      id: 'AUD-1003',
+      actor: 'Quản trị viên',
+      actorRole: 'Admin',
+      action: 'grant',
+      entityType: 'User',
+      entityId: '671c00000000000000000006',
+      detail: {
+        displayCode: 'USR-006',
+        summary: 'Cấp quyền Moderator',
+      },
+      createdAt: ago(1.1),
+    },
+    {
+      id: 'AUD-1004',
+      actor: 'Kiểm duyệt viên',
+      actorRole: 'Moderator',
+      action: 'hide',
+      entityType: 'Post',
+      entityId: '671d00000000000000000403',
+      detail: {
+        displayCode: 'F-403',
+        summary: 'Ẩn bài nghi vấn',
+        reason: 'Phát hiện thông tin cần được kiểm tra thêm.',
+      },
+      createdAt: ago(1.7),
+    },
+    {
+      id: 'AUD-1005',
+      actor: 'Kiểm duyệt viên',
+      actorRole: 'Moderator',
+      action: 'remind',
+      entityType: 'EscalationTicket',
+      entityId: '671b00000000000000000402',
+      detail: {
+        displayCode: 'ESC-402',
+        summary: 'Gửi email nhắc hai bên',
+      },
+      createdAt: ago(2.4),
+    },
+    {
+      id: 'AUD-1006',
+      actor: 'Quản trị viên',
+      actorRole: 'Admin',
+      action: 'lock',
+      entityType: 'User',
+      entityId: '671c00000000000000000011',
+      detail: {
+        displayCode: 'USR-011',
+        summary: 'Khóa tài khoản theo căn cứ vi phạm',
+        reason: 'Đăng nội dung không phù hợp với quy định cộng đồng.',
+      },
+      createdAt: ago(3.2),
+    },
+    {
+      id: 'AUD-1007',
+      actor: 'Quản trị viên',
+      actorRole: 'Admin',
+      action: 'unlock',
+      entityType: 'User',
+      entityId: '671c00000000000000000011',
+      detail: {
+        displayCode: 'USR-011',
+        summary: 'Mở lại tài khoản sau khi rà soát',
+      },
+      createdAt: ago(4.3),
+    },
+    {
+      id: 'AUD-1008',
+      actor: 'Kiểm duyệt viên',
+      actorRole: 'Moderator',
+      action: 'returned',
+      entityType: 'EscalationTicket',
+      entityId: '671b00000000000000000407',
+      detail: {
+        displayCode: 'ESC-407',
+        summary: 'Xác nhận hộ đã trao trả',
+      },
+      createdAt: ago(5.2),
+    },
+    {
+      id: 'AUD-1009',
+      actor: 'Quản trị viên',
+      actorRole: 'Admin',
+      action: 'revoke',
+      entityType: 'User',
+      entityId: '671c00000000000000000006',
+      detail: {
+        displayCode: 'USR-006',
+        summary: 'Thu hồi quyền Moderator',
+      },
+      createdAt: ago(6.4),
+    },
+    {
+      id: 'AUD-1010',
+      actor: 'Kiểm duyệt viên',
+      actorRole: 'Moderator',
+      action: 'incorrect',
+      entityType: 'EscalationTicket',
+      entityId: '671b00000000000000000405',
+      detail: {
+        displayCode: 'ESC-405',
+        summary: 'Xác nhận hộ kết quả matching không chính xác',
+        reason: 'Thông tin hai bài đăng không đủ cơ sở để xác nhận.',
+      },
+      createdAt: ago(8.1),
+    },
+    {
+      id: 'AUD-1011',
+      actor: 'Quản trị viên',
+      actorRole: 'Admin',
+      action: 'settings',
+      entityType: 'SystemConfig',
+      entityId: '671a00000000000000000002',
+      detail: {
+        displayCode: 'matchingWeights',
+        summary: 'Cập nhật trọng số các tiêu chí matching',
+      },
+      createdAt: ago(10.5),
+    },
+    {
+      id: 'AUD-1012',
+      actor: 'Kiểm duyệt viên',
+      actorRole: 'Moderator',
+      action: 'hide',
+      entityType: 'Post',
+      entityId: '671d00000000000000000404',
+      detail: {
+        displayCode: 'F-404',
+        summary: 'Ẩn bài đăng cần xác minh',
+      },
+      createdAt: ago(12.2),
+    },
+  ]
+}
