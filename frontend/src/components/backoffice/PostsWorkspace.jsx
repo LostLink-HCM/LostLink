@@ -111,6 +111,19 @@ function MatchingPosts({ matches, onView }) {
   )
 }
 
+function getMatchesForPost(postId, matchPairs, posts) {
+  return matchPairs
+    .filter((match) => match.postLost === postId || match.postFound === postId)
+    .map((match) => ({
+      ...match,
+      post: posts.find(
+        (post) => post.id === (match.postLost === postId ? match.postFound : match.postLost)
+      ),
+    }))
+    .filter((match) => match.post)
+    .sort((a, b) => b.score - a.score)
+}
+
 function VisibilityDialog({ post, onSubmit, onClose }) {
   const [reason, setReason] = useState('')
   const [error, setError] = useState('')
@@ -206,19 +219,7 @@ export default function PostsWorkspace({ posts, setPosts, matchPairs }) {
   })
   const invalidRange = hasInvalidRange(filters)
   const selected = modal && posts.find((post) => post.id === modal.id)
-  const matchingPosts = selected
-    ? matchPairs
-        .filter((match) => match.postLost === selected.id || match.postFound === selected.id)
-        .map((match) => ({
-          ...match,
-          post: posts.find(
-            (post) =>
-              post.id === (match.postLost === selected.id ? match.postFound : match.postLost)
-          ),
-        }))
-        .filter((match) => match.post)
-        .sort((a, b) => b.score - a.score)
-    : []
+  const matchingPosts = selected ? getMatchesForPost(selected.id, matchPairs, posts) : []
 
   const changeFilter = (key, value) => {
     setFilter(key, value)
@@ -408,14 +409,14 @@ export default function PostsWorkspace({ posts, setPosts, matchPairs }) {
               <div className="flex gap-2 whitespace-nowrap text-caption text-ink-muted">
                 {[
                   ['eye', post.views, 'Lượt xem'],
-                  ['chat', post.comments, 'Bình luận'],
-                  ['link', post.matches, 'Ghép nối'],
+                  ['comment', post.comments, 'Bình luận'],
+                  ['link', getMatchesForPost(post.id, matchPairs, posts).length, 'Ghép nối'],
                 ].map(([icon, count, label]) => (
                   <span
                     key={icon}
                     title={label}
                     aria-label={`${label}: ${count}`}
-                    className="flex items-center gap-0.5 last:text-primary"
+                    className="flex items-center gap-0.5"
                   >
                     <Icon name={icon} size={13} />
                     {count}
