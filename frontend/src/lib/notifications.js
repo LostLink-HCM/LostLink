@@ -12,7 +12,7 @@ export function unreadNotificationCount(notifications) {
   return notifications.filter((notification) => notification.unread).length
 }
 
-export function filterModeratorNotifications(
+export function filterNotifications(
   notifications,
   { filter = 'all', type = 'all', query = '', from = '', to = '' } = {}
 ) {
