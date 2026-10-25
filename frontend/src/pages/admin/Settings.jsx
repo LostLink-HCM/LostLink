@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import Button from '../../components/backoffice/Button'
 import { cx } from '../../components/backoffice/classes'
 import Dialog from '../../components/backoffice/Dialog'
+import IconButton from '../../components/backoffice/IconButton'
 import Icon from '../../components/common/Icon'
 import {
   DEFAULT_SETTINGS,
@@ -11,6 +13,12 @@ import {
   validateSettings,
   weightTotal,
 } from '../../lib/adminSettings'
+import {
+  cloneQuickReplies,
+  QUICK_REPLY_TEXT_LIMIT,
+  saveQuickReplies,
+  validateQuickReplies,
+} from '../../lib/quickReplies'
 
 const weightTones = {
   wLocation: 'bg-[#3976bd]',
@@ -261,7 +269,249 @@ function WeightField({ field, value, error, weightError, submitted, touched, onC
   )
 }
 
+const quickReplyGroups = [
+  { key: 'user', label: 'Người dùng' },
+  { key: 'internal', label: 'Nội bộ' },
+]
+
+function createQuickReplyId(group) {
+  const randomId = globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)
+  return `${group}-${randomId}`
+}
+
+function QuickReplyManager({ value, onChange, error }) {
+  const [activeGroup, setActiveGroup] = useState('user')
+  const [newText, setNewText] = useState('')
+  const [editingId, setEditingId] = useState(null)
+  const [editingText, setEditingText] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [actionError, setActionError] = useState('')
+  const replies = value?.[activeGroup] || []
+
+  const updateGroup = (nextReplies) => {
+    onChange({ ...value, [activeGroup]: nextReplies })
+    setActionError('')
+  }
+
+  const hasDuplicate = (text, ignoredId = null) =>
+    replies.some(
+      (reply) => reply.id !== ignoredId && reply.text.trim().toLocaleLowerCase('vi') === text
+    )
+
+  const addReply = () => {
+    const text = newText.trim()
+    if (!text) {
+      setActionError('Nội dung mẫu trả lời không được để trống.')
+      return
+    }
+    if (text.length > QUICK_REPLY_TEXT_LIMIT) {
+      setActionError(`Nội dung không được vượt quá ${QUICK_REPLY_TEXT_LIMIT} ký tự.`)
+      return
+    }
+    if (hasDuplicate(text.toLocaleLowerCase('vi'))) {
+      setActionError('Mẫu trả lời đã tồn tại. Vui lòng nhập nội dung khác.')
+      return
+    }
+
+    updateGroup([...replies, { id: createQuickReplyId(activeGroup), text }])
+    setNewText('')
+  }
+
+  const startEditing = (reply) => {
+    setEditingId(reply.id)
+    setEditingText(reply.text)
+    setActionError('')
+  }
+
+  const cancelEditing = () => {
+    setEditingId(null)
+    setEditingText('')
+  }
+
+  const saveEditing = () => {
+    const text = editingText.trim()
+    if (!text) {
+      setActionError('Nội dung mẫu trả lời không được để trống.')
+      return
+    }
+    if (text.length > QUICK_REPLY_TEXT_LIMIT) {
+      setActionError(`Nội dung không được vượt quá ${QUICK_REPLY_TEXT_LIMIT} ký tự.`)
+      return
+    }
+    if (hasDuplicate(text.toLocaleLowerCase('vi'), editingId)) {
+      setActionError('Mẫu trả lời đã tồn tại. Vui lòng nhập nội dung khác.')
+      return
+    }
+
+    updateGroup(replies.map((reply) => (reply.id === editingId ? { ...reply, text } : reply)))
+    cancelEditing()
+  }
+
+  const confirmDelete = () => {
+    if (!deleteTarget) return
+    updateGroup(replies.filter((reply) => reply.id !== deleteTarget.id))
+    setDeleteTarget(null)
+    if (editingId === deleteTarget.id) cancelEditing()
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Nhóm mẫu trả lời nhanh">
+        {quickReplyGroups.map((group) => {
+          const selected = activeGroup === group.key
+          const count = value?.[group.key]?.length || 0
+
+          return (
+            <button
+              key={group.key}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              className={cx(
+                'inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-caption font-semibold transition-colors',
+                selected
+                  ? 'border-primary bg-primary-soft text-primary'
+                  : 'border-transparent bg-slate-100 text-ink-muted hover:bg-primary-subtle hover:text-primary'
+              )}
+              onClick={() => {
+                setActiveGroup(group.key)
+                setActionError('')
+                cancelEditing()
+              }}
+            >
+              {group.label}
+              <span className="rounded-full bg-white px-1.5 text-[10px] text-ink-muted">
+                {count}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label htmlFor="new-quick-reply" className="text-small font-semibold text-ink-secondary">
+          Thêm mẫu trả lời
+        </label>
+        <div className="flex items-end gap-2 max-sm:flex-col max-sm:items-stretch">
+          <textarea
+            id="new-quick-reply"
+            rows={2}
+            maxLength={QUICK_REPLY_TEXT_LIMIT}
+            value={newText}
+            onChange={(event) => {
+              setNewText(event.target.value)
+              setActionError('')
+            }}
+            placeholder="Nhập nội dung mẫu trả lời..."
+            className="min-h-18 min-w-0 flex-1 resize-y rounded-lg border border-line-strong bg-surface px-3 py-2 text-small leading-relaxed text-ink outline-none transition focus:border-primary focus:ring-3 focus:ring-primary/10 placeholder:text-ink-subtle"
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            className="h-10 border-[#c7d9ef] bg-[#eaf3fc] text-primary hover:bg-[#dcecfb] max-sm:w-full"
+            onClick={addReply}
+          >
+            Lưu
+          </Button>
+        </div>
+        <p className="text-caption leading-relaxed text-ink-muted">
+          Tối đa {QUICK_REPLY_TEXT_LIMIT} ký tự.
+        </p>
+      </div>
+
+      <div className="flex flex-col divide-y divide-line rounded-lg border border-line">
+        {replies.map((reply) => (
+          <div
+            key={reply.id}
+            className="flex items-start gap-3 border-l-3 border-[#d7e6f4] bg-[#f8fbff] p-3 transition-colors hover:border-primary hover:bg-primary-soft/50"
+          >
+            {editingId === reply.id ? (
+              <div className="flex min-w-0 flex-1 flex-col gap-2">
+                <textarea
+                  rows={2}
+                  maxLength={QUICK_REPLY_TEXT_LIMIT}
+                  value={editingText}
+                  onChange={(event) => {
+                    setEditingText(event.target.value)
+                    setActionError('')
+                  }}
+                  className="min-h-18 w-full resize-y rounded-lg border border-primary bg-surface px-3 py-2 text-small leading-relaxed text-ink outline-none ring-3 ring-primary/10"
+                  autoFocus
+                />
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="primary" size="sm" onClick={saveEditing}>
+                    Lưu
+                  </Button>
+                  <Button type="button" size="sm" onClick={cancelEditing}>
+                    Hủy
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="min-w-0 flex-1 whitespace-pre-wrap text-small leading-relaxed text-ink-secondary">
+                  {reply.text}
+                </p>
+                <div className="flex shrink-0 items-center gap-1">
+                  <IconButton
+                    icon="edit"
+                    label="Chỉnh sửa mẫu trả lời"
+                    tone="edit"
+                    onClick={() => startEditing(reply)}
+                  />
+                  <IconButton
+                    icon="trash"
+                    label="Xóa mẫu trả lời"
+                    danger
+                    onClick={() => setDeleteTarget(reply)}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+        {!replies.length && (
+          <div className="px-4 py-6 text-center text-small text-ink-muted">
+            Chưa có mẫu trả lời trong nhóm này.
+          </div>
+        )}
+      </div>
+
+      {(actionError || error) && (
+        <p className="flex items-center gap-2 text-small text-danger-ink" role="alert">
+          <Icon name="warning" size={16} />
+          {actionError || error}
+        </p>
+      )}
+
+      {deleteTarget && (
+        <Dialog
+          size="sm"
+          title="Xác nhận"
+          onClose={() => setDeleteTarget(null)}
+          footer={
+            <>
+              <Button data-autofocus onClick={() => setDeleteTarget(null)}>
+                Hủy
+              </Button>
+              <Button variant="danger-subtle" onClick={confirmDelete}>
+                <Icon name="trash" size={16} />
+                Xóa
+              </Button>
+            </>
+          }
+        >
+          <p className="text-body leading-relaxed text-ink-secondary">
+            Bạn có chắc muốn xóa mẫu trả lời này không?
+          </p>
+        </Dialog>
+      )}
+    </div>
+  )
+}
+
 export default function Settings() {
+  const { quickReplies, setQuickReplies } = useOutletContext()
   const [saved, setSaved] = useState(() => {
     try {
       return readSettings(window.localStorage)
@@ -270,16 +520,20 @@ export default function Settings() {
     }
   })
   const [draft, setDraft] = useState(() => ({ ...saved.values }))
+  const [savedQuickReplies, setSavedQuickReplies] = useState(() => cloneQuickReplies(quickReplies))
+  const [quickReplyDraft, setQuickReplyDraft] = useState(() => cloneQuickReplies(quickReplies))
   const [touched, setTouched] = useState({})
   const [submitted, setSubmitted] = useState(false)
   const [notice, setNotice] = useState(null)
   const [confirmation, setConfirmation] = useState(null)
   const formRef = useRef(null)
   const errors = validateSettings(draft)
+  const quickReplyErrors = validateQuickReplies(quickReplyDraft)
   const changedCount = Object.keys(DEFAULT_SETTINGS).filter(
     (key) => String(draft[key]) !== String(saved.values[key])
   ).length
-  const dirty = changedCount > 0
+  const quickRepliesChanged = JSON.stringify(quickReplyDraft) !== JSON.stringify(savedQuickReplies)
+  const dirty = changedCount > 0 || quickRepliesChanged
   const total = weightTotal(draft)
   const weightError =
     submitted || WEIGHT_FIELDS.some(({ key }) => touched[key]) ? errors.weights : null
@@ -307,6 +561,11 @@ export default function Settings() {
     setNotice(null)
   }
 
+  const changeQuickReplies = (value) => {
+    setQuickReplyDraft(value)
+    setNotice(null)
+  }
+
   const blur = (key) => setTouched((current) => ({ ...current, [key]: true }))
 
   const field = (name, label, hint, unit, extra = {}) => (
@@ -326,8 +585,12 @@ export default function Settings() {
   const saveChanges = () => {
     try {
       const next = saveSettings(window.localStorage, draft)
+      const nextQuickReplies = saveQuickReplies(window.localStorage, quickReplyDraft)
       setSaved(next)
       setDraft({ ...next.values })
+      setSavedQuickReplies(nextQuickReplies)
+      setQuickReplyDraft(cloneQuickReplies(nextQuickReplies))
+      setQuickReplies(nextQuickReplies)
       setTouched({})
       setSubmitted(false)
       setNotice({ type: 'success', text: 'Đã lưu cấu hình.' })
@@ -341,6 +604,7 @@ export default function Settings() {
 
   const discardChanges = () => {
     setDraft({ ...saved.values })
+    setQuickReplyDraft(cloneQuickReplies(savedQuickReplies))
     setTouched({})
     setSubmitted(false)
     setNotice({ type: 'info', text: 'Đã hủy các thay đổi chưa lưu.' })
@@ -351,7 +615,7 @@ export default function Settings() {
     setSubmitted(true)
     setNotice(null)
 
-    if (Object.keys(errors).length) {
+    if (Object.keys(errors).length || Object.keys(quickReplyErrors).length) {
       const invalid = [...formRef.current.elements].find((element) => errors[element.name])
       const target = invalid || formRef.current.elements.namedItem('wLocation')
       target?.focus()
@@ -553,6 +817,20 @@ export default function Settings() {
                   </p>
                 </div>
               </div>
+            </SettingsCard>
+
+            <SettingsCard
+              id="settings-quick-replies"
+              icon="reply"
+              title="Mẫu trả lời nhanh"
+              description="Quản lý các nội dung được sử dụng khi trả lời hội thoại."
+              className="order-5 min-[761px]:col-span-2"
+            >
+              <QuickReplyManager
+                value={quickReplyDraft}
+                onChange={changeQuickReplies}
+                error={Object.keys(quickReplyErrors).length ? 'Có mẫu trả lời chưa hợp lệ.' : null}
+              />
             </SettingsCard>
           </div>
         </form>
