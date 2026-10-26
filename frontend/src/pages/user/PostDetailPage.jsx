@@ -15,8 +15,7 @@ import PostActionSheet from '../../components/user/post/PostActionSheet'
 import PostGallery from '../../components/user/post/PostGallery'
 import { authors } from '../../data/homeFeed'
 import { formatCount, publicTraits, timeAgo } from '../../lib/homeFeed'
-
-const COMING_SOON = 'Chức năng này đang được phát triển.'
+import { profilePath } from '../../lib/userProfiles'
 
 const formatDate = (iso, options) => new Date(iso).toLocaleDateString('vi-VN', options)
 
@@ -29,7 +28,7 @@ export default function PostDetailPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const ctx = useOutletContext()
-  const { posts, comments, now, liked, saved, followed, requireMember, notify } = ctx
+  const { posts, comments, now, liked, saved, followed, requireMember } = ctx
 
   const [sheetOpen, setSheetOpen] = useState(false)
   const closeSheet = useCallback(() => setSheetOpen(false), [])
@@ -74,9 +73,9 @@ export default function PostDetailPage() {
   const isLiked = liked.has(post.id)
   const author = authors[post.author]
 
-  // Trang đích chưa có: Guest đi đăng nhập, User nhận thông báo
-  const comingSoon = () => {
-    if (requireMember()) notify(COMING_SOON)
+  // Xem hồ sơ cần đăng nhập (UC10), Guest được đưa sang đăng nhập rồi quay lại bài này
+  const openProfile = () => {
+    if (requireMember()) navigate(profilePath(post.author))
   }
 
   const isSaved = saved.has(post.id)
@@ -246,7 +245,7 @@ export default function PostDetailPage() {
                 ))}
               </dl>
             )}
-            <Button block onClick={comingSoon}>
+            <Button block onClick={openProfile}>
               Xem trang cá nhân
             </Button>
           </Card>

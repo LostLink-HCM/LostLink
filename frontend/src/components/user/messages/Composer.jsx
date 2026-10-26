@@ -1,9 +1,11 @@
 import { useRef } from 'react'
+import { Link } from 'react-router-dom'
 import Icon from '../../common/Icon'
 import Button from '../Button'
 import { cx, focusRing } from '../classes'
 import { ACCEPTED_IMAGE_TYPES } from '../../../lib/composePost'
 import { MESSAGE_LIMIT, isClosedByMe } from '../../../lib/userMessages'
+import { profilePath } from '../../../lib/userProfiles'
 
 const iconButton = cx(
   'grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border-0 transition-colors disabled:cursor-not-allowed',
@@ -12,6 +14,7 @@ const iconButton = cx(
 
 export default function Composer({
   thread,
+  blocked,
   draft,
   error,
   inputRef,
@@ -24,6 +27,25 @@ export default function Composer({
 }) {
   const galleryRef = useRef(null)
   const { status, peer } = thread
+
+  // Đã chặn người này thì khóa ô nhập, bỏ chặn ở trang cá nhân của họ
+  if (blocked) {
+    return (
+      <p className="m-0 flex flex-wrap items-center gap-2 border-t border-line bg-surface-muted px-5 py-4 text-caption text-ink-muted">
+        <Icon name="lock" size={15} className="shrink-0" />
+        <span className="min-w-0 flex-1">Bạn đã chặn {peer.name} nên không thể nhắn tin.</span>
+        <Link
+          to={profilePath(peer.name)}
+          className={cx(
+            'rounded font-semibold text-primary no-underline hover:underline',
+            focusRing
+          )}
+        >
+          Bỏ chặn
+        </Link>
+      </p>
+    )
+  }
 
   if (status === 'incoming') {
     return (

@@ -27,8 +27,7 @@ import {
   timeLabel,
   validateMessage,
 } from '../../lib/userMessages'
-
-const COMING_SOON = 'Chức năng này đang được phát triển.'
+import { profilePath } from '../../lib/userProfiles'
 
 const STATUS_LINES = {
   open: ['Kênh trò chuyện đã mở', 'text-primary', 'bg-primary'],
@@ -154,7 +153,7 @@ export default function MessagesPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const { posts, now, chat, setChat, setPostStatus, notify, reviews } = useOutletContext()
-  const { closeConversation, reopenConversation } = useOutletContext()
+  const { closeConversation, reopenConversation, blockedUsers } = useOutletContext()
   const [query, setQuery] = useState('')
   // Vào từ bài đăng thì mobile mở thẳng hội thoại
   const [mobileConversation, setMobileConversation] = useState(
@@ -337,7 +336,7 @@ export default function MessagesPage() {
                 <IconButton
                   icon="user"
                   label="Xem trang cá nhân"
-                  onClick={() => notify(COMING_SOON)}
+                  onClick={() => navigate(profilePath(active.peer.name))}
                 />
                 <IconButton
                   icon="flag"
@@ -375,6 +374,7 @@ export default function MessagesPage() {
 
             <Composer
               thread={active}
+              blocked={blockedUsers.has(active.peer.name)}
               draft={draft}
               error={error}
               inputRef={inputRef}

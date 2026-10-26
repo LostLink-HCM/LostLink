@@ -9,6 +9,7 @@ import ReportPage from './pages/user/ReportPage.jsx'
 import ComposePostPage from './pages/user/ComposePostPage.jsx'
 import MessagesPage from './pages/user/MessagesPage.jsx'
 import NotificationsPage from './pages/user/NotificationsPage.jsx'
+import ProfilePage from './pages/user/ProfilePage.jsx'
 import UserLayout from './pages/user/UserLayout.jsx'
 import LoginPage from './pages/auth/LoginPage.jsx'
 import RegisterPage from './pages/auth/RegisterPage.jsx'
@@ -81,6 +82,22 @@ function App() {
             element={
               <RequireAuth>
                 <ReviewPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="users/:username"
+            element={
+              <RequireAuth>
+                <ProfilePage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="users/:username/report"
+            element={
+              <RequireAuth>
+                <ReportPage />
               </RequireAuth>
             }
           />

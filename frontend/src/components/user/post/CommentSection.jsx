@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { timeAgo } from '../../../lib/homeFeed'
+import { profilePath } from '../../../lib/userProfiles'
 import Avatar from '../Avatar'
 import Button from '../Button'
 import { buttonClass } from '../buttonClass'
@@ -42,7 +43,15 @@ function CommentItem({ comment, mine, now, onEdit, onDelete }) {
       <Avatar name={comment.author} size="md" tone={mine ? 'primary' : 'neutral'} />
       <div className="min-w-0 flex-1">
         <div className="mb-1 flex flex-wrap items-center gap-x-2">
-          <span className="text-caption font-semibold text-ink">{comment.author}</span>
+          <Link
+            to={profilePath(comment.author)}
+            className={cx(
+              'rounded text-caption font-semibold text-ink no-underline hover:text-primary',
+              focusRing
+            )}
+          >
+            {comment.author}
+          </Link>
           {mine && <span className="text-micro font-semibold text-primary">Bạn</span>}
           <time dateTime={comment.createdAt} className="text-tiny text-ink-subtle">
             {timeAgo(comment.createdAt, Math.max(now, Date.parse(comment.createdAt)))}

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { formatCount, timeAgo } from '../../../lib/homeFeed'
+import { profilePath } from '../../../lib/userProfiles'
 import Icon from '../../common/Icon'
 import { cardClass } from '../Card'
 import { cx, focusRing } from '../classes'
@@ -28,7 +29,16 @@ export default function PostCard({ post, commentCount, liked, onToggleLike, now 
 
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-tiny text-ink-subtle">
-          <span className="font-semibold text-ink">{post.author}</span>
+          {/* Nằm trên lớp link phủ cả thẻ để bấm được vào tên người đăng */}
+          <Link
+            to={profilePath(post.author)}
+            className={cx(
+              'relative z-10 rounded font-semibold text-ink no-underline hover:text-primary',
+              focusRing
+            )}
+          >
+            {post.author}
+          </Link>
           <Dot />
           <span>{post.category}</span>
           <Dot />
