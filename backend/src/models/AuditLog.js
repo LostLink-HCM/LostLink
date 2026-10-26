@@ -7,10 +7,27 @@ const auditLogSchema = new Schema(
   {
     // Nếu hành động do hệ thống tự động thực hiện thì actor là null, còn lại lưu UserID
     actor: { type: Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+    actorRole: {
+      type: String,
+      enum: ['user', 'moderator', 'admin', 'system'],
+      default: null,
+    },
 
     action: { type: String, required: true },
 
-    entityType: { type: String, default: null },
+    entityType: {
+      type: String,
+      required: true,
+      enum: [
+        'User',
+        'Post',
+        'Report',
+        'EscalationTicket',
+        'SystemConfig',
+        'QuickReply',
+        'Category',
+      ],
+    },
     entityId: { type: Schema.Types.ObjectId, default: null },
 
     detail: { type: Schema.Types.Mixed, default: {} },
