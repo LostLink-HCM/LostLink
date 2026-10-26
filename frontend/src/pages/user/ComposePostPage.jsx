@@ -23,7 +23,7 @@ import {
   prefillDescription,
   saveDraft,
   validateStep,
-} from '../../lib/composePost'
+} from '../../lib/user/composePost'
 
 const pageClass = 'mx-auto max-w-240 px-4 pt-5 pb-10 sm:px-6 lg:pt-7'
 

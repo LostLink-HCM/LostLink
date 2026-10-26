@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { profilePath } from '../../../lib/userProfiles'
+import { profilePath } from '../../../lib/user/profiles'
 import Avatar from '../Avatar'
 import Card from '../Card'
 import { cx, focusRing } from '../classes'

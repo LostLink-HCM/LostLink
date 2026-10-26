@@ -11,7 +11,7 @@ import PostCard from '../../components/user/home/PostCard'
 import RightRail from '../../components/user/home/RightRail'
 import SearchBox from '../../components/user/home/SearchBox'
 import StickyPanel from '../../components/user/home/StickyPanel'
-import { DEFAULT_FILTERS, filterPosts, validateFilters } from '../../lib/homeFeed'
+import { DEFAULT_FILTERS, filterPosts, validateFilters } from '../../lib/user/homeFeed'
 
 export default function HomePage() {
   const { user } = useAuth()

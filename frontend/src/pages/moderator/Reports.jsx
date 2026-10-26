@@ -18,7 +18,7 @@ import {
   violationHistory,
   resolveReport,
   filterModeratorReports,
-} from '../../lib/moderation'
+} from '../../lib/moderator/moderation'
 import { downloadCsv } from '../../lib/csv'
 import usePaginatedFilter from '../../hooks/usePaginatedFilter'
 

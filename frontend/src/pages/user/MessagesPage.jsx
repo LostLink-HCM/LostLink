@@ -11,7 +11,7 @@ import AttachedPost from '../../components/user/messages/AttachedPost'
 import Composer from '../../components/user/messages/Composer'
 import ThreadList from '../../components/user/messages/ThreadList'
 import TradePanel from '../../components/user/messages/TradePanel'
-import { checkImages } from '../../lib/composePost'
+import { checkImages } from '../../lib/user/composePost'
 import {
   acceptRequest,
   closedBy,
@@ -26,8 +26,8 @@ import {
   threadNotes,
   timeLabel,
   validateMessage,
-} from '../../lib/userMessages'
-import { profilePath } from '../../lib/userProfiles'
+} from '../../lib/user/messages'
+import { profilePath } from '../../lib/user/profiles'
 
 const STATUS_LINES = {
   open: ['Kênh trò chuyện đã mở', 'text-primary', 'bg-primary'],

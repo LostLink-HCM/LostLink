@@ -3,7 +3,7 @@ import Button from '../Button'
 import Card from '../Card'
 import { cx } from '../classes'
 import { SAFE_MEETUPS } from '../../../data/userMessages'
-import { canClose, closedBy, isReceiver } from '../../../lib/userMessages'
+import { canClose, closedBy, isReceiver } from '../../../lib/user/messages'
 
 function CheckRow({ done, children }) {
   return (

@@ -5,7 +5,7 @@ import Card from '../../components/user/Card'
 import { cx, focusRing } from '../../components/user/classes'
 import NotificationItem from '../../components/user/notifications/NotificationItem'
 import NotificationSettings from '../../components/user/notifications/NotificationSettings'
-import { openThread } from '../../lib/userMessages'
+import { openThread } from '../../lib/user/messages'
 import {
   NOTIFICATION_GROUPS,
   filterNotifications,
@@ -13,7 +13,7 @@ import {
   markAllRead,
   markRead,
   unreadCount,
-} from '../../lib/userNotifications'
+} from '../../lib/user/notifications'
 
 const COMING_SOON = 'Chức năng này đang được phát triển.'
 

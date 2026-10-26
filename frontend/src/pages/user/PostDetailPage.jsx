@@ -14,8 +14,8 @@ import CommentSection from '../../components/user/post/CommentSection'
 import PostActionSheet from '../../components/user/post/PostActionSheet'
 import PostGallery from '../../components/user/post/PostGallery'
 import { authors } from '../../data/homeFeed'
-import { formatCount, publicTraits, timeAgo } from '../../lib/homeFeed'
-import { profilePath } from '../../lib/userProfiles'
+import { formatCount, publicTraits, timeAgo } from '../../lib/user/homeFeed'
+import { profilePath } from '../../lib/user/profiles'
 
 const formatDate = (iso, options) => new Date(iso).toLocaleDateString('vi-VN', options)
 

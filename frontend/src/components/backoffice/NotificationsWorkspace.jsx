@@ -14,7 +14,7 @@ import {
   toggleNotificationPin,
   toggleNotificationRead,
   unreadNotificationCount,
-} from '../../lib/notifications'
+} from '../../lib/backoffice/notifications'
 
 const notificationTone = {
   review: 'bg-primary-soft text-primary',

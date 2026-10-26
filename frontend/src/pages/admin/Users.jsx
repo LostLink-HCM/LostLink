@@ -17,7 +17,7 @@ import {
   USER_STATUSES,
   usersToRows,
   userActionUnavailable,
-} from '../../lib/adminUsers'
+} from '../../lib/admin/users'
 import { createAdminUsers } from '../../data/adminUsers'
 import usePaginatedFilter from '../../hooks/usePaginatedFilter'
 

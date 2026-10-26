@@ -6,8 +6,8 @@ import SiteHeader from '../../components/user/home/SiteHeader'
 import { createFeedComments, createFeedPosts } from '../../data/homeFeed'
 import { createUserMessages } from '../../data/userMessages'
 import { createUserNotifications } from '../../data/userNotifications'
-import { DEFAULT_FILTERS } from '../../lib/homeFeed'
-import { reportKey } from '../../lib/userReports'
+import { DEFAULT_FILTERS } from '../../lib/user/homeFeed'
+import { reportKey } from '../../lib/user/reports'
 import {
   closeThread,
   hasOtherOpenThread,
@@ -18,8 +18,8 @@ import {
   postSnapshot,
   reopenThread,
   startRequest,
-} from '../../lib/userMessages'
-import { unreadCount } from '../../lib/userNotifications'
+} from '../../lib/user/messages'
+import { unreadCount } from '../../lib/user/notifications'
 
 // Khu người dùng dùng xanh thương hiệu thay cho xanh đậm của khu quản trị
 const userTheme = [

@@ -1,6 +1,6 @@
 import { useId } from 'react'
 import { DAY_PARTS, TIME_PRESETS } from '../../../data/composePost'
-import { applyTimePreset, describeTime, toDateInput } from '../../../lib/composePost'
+import { applyTimePreset, describeTime, toDateInput } from '../../../lib/user/composePost'
 import Icon from '../../common/Icon'
 import { cx } from '../classes'
 import { chipClass, inputClass, labelClass, tileClass } from './styles'

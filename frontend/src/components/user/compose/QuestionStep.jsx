@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { MAX_OPTIONS, MIN_OPTIONS } from '../../../lib/composePost'
+import { MAX_OPTIONS, MIN_OPTIONS } from '../../../lib/user/composePost'
 import Icon from '../../common/Icon'
 import Button from '../Button'
 import IconButton from '../IconButton'

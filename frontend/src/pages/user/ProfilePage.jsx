@@ -21,7 +21,7 @@ import {
   postsBy,
   profilePath,
   reviewsAbout,
-} from '../../lib/userProfiles'
+} from '../../lib/user/profiles'
 
 const COMING_SOON = 'Chức năng này đang được phát triển.'
 const pageClass = 'mx-auto max-w-300 px-4 pt-5 pb-10 sm:px-6 lg:px-10 lg:pt-7'

@@ -3,7 +3,7 @@ import BackofficeLayout from '../../components/backoffice/BackofficeLayout'
 import { createAdminMessages } from '../../data/adminMessages'
 import { createAdminNotifications } from '../../data/adminNotifications'
 import { createWorkspacePosts, workspacePostMatches } from '../../data/workspacePosts'
-import { readQuickReplies } from '../../lib/quickReplies'
+import { readQuickReplies } from '../../lib/backoffice/quickReplies'
 
 const navigation = [
   { path: '/dashboard', label: 'Dashboard', icon: 'dashboard' },

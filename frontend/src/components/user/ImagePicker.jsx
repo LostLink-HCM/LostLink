@@ -1,5 +1,10 @@
 import { useId, useState } from 'react'
-import { ACCEPTED_IMAGE_TYPES, MAX_IMAGE_MB, MAX_IMAGES, checkImages } from '../../lib/composePost'
+import {
+  ACCEPTED_IMAGE_TYPES,
+  MAX_IMAGE_MB,
+  MAX_IMAGES,
+  checkImages,
+} from '../../lib/user/composePost'
 import Icon from '../common/Icon'
 import { cx, focusRing } from './classes'
 

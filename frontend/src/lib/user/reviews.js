@@ -1,4 +1,4 @@
-import { isReceiver } from './userMessages'
+import { isReceiver } from './messages'
 
 export const COMMENT_MAX = 500
 

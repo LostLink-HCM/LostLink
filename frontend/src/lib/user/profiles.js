@@ -1,5 +1,5 @@
-import { authors, leaders } from '../data/homeFeed'
-import { BADGE_TONES, PROFILES, PUBLIC_REVIEWS } from '../data/userProfiles'
+import { authors, leaders } from '../../data/homeFeed'
+import { BADGE_TONES, PROFILES, PUBLIC_REVIEWS } from '../../data/userProfiles'
 
 export const PROFILE_TABS = [
   { value: '', label: 'Tất cả' },

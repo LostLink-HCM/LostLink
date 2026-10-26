@@ -1,4 +1,4 @@
-import { formatRating } from '../../../lib/userProfiles'
+import { formatRating } from '../../../lib/user/profiles'
 import Card from '../Card'
 
 // Điểm uy tín cộng đồng và số liệu đi kèm

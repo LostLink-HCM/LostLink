@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
-import { formatCount, timeAgo } from '../../../lib/homeFeed'
-import { profilePath } from '../../../lib/userProfiles'
+import { formatCount, timeAgo } from '../../../lib/user/homeFeed'
+import { profilePath } from '../../../lib/user/profiles'
 import Icon from '../../common/Icon'
 import { cardClass } from '../Card'
 import { cx, focusRing } from '../classes'

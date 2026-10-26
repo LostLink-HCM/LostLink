@@ -1,5 +1,5 @@
-import { ESCALATION_ACTIONS } from './escalations.js'
-import { USER_ACTIONS } from './adminUsers.js'
+import { ESCALATION_ACTIONS } from '../moderator/escalations.js'
+import { USER_ACTIONS } from './users.js'
 
 export const AUDIT_ACTIONS = {
   settings: 'Cập nhật cấu hình',
