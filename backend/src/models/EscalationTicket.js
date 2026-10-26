@@ -2,14 +2,20 @@ const mongoose = require('mongoose')
 
 const { Schema } = mongoose
 
-// Phiếu chuyển cho Moderator xử lý khi giao dịch bị treo quá 30 ngày
 // nhắc hai bên, xác nhận trao trả hộ hoặc gỡ liên kết trả bài về Đang tìm
 const escalationTicketSchema = new Schema(
   {
-    conversation: {
-      type: Schema.Types.ObjectId,
-      ref: 'Conversation',
+    participants: {
+      type: [{ type: Schema.Types.ObjectId, ref: 'User' }],
       required: true,
+      validate: {
+        validator: (participants) => {
+          if (participants.length !== 2) return false
+
+          const participantIds = participants.map((participant) => String(participant))
+          return new Set(participantIds).size === participantIds.length
+        },
+      },
       index: true,
     },
     match: { type: Schema.Types.ObjectId, ref: 'MatchSuggestion', default: null },
