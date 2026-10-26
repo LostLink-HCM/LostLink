@@ -20,7 +20,7 @@ import {
   postsToRows,
   setPostHidden,
   validateHideReason,
-} from '../../lib/posts'
+} from '../../lib/backoffice/posts'
 import { downloadCsv } from '../../lib/csv'
 import usePaginatedFilter from '../../hooks/usePaginatedFilter'
 

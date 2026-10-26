@@ -14,7 +14,7 @@ import {
   openThread as openThreadState,
   sendMessage,
   startThread as startThreadState,
-} from '../../lib/backofficeMessages'
+} from '../../lib/backoffice/messages'
 
 const avatarColors = {
   blue: 'bg-[#dfeafa] text-[#35679e]',

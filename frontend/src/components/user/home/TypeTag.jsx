@@ -1,4 +1,4 @@
-import { TYPE_LABELS } from '../../../lib/homeFeed'
+import { TYPE_LABELS } from '../../../lib/user/homeFeed'
 import { cx } from '../classes'
 
 const tones = {

@@ -1,4 +1,4 @@
-import { CATEGORY_ATTRIBUTES, DAY_PARTS, ROAD_SEGMENTS } from '../data/composePost'
+import { CATEGORY_ATTRIBUTES, DAY_PARTS, ROAD_SEGMENTS } from '../../data/composePost'
 import { normalize } from './homeFeed'
 
 // Giới hạn tối đa 9 ảnh, mỗi ảnh không quá 5 MB

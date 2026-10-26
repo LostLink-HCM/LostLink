@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { AREAS, CATEGORIES } from '../../../data/homeFeed'
-import { TIME_RANGES, TYPE_LABELS } from '../../../lib/homeFeed'
+import { TIME_RANGES, TYPE_LABELS } from '../../../lib/user/homeFeed'
 import Icon from '../../common/Icon'
 import Button from '../Button'
 import { cx, focusRing } from '../classes'

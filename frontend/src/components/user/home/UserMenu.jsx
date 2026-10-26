@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../../auth/AuthContext'
-import { profilePath } from '../../../lib/userProfiles'
+import { profilePath } from '../../../lib/user/profiles'
 import Icon from '../../common/Icon'
 import Avatar from '../Avatar'
 import { cx, focusRing } from '../classes'

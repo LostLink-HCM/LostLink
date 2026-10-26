@@ -11,8 +11,8 @@ import ImagePicker from '../../components/user/ImagePicker'
 import Note from '../../components/user/Note'
 import { cx, textareaClass } from '../../components/user/classes'
 import AttachedPost from '../../components/user/messages/AttachedPost'
-import { peerOf, postSnapshot } from '../../lib/userMessages'
-import { findProfile, profilePath } from '../../lib/userProfiles'
+import { peerOf, postSnapshot } from '../../lib/user/messages'
+import { findProfile, profilePath } from '../../lib/user/profiles'
 import {
   DESCRIPTION_MAX,
   MAX_SCREENSHOTS,
@@ -21,7 +21,7 @@ import {
   reasonsFor,
   reportKey,
   validateReport,
-} from '../../lib/userReports'
+} from '../../lib/user/reports'
 
 const pageClass = 'mx-auto max-w-160 px-4 pt-5 pb-10 sm:px-6 lg:px-10 lg:pt-7'
 const sectionTitle = 'm-0 mb-2.5 p-0 text-body font-bold text-ink'

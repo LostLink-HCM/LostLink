@@ -1,4 +1,4 @@
-import { CATEGORY_ATTRIBUTES } from '../data/composePost'
+import { CATEGORY_ATTRIBUTES } from '../../data/composePost'
 
 export const TIME_RANGES = [
   { value: '24h', label: '24 giờ qua', hours: 24 },

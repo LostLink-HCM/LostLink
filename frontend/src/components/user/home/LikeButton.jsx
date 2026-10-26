@@ -1,4 +1,4 @@
-import { formatCount } from '../../../lib/homeFeed'
+import { formatCount } from '../../../lib/user/homeFeed'
 import { cx, focusRing } from '../classes'
 
 // Nút Thích dùng chung cho thẻ bài đăng và trang chi tiết; count đã gồm lượt của mình

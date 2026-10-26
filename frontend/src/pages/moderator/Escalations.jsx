@@ -20,7 +20,7 @@ import {
   actionUnavailable,
   filterEscalations,
   applyEscalationAction,
-} from '../../lib/escalations'
+} from '../../lib/moderator/escalations'
 import usePaginatedFilter from '../../hooks/usePaginatedFilter'
 
 const EMPTY_FILTERS = { group: '', state: 'open', chat: '', query: '' }

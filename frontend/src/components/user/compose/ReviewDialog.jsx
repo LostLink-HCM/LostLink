@@ -1,5 +1,5 @@
 import { CATEGORY_ATTRIBUTES } from '../../../data/composePost'
-import { describeLocation, describeTime, getSteps } from '../../../lib/composePost'
+import { describeLocation, describeTime, getSteps } from '../../../lib/user/composePost'
 import TypeTag from '../home/TypeTag'
 import Button from '../Button'
 import Dialog from '../Dialog'

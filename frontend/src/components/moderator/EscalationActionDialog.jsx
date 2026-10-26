@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Button from '../backoffice/Button'
 import Dialog from '../backoffice/Dialog'
 import Field, { Input, Textarea } from '../backoffice/Field'
-import { ESCALATION_ACTIONS } from '../../lib/escalations'
+import { ESCALATION_ACTIONS } from '../../lib/moderator/escalations'
 
 const SUBMIT_VARIANTS = { view: 'primary', success: 'success', danger: 'danger' }
 

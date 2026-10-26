@@ -5,7 +5,7 @@ import { moderatorReports } from '../../data/moderatorReports'
 import { createEscalationLogs, createEscalationState } from '../../data/escalations'
 import { createModeratorMessages } from '../../data/moderatorMessages'
 import { createModeratorNotifications } from '../../data/moderatorNotifications'
-import { readQuickReplies } from '../../lib/quickReplies'
+import { readQuickReplies } from '../../lib/backoffice/quickReplies'
 
 const navigation = [
   { path: '/dashboard', label: 'Dashboard', icon: 'dashboard' },

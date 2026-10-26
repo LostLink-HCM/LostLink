@@ -12,13 +12,13 @@ import {
   saveSettings,
   validateSettings,
   weightTotal,
-} from '../../lib/adminSettings'
+} from '../../lib/admin/settings'
 import {
   cloneQuickReplies,
   QUICK_REPLY_TEXT_LIMIT,
   saveQuickReplies,
   validateQuickReplies,
-} from '../../lib/quickReplies'
+} from '../../lib/backoffice/quickReplies'
 
 const weightTones = {
   wLocation: 'bg-[#3976bd]',

@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom'
 import Icon from '../../common/Icon'
 import Button from '../Button'
 import { cx, focusRing } from '../classes'
-import { ACCEPTED_IMAGE_TYPES } from '../../../lib/composePost'
-import { MESSAGE_LIMIT, isClosedByMe } from '../../../lib/userMessages'
-import { profilePath } from '../../../lib/userProfiles'
+import { ACCEPTED_IMAGE_TYPES } from '../../../lib/user/composePost'
+import { MESSAGE_LIMIT, isClosedByMe } from '../../../lib/user/messages'
+import { profilePath } from '../../../lib/user/profiles'
 
 const iconButton = cx(
   'grid size-9 shrink-0 cursor-pointer place-items-center rounded-full border-0 transition-colors disabled:cursor-not-allowed',

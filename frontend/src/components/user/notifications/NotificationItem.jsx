@@ -1,7 +1,7 @@
 import Icon from '../../common/Icon'
 import { cx, focusRing } from '../classes'
-import { timeAgo } from '../../../lib/homeFeed'
-import { NOTIFICATION_TYPES } from '../../../lib/userNotifications'
+import { timeAgo } from '../../../lib/user/homeFeed'
+import { NOTIFICATION_TYPES } from '../../../lib/user/notifications'
 
 export default function NotificationItem({ item, now, onOpen }) {
   const type = NOTIFICATION_TYPES[item.type]

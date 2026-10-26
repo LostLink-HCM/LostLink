@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { DESCRIPTION_MAX, TITLE_MAX } from '../../../lib/composePost'
+import { DESCRIPTION_MAX, TITLE_MAX } from '../../../lib/user/composePost'
 import { cx } from '../classes'
 import ImagePicker from '../ImagePicker'
 import { inputClass } from './styles'

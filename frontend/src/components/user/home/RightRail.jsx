@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { communityStats, leaders } from '../../../data/homeFeed'
-import { profilePath, quarterLabel } from '../../../lib/userProfiles'
+import { profilePath, quarterLabel } from '../../../lib/user/profiles'
 import Avatar from '../Avatar'
 import Card from '../Card'
 import { cx, focusRing } from '../classes'

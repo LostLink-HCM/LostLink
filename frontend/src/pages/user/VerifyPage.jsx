@@ -10,7 +10,7 @@ import EmptyState from '../../components/user/EmptyState'
 import Note from '../../components/user/Note'
 import { cx } from '../../components/user/classes'
 import AttachedPost from '../../components/user/messages/AttachedPost'
-import { isClosedByMe, openThread, postSnapshot } from '../../lib/userMessages'
+import { isClosedByMe, openThread, postSnapshot } from '../../lib/user/messages'
 
 const pageClass = 'mx-auto max-w-180 px-4 pt-5 pb-10 sm:px-6 lg:pt-7'
 

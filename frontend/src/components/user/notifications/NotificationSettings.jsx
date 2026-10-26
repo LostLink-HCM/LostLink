@@ -1,7 +1,7 @@
 import Button from '../Button'
 import Card from '../Card'
 import Switch from '../Switch'
-import { NOTIFICATION_GROUPS } from '../../../lib/userNotifications'
+import { NOTIFICATION_GROUPS } from '../../../lib/user/notifications'
 
 // Thiết lập thông báo
 export default function NotificationSettings({ prefs, onChange, area, onChangeArea }) {

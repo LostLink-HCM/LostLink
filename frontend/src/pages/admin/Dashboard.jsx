@@ -8,7 +8,7 @@ import {
   localDate,
   percentChange,
   rangeError,
-} from '../../lib/adminDashboard'
+} from '../../lib/admin/dashboard'
 import Icon from '../../components/common/Icon'
 import { cx, focusRing } from '../../components/backoffice/classes'
 

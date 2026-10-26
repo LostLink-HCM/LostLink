@@ -1,4 +1,4 @@
-import { DEFAULT_QUICK_REPLIES } from '../data/backofficeQuickReplies'
+import { DEFAULT_QUICK_REPLIES } from '../../data/backofficeQuickReplies'
 
 export const QUICK_REPLIES_STORAGE_KEY = 'll_backoffice_quick_replies_v1'
 export const QUICK_REPLY_TEXT_LIMIT = 500

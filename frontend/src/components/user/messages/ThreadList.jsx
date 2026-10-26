@@ -1,6 +1,6 @@
 import Icon from '../../common/Icon'
 import { cx, focusRing } from '../classes'
-import { closedBy, lastActivity, previewTime, threadPreview } from '../../../lib/userMessages'
+import { closedBy, lastActivity, previewTime, threadPreview } from '../../../lib/user/messages'
 import Button from '../Button'
 import Avatar from '../Avatar'
 import CountBadge from '../CountBadge'

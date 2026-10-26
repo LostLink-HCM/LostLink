@@ -22,7 +22,7 @@ import {
   auditLogsToRows,
   filterAuditLogs,
   formatAuditDate,
-} from '../../lib/adminAudit'
+} from '../../lib/admin/audit'
 
 const PAGE_SIZE = 8
 
