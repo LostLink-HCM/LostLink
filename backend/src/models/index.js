@@ -28,4 +28,5 @@ module.exports = {
   EscalationTicket: require('./EscalationTicket'),
   AuditLog: require('./AuditLog'),
   SystemConfig: require('./SystemConfig'),
+  QuickReply: require('./QuickReply'),
 }
