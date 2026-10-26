@@ -49,6 +49,9 @@ export default function UserLayout() {
   const [liked, setLiked] = useState(() => new Set())
   const [saved, setSaved] = useState(() => new Set())
   const [followed, setFollowed] = useState(() => new Set())
+  // Theo dõi và chặn theo tên người dùng (UC11, UC12)
+  const [followedUsers, setFollowedUsers] = useState(() => new Set())
+  const [blockedUsers, setBlockedUsers] = useState(() => new Set())
   const [lastCommentAt, setLastCommentAt] = useState(0)
   const [chat, setChat] = useState(createUserMessages)
   const [notifications, setNotifications] = useState(createUserNotifications)
@@ -144,14 +147,39 @@ export default function UserLayout() {
     return true
   }
 
+  // Đang chặn nhau thì không theo dõi được
+  const toggleFollowUser = (name) => {
+    if (!requireMember() || blockedUsers.has(name)) return
+    setFollowedUsers((prev) => toggleIn(prev, name))
+  }
+
+  // Chặn thì ẩn tin của người đó ở Trang chủ, khóa hội thoại và bỏ theo dõi (UC12)
+  const blockUser = (name) => {
+    setBlockedUsers((prev) => new Set(prev).add(name))
+    setFollowedUsers((prev) => {
+      const next = new Set(prev)
+      next.delete(name)
+      return next
+    })
+  }
+
+  const unblockUser = (name) =>
+    setBlockedUsers((prev) => {
+      const next = new Set(prev)
+      next.delete(name)
+      return next
+    })
+
   const submitReport = (target, report) => {
     const key = reportKey(target)
     if (reports[key]) return false
     setReports((prev) => ({ ...prev, [key]: { ...report, createdAt: new Date().toISOString() } }))
+    // Chọn "Chặn và ẩn tin của họ" ở màn Báo cáo
+    if (report.block) blockUser(target.peer.name)
     return true
   }
 
-  // Ghi nhận câu trả lời xác minh; đúng thì mở hội thoại và chuyển bài sang Đã liên hệ
+  // Ghi nhận câu trả lời xác minh, đúng thì mở hội thoại và chuyển bài sang Đã liên hệ
   const answerQuestion = (post, choice) => {
     if (verifications[post.id]) return verifications[post.id]
     const result = choice === post.question.correct ? 'passed' : 'failed'
@@ -201,6 +229,11 @@ export default function UserLayout() {
           toggleSaved: memberToggle(setSaved),
           followed,
           toggleFollowed: memberToggle(setFollowed),
+          followedUsers,
+          toggleFollowUser,
+          blockedUsers,
+          blockUser,
+          unblockUser,
           requireMember,
           addView,
           addComment,

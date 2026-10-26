@@ -6,6 +6,7 @@ const sizes = {
   md: 'size-9 text-tiny',
   lg: 'size-10.5 text-caption',
   xl: 'size-11 text-small',
+  '2xl': 'size-20 text-heading sm:size-24',
 }
 
 const tones = {
@@ -13,7 +14,6 @@ const tones = {
   neutral: 'bg-line-subtle text-ink-secondary',
 }
 
-// Ảnh đại diện bằng chữ cái đầu; tên luôn hiện cạnh bên nên ẩn với trình đọc màn hình
 export default function Avatar({ name, initials, size = 'lg', tone = 'primary', className }) {
   return (
     <span

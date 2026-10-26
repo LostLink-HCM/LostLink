@@ -15,14 +15,22 @@ import { DEFAULT_FILTERS, filterPosts, validateFilters } from '../../lib/homeFee
 
 export default function HomePage() {
   const { user } = useAuth()
-  const { posts, comments, now, search, keyword, filters, liked, toggleLike } = useOutletContext()
+  const { posts, comments, now, search, keyword, filters, liked, toggleLike, blockedUsers } =
+    useOutletContext()
   const { draft, setDraft, applied, setApplied } = filters
   const [filterError, setFilterError] = useState('')
   const [drawerOpen, setDrawerOpen] = useState(false)
 
+  // Bỏ bài của người mình đã chặn
   const shown = useMemo(
-    () => filterPosts(posts, applied, keyword, now),
-    [posts, applied, keyword, now]
+    () =>
+      filterPosts(
+        posts.filter((post) => !blockedUsers.has(post.author)),
+        applied,
+        keyword,
+        now
+      ),
+    [posts, blockedUsers, applied, keyword, now]
   )
 
   const commentCounts = useMemo(() => {

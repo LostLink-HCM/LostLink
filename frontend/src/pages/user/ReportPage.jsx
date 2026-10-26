@@ -12,6 +12,7 @@ import Note from '../../components/user/Note'
 import { cx, textareaClass } from '../../components/user/classes'
 import AttachedPost from '../../components/user/messages/AttachedPost'
 import { peerOf, postSnapshot } from '../../lib/userMessages'
+import { findProfile, profilePath } from '../../lib/userProfiles'
 import {
   DESCRIPTION_MAX,
   MAX_SCREENSHOTS,
@@ -27,10 +28,23 @@ const sectionTitle = 'm-0 mb-2.5 p-0 text-body font-bold text-ink'
 
 let nextScreenshotId = 0
 
-// Đối tượng bị báo cáo: bài đăng (từ trang chi tiết) hoặc người dùng (từ hội thoại)
+// Đối tượng bị báo cáo: bài đăng (từ trang chi tiết) hoặc người dùng (từ hội thoại, trang cá nhân)
 function useReportTarget() {
-  const { id, threadId } = useParams()
+  const { id, threadId, username } = useParams()
   const { posts, chat } = useOutletContext()
+
+  if (username) {
+    const profile = findProfile(username, { posts })
+    if (!profile) return null
+    return {
+      type: 'user',
+      id: profile.username,
+      peer: { name: profile.username, initials: profile.initials },
+      post: null,
+      linkable: false,
+      back: { to: profilePath(profile.username), label: 'Quay lại trang cá nhân' },
+    }
+  }
 
   if (threadId) {
     const thread = chat.threads.find((item) => item.id === threadId)
@@ -111,7 +125,9 @@ export default function ReportPage() {
   }
 
   if (target.peer.name === user.username) {
-    return (
+    return target.type === 'user' ? (
+      <Unavailable back={target.back} title="Bạn không thể báo cáo chính mình" />
+    ) : (
       <Unavailable
         back={target.back}
         title="Bạn không thể báo cáo bài đăng của mình"
@@ -181,11 +197,15 @@ export default function ReportPage() {
                 {peer.name}
               </strong>
               <span className="block text-tiny text-ink-muted">
-                {isUser ? 'Báo cáo người bạn đang trò chuyện' : 'Báo cáo bài đăng của người này'}
+                {!isUser
+                  ? 'Báo cáo bài đăng của người này'
+                  : post
+                    ? 'Báo cáo người bạn đang trò chuyện'
+                    : 'Báo cáo tài khoản này'}
               </span>
             </div>
           </div>
-          <AttachedPost post={post} linkable={target.linkable} />
+          {post && <AttachedPost post={post} linkable={target.linkable} />}
         </div>
 
         {sent ? (

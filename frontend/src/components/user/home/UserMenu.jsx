@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../../auth/AuthContext'
+import { profilePath } from '../../../lib/userProfiles'
 import Icon from '../../common/Icon'
 import Avatar from '../Avatar'
 import { cx, focusRing } from '../classes'
@@ -66,6 +67,15 @@ export default function UserMenu() {
 
           <div className="my-1 h-px bg-line" />
 
+          <Link
+            to={profilePath(user.username)}
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className={cx(rowClass, 'text-ink-secondary hover:bg-primary-subtle', focusRing)}
+          >
+            <Icon name="user" size={16} />
+            Trang cá nhân
+          </Link>
           {['moderator', 'admin'].includes(user.role) && (
             <Link
               to="/moderator"

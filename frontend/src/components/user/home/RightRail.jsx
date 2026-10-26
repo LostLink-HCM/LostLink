@@ -1,11 +1,9 @@
 import { Link } from 'react-router-dom'
 import { communityStats, leaders } from '../../../data/homeFeed'
+import { profilePath, quarterLabel } from '../../../lib/userProfiles'
 import Avatar from '../Avatar'
 import Card from '../Card'
 import { cx, focusRing } from '../classes'
-
-const quarterLabel = (date = new Date()) =>
-  `Quý ${['I', 'II', 'III', 'IV'][Math.floor(date.getMonth() / 3)]}/${date.getFullYear()}`
 
 function LeaderRow({ leader }) {
   return (
@@ -42,23 +40,20 @@ export default function RightRail({ isGuest }) {
         <ol className="m-0 flex list-none flex-col gap-0.5 p-0">
           {leaders.map((leader) => (
             <li key={leader.rank}>
-              {isGuest ? (
-                <Link
-                  to="/login"
-                  state={{ from: '/' }}
-                  title="Đăng nhập để xem hồ sơ"
-                  className={cx(
-                    'flex items-center gap-3 rounded-xl px-2 py-2 no-underline transition-colors hover:bg-surface-muted',
-                    focusRing
-                  )}
-                >
-                  <LeaderRow leader={leader} />
-                </Link>
-              ) : (
-                <div className="flex items-center gap-3 px-2 py-2">
-                  <LeaderRow leader={leader} />
-                </div>
-              )}
+              {/* Guest đăng nhập xong quay về Trang chủ */}
+              <Link
+                to={isGuest ? '/login' : profilePath(leader.username)}
+                state={isGuest ? { from: '/' } : undefined}
+                title={
+                  isGuest ? 'Đăng nhập để xem hồ sơ' : `Xem trang cá nhân của ${leader.username}`
+                }
+                className={cx(
+                  'flex items-center gap-3 rounded-xl px-2 py-2 no-underline transition-colors hover:bg-surface-muted',
+                  focusRing
+                )}
+              >
+                <LeaderRow leader={leader} />
+              </Link>
             </li>
           ))}
         </ol>
