@@ -19,8 +19,7 @@ export default function NotificationSettings({ prefs, onChange, onError }) {
 
   return (
     <Card as="section" padding="sm">
-      <h2 className="m-0 mb-1 text-body font-bold text-ink">Nhắc mình khi nào?</h2>
-      <p className="m-0 mb-2 text-caption text-ink-muted">Bạn tắt bớt lúc nào cũng được.</p>
+      <h2 className="m-0 text-body font-bold text-ink">Nhắc mình khi nào?</h2>
 
       <h3 className="m-0 mt-3 mb-0.5 text-tiny font-semibold tracking-wide text-ink-subtle uppercase">
         Kênh nhận
