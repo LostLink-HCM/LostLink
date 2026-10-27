@@ -5,7 +5,7 @@ projects:
       - name: Production
         services:
           - type: web
-            name: LostLink
+            name: lostlink-api
             runtime: node
             repo: https://github.com/LostLink-HCM/LostLink
             branch: main
@@ -39,7 +39,7 @@ projects:
                 sync: false
 
           - type: web
-            name: lostlink-web
+            name: lostlink
             runtime: static
             repo: https://github.com/LostLink-HCM/LostLink
             branch: main
