@@ -1,6 +1,7 @@
-import { Link } from 'react-router-dom'
-import { communityStats, leaders } from '../../../data/homeFeed'
-import { profilePath, quarterLabel } from '../../../lib/user/profiles'
+import { Link, useLocation } from 'react-router-dom'
+import { communityStats } from '../../../data/homeFeed'
+import { profilePath } from '../../../lib/user/profiles'
+import { quarterLabel, quarterLeaders } from '../../../lib/user/reputation'
 import Avatar from '../Avatar'
 import Card from '../Card'
 import { cx, focusRing } from '../classes'
@@ -27,36 +28,48 @@ function LeaderRow({ leader }) {
     </>
   )
 }
+export default function RightRail({ isGuest, limit = 5, titled = true }) {
+  const { pathname } = useLocation()
+  const leaders = quarterLeaders().slice(0, limit)
 
-export default function RightRail({ isGuest }) {
   return (
     <div className="flex flex-col gap-4">
-      <Card as="section" padding="sm">
-        <div className="mb-1 flex items-baseline justify-between">
-          <h2 className="m-0 text-body font-bold text-ink">Bảng vinh danh</h2>
-          <span className="text-micro text-ink-subtle">{quarterLabel()}</span>
-        </div>
-        <p className="mt-0 mb-3 text-tiny text-ink-muted">Xếp theo điểm uy tín cộng đồng</p>
-        <ol className="m-0 flex list-none flex-col gap-0.5 p-0">
-          {leaders.map((leader) => (
-            <li key={leader.rank}>
-              {/* Guest đăng nhập xong quay về Trang chủ */}
-              <Link
-                to={isGuest ? '/login' : profilePath(leader.username)}
-                state={isGuest ? { from: '/' } : undefined}
-                title={
-                  isGuest ? 'Đăng nhập để xem hồ sơ' : `Xem trang cá nhân của ${leader.username}`
-                }
-                className={cx(
-                  'flex items-center gap-3 rounded-xl px-2 py-2 no-underline transition-colors hover:bg-surface-muted',
-                  focusRing
-                )}
-              >
-                <LeaderRow leader={leader} />
-              </Link>
-            </li>
-          ))}
-        </ol>
+      <Card as="section" padding="sm" aria-label={titled ? undefined : 'Bảng vinh danh'}>
+        {titled && (
+          <div className="mb-1 flex items-baseline justify-between">
+            <h2 className="m-0 text-body font-bold text-ink">Bảng vinh danh</h2>
+            <span className="text-micro text-ink-subtle">{quarterLabel()}</span>
+          </div>
+        )}
+        <p className="mt-0 mb-3 text-tiny text-ink-muted">
+          Xếp theo điểm uy tín kiếm được trong quý
+        </p>
+        {leaders.length ? (
+          <ol className="m-0 flex list-none flex-col gap-0.5 p-0">
+            {leaders.map((leader) => (
+              <li key={leader.username}>
+                {/* Guest đăng nhập xong quay về trang đang xem */}
+                <Link
+                  to={isGuest ? '/login' : profilePath(leader.username)}
+                  state={isGuest ? { from: pathname } : undefined}
+                  title={
+                    isGuest ? 'Đăng nhập để xem hồ sơ' : `Xem trang cá nhân của ${leader.username}`
+                  }
+                  className={cx(
+                    'flex items-center gap-3 rounded-xl px-2 py-2 no-underline transition-colors hover:bg-surface-muted',
+                    focusRing
+                  )}
+                >
+                  <LeaderRow leader={leader} />
+                </Link>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="m-0 rounded-xl bg-surface-muted px-3 py-5 text-center text-caption text-ink-muted">
+            Quý này chưa có lượt trao trả nào
+          </p>
+        )}
       </Card>
 
       <section className="rounded-2xl bg-[#1b3358] p-4.5 text-white">

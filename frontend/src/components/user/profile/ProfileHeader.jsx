@@ -1,4 +1,5 @@
-import { badgeTone, joinedLabel, quarterLabel } from '../../../lib/user/profiles'
+import { badgeTone, joinedLabel } from '../../../lib/user/profiles'
+import { quarterLabel } from '../../../lib/user/reputation'
 import Avatar from '../Avatar'
 import Card from '../Card'
 import { cx } from '../classes'

@@ -8,11 +8,10 @@ import { cx, focusRing } from '../classes'
 import SearchBox from './SearchBox'
 import UserMenu from './UserMenu'
 
-// Bóng nhẹ cho nút màu chính trên thanh điều hướng
 const headerShadow = 'shadow-[0_2px_10px_rgb(46_109_180/0.28)]'
 
 // Guest vẫn thấy Tin nhắn => bấm vào thì RequireAuth đưa sang đăng nhập rồi quay lại
-function NavItem({ to, end, label, badge = 0, unit }) {
+function NavItem({ to, end, label, badge = 0, unit, className }) {
   return (
     <NavLink
       to={to}
@@ -22,7 +21,8 @@ function NavItem({ to, end, label, badge = 0, unit }) {
         cx(
           'relative flex items-center gap-2 rounded-lg px-3.5 py-2 text-small font-medium no-underline transition-colors hover:bg-primary-subtle',
           isActive ? 'text-primary' : 'text-ink-secondary',
-          focusRing
+          focusRing,
+          className
         )
       }
     >
@@ -90,6 +90,8 @@ export default function SiteHeader({ search, unreadMessages = 0, unreadNotificat
           <NavItem to="/" end label="Trang chủ" />
           <NavItem to="/messages" label="Tin nhắn" badge={unread} unit="hội thoại" />
           <NavItem to="/notifications" label="Thông báo" badge={unreadAlerts} unit="thông báo" />
+          {/* Từ xl bảng vinh danh đã nằm ở cột phải trang chủ */}
+          <NavItem to="/leaderboard" label="Bảng vinh danh" className="xl:hidden" />
         </nav>
 
         <SearchBox
@@ -131,6 +133,8 @@ export default function SiteHeader({ search, unreadMessages = 0, unreadNotificat
             </>
           ) : (
             <>
+              {/* User mở Bảng vinh danh từ menu tài khoản, header mobile hết chỗ */}
+              <MobileIconLink to="/leaderboard" icon="trophy" label="Bảng vinh danh" />
               <Link to="/login" className={buttonClass({ variant: 'soft', size: 'lg' })}>
                 Đăng nhập
               </Link>

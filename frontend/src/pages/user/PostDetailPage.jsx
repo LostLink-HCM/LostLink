@@ -13,9 +13,9 @@ import TypeTag from '../../components/user/home/TypeTag'
 import CommentSection from '../../components/user/post/CommentSection'
 import PostActionSheet from '../../components/user/post/PostActionSheet'
 import PostGallery from '../../components/user/post/PostGallery'
-import { authors } from '../../data/homeFeed'
 import { formatCount, publicTraits, timeAgo } from '../../lib/user/homeFeed'
 import { profilePath } from '../../lib/user/profiles'
+import { reputationOf } from '../../lib/user/reputation'
 
 const formatDate = (iso, options) => new Date(iso).toLocaleDateString('vi-VN', options)
 
@@ -71,7 +71,8 @@ export default function PostDetailPage() {
   const lost = post.type === 'lost'
   const traits = publicTraits(post)
   const isLiked = liked.has(post.id)
-  const author = authors[post.author]
+  // Người chưa có lịch sử điểm vẫn hiện 0 điểm, 0 lần trao trả
+  const author = reputationOf(post.author) ?? { reputation: 0, returned: 0 }
 
   // Xem hồ sơ cần đăng nhập, Guest được đưa sang đăng nhập rồi quay lại bài này
   const openProfile = () => {
@@ -222,29 +223,24 @@ export default function PostDetailPage() {
                 {post.author}
               </h2>
             </div>
-            {author && (
-              <dl className="m-0 mb-4 grid grid-cols-2 gap-2">
-                {[
-                  ['Điểm uy tín', author.reputation, true],
-                  ['Đã trao trả', author.returned],
-                ].map(([label, value, accent]) => (
-                  <div
-                    key={label}
-                    className="flex flex-col-reverse rounded-xl bg-surface-muted px-3 py-2.5"
+            <dl className="m-0 mb-4 grid grid-cols-2 gap-2">
+              {[
+                ['Điểm uy tín', author.reputation, true],
+                ['Đã trao trả', author.returned],
+              ].map(([label, value, accent]) => (
+                <div
+                  key={label}
+                  className="flex flex-col-reverse rounded-xl bg-surface-muted px-3 py-2.5"
+                >
+                  <dt className="text-tiny text-ink-subtle">{label}</dt>
+                  <dd
+                    className={cx('m-0 text-lead font-bold', accent ? 'text-primary' : 'text-ink')}
                   >
-                    <dt className="text-tiny text-ink-subtle">{label}</dt>
-                    <dd
-                      className={cx(
-                        'm-0 text-lead font-bold',
-                        accent ? 'text-primary' : 'text-ink'
-                      )}
-                    >
-                      {value}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            )}
+                    {value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
             <Button block onClick={openProfile}>
               Xem trang cá nhân
             </Button>
