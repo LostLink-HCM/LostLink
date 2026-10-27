@@ -499,34 +499,12 @@ export const createFeedPosts = () => [
   },
 ]
 
-export const leaders = [
-  { rank: 1, username: 'minhkhoi.td', returned: 31, points: 312 },
-  { rank: 2, username: 'hoangnam.q1', returned: 24, points: 248 },
-  { rank: 3, username: 'baotran.sg', returned: 19, points: 174 },
-  { rank: 4, username: 'ngockhanh.q10', returned: 14, points: 141 },
-  { rank: 5, username: 'thuylinh.q3', returned: 9, points: 96 },
-]
-
 export const communityStats = [
   { value: '12.480', label: 'Tin đã đăng' },
   { value: '4.037', label: 'Đồ đã trao trả', accent: true },
   { value: '32,3%', label: 'Tỷ lệ ghép cặp thành công' },
   { value: '2,1 ngày', label: 'Thời gian trao trả trung bình' },
 ]
-
-// Thông tin công khai của người đăng, hiện ở cột phải trang chi tiết
-export const authors = {
-  'hoangnam.q1': { reputation: 248, returned: 24 },
-  'thuylinh.q3': { reputation: 96, returned: 9 },
-  'minhkhoi.td': { reputation: 312, returned: 31 },
-  'ducanh.bk': { reputation: 12, returned: 1 },
-  'baotran.sg': { reputation: 174, returned: 19 },
-  'vanhoa.gv': { reputation: 0, returned: 0 },
-  'thuha.q7': { reputation: 45, returned: 5 },
-  'quocbao.tb': { reputation: 8, returned: 1 },
-  'ngockhanh.q10': { reputation: 141, returned: 14 },
-  'thanhtam.q7': { reputation: 20, returned: 2 },
-}
 
 const comment = (id, postId, author, h, text) => ({
   id,

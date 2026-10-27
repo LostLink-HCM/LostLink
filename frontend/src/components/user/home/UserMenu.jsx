@@ -76,6 +76,20 @@ export default function UserMenu() {
             <Icon name="user" size={16} />
             Trang cá nhân
           </Link>
+          {/* Từ lg đã có mục này trên thanh điều hướng */}
+          <Link
+            to="/leaderboard"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className={cx(
+              rowClass,
+              'text-ink-secondary hover:bg-primary-subtle lg:hidden',
+              focusRing
+            )}
+          >
+            <Icon name="trophy" size={16} />
+            Bảng vinh danh
+          </Link>
           <Link
             to="/settings"
             role="menuitem"

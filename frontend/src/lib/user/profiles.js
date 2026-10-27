@@ -1,5 +1,5 @@
-import { authors, leaders } from '../../data/homeFeed'
 import { BADGE_TONES, PROFILES, PUBLIC_REVIEWS } from '../../data/userProfiles'
+import { quarterLeaders, reputationOf } from './reputation'
 
 export const PROFILE_TABS = [
   { value: '', label: 'Tất cả' },
@@ -9,20 +9,16 @@ export const PROFILE_TABS = [
 
 export const profilePath = (username) => `/users/${encodeURIComponent(username)}`
 
-export const quarterLabel = (date = new Date()) =>
-  `Quý ${['I', 'II', 'III', 'IV'][Math.floor(date.getMonth() / 3)]}/${date.getFullYear()}`
-
 export const badgeTone = (name) => BADGE_TONES[name] ?? 'neutral'
 
 // Với chính mình thì lấy điểm uy tín và ngày tham gia từ tài khoản đang đăng nhập
 export function findProfile(username, { posts, me }) {
   const isMe = username === me?.username
-  const known =
-    isMe || PROFILES[username] || authors[username] || posts.some((p) => p.author === username)
+  const stats = reputationOf(username)
+  const known = isMe || PROFILES[username] || stats || posts.some((p) => p.author === username)
   if (!known) return null
 
   const base = PROFILES[username] ?? {}
-  const stats = authors[username]
   return {
     username,
     initials: username.slice(0, 2).toUpperCase(),
@@ -31,7 +27,7 @@ export function findProfile(username, { posts, me }) {
     badges: base.badges ?? [],
     reputation: stats?.reputation ?? (isMe ? (me.reputationScore ?? 0) : 0),
     returned: stats?.returned ?? 0,
-    rank: leaders.find((leader) => leader.username === username)?.rank ?? null,
+    rank: quarterLeaders().find((leader) => leader.username === username)?.rank ?? null,
     isMe,
   }
 }

@@ -10,6 +10,7 @@ import ComposePostPage from './pages/user/ComposePostPage.jsx'
 import MessagesPage from './pages/user/MessagesPage.jsx'
 import NotificationsPage from './pages/user/NotificationsPage.jsx'
 import ProfilePage from './pages/user/ProfilePage.jsx'
+import LeaderboardPage from './pages/user/LeaderboardPage.jsx'
 import UserLayout from './pages/user/UserLayout.jsx'
 import LoginPage from './pages/auth/LoginPage.jsx'
 import RegisterPage from './pages/auth/RegisterPage.jsx'
@@ -60,6 +61,7 @@ function App() {
             }
           />
           <Route path="posts/:id" element={<PostDetailPage />} />
+          <Route path="leaderboard" element={<LeaderboardPage />} />
           <Route
             path="notifications"
             element={
