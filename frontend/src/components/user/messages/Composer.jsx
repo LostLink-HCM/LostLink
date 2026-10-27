@@ -33,7 +33,7 @@ export default function Composer({
     return (
       <p className="m-0 flex flex-wrap items-center gap-2 border-t border-line bg-surface-muted px-5 py-4 text-caption text-ink-muted">
         <Icon name="lock" size={15} className="shrink-0" />
-        <span className="min-w-0 flex-1">Bạn đã chặn {peer.name} nên không thể nhắn tin.</span>
+        <span className="min-w-0 flex-1">Không thể nhắn tin vì hai bên đã chặn nhau.</span>
         <Link
           to={profilePath(peer.name)}
           className={cx(
