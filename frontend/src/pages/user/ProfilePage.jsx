@@ -24,6 +24,22 @@ import {
 } from '../../lib/user/profiles'
 
 const COMING_SOON = 'Chức năng này đang được phát triển.'
+// Trang của mình chỉ hiện bài Đang tìm và Đã liên hệ
+const OWN_STATUSES = ['searching', 'contacted']
+
+// Hộp thoại xác nhận chặn / bỏ chặn
+const CONFIRMS = {
+  block: {
+    title: 'Chặn người dùng này?',
+    body: 'Tin của họ sẽ bị ẩn khỏi trang chủ của bạn và hội thoại giữa hai người sẽ bị khóa.',
+    action: 'Xác nhận',
+  },
+  unblock: {
+    title: 'Bỏ chặn người dùng này?',
+    body: 'Tin của họ sẽ hiển thị lại trên trang chủ của bạn.',
+    action: 'Xác nhận',
+  },
+}
 const pageClass = 'mx-auto max-w-300 px-4 pt-5 pb-10 sm:px-6 lg:px-10 lg:pt-7'
 
 const tabClass = (active) =>
@@ -42,7 +58,7 @@ function useBack() {
   return location.key === 'default' ? () => navigate('/') : () => navigate(-1)
 }
 
-// Trang cá nhân: hồ sơ người khác (UC10) hoặc của chính mình (UC06)
+// Trang cá nhân: hồ sơ người khác hoặc của chính mình
 export default function ProfilePage() {
   const { username } = useParams()
   // Đổi người xem thì làm mới bộ lọc và hộp thoại
@@ -56,7 +72,7 @@ function ProfileView({ username }) {
   const { posts, comments, now, liked, toggleLike, chat, reviews, notify } = ctx
   const { followedUsers, toggleFollowUser, blockedUsers, blockUser, unblockUser } = ctx
   const [tab, setTab] = useState('')
-  const [confirmBlock, setConfirmBlock] = useState(false)
+  const [confirming, setConfirming] = useState(null) // null | 'block' | 'unblock'
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -75,7 +91,7 @@ function ProfileView({ username }) {
     return counts
   }, [comments])
 
-  // Tài khoản không tồn tại hoặc đã bị xóa (UC10 luồng 2.a)
+  // Tài khoản không tồn tại hoặc đã bị xóa
   if (!profile) {
     return (
       <div className={pageClass}>
@@ -93,30 +109,28 @@ function ProfileView({ username }) {
 
   const blocked = blockedUsers.has(username)
   const following = followedUsers.has(username)
-  const allPosts = postsBy(posts, username)
-  const shown = postsBy(posts, username, tab)
+  const listOf = (type = '') =>
+    postsBy(posts, username, type).filter(
+      (post) => !profile.isMe || OWN_STATUSES.includes(post.status)
+    )
+  const allPosts = listOf()
+  const shown = listOf(tab)
 
+  // Bỏ theo dõi chỉ đổi nút, không cần thông báo
   const toggleFollow = () => {
     toggleFollowUser(username)
-    notify(
-      following
-        ? `Đã bỏ theo dõi ${username}.`
-        : `Đã theo dõi ${username}. Bạn sẽ nhận thông báo khi họ có bài mới.`
-    )
+    if (!following) notify('Đã theo dõi người dùng.')
   }
 
-  const confirmBlocking = () => {
-    blockUser(username)
-    setConfirmBlock(false)
-    notify(`Đã chặn ${username}.`)
+  const confirmAction = () => {
+    if (confirming === 'block') {
+      blockUser(username)
+      notify('Đã chặn người dùng.')
+    } else unblockUser(username)
+    setConfirming(null)
   }
 
-  const unblock = () => {
-    unblockUser(username)
-    notify(`Đã bỏ chặn ${username}.`)
-  }
-
-  // Hồ sơ của mình không có Theo dõi, Chặn, Báo cáo (UC11 luồng 1.b)
+  // Hồ sơ của mình không có Theo dõi, Chặn, Báo cáo
   const actions = profile.isMe ? (
     <Button onClick={() => notify(COMING_SOON)}>
       <Icon name="edit" size={15} />
@@ -124,20 +138,21 @@ function ProfileView({ username }) {
     </Button>
   ) : (
     <>
-      {/* Đang chặn thì không theo dõi được (UC11 luồng 1.c) */}
-      <Button
-        variant={following ? 'secondary' : 'primary'}
-        pressed={following}
-        disabled={blocked}
-        onClick={toggleFollow}
-      >
-        <Icon name="bell" size={15} />
-        {following ? 'Đang theo dõi' : 'Theo dõi'}
-      </Button>
+      {/* Đã chặn thì ẩn nút Theo dõi và đổi Chặn thành Bỏ chặn */}
+      {!blocked && (
+        <Button
+          variant={following ? 'secondary' : 'primary'}
+          pressed={following}
+          onClick={toggleFollow}
+        >
+          <Icon name="bell" size={15} />
+          {following ? 'Đang theo dõi' : 'Theo dõi'}
+        </Button>
+      )}
       {blocked ? (
-        <Button onClick={unblock}>Bỏ chặn</Button>
+        <Button onClick={() => setConfirming('unblock')}>Bỏ chặn</Button>
       ) : (
-        <Button variant="dangerSoft" onClick={() => setConfirmBlock(true)}>
+        <Button variant="dangerSoft" onClick={() => setConfirming('block')}>
           Chặn
         </Button>
       )}
@@ -153,7 +168,6 @@ function ProfileView({ username }) {
   )
 
   const emptyPosts = profile.isMe && allPosts.length === 0
-  const tabLabel = PROFILE_TABS.find((item) => item.value === tab).label.toLowerCase()
 
   return (
     <div className={pageClass}>
@@ -184,7 +198,7 @@ function ProfileView({ username }) {
                   className={tabClass(tab === item.value)}
                 >
                   {item.label}
-                  <span className="opacity-70">{postsBy(posts, username, item.value).length}</span>
+                  <span className="opacity-70">{listOf(item.value).length}</span>
                 </button>
               ))}
             </div>
@@ -206,7 +220,7 @@ function ProfileView({ username }) {
           ) : (
             <Card>
               {emptyPosts ? (
-                // Chưa đăng bài nào thì gợi ý đăng bài (UC06 luồng 4.a)
+                // Chưa đăng bài nào thì gợi ý đăng bài
                 <div className="pb-8">
                   <EmptyState icon="compose" title="Bạn chưa có bài đăng nào" />
                   <div className="flex justify-center">
@@ -216,10 +230,8 @@ function ProfileView({ username }) {
                   </div>
                 </div>
               ) : (
-                <EmptyState
-                  icon="search"
-                  title={tab ? `Chưa có bài ${tabLabel}` : 'Chưa có bài đăng công khai'}
-                />
+                // Chưa có bài theo bộ lọc đang chọn
+                <EmptyState icon="search" title="Chưa có dữ liệu" />
               )}
             </Card>
           )}
@@ -227,30 +239,36 @@ function ProfileView({ username }) {
 
         <aside className="flex flex-col gap-4">
           <ReputationCard profile={profile} rating={averageRating(reviewList)} />
-          <ReviewList reviews={reviewList} me={user.username} />
+          {/* Trống: trang của mình "Chưa có đánh giá nào", người khác "Chưa có dữ liệu" */}
+          <ReviewList
+            reviews={reviewList}
+            me={user.username}
+            emptyText={profile.isMe ? 'Chưa có đánh giá nào' : 'Chưa có dữ liệu'}
+          />
         </aside>
       </div>
 
-      {/* Xác nhận trước khi chặn (UC12 bước 3) */}
-      {confirmBlock && (
+      {confirming && (
         <Dialog
-          title={`Chặn ${username}?`}
+          title={CONFIRMS[confirming].title}
           size="sm"
-          onClose={() => setConfirmBlock(false)}
+          onClose={() => setConfirming(null)}
           footer={
             <>
-              <Button onClick={() => setConfirmBlock(false)} data-autofocus>
+              <Button onClick={() => setConfirming(null)} data-autofocus>
                 Hủy
               </Button>
-              <Button variant="danger" onClick={confirmBlocking}>
-                Xác nhận chặn
+              <Button
+                variant={confirming === 'block' ? 'danger' : 'primary'}
+                onClick={confirmAction}
+              >
+                {CONFIRMS[confirming].action}
               </Button>
             </>
           }
         >
           <p className="m-0 text-small leading-relaxed text-ink-secondary">
-            Tin của {username} sẽ bị ẩn khỏi Trang chủ của bạn và hội thoại giữa hai người sẽ bị
-            khóa. Bạn có thể bỏ chặn bất cứ lúc nào ở trang này.
+            {CONFIRMS[confirming].body}
           </p>
         </Dialog>
       )}

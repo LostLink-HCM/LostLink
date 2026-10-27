@@ -26,13 +26,13 @@ function Stars({ rating }) {
   )
 }
 
-// Mục "Người khác nói gì": lời cảm ơn người viết cho phép hiện công khai (UC10 bước 5)
-export default function ReviewList({ reviews, me }) {
+// Mục "Người khác nói gì": lời cảm ơn người viết cho phép hiện công khai
+export default function ReviewList({ reviews, me, emptyText }) {
   return (
     <Card as="section" padding="md">
       <h2 className="m-0 mb-3.5 text-body font-bold text-ink">Người khác nói gì</h2>
       {reviews.length === 0 ? (
-        <p className="m-0 text-caption text-ink-muted">Chưa có lời cảm ơn nào.</p>
+        <p className="m-0 text-caption text-ink-muted">{emptyText}</p>
       ) : (
         <ul className="m-0 flex list-none flex-col gap-4 p-0">
           {reviews.map((review) => (

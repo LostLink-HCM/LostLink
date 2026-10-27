@@ -20,6 +20,14 @@ import ResetPasswordPage from './pages/auth/ResetPasswordPage.jsx'
 // Khu quản trị => người dùng thường không phải tải
 const ModeratorRoutes = lazy(() => import('./pages/moderator/ModeratorRoutes.jsx'))
 const AdminRoutes = lazy(() => import('./pages/admin/AdminRoutes.jsx'))
+// Cài đặt ít khi mở nên tách gói riêng, không làm nặng lần tải đầu
+const SettingsLayout = lazy(() => import('./pages/user/settings/SettingsLayout.jsx'))
+const SettingsMenuPage = lazy(() => import('./pages/user/settings/SettingsMenuPage.jsx'))
+const AccountSettingsPage = lazy(() => import('./pages/user/settings/AccountSettingsPage.jsx'))
+const NotificationSettingsPage = lazy(
+  () => import('./pages/user/settings/NotificationSettingsPage.jsx')
+)
+const AreaSettingsPage = lazy(() => import('./pages/user/settings/AreaSettingsPage.jsx'))
 function PageLoading() {
   return (
     <div
@@ -28,6 +36,13 @@ function PageLoading() {
     >
       Đang tải…
     </div>
+  )
+}
+function SectionLoading() {
+  return (
+    <p role="status" className="m-0 py-14 text-center text-small text-ink-muted">
+      Đang tải…
+    </p>
   )
 }
 function App() {
@@ -85,6 +100,22 @@ function App() {
               </RequireAuth>
             }
           />
+          <Route
+            path="settings"
+            element={
+              <RequireAuth>
+                {/* Giữ header của khu người dùng trong lúc tải trang Cài đặt */}
+                <Suspense fallback={<SectionLoading />}>
+                  <SettingsLayout />
+                </Suspense>
+              </RequireAuth>
+            }
+          >
+            <Route index element={<SettingsMenuPage />} />
+            <Route path="account" element={<AccountSettingsPage />} />
+            <Route path="notifications" element={<NotificationSettingsPage />} />
+            <Route path="areas" element={<AreaSettingsPage />} />
+          </Route>
           <Route
             path="users/:username"
             element={

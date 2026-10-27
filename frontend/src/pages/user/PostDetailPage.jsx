@@ -73,7 +73,7 @@ export default function PostDetailPage() {
   const isLiked = liked.has(post.id)
   const author = authors[post.author]
 
-  // Xem hồ sơ cần đăng nhập (UC10), Guest được đưa sang đăng nhập rồi quay lại bài này
+  // Xem hồ sơ cần đăng nhập, Guest được đưa sang đăng nhập rồi quay lại bài này
   const openProfile = () => {
     if (requireMember()) navigate(profilePath(post.author))
   }

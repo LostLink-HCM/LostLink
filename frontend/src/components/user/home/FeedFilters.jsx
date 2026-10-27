@@ -39,7 +39,7 @@ const chipClass = (active) =>
 const dateClass =
   'h-9 w-full rounded-xl border border-line bg-surface px-2.5 text-caption text-ink outline-none focus:border-primary focus:ring-3 focus:ring-primary/12 aria-invalid:border-danger'
 
-// Chỉnh trên bản nháp, bấm "Áp dụng bộ lọc" mới lọc danh sách (UC01 bước 5-6)
+// Chỉnh trên bản nháp, bấm "Áp dụng bộ lọc" mới lọc danh sách
 export default function FeedFilters({ draft, onChange, onApply, onReset, error, idPrefix }) {
   const [expanded, setExpanded] = useState(false)
   // Thu gọn chỉ còn một hàng là lựa chọn hiện tại ('' = Tất cả danh mục)

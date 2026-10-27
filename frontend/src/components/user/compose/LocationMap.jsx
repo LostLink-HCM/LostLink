@@ -18,8 +18,16 @@ const BACKGROUND_ROADS = [
   'M78 -5 C 82 40, 72 60, 80 105',
 ]
 
-// Bản đồ minh hoạ cho phần giao diện
-export default function LocationMap({ point, road, label, emptyText, draggable, onMove }) {
+// Bản đồ minh hoạ cho phần giao diện.
+export default function LocationMap({
+  point,
+  road,
+  label,
+  emptyText,
+  draggable,
+  onMove,
+  ringPercent,
+}) {
   const ref = useRef(null)
   const [dragging, setDragging] = useState(false)
 
@@ -112,13 +120,23 @@ export default function LocationMap({ point, road, label, emptyText, draggable, 
         )}
       </svg>
 
+      {point && !road && ringPercent != null && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-dashed border-primary/45 bg-primary/12 transition-[width]"
+          style={{ left: `${point.x}%`, top: `${point.y}%`, width: `${ringPercent}%` }}
+        />
+      )}
+
       {point && !road && (
         <div className="absolute" style={{ left: `${point.x}%`, top: `${point.y}%` }}>
           {/* Vùng mờ người khác nhìn thấy thay cho vị trí chính xác */}
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute size-36 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-dashed border-primary/45 bg-primary/12 sm:size-52"
-          />
+          {ringPercent == null && (
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute size-36 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-dashed border-primary/45 bg-primary/12 sm:size-52"
+            />
+          )}
           {draggable ? (
             <button
               type="button"

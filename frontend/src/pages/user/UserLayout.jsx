@@ -6,6 +6,7 @@ import SiteHeader from '../../components/user/home/SiteHeader'
 import { createFeedComments, createFeedPosts } from '../../data/homeFeed'
 import { createUserMessages } from '../../data/userMessages'
 import { createUserNotifications } from '../../data/userNotifications'
+import { createWatchAreas } from '../../data/userSettings'
 import { DEFAULT_FILTERS } from '../../lib/user/homeFeed'
 import { reportKey } from '../../lib/user/reports'
 import {
@@ -49,12 +50,16 @@ export default function UserLayout() {
   const [liked, setLiked] = useState(() => new Set())
   const [saved, setSaved] = useState(() => new Set())
   const [followed, setFollowed] = useState(() => new Set())
-  // Theo dõi và chặn theo tên người dùng (UC11, UC12)
+  // Theo dõi và chặn theo tên người dùng
   const [followedUsers, setFollowedUsers] = useState(() => new Set())
   const [blockedUsers, setBlockedUsers] = useState(() => new Set())
   const [lastCommentAt, setLastCommentAt] = useState(0)
   const [chat, setChat] = useState(createUserMessages)
   const [notifications, setNotifications] = useState(createUserNotifications)
+  // Khu vực để ý, chỉnh ở Cài đặt
+  const [watchAreas, setWatchAreas] = useState(createWatchAreas)
+  // Thay đổi ở mục Tài khoản (chưa có API): email mới đã xác thực, lần đổi mật khẩu gần nhất
+  const [account, setAccount] = useState({ email: '', passwordChangedAt: null })
   // Kết quả xác minh theo bài: 'passed' | 'failed', mỗi bài chỉ được trả lời một lần
   const [verifications, setVerifications] = useState({})
   // Đánh giá đã gửi theo hội thoại, mỗi giao dịch chỉ đánh giá một lần
@@ -153,7 +158,7 @@ export default function UserLayout() {
     setFollowedUsers((prev) => toggleIn(prev, name))
   }
 
-  // Chặn thì ẩn tin của người đó ở Trang chủ, khóa hội thoại và bỏ theo dõi (UC12)
+  // Chặn thì ẩn tin của người đó ở Trang chủ, khóa hội thoại và bỏ theo dõi
   const blockUser = (name) => {
     setBlockedUsers((prev) => new Set(prev).add(name))
     setFollowedUsers((prev) => {
@@ -253,6 +258,10 @@ export default function UserLayout() {
           submitReport,
           notifications,
           setNotifications,
+          watchAreas,
+          setWatchAreas,
+          account,
+          setAccount,
           notify: setToast,
         }}
       />
