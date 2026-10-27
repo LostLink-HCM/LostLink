@@ -61,7 +61,7 @@ function StarRating({ value, onChange, describedBy }) {
   )
 }
 
-// Đánh giá và gửi lời cảm ơn sau khi trao trả (UC12), mỗi giao dịch đánh giá một lần
+// Đánh giá và gửi lời cảm ơn sau khi trao trả, mỗi giao dịch đánh giá một lần
 export default function ReviewPage() {
   const { threadId } = useParams()
   const navigate = useNavigate()

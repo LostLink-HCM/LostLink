@@ -76,6 +76,15 @@ export default function UserMenu() {
             <Icon name="user" size={16} />
             Trang cá nhân
           </Link>
+          <Link
+            to="/settings"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className={cx(rowClass, 'text-ink-secondary hover:bg-primary-subtle', focusRing)}
+          >
+            <Icon name="settings" size={16} />
+            Cài đặt
+          </Link>
           {['moderator', 'admin'].includes(user.role) && (
             <Link
               to="/moderator"

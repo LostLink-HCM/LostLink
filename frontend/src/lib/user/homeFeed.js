@@ -19,7 +19,7 @@ export const DEFAULT_FILTERS = {
 export const TYPE_LABELS = { lost: 'Mất đồ', found: 'Nhặt được' }
 
 // Đặc điểm công khai của bài. Bài Nhặt được giấu "Bên trong có" vì đó là chi tiết
-// chỉ chủ nhân biết, dùng cho câu hỏi xác minh và ghép cặp (UC08, NF01)
+// chỉ chủ nhân biết, dùng cho câu hỏi xác minh và ghép cặp
 export function publicTraits(post) {
   const labels = Object.fromEntries(
     (CATEGORY_ATTRIBUTES[post.category] ?? []).map((attr) => [attr.key, attr.label])

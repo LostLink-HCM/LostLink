@@ -91,7 +91,7 @@ function FieldError({ id, children }) {
   )
 }
 
-// Báo cáo vi phạm (UC05): người bị báo cáo không biết ai đã báo
+// Báo cáo vi phạm: người bị báo cáo không biết ai đã báo
 export default function ReportPage() {
   const { user } = useAuth()
   const { reports, submitReport, notify } = useOutletContext()

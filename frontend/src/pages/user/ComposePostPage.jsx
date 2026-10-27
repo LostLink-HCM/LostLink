@@ -41,13 +41,13 @@ const formatSavedAt = (iso) =>
     month: '2-digit',
   })
 
-// Form Đăng bài nhiều bước (UC04). Phần giao diện: chưa gọi API, bản nháp lưu ở trình duyệt
+// Form Đăng bài nhiều bước. Phần giao diện: chưa gọi API, bản nháp lưu ở trình duyệt
 export default function ComposePostPage() {
   const { user } = useAuth()
   const { notify } = useOutletContext()
   const navigate = useNavigate()
 
-  // Có bản nháp thì nạp vào để đăng tiếp (UC04 luồng 3.a)
+  // Có bản nháp thì nạp vào để đăng tiếp
   const [draft, setDraft] = useState(() => loadDraft(user.id))
   const [form, setForm] = useState(() => draft?.form ?? EMPTY_FORM)
   const [step, setStep] = useState(() => draft?.step ?? 0)
@@ -83,7 +83,7 @@ export default function ComposePostPage() {
   const stepKey = steps[current].key
   const isLast = current === steps.length - 1
 
-  // Tài khoản bị hạn chế không được đăng bài (UC04 luồng 2.a)
+  // Tài khoản bị hạn chế không được đăng bài
   if (user.status === 'restricted') {
     return (
       <div className={pageClass}>
@@ -158,7 +158,7 @@ export default function ComposePostPage() {
     setErrorTick((tick) => tick + 1)
   }
 
-  // Kiểm tra toàn bộ, thiếu ở đâu thì quay về bước đó (UC04 bước 11, luồng 11.a)
+  // Kiểm tra toàn bộ, thiếu ở đâu thì quay về bước đó
   const openReview = (target = form) => {
     const invalid = findInvalidStep(target)
     if (invalid) {
@@ -182,7 +182,7 @@ export default function ComposePostPage() {
 
   const back = () => (current === 0 ? navigate('/') : goTo(current - 1))
 
-  // Bỏ qua câu hỏi thì sang xem lại luôn (UC04 luồng 9.b)
+  // Bỏ qua câu hỏi thì sang xem lại luôn
   const skipQuestion = () => {
     const target = { ...form, question: { ...form.question, skipped: true } }
     setForm(target)
@@ -190,7 +190,7 @@ export default function ComposePostPage() {
     openReview(target)
   }
 
-  // Lưu nháp ở bất kỳ bước nào rồi kết thúc (UC04 luồng 4.a)
+  // Lưu nháp ở bất kỳ bước nào rồi kết thúc
   const handleSaveDraft = () => {
     if (!saveDraft(user.id, form, current)) {
       notify('Không lưu được bản nháp, vui lòng thử lại.')
@@ -215,7 +215,7 @@ export default function ComposePostPage() {
     setConfirmDiscard(false)
   }
 
-  // Chưa có API tạo bài: giả lập lưu thành công, bài chờ Moderator duyệt (UC04 bước 12-14)
+  // Chưa có API tạo bài: giả lập lưu thành công, bài chờ Moderator duyệt
   const submit = () => {
     clearDraft(user.id)
     setReviewing(false)

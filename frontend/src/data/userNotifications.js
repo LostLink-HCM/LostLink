@@ -92,5 +92,5 @@ export function createUserNotifications(now = Date.now()) {
     groups: { trade: true, post: true, system: true },
   }
 
-  return { items, prefs, area: 'Quận 1 · bán kính 3 km' }
+  return { items, prefs }
 }
