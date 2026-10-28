@@ -5,11 +5,13 @@ const authRoutes = require('./authRoutes')
 
 const router = Router()
 
+// Trả 503 khi mất kết nối CSDL để Render và dịch vụ uptime phát hiện sự cố
 router.get('/health', (req, res) => {
-  res.json({
-    success: true,
-    status: 'ok',
-    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+  const databaseUp = mongoose.connection.readyState === 1
+  res.status(databaseUp ? 200 : 503).json({
+    success: databaseUp,
+    status: databaseUp ? 'ok' : 'degraded',
+    database: databaseUp ? 'connected' : 'disconnected',
     uptime: process.uptime(),
   })
 })
