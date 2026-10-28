@@ -1,3 +1,4 @@
+const Sentry = require('@sentry/node')
 const ApiError = require('../utils/ApiError')
 const env = require('../config/env')
 
@@ -18,7 +19,11 @@ function errorHandler(err, req, res, _next) {
     message = `Duplicate value for ${Object.keys(err.keyValue || {}).join(', ')}`
   }
 
-  if (statusCode >= 500) console.error(err)
+  // Chỉ báo lỗi server lên Sentry, lỗi 4xx là lỗi của người dùng
+  if (statusCode >= 500) {
+    console.error(err)
+    Sentry.captureException(err)
+  }
 
   res.status(statusCode).json({
     success: false,

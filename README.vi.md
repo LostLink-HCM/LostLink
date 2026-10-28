@@ -67,7 +67,9 @@ Quyền được kế thừa (vai trò cao hơn có toàn bộ quyền của vai
 ```
 LostLink/
 ├─ frontend/   # Web client React + Vite
-└─ backend/    # API Express + MongoDB
+├─ backend/    # API Express + MongoDB
+├─ docs/       # Tài liệu dự án
+└─ .github/    # CI workflow, PR template
 ```
 
 ## Bắt đầu

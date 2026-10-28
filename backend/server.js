@@ -1,3 +1,5 @@
+// Sentry phải khởi tạo trước khi nạp Express để theo dõi được request
+require('./src/config/sentry')
 const env = require('./src/config/env')
 const app = require('./src/app')
 const { connectDatabase, disconnectDatabase } = require('./src/config/database')

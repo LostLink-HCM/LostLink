@@ -13,6 +13,7 @@ module.exports = {
   clientUrl: process.env.CLIENT_URL || 'http://localhost:8080',
   // Số proxy đứng trước app (Render = 1)
   trustProxy: Number(process.env.TRUST_PROXY) || 0,
+  sentryDsn: process.env.SENTRY_DSN,
   jwt: {
     secret: process.env.JWT_SECRET,
     expire: process.env.JWT_EXPIRE || '15m',

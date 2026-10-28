@@ -67,7 +67,9 @@ Permissions are inherited (each higher role includes the lower ones):
 ```
 LostLink/
 ├─ frontend/   # React + Vite web client
-└─ backend/    # Express + MongoDB API
+├─ backend/    # Express + MongoDB API
+├─ docs/       # Project documentation
+└─ .github/    # CI workflow, PR template
 ```
 
 ## Getting started
