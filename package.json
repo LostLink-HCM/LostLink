@@ -12,6 +12,6 @@
     "npm": ">=11"
   },
   "devDependencies": {
-    "prettier": "^3.9.9"
+    "prettier": "^3.9.10"
   }
 }
