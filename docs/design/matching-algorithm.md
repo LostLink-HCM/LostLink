@@ -181,7 +181,7 @@ Weibull là phân phối kinh điển trong phân tích thời gian chờ (survi
 **Bước 1, tính khoảng cách d.** Trái Đất cong nên không dùng Pythagoras trên kinh độ, vĩ độ. Công thức Haversine tính khoảng cách trên mặt cầu, với φ là vĩ độ, λ là kinh độ (radian) và R = 6 371 000 m:
 
 $$
-a = \sin^2\frac{\Delta\varphi}{2} + \cos\varphi_1 \cos\varphi_2 \sin^2\frac{\Delta\lambda}{2}, \qquad d = 2R \cdot \operatorname{atan2}\bigl(\sqrt{a}, \sqrt{1-a}\bigr)
+a = \sin^2\frac{\Delta\varphi}{2} + \cos\varphi_1 \cos\varphi_2 \sin^2\frac{\Delta\lambda}{2}, \qquad d = 2R \cdot \mathrm{atan2}\bigl(\sqrt{a}, \sqrt{1-a}\bigr)
 $$
 
 - **Điểm với đoạn đường:** chiếu vuông góc điểm lên đoạn. Nếu hình chiếu rơi ra ngoài đoạn thì lấy đầu mút gần nhất. Cách này hợp với các bài kiểu "rơi đâu đó trên đường Nguyễn Thị Minh Khai".
@@ -434,7 +434,7 @@ $$
 W là tổng bit bằng chứng. Để đổi sang xác suất dễ hiểu, cộng thêm **xác suất tiên nghiệm** p₀ (khả năng hai bài ngẫu nhiên đã qua bước lọc là cùng một món, ví dụ 1/200) rồi đưa qua hàm logistic:
 
 $$
-P(\text{khớp}) = \sigma\bigl(W \ln 2 + \operatorname{logit} p_0\bigr) = \frac{1}{1 + e^{-\left(W \ln 2 + \ln\frac{p_0}{1-p_0}\right)}}
+P(\text{khớp}) = \sigma\bigl(W \ln 2 + \mathrm{logit}\, p_0\bigr) = \frac{1}{1 + e^{-\left(W \ln 2 + \ln\frac{p_0}{1-p_0}\right)}}
 $$
 
 $W \ln 2$ đổi đơn vị từ bit sang nat (log tự nhiên). Cả biểu thức chính là định lý Bayes viết ở dạng log tỉ lệ cược: tỉ lệ cược sau bằng tỉ lệ cược trước nhân với các tỉ số hợp lý.
