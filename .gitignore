@@ -17,6 +17,9 @@ logs/
 .DS_Store
 Thumbs.db
 
+# Local notes & documents
+/local/
+
 # Editor
 .idea/
 .vscode/*

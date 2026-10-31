@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 662" width="760" height="662" role="img" aria-labelledby="t d">
+<title id="t">Bằng chứng từng tiêu chí của hai ví dụ</title>
+<desc id="d">Bài A tổng W = +12.1 bit, bài B tổng W = +3.6 bit. B gần cả thời gian lẫn vị trí nhưng khác giống, khác màu, mô tả không khớp nên bị trừ điểm.</desc>
+
+<style>
+svg { --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#6f6d68; --grid:#e1e0d9; --axis:#c3c2b7; --panel:#ffffff; --panel-line:#e1e0d9; --pos:#2a78d6; --neg:#e34948; }
+@media (prefers-color-scheme: dark) { svg { --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#a3a29b; --grid:#2c2c2a; --axis:#4a4a46; --panel:#242423; --panel-line:#383835; --pos:#3987e5; --neg:#e66767; } }
+text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: var(--ink2); font-size: 13px; }
+.title { fill: var(--ink); font-size: 17px; font-weight: 600; }
+.tick { fill: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.lab { fill: var(--ink); }
+.val { fill: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.grid { stroke: var(--grid); stroke-width: 1; }
+.axis { stroke: var(--axis); stroke-width: 1; }
+.guide { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.bg { fill: var(--surface); }
+.panel { fill: var(--panel); stroke: var(--panel-line); stroke-width: 1; }
+.anim { visibility: hidden; }
+@media (prefers-reduced-motion: no-preference) {
+.anim { visibility: visible; }
+
+}
+</style>
+<rect class="bg" width="760" height="662" rx="8"/>
+<text class="title" x="24" y="34">Mâu thuẫn bị trừ điểm, nên gần về thời gian và vị trí không đủ để thành gợi ý</text>
+<text x="24" y="56">Trọng số wᵢ (bit) của từng tiêu chí, ví dụ ở mục 7</text>
+<rect x="24" y="70" width="12" height="12" rx="3" fill="var(--pos)"/>
+<text x="44" y="81">Ủng hộ (cộng điểm)</text>
+<rect x="224" y="70" width="12" height="12" rx="3" fill="var(--neg)"/>
+<text x="244" y="81">Chống lại (trừ điểm)</text>
+<text class="lab" x="24" y="114" font-weight="600">Bài A: Poodle nâu, sau 11.5 ngày, cách 1.2 km</text>
+<line class="grid" x1="120.0" y1="124" x2="120.0" y2="324"/>
+<line class="grid" x1="240.0" y1="124" x2="240.0" y2="324"/>
+<line class="axis" x1="360.0" y1="124" x2="360.0" y2="324"/>
+<line class="grid" x1="480.0" y1="124" x2="480.0" y2="324"/>
+<line class="grid" x1="600.0" y1="124" x2="600.0" y2="324"/>
+<line class="grid" x1="720.0" y1="124" x2="720.0" y2="324"/>
+<text x="108" y="146.0" text-anchor="end">Danh mục</text>
+<path d="M360.0,133.0 L654.8,133.0 A4,4 0 0 1 658.8,137.0 L658.8,147.0 A4,4 0 0 1 654.8,151.0 L360.0,151.0 Z" fill="var(--pos)"/>
+<text class="val" x="666.8" y="146.0" text-anchor="start">+4.98</text>
+<text x="108" y="174.0" text-anchor="end">Thời gian</text>
+<path d="M360.0,161.0 L329.2,161.0 A4,4 0 0 0 325.2,165.0 L325.2,175.0 A4,4 0 0 0 329.2,179.0 L360.0,179.0 Z" fill="var(--neg)"/>
+<text class="val" x="317.2" y="174.0" text-anchor="end">−0.58</text>
+<text x="108" y="202.0" text-anchor="end">Vị trí</text>
+<path d="M360.0,189.0 L534.2,189.0 A4,4 0 0 1 538.2,193.0 L538.2,203.0 A4,4 0 0 1 534.2,207.0 L360.0,207.0 Z" fill="var(--pos)"/>
+<text class="val" x="546.2" y="202.0" text-anchor="start">+2.97</text>
+<text x="108" y="230.0" text-anchor="end">Loài</text>
+<path d="M360.0,217.0 L403.4,217.0 A4,4 0 0 1 407.4,221.0 L407.4,231.0 A4,4 0 0 1 403.4,235.0 L360.0,235.0 Z" fill="var(--pos)"/>
+<text class="val" x="415.4" y="230.0" text-anchor="start">+0.79</text>
+<text x="108" y="258.0" text-anchor="end">Giống</text>
+<path d="M360.0,245.0 L486.2,245.0 A4,4 0 0 1 490.2,249.0 L490.2,259.0 A4,4 0 0 1 486.2,263.0 L360.0,263.0 Z" fill="var(--pos)"/>
+<text class="val" x="498.2" y="258.0" text-anchor="start">+2.17</text>
+<text x="108" y="286.0" text-anchor="end">Màu</text>
+<path d="M360.0,273.0 L450.8,273.0 A4,4 0 0 1 454.8,277.0 L454.8,287.0 A4,4 0 0 1 450.8,291.0 L360.0,291.0 Z" fill="var(--pos)"/>
+<text class="val" x="462.8" y="286.0" text-anchor="start">+1.58</text>
+<text x="108" y="314.0" text-anchor="end">Mô tả</text>
+<path d="M360.0,301.0 L365.6,301.0 A4,4 0 0 1 369.6,305.0 L369.6,315.0 A4,4 0 0 1 365.6,319.0 L360.0,319.0 Z" fill="var(--pos)"/>
+<text class="val" x="377.6" y="314.0" text-anchor="start">+0.16</text>
+<text class="tick" x="120.0" y="342" text-anchor="middle">−4</text>
+<text class="tick" x="240.0" y="342" text-anchor="middle">−2</text>
+<text class="tick" x="360.0" y="342" text-anchor="middle">+0</text>
+<text class="tick" x="480.0" y="342" text-anchor="middle">+2</text>
+<text class="tick" x="600.0" y="342" text-anchor="middle">+4</text>
+<text class="tick" x="720.0" y="342" text-anchor="middle">+6</text>
+<text class="val" x="720" y="114" text-anchor="end">Tổng W = +12.1 bit</text>
+<text class="lab" x="24" y="380" font-weight="600">Bài B: Corgi vàng, cùng tối, cách 200 m</text>
+<line class="grid" x1="120.0" y1="390" x2="120.0" y2="590"/>
+<line class="grid" x1="240.0" y1="390" x2="240.0" y2="590"/>
+<line class="axis" x1="360.0" y1="390" x2="360.0" y2="590"/>
+<line class="grid" x1="480.0" y1="390" x2="480.0" y2="590"/>
+<line class="grid" x1="600.0" y1="390" x2="600.0" y2="590"/>
+<line class="grid" x1="720.0" y1="390" x2="720.0" y2="590"/>
+<text x="108" y="412.0" text-anchor="end">Danh mục</text>
+<path d="M360.0,399.0 L654.8,399.0 A4,4 0 0 1 658.8,403.0 L658.8,413.0 A4,4 0 0 1 654.8,417.0 L360.0,417.0 Z" fill="var(--pos)"/>
+<text class="val" x="666.8" y="412.0" text-anchor="start">+4.98</text>
+<text x="108" y="440.0" text-anchor="end">Thời gian</text>
+<path d="M360.0,427.0 L450.8,427.0 A4,4 0 0 1 454.8,431.0 L454.8,441.0 A4,4 0 0 1 450.8,445.0 L360.0,445.0 Z" fill="var(--pos)"/>
+<text class="val" x="462.8" y="440.0" text-anchor="start">+1.58</text>
+<text x="108" y="468.0" text-anchor="end">Vị trí</text>
+<path d="M360.0,455.0 L592.4,455.0 A4,4 0 0 1 596.4,459.0 L596.4,469.0 A4,4 0 0 1 592.4,473.0 L360.0,473.0 Z" fill="var(--pos)"/>
+<text class="val" x="604.4" y="468.0" text-anchor="start">+3.94</text>
+<text x="108" y="496.0" text-anchor="end">Loài</text>
+<path d="M360.0,483.0 L403.4,483.0 A4,4 0 0 1 407.4,487.0 L407.4,497.0 A4,4 0 0 1 403.4,501.0 L360.0,501.0 Z" fill="var(--pos)"/>
+<text class="val" x="415.4" y="496.0" text-anchor="start">+0.79</text>
+<text x="108" y="524.0" text-anchor="end">Giống</text>
+<path d="M360.0,511.0 L184.0,511.0 A4,4 0 0 0 180.0,515.0 L180.0,525.0 A4,4 0 0 0 184.0,529.0 L360.0,529.0 Z" fill="var(--neg)"/>
+<text class="val" x="172.0" y="524.0" text-anchor="end">−3.00</text>
+<text x="108" y="552.0" text-anchor="end">Màu</text>
+<path d="M360.0,539.0 L195.4,539.0 A4,4 0 0 0 191.4,543.0 L191.4,553.0 A4,4 0 0 0 195.4,557.0 L360.0,557.0 Z" fill="var(--neg)"/>
+<text class="val" x="183.4" y="552.0" text-anchor="end">−2.81</text>
+<text x="108" y="580.0" text-anchor="end">Mô tả</text>
+<path d="M360.0,567.0 L249.4,567.0 A4,4 0 0 0 245.4,571.0 L245.4,581.0 A4,4 0 0 0 249.4,585.0 L360.0,585.0 Z" fill="var(--neg)"/>
+<text class="val" x="237.4" y="580.0" text-anchor="end">−1.91</text>
+<text class="tick" x="120.0" y="608" text-anchor="middle">−4</text>
+<text class="tick" x="240.0" y="608" text-anchor="middle">−2</text>
+<text class="tick" x="360.0" y="608" text-anchor="middle">+0</text>
+<text class="tick" x="480.0" y="608" text-anchor="middle">+2</text>
+<text class="tick" x="600.0" y="608" text-anchor="middle">+4</text>
+<text class="tick" x="720.0" y="608" text-anchor="middle">+6</text>
+<text class="val" x="720" y="380" text-anchor="end">Tổng W = +3.6 bit</text>
+</svg>

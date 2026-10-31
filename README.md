@@ -11,7 +11,7 @@ Matching is built on three data axes — **location**, **time**, and **item attr
 ## Key features
 
 - **LOST / FOUND posts** with flexible categories, dynamic attributes, photos.
-- **Two-way matching engine** — an explainable, rule-based scorer (no ML). Hard gates on location + time + exclusive attributes narrow candidates; a weighted soft score (location, time, category, description, image) ranks the rest.
+- **Two-way matching engine** — explainable and statistics-based (no ML). Hard gates on location + time + exclusive attributes narrow candidates; location, time, category, attributes and description are each scored and combined as evidence with the Fellegi-Sunter model to rank the rest. Photos are not scored; they are shown in each suggestion so users can compare for themselves. Details in the [algorithm doc](docs/design/matching-algorithm.md) (Vietnamese).
 - **Ownership verification** — a finder's security question (or a contact request) must be passed before contact details are revealed and chat opens.
 - **Chat & handover** with safe public meetup suggestions and a mutual "returned" confirmation that marks the post as returned.
 - **Reputation & leaderboard** — trust points and badges earned from completed handovers and reviews.
@@ -52,10 +52,10 @@ Permissions are inherited (each higher role includes the lower ones):
 
 | Role          | Scope                                                                                                                  |
 | ------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| **Guest**     | Browse and filter public posts, view the leaderboard and overall stats (locations shown blurred).                      |
+| **Guest**     | Browse and filter public posts, view the leaderboard and overall stats.                                                |
 | **User**      | Post and manage items, handle match suggestions, verify & chat, claim, comment, review, set area alerts, report.       |
 | **Moderator** | Review posts, handle reports, temporarily lock accounts, resolve escalations and confirm handovers on behalf of users. |
-| **Admin**     | Manage users and roles, tune algorithm thresholds & weights, manage categories/attributes, dashboards, audit logs.     |
+| **Admin**     | Manage users and roles, tune matching parameters & thresholds, manage categories/attributes, dashboards, audit logs.   |
 
 ## Tech stack
 

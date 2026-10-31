@@ -11,7 +11,7 @@ Việc ghép cặp dựa trên ba trục dữ liệu là **vị trí**, **thời
 ## Tính năng chính
 
 - **Bài đăng MẤT / NHẶT ĐƯỢC** với danh mục linh hoạt, thuộc tính động và hình ảnh.
-- **Bộ ghép cặp hai chiều**: chấm điểm theo luật, giải thích được (không dùng ML). Các điều kiện bắt buộc về vị trí, thời gian và thuộc tính loại trừ giúp thu hẹp ứng viên; điểm mềm có trọng số (vị trí, thời gian, danh mục, mô tả, hình ảnh) dùng để xếp hạng phần còn lại.
+- **Bộ ghép cặp hai chiều**: dựa trên thống kê, giải thích được (không dùng ML). Lọc cứng theo vị trí, thời gian và thuộc tính loại trừ để thu hẹp ứng viên; các tiêu chí vị trí, thời gian, danh mục, thuộc tính và mô tả được chấm điểm rồi cộng thành bằng chứng theo mô hình Fellegi-Sunter để xếp hạng. Hình ảnh không dùng để chấm điểm mà hiển thị trong gợi ý để người dùng tự đối chiếu. Chi tiết ở [tài liệu thuật toán](docs/design/matching-algorithm.md).
 - **Xác minh chủ sở hữu**: phải trả lời đúng câu hỏi bảo mật của người nhặt (hoặc gửi yêu cầu liên hệ) thì mới thấy thông tin liên lạc và mở được chat.
 - **Chat và bàn giao**: gợi ý điểm hẹn công cộng an toàn, và hai bên cùng xác nhận "đã trao trả" để chuyển bài sang trạng thái Đã trao trả.
 - **Uy tín và bảng xếp hạng**: điểm tin cậy và huy hiệu nhận được từ các lần bàn giao thành công và đánh giá.
@@ -50,12 +50,12 @@ stateDiagram-v2
 
 Quyền được kế thừa (vai trò cao hơn có toàn bộ quyền của vai trò thấp hơn):
 
-| Vai trò       | Phạm vi                                                                                                                            |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| **Guest**     | Xem và lọc bài đăng công khai, xem bảng xếp hạng và thống kê chung (vị trí bị làm mờ).                                             |
-| **User**      | Đăng và quản lý bài, xử lý gợi ý ghép cặp, xác minh và chat, nhận đồ, bình luận, đánh giá, đặt cảnh báo khu vực, báo cáo vi phạm.  |
-| **Moderator** | Duyệt bài, xử lý báo cáo, khóa tài khoản tạm thời, giải quyết các trường hợp chuyển cấp và xác nhận bàn giao thay người dùng.      |
-| **Admin**     | Quản lý người dùng và vai trò, điều chỉnh ngưỡng và trọng số thuật toán, quản lý danh mục/thuộc tính, dashboard, nhật ký hệ thống. |
+| Vai trò       | Phạm vi                                                                                                                           |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Guest**     | Xem và lọc bài đăng công khai, xem bảng xếp hạng và thống kê chung.                                                               |
+| **User**      | Đăng và quản lý bài, xử lý gợi ý ghép cặp, xác minh và chat, nhận đồ, bình luận, đánh giá, đặt cảnh báo khu vực, báo cáo vi phạm. |
+| **Moderator** | Duyệt bài, xử lý báo cáo, khóa tài khoản tạm thời, giải quyết các trường hợp chuyển cấp và xác nhận bàn giao thay người dùng.     |
+| **Admin**     | Quản lý người dùng và vai trò, điều chỉnh tham số và ngưỡng ghép cặp, quản lý danh mục/thuộc tính, dashboard, nhật ký hệ thống.   |
 
 ## Công nghệ
 
