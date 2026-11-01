@@ -50,7 +50,7 @@ export function createUserMessages(now = Date.now()) {
       id: 'thread-student-card',
       peer: { name: 'tuanvu.q10', initials: 'TV' },
       post: {
-        id: null,
+        id: 201,
         mine: true,
         type: 'lost',
         title: 'Mất thẻ sinh viên và thẻ xe trong bao da đen',
