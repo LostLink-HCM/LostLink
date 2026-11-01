@@ -70,7 +70,7 @@ flowchart TD
     F -->|không đạt| X["Cặp bị loại<br/>không tốn công chấm điểm"]
     F -->|đạt| S["② Độ tương đồng từng tiêu chí<br/>thời gian, vị trí, danh mục, thuộc tính, mô tả<br/>mỗi tiêu chí cho điểm sᵢ từ 0 đến 1"]
     S --> C["③ Kết hợp bằng Fellegi-Sunter<br/>wᵢ = sᵢ·aᵢ + (1 − sᵢ)·bᵢ, cộng lại thành W (bit)<br/>P = σ(W·ln 2 + logit p₀)"]
-    C --> T{"④ So W với ngưỡng<br/>rồi xếp hạng Top-N"}
+    C --> T{"④ So W với ngưỡng"}
     T -->|"W ≥ T_upper"| M["Gợi ý mạnh<br/>thông báo cho cả hai bên"]
     T -->|"T_lower ≤ W < T_upper"| P["Gợi ý yếu<br/>hiện trong danh sách gợi ý"]
     T -->|"W < T_lower"| D["Bỏ<br/>không lưu gợi ý"]
@@ -83,12 +83,12 @@ Mấu chốt nằm ở hai câu hỏi được tách riêng:
 
 Nếu gộp hai câu hỏi vào một bộ trọng số do người chọn thì không câu nào được trả lời tốt. Tách ra thì câu đầu do các hàm tương đồng lo, câu sau do xác suất đo từ dữ liệu lo.
 
-| Bước              | Đầu vào                                                 | Đầu ra                    | Chi tiết                                             |
-| ----------------- | ------------------------------------------------------- | ------------------------- | ---------------------------------------------------- |
-| ① Lọc cứng        | `type`, `category`, `attributes`, thời gian, `locExact` | Vài chục ứng viên         | [Mục 4](#4-lọc-cứng)                                 |
-| ② Độ tương đồng   | Các trường của hai bài, trừ ảnh                         | Vectơ điểm sᵢ             | [Mục 5](#5-độ-tương-đồng-từng-tiêu-chí)              |
-| ③ Kết hợp         | sᵢ cùng tham số m, u                                    | W và P                    | [Mục 6](#6-kết-hợp-điểm-theo-mô-hình-fellegi-sunter) |
-| ④ Ngưỡng và Top-N | W                                                       | Bản ghi `MatchSuggestion` | [Mục 6.5](#65-ngưỡng-ra-quyết-định)                  |
+| Bước            | Đầu vào                                                 | Đầu ra                    | Chi tiết                                             |
+| --------------- | ------------------------------------------------------- | ------------------------- | ---------------------------------------------------- |
+| ① Lọc cứng      | `type`, `category`, `attributes`, thời gian, `locExact` | Vài chục ứng viên         | [Mục 4](#4-lọc-cứng)                                 |
+| ② Độ tương đồng | Các trường của hai bài, trừ ảnh                         | Vectơ điểm sᵢ             | [Mục 5](#5-độ-tương-đồng-từng-tiêu-chí)              |
+| ③ Kết hợp       | sᵢ cùng tham số m, u                                    | W và P                    | [Mục 6](#6-kết-hợp-điểm-theo-mô-hình-fellegi-sunter) |
+| ④ Ngưỡng        | W                                                       | Bản ghi `MatchSuggestion` | [Mục 6.5](#65-ngưỡng-ra-quyết-định)                  |
 
 ## 4. Lọc cứng
 
@@ -447,7 +447,9 @@ $W \ln 2$ đổi đơn vị từ bit sang nat (log tự nhiên). Cả biểu th�
 | $T_{lower} \le W < T_{upper}$ | Gợi ý yếu (possible match) | Lưu gợi ý, hiện trong danh sách gợi ý, không đẩy thông báo |
 | $W < T_{lower}$               | Bỏ (non-match)             | Không lưu gợi ý                                            |
 
-Sau đó sắp các gợi ý theo W và lấy Top-N theo cấu hình "Kết quả ghép cặp". Hai ngưỡng tạo ra vùng "không chắc" ở giữa, đúng như Fellegi-Sunter đề xuất: thay vì ép mọi cặp thành có hoặc không, hệ thống để con người xem xét các cặp mơ hồ.
+Số gợi ý không bị giới hạn: mọi cặp có $W \ge T_{lower}$ đều được lưu và hiển thị, gợi ý mạnh xếp trước gợi ý yếu, trong mỗi nhóm sắp theo W giảm dần. Ngưỡng đã bảo đảm chỉ cặp đủ bằng chứng mới được gợi ý. Nếu cắt thêm theo số lượng (Top-N), một bài có nhiều ứng viên tốt có thể bị bỏ sót đúng cặp cần tìm, còn bài có ít ứng viên thì N không có tác dụng.
+
+Hai ngưỡng tạo ra vùng "không chắc" ở giữa, đúng như Fellegi-Sunter đề xuất: thay vì ép mọi cặp thành có hoặc không, hệ thống để con người xem xét các cặp mơ hồ.
 
 Admin nhập ngưỡng dưới dạng xác suất cho dễ hiểu, hệ thống đổi sang W bằng công thức ngược của mục 6.4. Với p₀ = 1/200, ngưỡng minh họa là:
 
@@ -552,7 +554,6 @@ Bài B được điểm vị trí rất cao (+3.94) vì 200 m nằm sát tâm v�
 | Độ tin cậy của danh mục, thời gian, vị trí, mô tả, đồ bên trong | m                        | 0.95, 0.9, 0.9, 0.8, 0.8 | 6.1    |
 | Xác suất tiên nghiệm                                            | p₀                       | 1/200                    | 6.4    |
 | Ngưỡng gợi ý mạnh, gợi ý yếu                                    | $T_{upper}$, $T_{lower}$ | 90%, 50%                 | 6.5    |
-| Số kết quả đề xuất                                              | N                        | 10                       | 6.5    |
 | Dung sai thời gian                                              | ε                        | 1 ngày                   | 4      |
 | Điểm tối thiểu của cửa sổ thời gian                             | $S_{\min}$               | 0.05                     | 5.1    |
 
