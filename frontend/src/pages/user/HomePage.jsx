@@ -78,7 +78,7 @@ export default function HomePage({ hot = false }) {
   return (
     <>
       <div className="mx-auto max-w-360 px-4 pt-5 pb-10 sm:px-6 lg:px-10 lg:pt-7">
-        {!hot && <h1 className="sr-only">Bài đăng mới trên LostLink</h1>}
+        <h1 className="sr-only">{hot ? 'Tin hot gần đây' : 'Bài đăng mới trên LostLink'}</h1>
 
         <nav
           aria-label="Chọn cách xem bài đăng"
@@ -122,16 +122,6 @@ export default function HomePage({ hot = false }) {
           </StickyPanel>
 
           <section aria-label="Danh sách bài đăng" className="min-w-0">
-            {hot && (
-              <div className="mb-4">
-                <h1 className="m-0 text-title font-bold tracking-tight text-ink lg:text-heading">
-                  Tin hot gần đây
-                </h1>
-                <p className="m-0 mt-1 text-caption text-ink-muted">
-                  Tin được cộng đồng quan tâm nhiều nhất, xếp theo lượt xem và lượt thích
-                </p>
-              </div>
-            )}
             {shown.length ? (
               <div className="flex flex-col gap-4">
                 {shown.map((post) => (
