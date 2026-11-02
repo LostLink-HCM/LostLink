@@ -1,4 +1,3 @@
-// Thông báo mẫu của người dùng (U09). link: to = trang đích, thread = mở hội thoại,
 // soon = màn hình chưa làm
 export function createUserNotifications(now = Date.now()) {
   const ago = (minutes) => new Date(now - minutes * 60_000).toISOString()
@@ -19,13 +18,13 @@ export function createUserNotifications(now = Date.now()) {
     {
       id: 'n2',
       type: 'match',
-      title: 'Có 2 bài Nhặt được giống thẻ sinh viên của bạn',
-      body: 'Gần nhất là một bao da đen nhặt ở cổng trường, Quận 10.',
-      reasons: ['Cách ~800 m', 'Lệch 1 ngày', 'Cùng danh mục Giấy tờ & thẻ'],
+      title: 'Có bài Nhặt được rất giống thẻ sinh viên của bạn',
+      body: 'Một bao da đen nhặt ở cổng trường, Quận 10, khả năng khớp 96%.',
+      reasons: ['Cách ~300 m', 'Cùng là thẻ sinh viên', 'Lệch chưa tới 1 ngày'],
       createdAt: ago(50),
       unread: true,
       action: 'Xem gợi ý',
-      link: { soon: true },
+      link: { to: '/matches?post=201' },
     },
     {
       id: 'n3',
@@ -83,6 +82,17 @@ export function createUserNotifications(now = Date.now()) {
       unread: false,
       action: 'Sửa bài',
       link: { soon: true },
+    },
+    {
+      id: 'n9',
+      type: 'match',
+      title: 'Có bài Mất đồ rất giống món bạn nhặt được',
+      body: 'ducanh.bk đang tìm máy tính Casio fx-580 để quên ở thư viện trường, khả năng khớp 93%.',
+      reasons: ['Cùng thư viện', 'Cùng là máy tính Casio fx-580'],
+      createdAt: ago(17 * DAY),
+      unread: false,
+      action: 'Xem gợi ý',
+      link: { to: '/matches?post=202' },
     },
   ]
 

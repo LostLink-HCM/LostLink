@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import Icon from '../../components/common/Icon'
 import Avatar from '../../components/user/Avatar'
 import Button from '../../components/user/Button'
 import BackLink from '../../components/user/BackLink'
+import { buttonClass } from '../../components/user/buttonClass'
 import Card from '../../components/user/Card'
 import EmptyState from '../../components/user/EmptyState'
 import { cx, focusRing } from '../../components/user/classes'
@@ -14,6 +15,7 @@ import CommentSection from '../../components/user/post/CommentSection'
 import PostActionSheet from '../../components/user/post/PostActionSheet'
 import PostGallery from '../../components/user/post/PostGallery'
 import { formatCount, publicTraits, timeAgo } from '../../lib/user/homeFeed'
+import { isMatchable, suggestionsFor } from '../../lib/user/matches'
 import { profilePath } from '../../lib/user/profiles'
 import { reputationOf } from '../../lib/user/reputation'
 
@@ -93,21 +95,36 @@ export default function PostDetailPage() {
     } else ctx.contactAbout(post)
   }
 
+  // Bài của chính mình: không nhận đồ hay báo cáo, thay bằng lối vào gợi ý ghép cặp
+  const isMine = post.author === user?.username
+  const showMatches = isMine && isMatchable(post)
+  const matchCount = showMatches ? suggestionsFor(post, posts, ctx.matches).length : 0
+  const matchesPath = `/matches?post=${post.id}`
+
   // Trên mobile các hành động gom vào nút ⋯ thay cho hai khối ở cột phải
-  const sheetActions = [
-    { label: claimLabel, icon: 'check', tone: 'primary', onClick: claim },
-    {
-      label: isSaved ? 'Bỏ lưu bài' : 'Lưu bài',
-      icon: 'bookmark',
-      onClick: () => ctx.toggleSaved(post.id),
-    },
-    {
-      label: isFollowed ? 'Bỏ theo dõi' : 'Theo dõi bài',
-      icon: 'bell',
-      onClick: () => ctx.toggleFollowed(post.id),
-    },
-    { label: 'Báo cáo bài đăng này', icon: 'flag', tone: 'danger', onClick: report },
-  ]
+  const sheetActions = isMine
+    ? [
+        matchCount > 0 && {
+          label: `Xem ${matchCount} gợi ý ghép cặp`,
+          icon: 'search',
+          tone: 'primary',
+          onClick: () => navigate(matchesPath),
+        },
+      ].filter(Boolean)
+    : [
+        { label: claimLabel, icon: 'check', tone: 'primary', onClick: claim },
+        {
+          label: isSaved ? 'Bỏ lưu bài' : 'Lưu bài',
+          icon: 'bookmark',
+          onClick: () => ctx.toggleSaved(post.id),
+        },
+        {
+          label: isFollowed ? 'Bỏ theo dõi' : 'Theo dõi bài',
+          icon: 'bell',
+          onClick: () => ctx.toggleFollowed(post.id),
+        },
+        { label: 'Báo cáo bài đăng này', icon: 'flag', tone: 'danger', onClick: report },
+      ]
 
   return (
     <div className="mx-auto max-w-360 px-4 pt-5 pb-10 sm:px-6 lg:px-10 lg:pt-7">
@@ -119,19 +136,21 @@ export default function PostDetailPage() {
           <PostGallery images={post.images} title={post.title} />
 
           <Card as="article" className="relative p-5 lg:p-6">
-            <button
-              type="button"
-              aria-label="Tuỳ chọn bài đăng"
-              aria-haspopup="dialog"
-              aria-expanded={sheetOpen}
-              onClick={() => setSheetOpen(true)}
-              className={cx(
-                'absolute top-3.5 right-3.5 grid size-9 cursor-pointer place-items-center rounded-full border border-line bg-surface text-ink-secondary hover:bg-surface-muted lg:hidden',
-                focusRing
-              )}
-            >
-              <Icon name="more" size={20} />
-            </button>
+            {sheetActions.length > 0 && (
+              <button
+                type="button"
+                aria-label="Tuỳ chọn bài đăng"
+                aria-haspopup="dialog"
+                aria-expanded={sheetOpen}
+                onClick={() => setSheetOpen(true)}
+                className={cx(
+                  'absolute top-3.5 right-3.5 grid size-9 cursor-pointer place-items-center rounded-full border border-line bg-surface text-ink-secondary hover:bg-surface-muted lg:hidden',
+                  focusRing
+                )}
+              >
+                <Icon name="more" size={20} />
+              </button>
+            )}
             <div className="mb-3 flex flex-wrap items-center gap-2 pr-10 lg:pr-0">
               <TypeTag type={post.type} className="py-1" />
               <span className="rounded-full bg-line-subtle px-2.5 py-1 text-tiny text-ink-secondary">
@@ -246,44 +265,77 @@ export default function PostDetailPage() {
             </Button>
           </Card>
 
-          {/* Khối nhận đồ / báo đang giữ đồ (U08) */}
-          <Card as="section" padding="md">
-            <h2 className="m-0 mb-1.5 text-body font-bold text-ink">
-              {lost ? 'Bạn nhặt được món này?' : 'Đây là đồ của bạn?'}
-            </h2>
-            <p className="m-0 mb-4 text-caption leading-relaxed text-ink-muted">
-              {lost
-                ? 'Gửi một lời nhắn cho người mất. Khi họ đồng ý, hai bên nhắn tin để hẹn trao trả.'
-                : 'Người đăng sẽ hỏi vài chi tiết về món đồ. Trả lời đúng là hai bên nhắn tin được ngay.'}
-            </p>
-            <Button variant="primary" size="xl" block onClick={claim}>
-              {claimLabel}
-            </Button>
-            <div className="mt-2.5 flex gap-2">
-              <Button pressed={isSaved} onClick={() => ctx.toggleSaved(post.id)} className="flex-1">
-                {isSaved ? 'Đã lưu' : 'Lưu bài'}
-              </Button>
-              <Button
-                pressed={isFollowed}
-                onClick={() => ctx.toggleFollowed(post.id)}
-                className="flex-1"
+          {showMatches && (
+            <Card as="section" padding="md">
+              <h2 className="m-0 mb-1.5 text-body font-bold text-ink">Gợi ý ghép cặp</h2>
+              <p
+                className={cx(
+                  'm-0 text-caption leading-relaxed text-ink-muted',
+                  matchCount > 0 && 'mb-4'
+                )}
               >
-                <Icon name="bell" size={14} />
-                {isFollowed ? 'Đang theo dõi' : 'Theo dõi'}
-              </Button>
-            </div>
-          </Card>
+                {matchCount > 0
+                  ? `LostLink tìm thấy ${matchCount} bài ${lost ? 'Nhặt được' : 'Mất đồ'} có thể khớp với bài của bạn.`
+                  : 'Chưa có bài nào khớp. LostLink sẽ báo cho bạn ngay khi có bài phù hợp.'}
+              </p>
+              {matchCount > 0 && (
+                <Link
+                  to={matchesPath}
+                  className={buttonClass({ variant: 'primary', size: 'xl', block: true })}
+                >
+                  Xem {matchCount} gợi ý ghép cặp
+                </Link>
+              )}
+            </Card>
+          )}
 
-          <Card as="section" padding="md">
-            <h2 className="m-0 mb-1 text-small font-bold text-ink">Thấy tin này có vấn đề?</h2>
-            <p className="m-0 mb-3.5 text-tiny leading-relaxed text-ink-muted">
-              Tin rác, đòi tiền mới trả đồ, hay ảnh không phải của người đăng, hãy báo cho LostLink.
-            </p>
-            <Button variant="dangerSoft" block onClick={report}>
-              <Icon name="flag" size={14} />
-              Báo cáo bài đăng này
-            </Button>
-          </Card>
+          {/* Khối nhận đồ / báo đang giữ đồ */}
+          {!isMine && (
+            <Card as="section" padding="md">
+              <h2 className="m-0 mb-1.5 text-body font-bold text-ink">
+                {lost ? 'Bạn nhặt được món này?' : 'Đây là đồ của bạn?'}
+              </h2>
+              <p className="m-0 mb-4 text-caption leading-relaxed text-ink-muted">
+                {lost
+                  ? 'Gửi một lời nhắn cho người mất. Khi họ đồng ý, hai bên nhắn tin để hẹn trao trả.'
+                  : 'Người đăng sẽ hỏi vài chi tiết về món đồ. Trả lời đúng là hai bên nhắn tin được ngay.'}
+              </p>
+              <Button variant="primary" size="xl" block onClick={claim}>
+                {claimLabel}
+              </Button>
+              <div className="mt-2.5 flex gap-2">
+                <Button
+                  pressed={isSaved}
+                  onClick={() => ctx.toggleSaved(post.id)}
+                  className="flex-1"
+                >
+                  {isSaved ? 'Đã lưu' : 'Lưu bài'}
+                </Button>
+                <Button
+                  pressed={isFollowed}
+                  onClick={() => ctx.toggleFollowed(post.id)}
+                  className="flex-1"
+                >
+                  <Icon name="bell" size={14} />
+                  {isFollowed ? 'Đang theo dõi' : 'Theo dõi'}
+                </Button>
+              </div>
+            </Card>
+          )}
+
+          {!isMine && (
+            <Card as="section" padding="md">
+              <h2 className="m-0 mb-1 text-small font-bold text-ink">Thấy tin này có vấn đề?</h2>
+              <p className="m-0 mb-3.5 text-tiny leading-relaxed text-ink-muted">
+                Tin rác, đòi tiền mới trả đồ, hay ảnh không phải của người đăng, hãy báo cho
+                LostLink.
+              </p>
+              <Button variant="dangerSoft" block onClick={report}>
+                <Icon name="flag" size={14} />
+                Báo cáo bài đăng này
+              </Button>
+            </Card>
+          )}
         </aside>
 
         <div className="min-w-0 lg:col-start-1">

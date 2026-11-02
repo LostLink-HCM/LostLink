@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import { cx } from '../../components/user/classes'
 import SiteHeader from '../../components/user/home/SiteHeader'
-import { createFeedComments, createFeedPosts } from '../../data/homeFeed'
+import { createFeedComments, createFeedPosts, createMyPosts } from '../../data/homeFeed'
+import { createMatchSuggestions } from '../../data/matchSuggestions'
 import { createUserMessages } from '../../data/userMessages'
 import { createUserNotifications } from '../../data/userNotifications'
 import { createWatchAreas } from '../../data/userSettings'
@@ -44,7 +45,8 @@ export default function UserLayout() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const [posts, setPosts] = useState(createFeedPosts)
+  const [posts, setPosts] = useState(() => [...createMyPosts(), ...createFeedPosts()])
+  const [matches, setMatches] = useState(createMatchSuggestions)
   const [comments, setComments] = useState(createFeedComments)
   const [now] = useState(Date.now)
   const [liked, setLiked] = useState(() => new Set())
@@ -115,6 +117,20 @@ export default function UserLayout() {
     )
 
   const deleteComment = (id) => setComments((prev) => prev.filter((item) => item.id !== id))
+
+  // Bài mẫu `mine` thuộc về tài khoản đang đăng nhập, Guest không thấy
+  const visiblePosts = useMemo(
+    () =>
+      user
+        ? posts.map((post) => (post.mine ? { ...post, author: user.username } : post))
+        : posts.filter((post) => !post.mine),
+    [posts, user]
+  )
+
+  // Phản hồi gợi ý ghép cặp: confirmed_one khi xác nhận, rejected khi bấm Không phải,
+  // stale khi bài đối ứng không còn nhận gợi ý
+  const respondToMatch = (id, state) =>
+    setMatches((prev) => prev.map((match) => (match.id === id ? { ...match, state } : match)))
 
   const setPostStatus = (id, status) =>
     setPosts((prev) => prev.map((post) => (post.id === id ? { ...post, status } : post)))
@@ -222,7 +238,7 @@ export default function UserLayout() {
 
       <Outlet
         context={{
-          posts,
+          posts: visiblePosts,
           comments,
           now,
           search,
@@ -250,6 +266,8 @@ export default function UserLayout() {
           closeConversation,
           reopenConversation,
           contactAbout,
+          matches,
+          respondToMatch,
           verifications,
           answerQuestion,
           reviews,
