@@ -13,6 +13,9 @@ const attributeValueSchema = new Schema(
     },
 
     value: { type: String, required: true, trim: true },
+
+    // Độ hiếm u: tỉ lệ bài có giá trị này trong cùng danh mục, chỉ job định kỳ ghi
+    frequency: { type: Number, min: 0, max: 1, default: null },
   },
   { timestamps: true, collection: 'attribute_values' }
 )
