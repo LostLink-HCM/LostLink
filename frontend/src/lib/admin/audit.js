@@ -1,4 +1,4 @@
-import { ESCALATION_ACTIONS } from '../moderator/escalations.js'
+import { ESCALATION_ACTIONS } from '../backoffice/escalations.js'
 import { USER_ACTIONS } from './users.js'
 
 export const AUDIT_ACTIONS = {
