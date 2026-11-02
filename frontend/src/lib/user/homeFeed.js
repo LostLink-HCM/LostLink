@@ -71,11 +71,19 @@ function matchesKeyword(post, keyword) {
   return haystack.includes(normalize(keyword))
 }
 
+const RETURNED_LISTED_MS = 7 * 24 * 60 * 60 * 1000
+
+// Danh sách công khai bỏ bài Đã đóng ngay, bài Đã trao trả còn hiện 7 ngày rồi tự ẩn
+export const isListed = (post, now = Date.now()) =>
+  post.status !== 'closed' &&
+  !(post.status === 'returned' && now - new Date(post.returnedAt).getTime() > RETURNED_LISTED_MS)
+
 // Mới nhất trước
 export function filterPosts(posts, filters, keyword = '', now = Date.now()) {
   return posts
     .filter(
       (post) =>
+        isListed(post, now) &&
         (!filters.type || post.type === filters.type) &&
         (!filters.category || post.category === filters.category) &&
         (!filters.area || post.area === filters.area) &&

@@ -132,8 +132,19 @@ export default function UserLayout() {
   const respondToMatch = (id, state) =>
     setMatches((prev) => prev.map((match) => (match.id === id ? { ...match, state } : match)))
 
+  // Lưu lúc chuyển Đã trao trả để bài tự ẩn khỏi danh sách công khai sau 7 ngày
   const setPostStatus = (id, status) =>
-    setPosts((prev) => prev.map((post) => (post.id === id ? { ...post, status } : post)))
+    setPosts((prev) =>
+      prev.map((post) =>
+        post.id === id
+          ? {
+              ...post,
+              status,
+              ...(status === 'returned' && { returnedAt: new Date().toISOString() }),
+            }
+          : post
+      )
+    )
 
   // Đóng hội thoại khi món đồ không khớp; bài chỉ trở lại Đang tìm khi không còn hội thoại nào khác về bài đó đang mở
   const closeConversation = (thread) => {
