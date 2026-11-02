@@ -27,6 +27,8 @@ export default function BackofficeLayout({
   const { user, signOut } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
+  // Lấy ngày một lần lúc mở trang để render thuần
+  const [today] = useState(() => new Date())
 
   const sidebarId = `${basePath.slice(1).replaceAll('/', '-') || 'backoffice'}-sidebar`
   const currentPath = pathname.replace(/\/$/, '')
@@ -178,8 +180,8 @@ export default function BackofficeLayout({
           </div>
           <div className="ml-auto flex items-center gap-2 text-caption text-ink-muted max-sm:hidden">
             <Icon name="calendar" size={16} />
-            <time dateTime={new Date().toLocaleDateString('en-CA')}>
-              {new Date().toLocaleDateString('vi-VN', {
+            <time dateTime={today.toLocaleDateString('en-CA')}>
+              {today.toLocaleDateString('vi-VN', {
                 weekday: 'long',
                 day: 'numeric',
                 month: 'long',

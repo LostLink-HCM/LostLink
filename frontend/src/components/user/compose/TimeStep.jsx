@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useId, useState } from 'react'
 import { DAY_PARTS, TIME_PRESETS } from '../../../data/composePost'
 import { applyTimePreset, describeTime, toDateInput } from '../../../lib/user/composePost'
 import Icon from '../../common/Icon'
@@ -9,6 +9,8 @@ import { FieldError, StepHeading } from './ui'
 // Ngày bắt buộc, mốc gần đúng và buổi trong ngày tuỳ chọn
 export default function TimeStep({ form, errors, onChange }) {
   const id = useId()
+  // Không cho chọn ngày trong tương lai; lấy một lần lúc mở bước để render thuần
+  const [today] = useState(() => toDateInput(new Date()))
   const lost = form.type === 'lost'
   const summary = describeTime(form)
 
@@ -23,7 +25,7 @@ export default function TimeStep({ form, errors, onChange }) {
         id={`${id}-date`}
         type="date"
         value={form.date}
-        max={toDateInput(new Date())}
+        max={today}
         onChange={(e) => onChange({ date: e.target.value, timePreset: '' })}
         aria-invalid={errors.date ? true : undefined}
         aria-describedby={errors.date ? `${id}-date-error` : undefined}
