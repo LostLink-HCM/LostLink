@@ -8,7 +8,7 @@ LostLink là nền tảng web giúp người dân TP.HCM tìm lại và trao tr�
 
 ### 1.1. Vai trò
 
-Vai trò cao hơn kế thừa quyền của vai trò thấp hơn. Riêng kiểm duyệt bài đăng (M03) và xử lý report (M04) chỉ dành cho Moderator.
+Moderator và Admin cùng kế thừa quyền của User.
 
 | Vai trò       | Mô tả                                        | Nhóm yêu cầu      |
 | ------------- | -------------------------------------------- | ----------------- |
@@ -219,7 +219,7 @@ Như M02.
 
 - Xem cấu hình hiện tại, kèm thời gian cập nhật gần nhất.
 - **Ngưỡng thời gian:** ngưỡng không hoạt động (số ngày), thời gian nhắc liên hệ sau khi hai bên xác nhận ghép cặp, thời hạn hoàn tất giao dịch.
-- **Trọng số ghép nối:** vị trí, thời gian, danh mục, mô tả, hình ảnh. Mỗi trọng số là số nguyên 0-100%, tổng phải bằng 100%.
+- **Ghép cặp:** độ tin cậy m của danh mục, thời gian, vị trí, mô tả, đồ bên trong (lớn hơn 0 và nhỏ hơn 1); ngưỡng gợi ý mạnh và gợi ý yếu (1-99%, ngưỡng yếu nhỏ hơn ngưỡng mạnh); nâng cao: xác suất tiên nghiệm p₀, dung sai thời gian ε, điểm tối thiểu Sₘᵢₙ.
 - **Kết quả ghép cặp:** số kết quả đề xuất tối đa.
 - **Ngưỡng xử lý báo cáo:** số ngày.
 - Lưu hoặc hủy thay đổi.
@@ -256,6 +256,6 @@ Như M07.
 | NF11 | Khả năng chịu tải          | Phục vụ tối thiểu 100 người dùng đồng thời vẫn đạt NF10. Danh sách có phân trang, dùng chỉ mục địa lý.                                                                                                                                                                             |
 | NF12 | Dễ dùng                    | Giao diện tiếng Việt, báo lỗi rõ ràng. Ưu tiên desktop, hỗ trợ responsive trên mobile.                                                                                                                                                                                             |
 | NF13 | Tích hợp dịch vụ bên ngoài | Google Identity, Cloudinary (tối đa 9 ảnh mỗi bài, mỗi ảnh không quá 5 MB), dịch vụ gửi email, dịch vụ bản đồ và geocoding.                                                                                                                                                        |
-| NF14 | Cấu hình tham số           | Bán kính, cửa sổ thời gian, trọng số thuật toán, ngưỡng báo cáo, các mốc nhắc chỉnh được qua màn hình Admin, không sửa code.                                                                                                                                                       |
+| NF14 | Cấu hình tham số           | Bán kính, cửa sổ thời gian, tham số thuật toán ghép cặp, ngưỡng báo cáo, các mốc nhắc chỉnh được qua màn hình Admin, không sửa code.                                                                                                                                               |
 | NF15 | Nhật ký hệ thống           | Log lỗi server. Audit log hành động Moderator/Admin (ai, làm gì, khi nào), chỉ đọc. Log không chứa mật khẩu, OTP, token.                                                                                                                                                           |
 | NF16 | Dữ liệu cá nhân, bản quyền | Tuân thủ Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15 và Nghị định 356/2025/NĐ-CP: chỉ gửi email khi người dùng đồng ý, người dùng được xóa dữ liệu. Chỉ dùng thư viện mã nguồn mở có giấy phép cho phép dùng miễn phí. Tuân thủ điều khoản của Google, Cloudinary, dịch vụ bản đồ. |
