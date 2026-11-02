@@ -15,7 +15,7 @@ import { DEFAULT_FILTERS, filterPosts, sortByHot, validateFilters } from '../../
 
 // Trên mobile không có thanh điều hướng nên chuyển giữa hai trang bằng tab
 const FEEDS = [
-  { to: '/', label: 'Mới nhất' },
+  { to: '/', label: 'Trang chủ' },
   { to: '/trending', label: 'Tin hot' },
 ]
 
