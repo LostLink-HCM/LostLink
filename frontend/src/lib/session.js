@@ -8,5 +8,6 @@ export const setAccessToken = (token) => {
   accessToken = token
 }
 
-export const homePathFor = (user) =>
-  ['moderator', 'admin'].includes(user?.role) ? '/moderator' : '/'
+const HOME_PATHS = { admin: '/admin', moderator: '/moderator' }
+
+export const homePathFor = (user) => HOME_PATHS[user?.role] || '/'

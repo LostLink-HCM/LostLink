@@ -48,7 +48,7 @@ stateDiagram-v2
 
 ## Vai trò
 
-Quyền được kế thừa (vai trò cao hơn có toàn bộ quyền của vai trò thấp hơn):
+Moderator và Admin cùng kế thừa quyền của User:
 
 | Vai trò       | Phạm vi                                                                                                                           |
 | ------------- | --------------------------------------------------------------------------------------------------------------------------------- |
