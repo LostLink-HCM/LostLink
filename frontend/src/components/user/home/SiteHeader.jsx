@@ -88,6 +88,7 @@ export default function SiteHeader({ search, unreadMessages = 0, unreadNotificat
 
         <nav aria-label="Điều hướng chính" className="hidden items-center gap-1 lg:flex">
           <NavItem to="/" end label="Trang chủ" />
+          <NavItem to="/trending" label="Tin hot" />
           <NavItem to="/messages" label="Tin nhắn" badge={unread} unit="hội thoại" />
           <NavItem to="/notifications" label="Thông báo" badge={unreadAlerts} unit="thông báo" />
           {/* Từ xl bảng vinh danh đã nằm ở cột phải trang chủ */}

@@ -93,6 +93,12 @@ export function filterPosts(posts, filters, keyword = '', now = Date.now()) {
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
 }
 
+// Độ nổi bật của tin hot: lượt thích nặng hơn lượt xem
+export const hotScore = (post) => post.views + post.likes * 20
+
+// Nổi bật trước; sort ổn định nên bằng điểm thì giữ thứ tự mới nhất trước của filterPosts
+export const sortByHot = (posts) => [...posts].sort((a, b) => hotScore(b) - hotScore(a))
+
 export function timeAgo(iso, now = Date.now()) {
   const minutes = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000))
   if (minutes < 1) return 'Vừa xong'

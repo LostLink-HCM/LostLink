@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { RequireAuth } from './auth/guards.jsx'
 import HomePage from './pages/user/HomePage.jsx'
+import TrendingPage from './pages/user/TrendingPage.jsx'
 import PostDetailPage from './pages/user/PostDetailPage.jsx'
 import VerifyPage from './pages/user/VerifyPage.jsx'
 import ReviewPage from './pages/user/ReviewPage.jsx'
@@ -53,6 +54,7 @@ function App() {
       <Routes>
         <Route path="/" element={<UserLayout />}>
           <Route index element={<HomePage />} />
+          <Route path="trending" element={<TrendingPage />} />
           <Route
             path="posts/new"
             element={

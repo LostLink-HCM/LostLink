@@ -228,10 +228,10 @@ export default function UserLayout() {
   const search = {
     value: searchInput,
     onChange: setSearchInput,
-    // Tìm từ trang khác thì quay về trang chủ để xem kết quả
+    // Tìm từ trang khác thì quay về trang chủ để xem kết quả, đang ở Tin hot thì lọc ngay tại đó
     onSearch: (value) => {
       setKeyword(value)
-      if (location.pathname !== '/') navigate('/')
+      if (!['/', '/trending'].includes(location.pathname)) navigate('/')
     },
     onClear: () => {
       setSearchInput('')

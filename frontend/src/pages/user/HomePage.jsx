@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { NavLink, useOutletContext } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import Icon from '../../components/common/Icon'
 import Button from '../../components/user/Button'
@@ -11,9 +11,16 @@ import PostCard from '../../components/user/home/PostCard'
 import RightRail from '../../components/user/home/RightRail'
 import SearchBox from '../../components/user/home/SearchBox'
 import StickyPanel from '../../components/user/home/StickyPanel'
-import { DEFAULT_FILTERS, filterPosts, validateFilters } from '../../lib/user/homeFeed'
+import { DEFAULT_FILTERS, filterPosts, sortByHot, validateFilters } from '../../lib/user/homeFeed'
 
-export default function HomePage() {
+// Trên mobile không có thanh điều hướng nên chuyển giữa hai trang bằng tab
+const FEEDS = [
+  { to: '/', label: 'Mới nhất' },
+  { to: '/trending', label: 'Tin hot' },
+]
+
+// Dùng chung cho Trang chủ và Tin hot gần đây (hot), cùng bộ lọc, chỉ khác cách sắp xếp
+export default function HomePage({ hot = false }) {
   const { user } = useAuth()
   const { posts, comments, now, search, keyword, filters, liked, toggleLike, blockedUsers } =
     useOutletContext()
@@ -22,16 +29,15 @@ export default function HomePage() {
   const [drawerOpen, setDrawerOpen] = useState(false)
 
   // Bỏ bài của người mình đã chặn
-  const shown = useMemo(
-    () =>
-      filterPosts(
-        posts.filter((post) => !blockedUsers.has(post.author)),
-        applied,
-        keyword,
-        now
-      ),
-    [posts, blockedUsers, applied, keyword, now]
-  )
+  const shown = useMemo(() => {
+    const list = filterPosts(
+      posts.filter((post) => !blockedUsers.has(post.author)),
+      applied,
+      keyword,
+      now
+    )
+    return hot ? sortByHot(list) : list
+  }, [posts, blockedUsers, applied, keyword, now, hot])
 
   const commentCounts = useMemo(() => {
     const counts = {}
@@ -72,7 +78,31 @@ export default function HomePage() {
   return (
     <>
       <div className="mx-auto max-w-360 px-4 pt-5 pb-10 sm:px-6 lg:px-10 lg:pt-7">
-        <h1 className="sr-only">Bài đăng mới trên LostLink</h1>
+        {!hot && <h1 className="sr-only">Bài đăng mới trên LostLink</h1>}
+
+        <nav
+          aria-label="Chọn cách xem bài đăng"
+          className="mb-3 flex gap-1 rounded-full bg-line-subtle p-1 lg:hidden"
+        >
+          {FEEDS.map(({ to, label }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end
+              className={({ isActive }) =>
+                cx(
+                  'flex-1 rounded-full py-1.5 text-center text-caption font-semibold no-underline transition-colors',
+                  isActive
+                    ? 'bg-surface text-primary shadow-card'
+                    : 'text-ink-muted hover:text-ink',
+                  focusRing
+                )
+              }
+            >
+              {label}
+            </NavLink>
+          ))}
+        </nav>
 
         {/* Trên mobile bộ lọc nằm trong drawer, mở bằng nút cạnh ô tìm kiếm */}
         <div className="mb-4 flex items-center gap-2 lg:hidden">
@@ -92,6 +122,16 @@ export default function HomePage() {
           </StickyPanel>
 
           <section aria-label="Danh sách bài đăng" className="min-w-0">
+            {hot && (
+              <div className="mb-4">
+                <h1 className="m-0 text-title font-bold tracking-tight text-ink lg:text-heading">
+                  Tin hot gần đây
+                </h1>
+                <p className="m-0 mt-1 text-caption text-ink-muted">
+                  Tin được cộng đồng quan tâm nhiều nhất, xếp theo lượt xem và lượt thích
+                </p>
+              </div>
+            )}
             {shown.length ? (
               <div className="flex flex-col gap-4">
                 {shown.map((post) => (
