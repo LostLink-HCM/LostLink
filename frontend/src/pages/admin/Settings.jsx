@@ -1,17 +1,19 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import Button from '../../components/backoffice/Button'
 import { cx } from '../../components/backoffice/classes'
 import Dialog from '../../components/backoffice/Dialog'
 import IconButton from '../../components/backoffice/IconButton'
 import Icon from '../../components/common/Icon'
+import { formatNumber, formatPercent } from '../../lib/admin/matching'
 import {
+  ADVANCED_FIELDS,
   DEFAULT_SETTINGS,
-  WEIGHT_FIELDS,
+  RELIABILITY_FIELDS,
   readSettings,
   saveSettings,
+  thresholdBits,
   validateSettings,
-  weightTotal,
 } from '../../lib/admin/settings'
 import {
   cloneQuickReplies,
@@ -19,14 +21,6 @@ import {
   saveQuickReplies,
   validateQuickReplies,
 } from '../../lib/backoffice/quickReplies'
-
-const weightTones = {
-  wLocation: 'bg-[#3976bd]',
-  wTime: 'bg-[#299687]',
-  wCategory: 'bg-[#8a73ba]',
-  wDescription: 'bg-[#bb8c38]',
-  wImage: 'bg-[#bd7086]',
-}
 
 const cardTones = {
   blue: {
@@ -90,8 +84,10 @@ function SettingField({
   options,
   min,
   max,
+  step = 1,
 }) {
   const id = `setting-${name}`
+  const describedBy = [hint && `${id}-hint`, error && `${id}-error`].filter(Boolean).join(' ')
 
   return (
     <div className="mb-[22px] flex min-w-0 flex-col gap-2">
@@ -113,7 +109,7 @@ function SettingField({
             onChange={(event) => onChange(name, event.target.value)}
             onBlur={() => onBlur(name)}
             aria-invalid={Boolean(error)}
-            aria-describedby={`${id}-hint${error ? ` ${id}-error` : ''}`}
+            aria-describedby={describedBy || undefined}
             required
             className="min-h-[43px] w-full min-w-0 cursor-pointer border-0 bg-transparent px-3 py-2 text-base font-semibold text-ink outline-none"
           >
@@ -129,30 +125,34 @@ function SettingField({
               id={id}
               name={name}
               type="number"
-              inputMode="numeric"
+              inputMode={step === 1 ? 'numeric' : 'decimal'}
               min={min}
               max={max}
-              step="1"
+              step={step}
               value={value}
               onChange={(event) => onChange(name, event.target.value)}
               onBlur={() => onBlur(name)}
               aria-invalid={Boolean(error)}
-              aria-describedby={`${id}-hint${error ? ` ${id}-error` : ''}`}
+              aria-describedby={describedBy || undefined}
               required
               className="min-h-[43px] min-w-0 flex-1 border-0 bg-transparent px-3 py-2 text-base font-semibold text-ink outline-none"
             />
-            <span
-              className="shrink-0 border-l border-[#dce5ef] px-3 text-small text-ink-muted"
-              aria-hidden="true"
-            >
-              {unit}
-            </span>
+            {unit && (
+              <span
+                className="shrink-0 border-l border-[#dce5ef] px-3 text-small text-ink-muted"
+                aria-hidden="true"
+              >
+                {unit}
+              </span>
+            )}
           </>
         )}
       </div>
-      <p id={`${id}-hint`} className="text-small leading-[1.65] text-ink-muted">
-        {hint}
-      </p>
+      {hint && (
+        <p id={`${id}-hint`} className="text-small leading-[1.65] text-ink-muted">
+          {hint}
+        </p>
+      )}
       {error && (
         <p id={`${id}-error`} className="text-small leading-relaxed text-danger-ink" role="alert">
           {error}
@@ -182,89 +182,6 @@ function SettingsNotice({ notice }) {
     >
       <Icon name={icons[notice.type]} size={18} />
       <span>{notice.text}</span>
-    </div>
-  )
-}
-
-function WeightTrack({ values }) {
-  return (
-    <div
-      className="mt-4 mb-3 flex h-[9px] w-full gap-0.5 overflow-hidden rounded-[5px] bg-[#edf2f8]"
-      role="img"
-      aria-label="Biểu đồ phân bổ trọng số"
-    >
-      {WEIGHT_FIELDS.map(({ key }) => {
-        const value = Math.max(0, Math.min(100, Number(values[key]) || 0))
-
-        return Array.from({ length: 100 }, (_, index) => (
-          <span
-            key={`${key}-${index}`}
-            className={cx(
-              'h-full min-w-0 flex-1',
-              index < value ? weightTones[key] : 'bg-line-subtle'
-            )}
-          />
-        ))
-      })}
-    </div>
-  )
-}
-
-function WeightField({ field, value, error, weightError, submitted, touched, onChange, onBlur }) {
-  const { key, label, symbol } = field
-  const id = `setting-${key}`
-  const visibleError = (submitted || touched[key]) && error
-
-  return (
-    <div className="grid grid-cols-[minmax(0,1fr)_110px] items-center gap-x-4 gap-y-1 border-b border-[#e0e8f1] py-3 last:border-b-0">
-      <label
-        htmlFor={id}
-        className="flex min-w-0 items-center gap-[11px] text-[15px] font-semibold text-ink-secondary"
-      >
-        <span className={cx('size-[9px] shrink-0 rounded-[3px]', weightTones[key])} />
-        <span className="min-w-0">
-          <span className="block truncate">{label}</span>
-          <small className="mt-0.5 block text-caption font-normal text-ink-muted">{symbol}</small>
-        </span>
-      </label>
-      <div>
-        <div
-          className={cx(
-            'flex min-h-[45px] items-center overflow-hidden rounded-[7px] border border-[#b7c8dc] bg-[#fcfdff] transition focus-within:border-[#3976bd] focus-within:ring-3 focus-within:ring-[#3976bd]/10',
-            visibleError &&
-              'border-[#c75c70] bg-[#fffafb] focus-within:border-[#c75c70] focus-within:ring-[#c75c70]/10'
-          )}
-        >
-          <input
-            id={id}
-            name={key}
-            type="number"
-            inputMode="numeric"
-            min="0"
-            max="100"
-            step="1"
-            value={value}
-            onChange={(event) => onChange(key, event.target.value)}
-            onBlur={() => onBlur(key)}
-            aria-label={`Trọng số ${label.toLocaleLowerCase('vi')}`}
-            aria-invalid={Boolean((visibleError || weightError) && (submitted || touched[key]))}
-            aria-describedby={`${visibleError ? `setting-${key}-error ` : ''}settings-weight-help${weightError ? ' settings-weight-error' : ''}`}
-            required
-            className="min-h-[43px] min-w-0 flex-1 border-0 bg-transparent px-1 py-2 text-right text-base font-semibold text-ink outline-none"
-          />
-          <span
-            className="border-l border-[#dce5ef] px-3 text-small text-ink-muted"
-            aria-hidden="true"
-          >
-            %
-          </span>
-        </div>
-        {visibleError && (
-          <p id={`setting-${key}-error`} className="mt-1 text-caption text-danger-ink" role="alert">
-            {error}
-          </p>
-        )}
-      </div>
     </div>
   )
 }
@@ -534,9 +451,14 @@ export default function Settings() {
   ).length
   const quickRepliesChanged = JSON.stringify(quickReplyDraft) !== JSON.stringify(savedQuickReplies)
   const dirty = changedCount > 0 || quickRepliesChanged
-  const total = weightTotal(draft)
-  const weightError =
-    submitted || WEIGHT_FIELDS.some(({ key }) => touched[key]) ? errors.weights : null
+  const [advancedOpen, setAdvancedOpen] = useState(false)
+  const priorOdds = Number(draft.priorOdds)
+  const bitsHint = (key) =>
+    errors[key] || errors.priorOdds
+      ? ''
+      : `Tương ứng W ≈ ${formatNumber(thresholdBits(Number(draft[key]), priorOdds), 1)} bit`
+  const priorHint = () =>
+    errors.priorOdds ? '' : `p₀ = 1/${formatNumber(priorOdds)} ≈ ${formatPercent(1 / priorOdds)}`
 
   useEffect(() => {
     if (!dirty) return undefined
@@ -616,9 +538,11 @@ export default function Settings() {
     setNotice(null)
 
     if (Object.keys(errors).length || Object.keys(quickReplyErrors).length) {
+      if (ADVANCED_FIELDS.some((key) => errors[key])) setAdvancedOpen(true)
       const invalid = [...formRef.current.elements].find((element) => errors[element.name])
-      const target = invalid || formRef.current.elements.namedItem('wLocation')
-      target?.focus()
+      const target = invalid || formRef.current.elements.namedItem('mCategory')
+      // Đợi mục Nâng cao mở ra thì ô bên trong mới nhận focus được
+      requestAnimationFrame(() => target?.focus())
       setNotice({
         type: 'error',
         text: 'Chưa thể lưu. Vui lòng kiểm tra các giá trị được đánh dấu bên dưới.',
@@ -732,60 +656,59 @@ export default function Settings() {
             </SettingsCard>
 
             <SettingsCard
-              id="settings-weights"
+              id="settings-match-params"
               icon="settings"
-              title="Trọng số ghép nối"
-              description="Phân bổ mức độ ưu tiên cho từng tiêu chí."
+              title="Ghép cặp"
+              description="Độ tin cậy và ngưỡng gợi ý dùng chung cho mọi danh mục."
               className="order-2"
             >
-              <div
-                className={cx(
-                  'flex flex-wrap items-center justify-between gap-3 text-[15px]',
-                  weightError && 'text-danger-ink'
-                )}
-              >
-                <span className="font-semibold">
-                  <span className="block">Tổng trọng số</span>
-                  <small className="mt-1 block text-small font-normal text-ink-muted">Σw = 1</small>
-                </span>
-                <strong
-                  className={cx(
-                    'whitespace-nowrap text-[26px] font-semibold text-[#277f6c]',
-                    weightError && 'text-danger-ink'
-                  )}
-                >
-                  {total.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
-                  <span className="text-[15px] font-normal text-ink-muted"> / 100%</span>
-                </strong>
-              </div>
-              <WeightTrack values={draft} />
-              <div className="flex flex-col">
-                {WEIGHT_FIELDS.map((fieldConfig) => (
-                  <WeightField
-                    key={fieldConfig.key}
-                    field={fieldConfig}
-                    value={draft[fieldConfig.key]}
-                    error={errors[fieldConfig.key]}
-                    weightError={weightError}
-                    submitted={submitted}
-                    touched={touched}
-                    onChange={change}
-                    onBlur={blur}
-                  />
+              <h3 className="mb-3 text-small font-semibold text-ink">Độ tin cậy (m)</h3>
+              <div className="grid gap-x-[18px] min-[601px]:grid-cols-2">
+                {RELIABILITY_FIELDS.map(({ key, label }) => (
+                  <Fragment key={key}>
+                    {field(key, label, '', '', { min: 0.01, max: 0.99, step: 0.01 })}
+                  </Fragment>
                 ))}
               </div>
-              <p id="settings-weight-help" className="text-caption leading-relaxed text-ink-muted">
-                Mỗi trọng số là số nguyên từ 0–100%. Tổng phải bằng 100% để lưu cấu hình.
-              </p>
-              {weightError && (
-                <p
-                  id="settings-weight-error"
-                  className="text-caption text-danger-ink"
-                  aria-live="polite"
-                >
-                  {weightError}
-                </p>
-              )}
+
+              <h3 className="mb-3 text-small font-semibold text-ink">Ngưỡng gợi ý</h3>
+              <div className="grid gap-x-[18px] min-[601px]:grid-cols-2">
+                {field('strongThreshold', 'Gợi ý mạnh', bitsHint('strongThreshold'), '%', {
+                  min: 1,
+                  max: 99,
+                })}
+                {field('weakThreshold', 'Gợi ý yếu', bitsHint('weakThreshold'), '%', {
+                  min: 1,
+                  max: 99,
+                })}
+              </div>
+
+              <details
+                open={advancedOpen}
+                onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
+                className="rounded-lg border border-line bg-surface-muted"
+              >
+                <summary className="cursor-pointer rounded-lg px-4 py-3 text-small font-semibold text-primary outline-none hover:bg-primary-subtle focus-visible:ring-2 focus-visible:ring-focus/30">
+                  Nâng cao
+                </summary>
+                <div className="border-t border-line px-4 pt-4">
+                  {field('priorOdds', 'Xác suất tiên nghiệm p₀ = 1 / N', priorHint(), 'N', {
+                    min: 2,
+                    max: 100000,
+                  })}
+                  <div className="grid gap-x-[18px] min-[601px]:grid-cols-2">
+                    {field('timeTolerance', 'Dung sai thời gian ε', '', 'ngày', {
+                      min: 0,
+                      max: 30,
+                    })}
+                    {field('sMin', 'Điểm tối thiểu Sₘᵢₙ', '', '', {
+                      min: 0.01,
+                      max: 0.5,
+                      step: 0.01,
+                    })}
+                  </div>
+                </div>
+              </details>
             </SettingsCard>
 
             <SettingsCard

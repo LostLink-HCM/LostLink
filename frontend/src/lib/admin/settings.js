@@ -1,12 +1,16 @@
-export const SETTINGS_STORAGE_KEY = 'll_admin_system_settings_v1'
+// v2: bỏ 5 trọng số w, thay bằng tham số Fellegi-Sunter của docs/design/matching-algorithm.md
+export const SETTINGS_STORAGE_KEY = 'll_admin_system_settings_v2'
 
-export const WEIGHT_FIELDS = [
-  { key: 'wLocation', label: 'Vị trí', symbol: 'w_location' },
-  { key: 'wTime', label: 'Thời gian', symbol: 'w_time' },
-  { key: 'wCategory', label: 'Danh mục', symbol: 'w_category' },
-  { key: 'wDescription', label: 'Mô tả', symbol: 'w_description' },
-  { key: 'wImage', label: 'Hình ảnh', symbol: 'w_image' },
+// Độ tin cậy m của các tiêu chí dùng chung (mục 8). Ảnh không được chấm điểm nên không có ô
+export const RELIABILITY_FIELDS = [
+  { key: 'mCategory', label: 'Danh mục' },
+  { key: 'mTime', label: 'Thời gian' },
+  { key: 'mLocation', label: 'Vị trí' },
+  { key: 'mDescription', label: 'Mô tả' },
+  { key: 'mContents', label: 'Đồ bên trong' },
 ]
+
+export const ADVANCED_FIELDS = ['priorOdds', 'timeTolerance', 'sMin']
 
 export const DEFAULT_SETTINGS = Object.freeze({
   staleDays: 3,
@@ -14,11 +18,16 @@ export const DEFAULT_SETTINGS = Object.freeze({
   completionDays: 30,
   topN: 10,
   reportDays: 5,
-  wLocation: 30,
-  wTime: 20,
-  wCategory: 20,
-  wDescription: 20,
-  wImage: 10,
+  mCategory: 0.95,
+  mTime: 0.9,
+  mLocation: 0.9,
+  mDescription: 0.8,
+  mContents: 0.8,
+  strongThreshold: 90,
+  weakThreshold: 50,
+  priorOdds: 200, // p₀ = 1 / priorOdds
+  timeTolerance: 1,
+  sMin: 0.05,
 })
 
 const numberValue = (value) =>
@@ -26,11 +35,9 @@ const numberValue = (value) =>
     ? Number(value)
     : NaN
 
-export const weightTotal = (values) =>
-  WEIGHT_FIELDS.reduce((sum, { key }) => {
-    const value = numberValue(values[key])
-    return sum + (Number.isFinite(value) ? value : 0)
-  }, 0)
+// Ngưỡng nhập dạng xác suất, đổi sang tổng bit W bằng công thức ngược của mục 6.4
+export const thresholdBits = (percent, priorOdds) =>
+  Math.log2((percent / (100 - percent)) * (priorOdds - 1))
 
 export const normalizeSettings = (values) =>
   Object.fromEntries(Object.keys(DEFAULT_SETTINGS).map((key) => [key, numberValue(values[key])]))
@@ -41,7 +48,7 @@ export function validateSettings(values) {
   const integer = (key, min, max, unit) => {
     if (!Number.isInteger(parsed[key]) || parsed[key] < min || parsed[key] > max) {
       errors[key] =
-        `Nhập số nguyên từ ${min.toLocaleString('vi-VN')} đến ${max.toLocaleString('vi-VN')} ${unit}.`
+        `Nhập số nguyên từ ${min.toLocaleString('vi-VN')} đến ${max.toLocaleString('vi-VN')}${unit ? ` ${unit}` : ''}.`
     }
   }
 
@@ -60,10 +67,21 @@ export function validateSettings(values) {
     errors.completionDays = 'Thời hạn hoàn tất phải dài hơn ngưỡng STALE.'
   }
 
-  for (const { key } of WEIGHT_FIELDS) integer(key, 0, 100, '%')
-  if (WEIGHT_FIELDS.some(({ key }) => errors[key]) || weightTotal(parsed) !== 100) {
-    errors.weights = 'Tổng trọng số phải bằng 100% (Σw = 1).'
+  for (const { key } of RELIABILITY_FIELDS) {
+    if (!(parsed[key] > 0 && parsed[key] < 1)) errors[key] = 'Nhập số lớn hơn 0 và nhỏ hơn 1.'
   }
+  integer('strongThreshold', 1, 99, '%')
+  integer('weakThreshold', 1, 99, '%')
+  if (
+    !errors.strongThreshold &&
+    !errors.weakThreshold &&
+    parsed.weakThreshold >= parsed.strongThreshold
+  ) {
+    errors.weakThreshold = 'Ngưỡng gợi ý yếu phải nhỏ hơn ngưỡng gợi ý mạnh.'
+  }
+  integer('priorOdds', 2, 100000, '')
+  integer('timeTolerance', 0, 30, 'ngày')
+  if (!(parsed.sMin >= 0.01 && parsed.sMin <= 0.5)) errors.sMin = 'Nhập số từ 0,01 đến 0,5.'
 
   return errors
 }
