@@ -48,7 +48,7 @@ stateDiagram-v2
 
 ## Roles
 
-Permissions are inherited (each higher role includes the lower ones):
+Moderator and Admin both inherit the User permissions:
 
 | Role          | Scope                                                                                                                  |
 | ------------- | ---------------------------------------------------------------------------------------------------------------------- |

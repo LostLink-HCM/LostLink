@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import Button from '../backoffice/Button'
-import Dialog from '../backoffice/Dialog'
-import Field, { Input, Textarea } from '../backoffice/Field'
-import { ESCALATION_ACTIONS } from '../../lib/moderator/escalations'
+import Button from './Button'
+import Dialog from './Dialog'
+import Field, { Input, Textarea } from './Field'
+import { ESCALATION_ACTIONS } from '../../lib/backoffice/escalations'
 
 const SUBMIT_VARIANTS = { view: 'primary', success: 'success', danger: 'danger' }
 
@@ -156,8 +156,8 @@ export default function EscalationActionDialog({ ticket, action, onClose, onSubm
           )}
         </Field>
         <p className={hint}>
-          Thao tác và căn cứ xử lý sẽ được ghi vào nhật ký cùng tài khoản moderator và thời gian
-          thực hiện.
+          Thao tác và căn cứ xử lý sẽ được ghi vào nhật ký cùng tài khoản của bạn và thời gian thực
+          hiện.
         </p>
       </form>
     </Dialog>
