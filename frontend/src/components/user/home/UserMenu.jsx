@@ -7,6 +7,10 @@ import Avatar from '../Avatar'
 import { cx, focusRing } from '../classes'
 
 const ROLE_LABELS = { admin: 'Quản trị viên', moderator: 'Kiểm duyệt viên', user: 'Thành viên' }
+const WORKSPACES = {
+  admin: { to: '/admin', icon: 'dashboard', label: 'Trang quản trị' },
+  moderator: { to: '/moderator', icon: 'shield', label: 'Không gian kiểm duyệt' },
+}
 
 const rowClass =
   'flex w-full cursor-pointer items-center gap-3 rounded-lg border-0 bg-transparent px-3 py-2.5 text-left text-small font-medium no-underline transition-colors'
@@ -99,14 +103,14 @@ export default function UserMenu() {
             <Icon name="settings" size={16} />
             Cài đặt
           </Link>
-          {['moderator', 'admin'].includes(user.role) && (
+          {WORKSPACES[user.role] && (
             <Link
-              to="/moderator"
+              to={WORKSPACES[user.role].to}
               role="menuitem"
               className={cx(rowClass, 'text-ink-secondary hover:bg-primary-subtle', focusRing)}
             >
-              <Icon name="shield" size={16} />
-              Không gian kiểm duyệt
+              <Icon name={WORKSPACES[user.role].icon} size={16} />
+              {WORKSPACES[user.role].label}
             </Link>
           )}
           <button

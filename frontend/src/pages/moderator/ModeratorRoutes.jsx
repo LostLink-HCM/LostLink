@@ -15,7 +15,7 @@ export default function ModeratorRoutes() {
     <Routes>
       <Route
         element={
-          <RequireRole roles={['moderator', 'admin']}>
+          <RequireRole roles={['moderator']}>
             <ModeratorLayout />
           </RequireRole>
         }
