@@ -8,7 +8,7 @@ LostLink is a web platform that helps people in Ho Chi Minh City find and return
 
 ### 1.1. User roles
 
-Each higher role inherits the permissions of the roles below it. Post review (M03) and report handling (M04) are for Moderators only.
+Moderator and Admin both inherit the User permissions.
 
 | Role          | Description                                     | Requirement groups |
 | ------------- | ----------------------------------------------- | ------------------ |
@@ -219,7 +219,7 @@ Same as M02.
 
 - View the current configuration and its last update time.
 - **Time thresholds:** inactivity threshold (days), contact reminder delay after both sides confirm a match, handover deadline.
-- **Matching weights:** location, time, category, description, image. Each weight is an integer from 0-100%, and they must sum to 100%.
+- **Matching:** reliability m for category, time, location, description and contents (greater than 0 and less than 1); strong and weak suggestion thresholds (1-99%, the weak threshold below the strong one); advanced: prior probability p₀, time tolerance ε, minimum time score Sₘᵢₙ.
 - **Matching results:** maximum number of suggestions.
 - **Report threshold:** number of days.
 - Save or discard changes.
@@ -256,6 +256,6 @@ Same as M07.
 | NF11 | Load capacity              | At least 100 concurrent users while still meeting NF10. Lists are paginated and use geospatial indexes.                                                                                                                                                                       |
 | NF12 | Usability                  | Vietnamese UI with clear error messages. Desktop first, responsive on mobile.                                                                                                                                                                                                 |
 | NF13 | External integrations      | Google Identity, Cloudinary (up to 9 images per post, max 5 MB each), an email delivery service, and a map and geocoding service.                                                                                                                                             |
-| NF14 | Configurable parameters    | Radius, time window, algorithm weights, report thresholds and reminder delays are editable from the Admin screens without code changes.                                                                                                                                       |
+| NF14 | Configurable parameters    | Radius, time window, matching parameters, report thresholds and reminder delays are editable from the Admin screens without code changes.                                                                                                                                     |
 | NF15 | System logs                | Server error logs. Read-only audit log of Moderator/Admin actions (who, what, when). Logs never contain passwords, OTPs or tokens.                                                                                                                                            |
 | NF16 | Personal data and licenses | Comply with the Personal Data Protection Law No. 91/2025/QH15 and Decree 356/2025/ND-CP: send email only with consent, let users delete their data. Use only open-source libraries whose licenses allow free use. Follow the terms of Google, Cloudinary and the map service. |

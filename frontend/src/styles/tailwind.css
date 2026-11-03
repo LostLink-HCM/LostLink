@@ -43,7 +43,17 @@
   --color-primary-hover: #144073;
   --color-primary-soft: #e6f0fa;
   --color-primary-subtle: #edf4fb;
+  --color-primary-faint: #f5f9fe;
+  --color-primary-muted: #7fa8d6;
   --color-focus: #60a5fa;
+
+  /* Thang xanh từ đậm tới nhạt, dùng khi cần phân biệt các nhóm cùng tông (vd 5 tab danh mục).
+     Ba sắc đầu đi với chữ trắng, hai sắc cuối đi với chữ ramp-1 */
+  --color-ramp-1: #0f2f57;
+  --color-ramp-2: #1a528e;
+  --color-ramp-3: #2f74bd;
+  --color-ramp-4: #6fa3dc;
+  --color-ramp-5: #a9cbef;
 
   --color-canvas: #f0f4f8;
   --color-surface: #ffffff;
@@ -51,6 +61,7 @@
   --color-line: #dce4ed;
   --color-line-strong: #cbd5e1;
   --color-line-subtle: #edf1f5;
+  --color-line-soft: #e4ecf6;
 
   --color-ink: #16233a;
   --color-ink-secondary: #43536b;
@@ -97,6 +108,9 @@
   /* Bo góc dùng thang mặc định của Tailwind: md 6px, lg 8px, xl 12px, 2xl 16px */
   --shadow-card: 0 2px 6px rgb(22 35 58 / 0.04);
   --shadow-dialog: 0 24px 100px rgb(11 25 48 / 0.25);
+  /* Bóng mờ tông xanh: soft cho khung lớn, raised cho ô nổi nhỏ (ảnh, tab đang chọn) */
+  --shadow-soft: 0 10px 30px -20px rgb(26 82 142 / 0.45);
+  --shadow-raised: 0 4px 12px -6px rgb(26 82 142 / 0.4);
 
   --animate-ll-glow-slow: ll-glow 9s ease-in-out infinite;
   --animate-ll-glow-fast: ll-glow 5s ease-in-out infinite;

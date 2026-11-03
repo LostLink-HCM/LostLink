@@ -14,10 +14,18 @@ const categoryAttributeSchema = new Schema(
 
     name: { type: String, required: true, trim: true },
 
-    strength: {
+    // Loại trừ: khác giá trị thì loại ngay ở bước lọc. Tính điểm: khác giá trị thì trừ điểm
+    matchRole: {
       type: String,
-      enum: ['strong', 'medium', 'weak'],
-      default: 'medium',
+      enum: ['exclude', 'score'],
+      default: 'score',
+    },
+
+    // m: xác suất hai bài của cùng một món ghi trùng giá trị (Cao, Vừa, Thấp)
+    mProb: {
+      type: Number,
+      enum: [0.95, 0.9, 0.8],
+      default: 0.9,
     },
 
     isRequired: { type: Boolean, default: false },

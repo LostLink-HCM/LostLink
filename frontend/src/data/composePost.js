@@ -1,4 +1,4 @@
-// Dữ liệu mẫu cho form Đăng bài, sau này lấy từ API danh mục do Admin quản lý
+// Dữ liệu mẫu cho form Đăng bài
 
 const COLORS = [
   'Đen',
@@ -15,6 +15,8 @@ const COLORS = [
 ]
 
 const color = { key: 'color', label: 'Màu chủ đạo', options: COLORS }
+
+// exclusion: vai trò Loại trừ, khác giá trị thì hai bài không bao giờ được ghép
 
 export const CATEGORY_ATTRIBUTES = {
   'Giấy tờ & thẻ': [
@@ -48,6 +50,7 @@ export const CATEGORY_ATTRIBUTES = {
     {
       key: 'deviceType',
       label: 'Loại thiết bị',
+      exclusion: true,
       options: [
         'Điện thoại',
         'Máy tính bảng',
@@ -69,6 +72,7 @@ export const CATEGORY_ATTRIBUTES = {
     {
       key: 'keyType',
       label: 'Loại',
+      exclusion: true,
       options: ['Chìa khóa nhà', 'Chìa khóa xe máy', 'Chìa khóa ô tô', 'Xe máy', 'Xe đạp'],
     },
   ],
@@ -82,7 +86,26 @@ export const CATEGORY_ATTRIBUTES = {
   ],
   'Thú cưng': [
     { key: 'species', label: 'Loài', options: ['Chó', 'Mèo', 'Chim', 'Khác'], exclusion: true },
-    color,
+    {
+      key: 'breed',
+      label: 'Giống',
+      options: [
+        'Chó ta',
+        'Poodle',
+        'Phốc sóc',
+        'Corgi',
+        'Husky',
+        'Mèo ta',
+        'Mèo Anh lông ngắn',
+        'Mèo Ba Tư',
+        'Khác',
+      ],
+    },
+    {
+      key: 'color',
+      label: 'Màu lông',
+      options: ['Nâu', 'Vàng', 'Trắng', 'Đen', 'Xám', 'Nhiều màu'],
+    },
   ],
   Khác: [color],
 }
