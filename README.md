@@ -90,6 +90,22 @@ npm install
 npm run dev
 ```
 
+### Run with Docker
+
+Requires Docker Desktop. Runs MongoDB, the backend and the frontend (nginx) together; ports differ from the dev servers so both can run side by side.
+
+```bash
+copy backend\.env.example backend\.env   # (macOS/Linux: cp) — skip if you already have it
+docker compose up -d --build
+docker compose exec backend node src/seeds/index.js   # first run only
+```
+
+- App: http://localhost:8888 (nginx forwards `/api` to the backend)
+- MongoDB: `mongodb://localhost:27018/LostLink` (for Compass)
+- `MONGO_URI` and `CLIENT_URL` in `backend/.env` are overridden inside Docker.
+- To enable Google sign-in, set `VITE_GOOGLE_CLIENT_ID` in a root `.env` before building.
+- Stop with `docker compose down` (add `-v` to wipe the database).
+
 ## Staging
 
 Deployed on Render from `main` (config in [`render.yaml`](render.yaml)): https://lostlink-web.onrender.com
