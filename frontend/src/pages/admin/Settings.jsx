@@ -35,6 +35,30 @@ const cardTones = {
   },
 }
 
+const MATCHING_SETTING_KEYS = [
+  ...RELIABILITY_FIELDS.map(({ key }) => key),
+  'strongThreshold',
+  'weakThreshold',
+  'priorOdds',
+  'timeTolerance',
+  'sMin',
+]
+const REPORT_SETTING_KEYS = ['reportDays']
+const PAGINATION_SETTING_KEYS = ['paginationPageSize']
+const SETTINGS_TABS = [
+  { key: 'matching', label: 'Ghép cặp' },
+  { key: 'reports', label: 'Ngưỡng xử lý report' },
+  { key: 'quickReplies', label: 'Mẫu trả lời nhanh' },
+  { key: 'pagination', label: 'Phân trang' },
+]
+const SETTINGS_KEYS_BY_TAB = {
+  matching: MATCHING_SETTING_KEYS,
+  reports: REPORT_SETTING_KEYS,
+  pagination: PAGINATION_SETTING_KEYS,
+}
+
+const pickSettings = (values, keys) => Object.fromEntries(keys.map((key) => [key, values[key]]))
+
 function SettingsCard({ id, icon, title, description, children, tone = 'blue', className }) {
   const colors = cardTones[tone]
 
@@ -79,6 +103,7 @@ function SettingField({
   unit,
   value,
   error,
+  errorTextClassName = 'text-danger-ink',
   onChange,
   onBlur,
   options,
@@ -90,15 +115,15 @@ function SettingField({
   const describedBy = [hint && `${id}-hint`, error && `${id}-error`].filter(Boolean).join(' ')
 
   return (
-    <div className="mb-[22px] flex min-w-0 flex-col gap-2">
-      <label htmlFor={id} className="text-[15px] font-semibold text-ink-secondary">
+    <div className="mb-5 flex min-w-0 flex-col gap-1.5">
+      <label htmlFor={id} className="text-small font-semibold text-ink-secondary">
         {label}
       </label>
       <div
         className={cx(
-          'flex min-h-[45px] items-center overflow-hidden rounded-[7px] border border-[#b7c8dc] bg-[#fcfdff] transition focus-within:border-[#3976bd] focus-within:ring-3 focus-within:ring-[#3976bd]/10',
+          'flex h-9 items-center overflow-hidden rounded-lg border border-line-strong bg-surface transition focus-within:border-focus focus-within:ring-2 focus-within:ring-focus/20',
           error &&
-            'border-[#c75c70] bg-[#fffafb] focus-within:border-[#c75c70] focus-within:ring-[#c75c70]/10'
+            'border-danger bg-danger-soft focus-within:border-danger focus-within:ring-danger/20'
         )}
       >
         {options ? (
@@ -111,7 +136,7 @@ function SettingField({
             aria-invalid={Boolean(error)}
             aria-describedby={describedBy || undefined}
             required
-            className="min-h-[43px] w-full min-w-0 cursor-pointer border-0 bg-transparent px-3 py-2 text-base font-semibold text-ink outline-none"
+            className="h-full w-full min-w-0 cursor-pointer border-0 bg-transparent px-3 text-small font-semibold text-ink outline-none"
           >
             {options.map((option) => (
               <option key={option} value={option}>
@@ -135,11 +160,11 @@ function SettingField({
               aria-invalid={Boolean(error)}
               aria-describedby={describedBy || undefined}
               required
-              className="min-h-[43px] min-w-0 flex-1 border-0 bg-transparent px-3 py-2 text-base font-semibold text-ink outline-none"
+              className="h-full min-w-0 flex-1 border-0 bg-transparent px-3 text-small font-semibold text-ink outline-none"
             />
             {unit && (
               <span
-                className="shrink-0 border-l border-[#dce5ef] px-3 text-small text-ink-muted"
+                className="shrink-0 border-l border-line px-3 text-small text-ink-muted"
                 aria-hidden="true"
               >
                 {unit}
@@ -154,7 +179,11 @@ function SettingField({
         </p>
       )}
       {error && (
-        <p id={`${id}-error`} className="text-small leading-relaxed text-danger-ink" role="alert">
+        <p
+          id={`${id}-error`}
+          className={cx('text-small leading-relaxed', errorTextClassName)}
+          role="alert"
+        >
           {error}
         </p>
       )}
@@ -440,17 +469,33 @@ export default function Settings() {
   const [savedQuickReplies, setSavedQuickReplies] = useState(() => cloneQuickReplies(quickReplies))
   const [quickReplyDraft, setQuickReplyDraft] = useState(() => cloneQuickReplies(quickReplies))
   const [touched, setTouched] = useState({})
-  const [submitted, setSubmitted] = useState(false)
+  const [activeTab, setActiveTab] = useState('matching')
+  const [submittedTabs, setSubmittedTabs] = useState({})
   const [notice, setNotice] = useState(null)
   const [confirmation, setConfirmation] = useState(null)
   const formRef = useRef(null)
   const errors = validateSettings(draft)
   const quickReplyErrors = validateQuickReplies(quickReplyDraft)
-  const changedCount = Object.keys(DEFAULT_SETTINGS).filter(
+  const settingsChanged = Object.keys(DEFAULT_SETTINGS).some(
     (key) => String(draft[key]) !== String(saved.values[key])
-  ).length
+  )
   const quickRepliesChanged = JSON.stringify(quickReplyDraft) !== JSON.stringify(savedQuickReplies)
-  const dirty = changedCount > 0 || quickRepliesChanged
+  const dirty = settingsChanged || quickRepliesChanged
+  const activeSettingsKeys = SETTINGS_KEYS_BY_TAB[activeTab] || []
+  const activeSectionDirty =
+    activeTab === 'quickReplies'
+      ? quickRepliesChanged
+      : activeSettingsKeys.some((key) => String(draft[key]) !== String(saved.values[key]))
+  const activeSectionErrors =
+    activeTab === 'quickReplies'
+      ? quickReplyErrors
+      : Object.fromEntries(
+          activeSettingsKeys.filter((key) => errors[key]).map((key) => [key, errors[key]])
+        )
+  const saveDisabled =
+    activeTab === 'quickReplies'
+      ? !quickRepliesChanged
+      : !activeSectionDirty && Boolean(saved.savedAt)
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const priorOdds = Number(draft.priorOdds)
   const bitsHint = (key) =>
@@ -496,74 +541,107 @@ export default function Settings() {
       label={label}
       hint={hint}
       unit={unit}
-      value={draft[name]}
-      error={submitted || touched[name] ? errors[name] : null}
+      value={draft[name] ?? DEFAULT_SETTINGS[name] ?? ''}
+      error={submittedTabs[activeTab] || touched[name] ? errors[name] : null}
       onChange={change}
       onBlur={blur}
       {...extra}
     />
   )
 
-  const saveChanges = () => {
+  const saveTab = (tab) => {
     try {
-      const next = saveSettings(window.localStorage, draft)
-      const nextQuickReplies = saveQuickReplies(window.localStorage, quickReplyDraft)
-      setSaved(next)
-      setDraft({ ...next.values })
-      setSavedQuickReplies(nextQuickReplies)
-      setQuickReplyDraft(cloneQuickReplies(nextQuickReplies))
-      setQuickReplies(nextQuickReplies)
-      setTouched({})
-      setSubmitted(false)
+      const keys = SETTINGS_KEYS_BY_TAB[tab] || []
+      if (tab === 'quickReplies') {
+        const next = saveQuickReplies(window.localStorage, quickReplyDraft)
+        setSavedQuickReplies(next)
+        setQuickReplyDraft(cloneQuickReplies(next))
+        setQuickReplies(next)
+      } else {
+        const next = saveSettings(window.localStorage, {
+          ...saved.values,
+          ...pickSettings(draft, keys),
+        })
+        setSaved(next)
+        setDraft((current) => ({ ...current, ...pickSettings(next.values, keys) }))
+      }
+      setTouched((current) => {
+        const next = { ...current }
+        keys.forEach((key) => delete next[key])
+        return next
+      })
+      setSubmittedTabs((current) => ({ ...current, [tab]: false }))
       setNotice({ type: 'success', text: 'Đã lưu cấu hình.' })
     } catch {
       setNotice({
         type: 'error',
-        text: 'Không thể lưu cấu hình. Vui lòng kiểm tra quyền lưu trữ của trình duyệt và thử lại.',
+        text: 'Không thể lưu thay đổi. Vui lòng kiểm tra quyền lưu trữ của trình duyệt và thử lại.',
       })
     }
   }
 
-  const discardChanges = () => {
-    setDraft({ ...saved.values })
-    setQuickReplyDraft(cloneQuickReplies(savedQuickReplies))
-    setTouched({})
-    setSubmitted(false)
-    setNotice({ type: 'info', text: 'Đã hủy các thay đổi chưa lưu.' })
+  const discardTab = (tab) => {
+    const keys = SETTINGS_KEYS_BY_TAB[tab] || []
+    if (tab === 'quickReplies') {
+      setQuickReplyDraft(cloneQuickReplies(savedQuickReplies))
+    } else {
+      setDraft((current) => ({ ...current, ...pickSettings(saved.values, keys) }))
+    }
+    setTouched((current) => {
+      const next = { ...current }
+      keys.forEach((key) => delete next[key])
+      return next
+    })
+    setSubmittedTabs((current) => ({ ...current, [tab]: false }))
+    setNotice({ type: 'info', text: 'Đã hủy thay đổi trong tab này.' })
   }
 
   const submit = (event) => {
     event.preventDefault()
-    setSubmitted(true)
+    setSubmittedTabs((current) => ({ ...current, [activeTab]: true }))
     setNotice(null)
 
-    if (Object.keys(errors).length || Object.keys(quickReplyErrors).length) {
-      if (ADVANCED_FIELDS.some((key) => errors[key])) setAdvancedOpen(true)
-      const invalid = [...formRef.current.elements].find((element) => errors[element.name])
-      const target = invalid || formRef.current.elements.namedItem('mCategory')
-      // Đợi mục Nâng cao mở ra thì ô bên trong mới nhận focus được
-      requestAnimationFrame(() => target?.focus())
+    if (Object.keys(activeSectionErrors).length) {
+      if (activeTab === 'matching' && ADVANCED_FIELDS.some((key) => activeSectionErrors[key])) {
+        setAdvancedOpen(true)
+      }
+      if (activeTab !== 'quickReplies') {
+        const elements = formRef.current?.elements
+        const invalid = [...(elements || [])].find((element) => activeSectionErrors[element.name])
+        const fallbackName =
+          activeTab === 'matching'
+            ? 'mCategory'
+            : activeTab === 'reports'
+              ? 'reportDays'
+              : 'paginationPageSize'
+        const target = invalid || elements?.namedItem(fallbackName)
+        // Đợi mục Nâng cao mở ra thì ô bên trong mới nhận focus được
+        requestAnimationFrame(() => target?.focus())
+      }
       setNotice({
         type: 'error',
-        text: 'Chưa thể lưu. Vui lòng kiểm tra các giá trị được đánh dấu bên dưới.',
+        text:
+          activeTab === 'quickReplies'
+            ? 'Chưa thể lưu. Vui lòng kiểm tra mẫu trả lời được đánh dấu bên dưới.'
+            : 'Chưa thể lưu. Vui lòng kiểm tra các giá trị được đánh dấu bên dưới.',
       })
       return
     }
 
-    setConfirmation('save')
+    setConfirmation({ action: 'save', tab: activeTab })
   }
 
   const requestDiscard = () => {
-    if (!dirty) return
-    setConfirmation('discard')
+    if (!activeSectionDirty) return
+    setConfirmation({ action: 'discard', tab: activeTab })
   }
 
   const confirmAction = () => {
-    const action = confirmation
+    const { action, tab } = confirmation
     setConfirmation(null)
 
-    if (action === 'save') saveChanges()
-    if (action === 'discard') discardChanges()
+    if (action === 'save') saveTab(tab)
+    if (action === 'discard') discardTab(tab)
   }
 
   return (
@@ -571,7 +649,7 @@ export default function Settings() {
       <div className="flex flex-col gap-5">
         <SettingsNotice notice={notice} />
 
-        <div className="mb-[2px] flex items-center justify-between gap-[18px] max-sm:flex-col max-sm:items-stretch max-sm:gap-3">
+        <div className="mb-[2px] flex items-center gap-[18px] max-sm:flex-col max-sm:items-stretch max-sm:gap-3">
           <div className="flex w-fit min-w-0 items-center gap-2.5 rounded-[7px] border border-[#d2dfeb] bg-[#f7fafd] px-3.5 py-[11px] text-caption text-[#71839a]">
             <Icon name="history" size={18} />
             <span>
@@ -583,178 +661,190 @@ export default function Settings() {
               </strong>
             </span>
           </div>
-          <div className="flex shrink-0 gap-2.5 max-sm:[&>button]:flex-1">
-            <Button
-              className="h-auto min-h-[43px] px-[17px] text-small max-sm:px-2.5"
-              disabled={!dirty}
-              icon="reset"
-              onClick={requestDiscard}
-            >
-              Hủy thay đổi
-            </Button>
-            <Button
-              className="h-auto min-h-[43px] px-[17px] text-small max-sm:px-2.5"
-              type="submit"
-              form="admin-settings-form"
-              variant="primary"
-              disabled={!dirty && Boolean(saved.savedAt)}
-              icon="check"
-            >
-              Lưu cấu hình
-            </Button>
-          </div>
         </div>
 
         <form id="admin-settings-form" ref={formRef} noValidate onSubmit={submit}>
-          <div className="grid items-stretch gap-[22px] max-[600px]:gap-[17px] max-[760px]:grid-cols-1 min-[761px]:grid-cols-2">
-            <SettingsCard
-              id="settings-time"
-              icon="history"
-              title="Ngưỡng thời gian"
-              description="Các mốc theo dõi tiến độ ghép nối."
-              className="order-1"
-            >
-              {field(
-                'staleDays',
-                'Ngưỡng không hoạt động · STALE',
-                'Nhập số ngày để đánh dấu ghép nối không có tương tác.',
-                'ngày',
-                { min: 1, max: 365 }
-              )}
-              <div className="grid gap-[18px] max-[600px]:grid-cols-1 max-[600px]:gap-0 min-[601px]:grid-cols-2">
-                {field(
-                  'contactHours',
-                  'Nhắc liên hệ',
-                  'Thời gian nhắc liên hệ được tính trước mốc STALE.',
-                  'giờ',
-                  { min: 1, max: 72 }
-                )}
-                {field(
-                  'completionDays',
-                  'Thời hạn hoàn tất',
-                  'Tính từ khi hai bên bắt đầu giao dịch trao trả.',
-                  'ngày',
-                  { min: 1, max: 730 }
-                )}
-              </div>
-            </SettingsCard>
-
-            <SettingsCard
-              id="settings-matching"
-              icon="list"
-              title="Kết quả matching"
-              description="Giới hạn số kết quả được đề xuất."
-              className="order-3"
-            >
-              {field(
-                'topN',
-                'Số kết quả đề xuất · Top-N',
-                'Từ 1–100 kết quả, xếp theo điểm phù hợp giảm dần.',
-                'kết quả',
-                { min: 1, max: 100 }
-              )}
-            </SettingsCard>
-
-            <SettingsCard
-              id="settings-match-params"
-              icon="settings"
-              title="Ghép cặp"
-              description="Độ tin cậy và ngưỡng gợi ý dùng chung cho mọi danh mục."
-              className="order-2"
-            >
-              <h3 className="mb-3 text-small font-semibold text-ink">Độ tin cậy (m)</h3>
-              <div className="grid gap-x-[18px] min-[601px]:grid-cols-2">
-                {RELIABILITY_FIELDS.map(({ key, label }) => (
-                  <Fragment key={key}>
-                    {field(key, label, '', '', { min: 0.01, max: 0.99, step: 0.01 })}
-                  </Fragment>
-                ))}
-              </div>
-
-              <h3 className="mb-3 text-small font-semibold text-ink">Ngưỡng gợi ý</h3>
-              <div className="grid gap-x-[18px] min-[601px]:grid-cols-2">
-                {field('strongThreshold', 'Gợi ý mạnh', bitsHint('strongThreshold'), '%', {
-                  min: 1,
-                  max: 99,
-                })}
-                {field('weakThreshold', 'Gợi ý yếu', bitsHint('weakThreshold'), '%', {
-                  min: 1,
-                  max: 99,
-                })}
-              </div>
-
-              <details
-                open={advancedOpen}
-                onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
-                className="rounded-lg border border-line bg-surface-muted"
+          <div
+            className="mb-5 flex gap-1 overflow-x-auto border-b border-line"
+            role="tablist"
+            aria-label="Nhóm cấu hình hệ thống"
+          >
+            {SETTINGS_TABS.map((tab) => {
+              const selected = activeTab === tab.key
+              return (
+                <button
+                  key={tab.key}
+                  id={`settings-tab-${tab.key}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  aria-controls="settings-tab-panel"
+                  className={cx(
+                    'min-h-[45px] shrink-0 border-b-2 px-4 text-small font-semibold transition-colors',
+                    selected
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-ink-muted hover:text-primary'
+                  )}
+                  onClick={() => {
+                    setActiveTab(tab.key)
+                    setNotice(null)
+                  }}
+                >
+                  {tab.label}
+                </button>
+              )
+            })}
+          </div>
+          <div
+            id="settings-tab-panel"
+            role="tabpanel"
+            aria-labelledby={`settings-tab-${activeTab}`}
+            tabIndex={0}
+            className="flex flex-col gap-4"
+          >
+            {activeTab === 'matching' && (
+              <SettingsCard
+                id="settings-match-params"
+                icon="settings"
+                title="Ghép cặp"
+                description="Độ tin cậy và ngưỡng gợi ý dùng chung cho mọi danh mục."
               >
-                <summary className="cursor-pointer rounded-lg px-4 py-3 text-small font-semibold text-primary outline-none hover:bg-primary-subtle focus-visible:ring-2 focus-visible:ring-focus/30">
-                  Nâng cao
-                </summary>
-                <div className="border-t border-line px-4 pt-4">
-                  {field('priorOdds', 'Xác suất tiên nghiệm p₀ = 1 / N', priorHint(), 'N', {
-                    min: 2,
-                    max: 100000,
+                <h3 className="mb-3 text-body font-semibold text-ink">Độ tin cậy (m)</h3>
+                <div className="grid gap-x-[18px] min-[601px]:grid-cols-2">
+                  {RELIABILITY_FIELDS.map(({ key, label }) => (
+                    <Fragment key={key}>
+                      {field(key, label, '', '', { min: 0.01, max: 0.99, step: 0.01 })}
+                    </Fragment>
+                  ))}
+                </div>
+
+                <h3 className="mt-5 mb-3 border-t border-primary-muted pt-5 text-body font-semibold text-ink">
+                  Ngưỡng gợi ý
+                </h3>
+                <div className="grid gap-x-[18px] min-[601px]:grid-cols-2">
+                  {field('strongThreshold', 'Gợi ý mạnh', bitsHint('strongThreshold'), '%', {
+                    min: 1,
+                    max: 99,
                   })}
-                  <div className="grid gap-x-[18px] min-[601px]:grid-cols-2">
-                    {field('timeTolerance', 'Dung sai thời gian ε', '', 'ngày', {
-                      min: 0,
-                      max: 30,
+                  {field('weakThreshold', 'Gợi ý yếu', bitsHint('weakThreshold'), '%', {
+                    min: 1,
+                    max: 99,
+                  })}
+                </div>
+
+                <details
+                  open={advancedOpen}
+                  onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
+                  className="rounded-lg border border-line bg-surface-muted"
+                >
+                  <summary className="cursor-pointer rounded-lg px-4 py-3 text-small font-semibold text-primary outline-none hover:bg-primary-subtle focus-visible:ring-2 focus-visible:ring-focus/30">
+                    Nâng cao
+                  </summary>
+                  <div className="border-t border-line px-4 pt-4">
+                    {field('priorOdds', 'Xác suất tiên nghiệm p₀ = 1 / N', priorHint(), 'N', {
+                      min: 2,
+                      max: 100000,
                     })}
-                    {field('sMin', 'Điểm tối thiểu Sₘᵢₙ', '', '', {
-                      min: 0.01,
-                      max: 0.5,
-                      step: 0.01,
-                    })}
+                    <div className="grid gap-x-[18px] min-[601px]:grid-cols-2">
+                      {field('timeTolerance', 'Dung sai thời gian ε', '', 'ngày', {
+                        min: 0,
+                        max: 30,
+                      })}
+                      {field('sMin', 'Điểm tối thiểu Sₘᵢₙ', '', '', {
+                        min: 0.01,
+                        max: 0.5,
+                        step: 0.01,
+                      })}
+                    </div>
+                  </div>
+                </details>
+              </SettingsCard>
+            )}
+
+            {activeTab === 'reports' && (
+              <SettingsCard
+                id="settings-reports"
+                icon="flag"
+                title="Ngưỡng xử lý report"
+                description="Thời hạn theo dõi các báo cáo vi phạm."
+              >
+                {field(
+                  'reportDays',
+                  'Thời hạn xử lý report',
+                  'Tính từ khi tiếp nhận báo cáo chưa được xử lý.',
+                  'ngày',
+                  { min: 1, max: 365, step: 1 }
+                )}
+                <div className="mb-[23px] flex items-start gap-[13px] rounded-lg border border-[#d5e0ec] bg-[#f7fafd] px-[17px] py-[21px] text-body leading-[1.8] text-[#71839a]">
+                  <span className="grid size-[38px] shrink-0 place-items-center rounded-lg bg-[#edf3fc] text-[#3976bd]">
+                    <Icon name="flag" size={18} />
+                  </span>
+                  <div>
+                    <strong className="mt-0.5 mb-2 block text-[15px] font-semibold text-[#3976bd]">
+                      Theo dõi báo cáo quá hạn
+                    </strong>
+                    <p>
+                      Báo cáo chưa xử lý sau <b>{draft.reportDays} ngày</b> được đánh dấu quá hạn để
+                      ưu tiên rà soát.
+                    </p>
                   </div>
                 </div>
-              </details>
-            </SettingsCard>
+              </SettingsCard>
+            )}
 
-            <SettingsCard
-              id="settings-reports"
-              icon="flag"
-              title="Ngưỡng xử lý report"
-              description="Thời hạn theo dõi các báo cáo vi phạm."
-              tone="amber"
-              className="order-4"
-            >
-              {field(
-                'reportDays',
-                'Thời hạn xử lý report',
-                'Tính từ khi tiếp nhận báo cáo chưa được xử lý.',
-                '',
-                { options: [3, 5, 7] }
-              )}
-              <div className="mb-[23px] flex items-start gap-[13px] rounded-lg border border-[#e4d5b8] bg-[#fffbf3] px-[17px] py-[21px] text-body leading-[1.8] text-[#806d4c]">
-                <span className="grid size-[38px] shrink-0 place-items-center rounded-lg bg-[#f8edda] text-[#a67a2d]">
-                  <Icon name="flag" size={18} />
-                </span>
-                <div>
-                  <strong className="mt-0.5 mb-2 block text-[15px] font-semibold text-[#806029]">
-                    Theo dõi báo cáo quá hạn
-                  </strong>
-                  <p>
-                    Báo cáo chưa xử lý sau <b>{draft.reportDays} ngày</b> được đánh dấu quá hạn để
-                    ưu tiên rà soát.
-                  </p>
-                </div>
-              </div>
-            </SettingsCard>
+            {activeTab === 'quickReplies' && (
+              <SettingsCard
+                id="settings-quick-replies"
+                icon="reply"
+                title="Mẫu trả lời nhanh"
+                description="Quản lý các nội dung được sử dụng khi trả lời hội thoại."
+              >
+                <QuickReplyManager
+                  value={quickReplyDraft}
+                  onChange={changeQuickReplies}
+                  error={
+                    Object.keys(quickReplyErrors).length ? 'Có mẫu trả lời chưa hợp lệ.' : null
+                  }
+                />
+              </SettingsCard>
+            )}
 
-            <SettingsCard
-              id="settings-quick-replies"
-              icon="reply"
-              title="Mẫu trả lời nhanh"
-              description="Quản lý các nội dung được sử dụng khi trả lời hội thoại."
-              className="order-5 min-[761px]:col-span-2"
-            >
-              <QuickReplyManager
-                value={quickReplyDraft}
-                onChange={changeQuickReplies}
-                error={Object.keys(quickReplyErrors).length ? 'Có mẫu trả lời chưa hợp lệ.' : null}
-              />
-            </SettingsCard>
+            {activeTab === 'pagination' && (
+              <SettingsCard
+                id="settings-pagination"
+                icon="list"
+                title="Phân trang"
+                description="Số mục hiển thị trên mỗi trang trong các danh sách admin và moderator."
+              >
+                {field('paginationPageSize', 'Số mục trên mỗi trang', '', 'mục', {
+                  min: 1,
+                  max: 100,
+                  step: 1,
+                  errorTextClassName: 'text-ink-muted',
+                })}
+              </SettingsCard>
+            )}
+
+            <div className="flex justify-end gap-2.5 max-sm:[&>button]:flex-1">
+              <Button
+                type="button"
+                className="h-auto min-h-[43px] px-[17px] text-small max-sm:px-2.5"
+                disabled={!activeSectionDirty}
+                icon="reset"
+                onClick={requestDiscard}
+              >
+                Hủy thay đổi
+              </Button>
+              <Button
+                className="h-auto min-h-[43px] px-[17px] text-small max-sm:px-2.5"
+                type="submit"
+                variant="primary"
+                disabled={saveDisabled}
+                icon="check"
+              >
+                Lưu cấu hình
+              </Button>
+            </div>
           </div>
         </form>
 
@@ -765,23 +855,24 @@ export default function Settings() {
             onClose={() => setConfirmation(null)}
             footer={
               <>
-                <Button data-autofocus onClick={() => setConfirmation(null)}>
+                <Button data-autofocus type="button" onClick={() => setConfirmation(null)}>
                   Quay lại
                 </Button>
                 <Button
-                  variant={confirmation === 'save' ? 'primary' : 'danger-subtle'}
+                  variant={confirmation.action === 'save' ? 'primary' : 'danger-subtle'}
+                  type="button"
                   onClick={confirmAction}
                 >
-                  <Icon name={confirmation === 'save' ? 'check' : 'reset'} size={16} />
-                  {confirmation === 'save' ? 'Lưu' : 'Hủy'}
+                  <Icon name={confirmation.action === 'save' ? 'check' : 'reset'} size={16} />
+                  {confirmation.action === 'save' ? 'Lưu' : 'Hủy'}
                 </Button>
               </>
             }
           >
             <p className="text-body leading-relaxed text-ink-secondary">
-              {confirmation === 'save'
-                ? 'Bạn có chắc muốn lưu các thay đổi cấu hình này không?'
-                : 'Các thay đổi chưa lưu sẽ bị mất. Bạn có chắc muốn hủy không?'}
+              {confirmation.action === 'save'
+                ? `Bạn có chắc muốn lưu thay đổi trong tab “${SETTINGS_TABS.find((tab) => tab.key === confirmation.tab)?.label}” không?`
+                : `Các thay đổi chưa lưu trong tab “${SETTINGS_TABS.find((tab) => tab.key === confirmation.tab)?.label}” sẽ bị mất. Bạn có chắc muốn hủy không?`}
             </p>
           </Dialog>
         )}

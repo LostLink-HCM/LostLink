@@ -13,10 +13,6 @@ export const RELIABILITY_FIELDS = [
 export const ADVANCED_FIELDS = ['priorOdds', 'timeTolerance', 'sMin']
 
 export const DEFAULT_SETTINGS = Object.freeze({
-  staleDays: 3,
-  contactHours: 12,
-  completionDays: 30,
-  topN: 10,
   reportDays: 5,
   mCategory: 0.95,
   mTime: 0.9,
@@ -28,6 +24,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   priorOdds: 200, // p₀ = 1 / priorOdds
   timeTolerance: 1,
   sMin: 0.05,
+  paginationPageSize: 10,
 })
 
 const numberValue = (value) =>
@@ -52,20 +49,7 @@ export function validateSettings(values) {
     }
   }
 
-  integer('staleDays', 1, 365, 'ngày')
-  integer('contactHours', 1, 72, 'giờ')
-  integer('completionDays', 1, 730, 'ngày')
-  integer('topN', 1, 100, 'kết quả')
-
-  if (![3, 5, 7].includes(parsed.reportDays)) {
-    errors.reportDays = 'Chọn thời hạn xử lý report là 3, 5 hoặc 7 ngày.'
-  }
-  if (!errors.contactHours && !errors.staleDays && parsed.contactHours >= parsed.staleDays * 24) {
-    errors.contactHours = 'Thời gian nhắc liên hệ phải ngắn hơn ngưỡng STALE.'
-  }
-  if (!errors.completionDays && !errors.staleDays && parsed.completionDays <= parsed.staleDays) {
-    errors.completionDays = 'Thời hạn hoàn tất phải dài hơn ngưỡng STALE.'
-  }
+  integer('reportDays', 1, 365, 'ngày')
 
   for (const { key } of RELIABILITY_FIELDS) {
     if (!(parsed[key] > 0 && parsed[key] < 1)) errors[key] = 'Nhập số lớn hơn 0 và nhỏ hơn 1.'
@@ -82,6 +66,7 @@ export function validateSettings(values) {
   integer('priorOdds', 2, 100000, '')
   integer('timeTolerance', 0, 30, 'ngày')
   if (!(parsed.sMin >= 0.01 && parsed.sMin <= 0.5)) errors.sMin = 'Nhập số từ 0,01 đến 0,5.'
+  integer('paginationPageSize', 1, 100, 'mục')
 
   return errors
 }
@@ -91,17 +76,16 @@ export function readSettings(storage) {
 
   try {
     const stored = JSON.parse(storage.getItem(SETTINGS_STORAGE_KEY))
-    if (
-      !stored ||
-      typeof stored.values !== 'object' ||
-      stored.values === null ||
-      Object.keys(validateSettings(stored.values)).length
-    ) {
+    if (!stored || typeof stored.values !== 'object' || stored.values === null) {
       return fallback
     }
 
+    // Giữ cấu hình cũ và thêm giá trị mặc định cho các trường mới.
+    const values = { ...DEFAULT_SETTINGS, ...stored.values }
+    if (Object.keys(validateSettings(values)).length) return fallback
+
     return {
-      values: normalizeSettings(stored.values),
+      values: normalizeSettings(values),
       savedAt:
         typeof stored.savedAt === 'string' && Number.isFinite(Date.parse(stored.savedAt))
           ? stored.savedAt
