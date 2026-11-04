@@ -22,16 +22,24 @@ const MODERATOR = [
   'user:restrict',
 ]
 
+const ADMIN = [
+  ...USER,
+  'post:update:any', // trang Tất cả bài đăng: đổi trạng thái, ẩn bài
+  'escalation:handle', // SRS A06: admin cũng xử lý hồ sơ chuyển cấp
+  'user:manage',
+  'role:manage',
+  'category:manage',
+  'config:manage',
+  'audit:read',
+]
+
 const ROLE_PERMISSIONS = {
   user: USER,
   moderator: MODERATOR,
-  admin: ['*'],
+  admin: ADMIN,
 }
 
-const hasPermission = (role, permission) => {
-  const perms = ROLE_PERMISSIONS[role] || []
-  return perms.includes('*') || perms.includes(permission)
-}
+const hasPermission = (role, permission) => (ROLE_PERMISSIONS[role] || []).includes(permission)
 
 // Được làm nếu có quyền :any, hoặc có quyền :own và là chủ sở hữu
 const canActOn = (user, action, ownerId) =>
