@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Icon from '../../common/Icon'
 import { isSame, validateAlgorithm } from '../../../lib/admin/categories'
+import { readSettings } from '../../../lib/admin/settings'
 import {
   TIME_SHAPES,
   filterRadius,
@@ -40,7 +41,7 @@ function Stat({ label, value }) {
   )
 }
 
-function Preview({ form, valid, frequency }) {
+function Preview({ form, valid, frequency, sMin }) {
   const { matchRadius, timeShape, timeMedianDays, diffusion } = toNumbers(form)
   const show = (compute) => (valid ? compute() : '—')
 
@@ -57,7 +58,7 @@ function Preview({ form, valid, frequency }) {
       <dl className="mt-3.5 grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(150px,1fr))]">
         <Stat
           label="Cửa sổ thời gian Tₘₐₓ"
-          value={show(() => `≈ ${formatDays(timeWindow(timeMedianDays, timeShape))}`)}
+          value={show(() => `≈ ${formatDays(timeWindow(timeMedianDays, timeShape, sMin))}`)}
         />
         <Stat
           label="Tần suất danh mục u"
@@ -82,6 +83,7 @@ function Preview({ form, valid, frequency }) {
 
 export default function AlgorithmTab({ category, onSave }) {
   const saved = pick(category)
+  const sMin = readSettings(window.localStorage).values.sMin
   const [form, setForm] = useState(saved)
   const [shape, setShape] = useState(() => timeShapeKey(saved.timeShape))
   const [errors, setErrors] = useState({})
@@ -169,7 +171,7 @@ export default function AlgorithmTab({ category, onSave }) {
         </Card>
       </div>
 
-      <Preview form={form} valid={valid} frequency={category.frequency} />
+      <Preview form={form} valid={valid} frequency={category.frequency} sMin={sMin} />
 
       <SaveBar formId="category-algorithm-form" dirty={dirty} onReset={reset} />
     </form>
