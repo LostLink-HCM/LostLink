@@ -45,7 +45,7 @@ projects:
             routes:
               - type: rewrite
                 source: /api/*
-                destination: https://lostlink-evmi.onrender.com/api/*
+                destination: https://lostlink-api-158f.onrender.com/api/*
               - type: rewrite
                 source: /*
                 destination: /index.html
