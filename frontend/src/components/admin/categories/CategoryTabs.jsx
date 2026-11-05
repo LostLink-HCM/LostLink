@@ -50,7 +50,7 @@ export default function CategoryTabs({ value, onChange }) {
             onClick={() => onChange(tab.key)}
             onKeyDown={(event) => move(event, index)}
             className={cx(
-              'flex min-w-0 cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-left text-small font-semibold whitespace-nowrap transition duration-200',
+              'flex min-w-0 cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-left text-small font-semibold transition duration-200',
               active
                 ? cx('shadow-raised', tab.tone)
                 : 'text-ink-muted hover:bg-primary-subtle hover:text-primary',
@@ -65,7 +65,7 @@ export default function CategoryTabs({ value, onChange }) {
             >
               <Icon name={tab.icon} size={14} />
             </span>
-            <span className="min-w-0 truncate">{tab.label}</span>
+            <span className="min-w-0 leading-snug">{tab.label}</span>
           </button>
         )
       })}
