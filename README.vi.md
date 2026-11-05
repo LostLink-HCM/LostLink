@@ -90,6 +90,22 @@ npm install
 npm run dev
 ```
 
+### Chạy bằng Docker
+
+Cần cài Docker Desktop. Lệnh dưới chạy cùng lúc MongoDB, backend và frontend (nginx); cổng khác với dev server nên chạy song song được.
+
+```bash
+copy backend\.env.example backend\.env   # (macOS/Linux: cp) — bỏ qua nếu đã có
+docker compose up -d --build
+docker compose exec backend node src/seeds/index.js   # chỉ cần lần đầu
+```
+
+- Ứng dụng: http://localhost:8888 (nginx chuyển `/api` sang backend)
+- MongoDB: `mongodb://localhost:27018/LostLink` (mở bằng Compass)
+- `MONGO_URI` và `CLIENT_URL` trong `backend/.env` được ghi đè khi chạy trong Docker.
+- Muốn bật đăng nhập Google thì đặt `VITE_GOOGLE_CLIENT_ID` trong file `.env` ở thư mục gốc trước khi build.
+- Dừng bằng `docker compose down` (thêm `-v` để xóa luôn dữ liệu).
+
 ## Staging
 
 Deploy trên Render từ nhánh `main` (cấu hình trong [`render.yaml`](render.yaml)): https://lostlink-web.onrender.com

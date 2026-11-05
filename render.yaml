@@ -4,21 +4,16 @@ projects:
     environments:
       - name: Production
         services:
+          # Backend chạy image Docker do CI đẩy lên GHCR; CI gọi Deploy Hook kèm tag commit SHA
           - type: web
             name: lostlink-api
-            runtime: node
-            repo: https://github.com/LostLink-HCM/LostLink
-            branch: main
+            runtime: image
+            image:
+              url: ghcr.io/lostlink-hcm/lostlink-api:latest
             plan: free
             region: singapore
-            rootDir: backend
-            buildCommand: npm ci
-            startCommand: npm start
             healthCheckPath: /api/health
-            autoDeployTrigger: checksPass
             envVars:
-              - key: NODE_VERSION
-                value: '24'
               - key: NODE_ENV
                 value: production
               - key: CLIENT_URL
