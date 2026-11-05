@@ -43,17 +43,17 @@ const MATCHING_SETTING_KEYS = [
   'timeTolerance',
   'sMin',
 ]
-const REPORT_SETTING_KEYS = ['reportDays']
+const TIME_THRESHOLD_SETTING_KEYS = ['reportDays', 'contactHours', 'returnReminderDays']
 const PAGINATION_SETTING_KEYS = ['paginationPageSize']
 const SETTINGS_TABS = [
   { key: 'matching', label: 'Ghép cặp' },
-  { key: 'reports', label: 'Ngưỡng xử lý report' },
+  { key: 'timeThresholds', label: 'Thời hạn' },
   { key: 'quickReplies', label: 'Mẫu trả lời nhanh' },
   { key: 'pagination', label: 'Phân trang' },
 ]
 const SETTINGS_KEYS_BY_TAB = {
   matching: MATCHING_SETTING_KEYS,
-  reports: REPORT_SETTING_KEYS,
+  timeThresholds: TIME_THRESHOLD_SETTING_KEYS,
   pagination: PAGINATION_SETTING_KEYS,
 }
 
@@ -611,7 +611,7 @@ export default function Settings() {
         const fallbackName =
           activeTab === 'matching'
             ? 'mCategory'
-            : activeTab === 'reports'
+            : activeTab === 'timeThresholds'
               ? 'reportDays'
               : 'paginationPageSize'
         const target = invalid || elements?.namedItem(fallbackName)
@@ -761,33 +761,35 @@ export default function Settings() {
               </SettingsCard>
             )}
 
-            {activeTab === 'reports' && (
+            {activeTab === 'timeThresholds' && (
               <SettingsCard
-                id="settings-reports"
+                id="settings-time-thresholds"
                 icon="flag"
-                title="Ngưỡng xử lý report"
-                description="Thời hạn theo dõi các báo cáo vi phạm."
+                title="Thời hạn"
+                description="Thiết lập thời hạn xử lý báo cáo và lịch gửi email nhắc cho các hội thoại đang mở."
               >
                 {field(
                   'reportDays',
-                  'Thời hạn xử lý report',
+                  'Thời hạn xử lý báo cáo',
                   'Tính từ khi tiếp nhận báo cáo chưa được xử lý.',
                   'ngày',
                   { min: 1, max: 365, step: 1 }
                 )}
-                <div className="mb-[23px] flex items-start gap-[13px] rounded-lg border border-[#d5e0ec] bg-[#f7fafd] px-[17px] py-[21px] text-body leading-[1.8] text-[#71839a]">
-                  <span className="grid size-[38px] shrink-0 place-items-center rounded-lg bg-[#edf3fc] text-[#3976bd]">
-                    <Icon name="flag" size={18} />
-                  </span>
-                  <div>
-                    <strong className="mt-0.5 mb-2 block text-[15px] font-semibold text-[#3976bd]">
-                      Theo dõi báo cáo quá hạn
-                    </strong>
-                    <p>
-                      Báo cáo chưa xử lý sau <b>{draft.reportDays} ngày</b> được đánh dấu quá hạn để
-                      ưu tiên rà soát.
-                    </p>
-                  </div>
+                <div className="grid gap-x-[18px] border-t border-primary-muted pt-5 min-[601px]:grid-cols-2">
+                  {field(
+                    'contactHours',
+                    'Thời gian không hoạt động trước khi gửi email nhắc',
+                    'Tính từ lần hoạt động gần nhất.',
+                    'giờ',
+                    { min: 1, max: 72, step: 1 }
+                  )}
+                  {field(
+                    'returnReminderDays',
+                    'Nhắc nếu hội thoại vẫn mở sau',
+                    'Chỉ nhắc khi hội thoại chưa được đánh dấu “Đã trao trả” hoặc “Đã đóng”.',
+                    'ngày',
+                    { min: 1, step: 1 }
+                  )}
                 </div>
               </SettingsCard>
             )}
@@ -820,7 +822,6 @@ export default function Settings() {
                   min: 1,
                   max: 100,
                   step: 1,
-                  errorTextClassName: 'text-ink-muted',
                 })}
               </SettingsCard>
             )}

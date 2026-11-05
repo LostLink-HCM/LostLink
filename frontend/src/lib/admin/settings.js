@@ -14,6 +14,8 @@ export const ADVANCED_FIELDS = ['priorOdds', 'timeTolerance', 'sMin']
 
 export const DEFAULT_SETTINGS = Object.freeze({
   reportDays: 5,
+  contactHours: 12,
+  returnReminderDays: 7,
   mCategory: 0.95,
   mTime: 0.9,
   mLocation: 0.9,
@@ -50,6 +52,10 @@ export function validateSettings(values) {
   }
 
   integer('reportDays', 1, 365, 'ngày')
+  integer('contactHours', 1, 72, 'giờ')
+  if (!Number.isInteger(parsed.returnReminderDays) || parsed.returnReminderDays < 1) {
+    errors.returnReminderDays = 'Nhập số ngày nguyên dương.'
+  }
 
   for (const { key } of RELIABILITY_FIELDS) {
     if (!(parsed[key] > 0 && parsed[key] < 1)) errors[key] = 'Nhập số lớn hơn 0 và nhỏ hơn 1.'
