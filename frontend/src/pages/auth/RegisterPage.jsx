@@ -5,9 +5,11 @@ import AuthLayout from '../../components/auth/AuthLayout'
 import AuthTabs from '../../components/auth/AuthTabs'
 import {
   Alert,
+  EmailOptInCheckbox,
   Field,
   PasswordField,
   PrimaryButton,
+  TermsCheckbox,
   TextLink,
 } from '../../components/auth/AuthControls'
 import GoogleSignIn from '../../components/auth/GoogleSignIn'
@@ -41,11 +43,13 @@ export default function RegisterPage() {
 
     setLoading(true)
     try {
-      const res = await authApi.register({ ...form, emailOptIn })
+      const res = await authApi.register({ ...form, emailOptIn, acceptTerms: agreed })
       navigate('/verify-email', { state: { ...res.data, justSent: true } })
     } catch (err) {
-      setFieldErrors(err.fieldErrors ?? {})
-      if (!err.details?.length) setError(err.message)
+      const { acceptTerms: termsError, ...rest } = err.fieldErrors ?? {}
+      setFieldErrors(rest)
+      // Lỗi điều khoản không gắn với ô nhập nào nên hiện ở khung báo lỗi chung
+      if (termsError || !err.details?.length) setError(termsError ?? err.message)
       if (err.code === 'EMAIL_PENDING_VERIFICATION') setPendingEmail(form.email)
     } finally {
       setLoading(false)
@@ -109,31 +113,9 @@ export default function RegisterPage() {
           <PasswordChecklist password={form.password} />
         </div>
 
-        <label
-          className={`flex cursor-pointer gap-2 rounded-au-control border px-3 py-2 transition-colors ${
-            emailOptIn ? 'border-au-accent/34 bg-au-accent/10' : 'border-white/14 bg-white/4'
-          }`}
-        >
-          <input
-            type="checkbox"
-            checked={emailOptIn}
-            onChange={(e) => setEmailOptIn(e.target.checked)}
-            className="mt-px size-3.5 flex-none cursor-pointer accent-au-primary"
-          />
-          <span className="self-center text-caption font-medium">
-            Nhận email khi có tin liên quan đến món đồ của bạn
-          </span>
-        </label>
+        <EmailOptInCheckbox checked={emailOptIn} onChange={setEmailOptIn} />
 
-        <label className="flex cursor-pointer items-start gap-2 text-au-note leading-normal text-au-ink/60">
-          <input
-            type="checkbox"
-            checked={agreed}
-            onChange={(e) => setAgreed(e.target.checked)}
-            className="mt-px size-3.5 flex-none cursor-pointer accent-au-primary"
-          />
-          <span>Tôi đồng ý với Điều khoản sử dụng và Chính sách bảo mật</span>
-        </label>
+        <TermsCheckbox checked={agreed} onChange={setAgreed} />
 
         <PrimaryButton type="submit" disabled={loading}>
           {loading ? 'Đang gửi…' : 'Gửi mã xác thực'}
@@ -142,6 +124,8 @@ export default function RegisterPage() {
 
       <GoogleSignIn
         text="signup_with"
+        // Đã tích đồng ý ở form thì gửi luôn, chưa tích thì GoogleSignIn sẽ hỏi lại khi cần
+        consent={agreed ? { acceptTerms: true, emailOptIn } : undefined}
         onError={(message) => {
           setError(message)
           setPendingEmail('')

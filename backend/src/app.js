@@ -5,6 +5,7 @@ const helmet = require('helmet')
 const morgan = require('morgan')
 const env = require('./config/env')
 const routes = require('./routes')
+const { apiLimiter } = require('./middleware/rateLimiter')
 const { notFound, errorHandler } = require('./middleware/errorMiddleware')
 
 const app = express()
@@ -12,12 +13,11 @@ app.set('trust proxy', env.trustProxy)
 
 app.use(helmet())
 app.use(cors({ origin: env.clientUrl, credentials: true }))
-app.use(express.json({ limit: '1mb' }))
-app.use(express.urlencoded({ extended: true }))
+app.use(express.json({ limit: '100kb' }))
 app.use(cookieParser())
 if (env.nodeEnv !== 'test') app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'))
 
-app.use('/api', routes)
+app.use('/api', apiLimiter, routes)
 
 app.use(notFound)
 app.use(errorHandler)

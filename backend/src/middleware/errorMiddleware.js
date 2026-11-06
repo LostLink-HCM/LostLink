@@ -15,8 +15,13 @@ function errorHandler(err, req, res, _next) {
     statusCode = 400
     message = `Invalid ${err.path}`
   } else if (err.code === 11000) {
+    // Không nêu tên field bị trùng để tránh lộ cấu trúc CSDL
     statusCode = 409
-    message = `Duplicate value for ${Object.keys(err.keyValue || {}).join(', ')}`
+    message = 'Đã có lỗi xảy ra, vui lòng thử lại.'
+  } else if (err.type === 'entity.too.large') {
+    message = 'Dữ liệu gửi lên quá lớn.'
+  } else if (err.type === 'entity.parse.failed') {
+    message = 'Dữ liệu gửi lên không đúng định dạng JSON.'
   }
 
   // Chỉ báo lỗi server lên Sentry, lỗi 4xx là lỗi của người dùng

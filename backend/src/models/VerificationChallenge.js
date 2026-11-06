@@ -22,7 +22,9 @@ const verificationChallengeSchema = new Schema(
         message: 'Câu hỏi xác minh cần từ 2 đến 5 phương án.',
       },
     },
-    correctOptionHash: { type: String, required: true },
+    // HMAC của _id phương án đúng, tạo bằng hashAnswer() trong utils/crypto.
+    // Không trả về mặc định để không lộ ra API cùng với câu hỏi
+    correctOptionHash: { type: String, required: true, select: false },
     maxAttempts: { type: Number, default: 1 },
   },
   { timestamps: true, collection: 'verification_challenges' }

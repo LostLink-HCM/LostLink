@@ -136,6 +136,42 @@ export function FieldLegend({ children }) {
   return <legend className={`mb-1 p-0 ${labelClass}`}>{children}</legend>
 }
 
+// Lựa chọn nhận email thông báo, mặc định được chọn
+export function EmailOptInCheckbox({ checked, onChange }) {
+  return (
+    <label
+      className={`flex cursor-pointer gap-2 rounded-au-control border px-3 py-2 transition-colors ${
+        checked ? 'border-au-accent/34 bg-au-accent/10' : 'border-white/14 bg-white/4'
+      }`}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-px size-3.5 flex-none cursor-pointer accent-au-primary"
+      />
+      <span className="self-center text-caption font-medium">
+        Nhận email khi có tin liên quan đến món đồ của bạn
+      </span>
+    </label>
+  )
+}
+
+// Ô đồng ý điều khoản, bắt buộc tích trước khi tạo tài khoản
+export function TermsCheckbox({ checked, onChange }) {
+  return (
+    <label className="flex cursor-pointer items-start gap-2 text-au-note leading-normal text-au-ink/60">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-px size-3.5 flex-none cursor-pointer accent-au-primary"
+      />
+      <span>Tôi đồng ý với Điều khoản sử dụng và Chính sách bảo mật</span>
+    </label>
+  )
+}
+
 // Khung ghi chú phụ, ví dụ nhắc kiểm tra thư mục Spam
 export function Note({ className = '', children }) {
   return (
