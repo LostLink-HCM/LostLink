@@ -25,7 +25,6 @@ module.exports = {
   Notification: require('./Notification'),
   GeofenceSubscription: require('./GeofenceSubscription'),
   Report: require('./Report'),
-  EscalationTicket: require('./EscalationTicket'),
   AuditLog: require('./AuditLog'),
   SystemConfig: require('./SystemConfig'),
   QuickReply: require('./QuickReply'),

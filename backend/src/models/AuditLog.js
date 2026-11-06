@@ -22,7 +22,6 @@ const auditLogSchema = new Schema(
         'User',
         'Post',
         'Report',
-        'EscalationTicket',
         'SystemConfig',
         'QuickReply',
         'Category',

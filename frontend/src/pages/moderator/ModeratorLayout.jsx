@@ -2,7 +2,6 @@ import { useState } from 'react'
 import BackofficeLayout from '../../components/backoffice/BackofficeLayout'
 import { createWorkspacePosts, workspacePostMatches } from '../../data/workspacePosts'
 import { moderatorReports } from '../../data/moderatorReports'
-import { createEscalationLogs, createEscalationState } from '../../data/escalations'
 import { createModeratorMessages } from '../../data/moderatorMessages'
 import { createModeratorNotifications } from '../../data/moderatorNotifications'
 import { readQuickReplies } from '../../lib/backoffice/quickReplies'
@@ -12,7 +11,6 @@ const navigation = [
   { path: '', label: 'Tất cả bài đăng', icon: 'list' },
   { path: '/review', label: 'Kiểm duyệt bài', icon: 'check' },
   { path: '/reports', label: 'Hàng đợi report', icon: 'flag' },
-  { path: '/escalations', label: 'Escalation', icon: 'shield' },
   { path: '/messages', label: 'Tin nhắn', icon: 'chat' },
   { path: '/notifications', label: 'Thông báo', icon: 'bell' },
 ]
@@ -20,10 +18,6 @@ const navigation = [
 export default function ModeratorLayout() {
   const [posts, setPosts] = useState(createWorkspacePosts)
   const [reports, setReports] = useState(moderatorReports)
-  const [escalationState, setEscalationState] = useState(() => {
-    const state = createEscalationState()
-    return { ...state, logs: createEscalationLogs(state.tickets) }
-  })
   const [messageState, setMessageState] = useState(createModeratorMessages)
   const [quickReplies, setQuickReplies] = useState(() => readQuickReplies(window.localStorage))
   const [notificationState, setNotificationState] = useState(createModeratorNotifications)
@@ -45,8 +39,6 @@ export default function ModeratorLayout() {
         matchPairs: workspacePostMatches,
         reports,
         setReports,
-        escalationState,
-        setEscalationState,
         messageState,
         setMessageState,
         quickReplies,

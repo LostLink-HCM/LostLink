@@ -30,12 +30,8 @@ const actionIcons = {
   lock: 'lock',
   hide: 'lock',
   revoke: 'lock',
-  incorrect: 'lock',
   grant: 'check',
-  verify: 'check',
-  returned: 'check',
   settings: 'settings',
-  remind: 'mail',
 }
 
 const roleTones = { Admin: 'primary', Moderator: 'info' }

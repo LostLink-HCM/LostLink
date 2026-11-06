@@ -1,4 +1,3 @@
-import { ESCALATION_ACTIONS } from '../backoffice/escalations.js'
 import { USER_ACTIONS } from './users.js'
 
 export const AUDIT_ACTIONS = {
@@ -7,17 +6,12 @@ export const AUDIT_ACTIONS = {
   unlock: USER_ACTIONS.unlock.label,
   grant: USER_ACTIONS.grant.label,
   revoke: USER_ACTIONS.revoke.label,
-  remind: ESCALATION_ACTIONS.remind.label,
-  returned: ESCALATION_ACTIONS.returned.label,
-  incorrect: ESCALATION_ACTIONS.incorrect.label,
-  verify: ESCALATION_ACTIONS.verify.label,
-  hide: ESCALATION_ACTIONS.hide.label,
+  hide: 'Ẩn bài nghi vấn',
 }
 
 export const AUDIT_ENTITY_TYPES = {
   User: 'Tài khoản',
   Post: 'Bài đăng',
-  EscalationTicket: 'Hồ sơ escalation',
   SystemConfig: 'Cấu hình hệ thống',
 }
 

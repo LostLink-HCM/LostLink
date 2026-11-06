@@ -6,17 +6,6 @@ export function createAdminNotifications(now = Date.now()) {
   return {
     notifications: [
       {
-        id: 'admin-notification-1',
-        type: 'escalation',
-        title: 'Moderator cần hỗ trợ hồ sơ #401',
-        body: 'Hồ sơ xác nhận trao trả quá hạn cần quản trị viên hỗ trợ rà soát.',
-        createdAt: minutesAgo(8),
-        unread: true,
-        pinned: true,
-        actionLabel: 'Xem toàn bộ escalation',
-        href: '/admin/escalations',
-      },
-      {
         id: 'admin-notification-2',
         type: 'warning',
         title: 'Bài đăng cần được rà soát',
@@ -48,17 +37,6 @@ export function createAdminNotifications(now = Date.now()) {
         pinned: false,
         actionLabel: 'Xem Dashboard',
         href: '/admin/dashboard',
-      },
-      {
-        id: 'admin-notification-5',
-        type: 'escalation',
-        title: 'Escalation đang chờ phản hồi',
-        body: 'Một hồ sơ cần được cập nhật thêm thông tin trước khi hoàn tất xử lý.',
-        createdAt: minutesAgo(26 * 60),
-        unread: false,
-        pinned: false,
-        actionLabel: 'Xem escalation',
-        href: '/admin/escalations',
       },
       {
         id: 'admin-notification-6',
@@ -102,18 +80,7 @@ export function createAdminNotifications(now = Date.now()) {
         unread: false,
         pinned: false,
         actionLabel: 'Xem báo cáo',
-        href: '/admin/escalations',
-      },
-      {
-        id: 'admin-notification-10',
-        type: 'escalation',
-        title: 'Escalation đã được đóng',
-        body: 'Hồ sơ trao trả đã được xử lý và ghi nhận kết quả vào hệ thống.',
-        createdAt: minutesAgo(10 * 24 * 60),
-        unread: false,
-        pinned: false,
-        actionLabel: 'Xem escalation',
-        href: '/admin/escalations',
+        href: '/admin/posts',
       },
       {
         id: 'admin-notification-11',

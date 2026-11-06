@@ -2,7 +2,6 @@ export const NOTIFICATION_TYPES = {
   review: { label: 'Kiểm duyệt', icon: 'check' },
   warning: { label: 'Cảnh báo', icon: 'warning' },
   report: { label: 'Report', icon: 'flag' },
-  escalation: { label: 'Escalation', icon: 'shield' },
   system: { label: 'Hệ thống', icon: 'bell' },
 }
 

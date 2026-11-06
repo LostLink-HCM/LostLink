@@ -20,15 +20,6 @@ export function createModeratorMessages(now = Date.now()) {
       color: 'purple',
     },
     {
-      id: 'user-minh',
-      name: 'Minh Anh',
-      initials: 'MA',
-      role: 'user',
-      email: 'minh.anh@example.com',
-      description: 'Thành viên cộng đồng',
-      color: 'amber',
-    },
-    {
       id: 'user-trang',
       name: 'TrangMit',
       initials: 'TM',
@@ -131,35 +122,6 @@ export function createModeratorMessages(now = Date.now()) {
             'peer',
             'Nếu còn thiếu thông tin, mình liên hệ hai bên để làm rõ rồi mới kết luận.',
             3
-          ),
-        ],
-      },
-      {
-        id: 'thread-minh',
-        contactId: 'user-minh',
-        unread: 1,
-        priority: false,
-        resolved: false,
-        createdAt: ago(180),
-        context: {
-          label: 'Hồ sơ Escalation',
-          title: 'Xác nhận trao trả ví da nam màu nâu',
-          code: '#401',
-          path: '/moderator/escalations',
-          icon: 'shield',
-        },
-        messages: [
-          message(
-            'm1',
-            'me',
-            'Chào bạn, mình liên hệ về cặp ghép ví da. Hai bên đã hoàn tất việc trao trả chưa ạ?',
-            180
-          ),
-          message(
-            'm2',
-            'peer',
-            'Mình đã nhận lại ví ở cổng trường rồi nhưng quên xác nhận trên ứng dụng. Nhờ bạn hướng dẫn giúp mình.',
-            22
           ),
         ],
       },

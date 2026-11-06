@@ -18,14 +18,12 @@ const MODERATOR = [
   'comment:delete:any',
   'claim:review',
   'report:review',
-  'escalation:handle',
   'user:restrict',
 ]
 
 const ADMIN = [
   ...USER,
   'post:update:any', // trang Tất cả bài đăng: đổi trạng thái, ẩn bài
-  'escalation:handle', // SRS A06: admin cũng xử lý hồ sơ chuyển cấp
   'user:manage',
   'role:manage',
   'category:manage',
