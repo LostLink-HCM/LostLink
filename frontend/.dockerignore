@@ -6,3 +6,6 @@ dist
 !.env.example
 Dockerfile
 .dockerignore
+tests
+playwright.config.js
+dist-e2e
