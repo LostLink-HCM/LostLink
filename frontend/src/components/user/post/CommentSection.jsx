@@ -127,7 +127,7 @@ function CommentItem({ comment, mine, now, onEdit, onDelete }) {
   )
 }
 
-// Guest chỉ đọc bình luận (G01); User được thêm, sửa và xoá bình luận của mình (U07)
+// Guest chỉ đọc bình luận; User được thêm, sửa và xoá bình luận của mình
 export default function CommentSection({ comments, user, now, onAdd, onEdit, onDelete }) {
   const location = useLocation()
   const [text, setText] = useState('')

@@ -1,1 +1,4 @@
 package-lock.json
+frontend/dist-e2e
+frontend/tests/results
+frontend/tests/report

@@ -26,6 +26,8 @@ projects:
                 sync: false
               - key: JWT_REFRESH_SECRET
                 sync: false
+              - key: ANSWER_HASH_SECRET
+                sync: false
               - key: GOOGLE_CLIENT_ID
                 sync: false
               - key: BREVO_API_KEY

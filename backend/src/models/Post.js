@@ -6,6 +6,8 @@ const { Schema } = mongoose
 const POST_STATUSES = ['pending', 'rejected', 'searching', 'contacted', 'returned', 'closed']
 
 const MAX_IMAGES = 9
+const TITLE_MAX = 120
+const DESCRIPTION_MAX = 1000
 
 // Vị trí dạng GeoJSON: điểm (ghim, GPS, địa chỉ) hoặc đoạn đường
 const geoSchema = new Schema(
@@ -59,11 +61,29 @@ const postSchema = new Schema(
 
     category: { type: Schema.Types.ObjectId, ref: 'Category', required: true, index: true },
 
-    title: { type: String, required: true, trim: true },
-    description: { type: String, default: '' },
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: [TITLE_MAX, 'Tiêu đề tối đa 120 ký tự.'],
+    },
+    description: {
+      type: String,
+      default: '',
+      maxlength: [DESCRIPTION_MAX, 'Mô tả tối đa 1.000 ký tự.'],
+    },
 
     timeFrom: { type: Date, required: true },
-    timeTo: { type: Date, default: null },
+    timeTo: {
+      type: Date,
+      default: null,
+      validate: {
+        validator(value) {
+          return !value || !this.timeFrom || value >= this.timeFrom
+        },
+        message: 'Thời điểm kết thúc phải sau thời điểm bắt đầu.',
+      },
+    },
 
     area: { type: String, default: '', trim: true },
     placeName: { type: String, default: '', trim: true },
@@ -111,7 +131,7 @@ const postSchema = new Schema(
 
 postSchema.index({ type: 1, status: 1, createdAt: -1 })
 postSchema.index({ status: 1, viewCount: -1, likeCount: -1 })
-postSchema.index({ title: 'text', description: 'text' })
+postSchema.index({ title: 'text', description: 'text' }, { default_language: 'none' })
 postSchema.index({ locExact: '2dsphere' })
 
 const Post = mongoose.model('Post', postSchema)

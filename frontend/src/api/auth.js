@@ -10,7 +10,9 @@ export const resendCode = (email) => api.post('/auth/resend-code', { email }, pu
 
 export const login = (payload) => api.post('/auth/login', payload, pub)
 
-export const googleLogin = (idToken) => api.post('/auth/google', { idToken }, pub)
+// consent: { acceptTerms, emailOptIn }, chỉ cần khi Google tạo tài khoản mới
+export const googleLogin = (idToken, consent = {}) =>
+  api.post('/auth/google', { idToken, ...consent }, pub)
 
 export const forgotPassword = (email) => api.post('/auth/forgot-password', { email }, pub)
 

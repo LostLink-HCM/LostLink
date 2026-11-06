@@ -213,7 +213,7 @@ function AuditRows({ logs, onView }) {
   )
 }
 
-// Dùng chung cho moderator (M05) và admin (A06), actor là vai trò ghi vào nhật ký
+// Dùng chung cho moderator và admin, actor là vai trò ghi vào nhật ký
 export default function EscalationsWorkspace({ escalationState, setEscalationState, actor }) {
   const [tab, setTab] = useState('queue')
   const [logPage, setLogPage] = useState(1)

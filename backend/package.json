@@ -5,11 +5,13 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
     "dev": "nodemon server.js",
     "seed": "node src/seeds/index.js",
-    "lint": "oxlint"
+    "db:sync-indexes": "node src/scripts/syncIndexes.js",
+    "lint": "oxlint",
+    "test": "node --test --test-global-setup=tests/setup/globalSetup.js --require ./tests/setup/env.js --test-timeout=60000 \"tests/**/*.test.js\"",
+    "test:coverage": "node --test --test-global-setup=tests/setup/globalSetup.js --require ./tests/setup/env.js --test-timeout=60000 --experimental-test-coverage --test-coverage-include=\"src/**\" --test-coverage-exclude=\"src/seeds/**\" --test-coverage-exclude=\"src/scripts/**\" \"tests/**/*.test.js\""
   },
   "keywords": [],
   "author": "",
@@ -38,8 +40,10 @@
     "nodemailer": "^10.3.1"
   },
   "devDependencies": {
+    "mongodb-memory-server": "^11.3.0",
     "nodemon": "^3.1.14",
-    "oxlint": "^1.90.0"
+    "oxlint": "^1.90.0",
+    "supertest": "^7.3.1"
   },
   "overrides": {
     "glob": "^14.0.3",

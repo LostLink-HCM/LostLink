@@ -1,13 +1,21 @@
 require('dotenv').config({ quiet: true })
 
-const required = ['MONGO_URI', 'JWT_SECRET', 'JWT_REFRESH_SECRET']
+const nodeEnv = process.env.NODE_ENV || 'development'
+
+// ANSWER_HASH_SECRET chỉ bắt buộc trên production, local dùng giá trị mặc định
+const required = [
+  'MONGO_URI',
+  'JWT_SECRET',
+  'JWT_REFRESH_SECRET',
+  ...(nodeEnv === 'production' ? ['ANSWER_HASH_SECRET'] : []),
+]
 const missing = required.filter((key) => !process.env[key])
 if (missing.length) {
   throw new Error(`Missing required environment variables: ${missing.join(', ')}`)
 }
 
 module.exports = {
-  nodeEnv: process.env.NODE_ENV || 'development',
+  nodeEnv,
   port: Number(process.env.PORT) || 5000,
   mongoUri: process.env.MONGO_URI,
   clientUrl: process.env.CLIENT_URL || 'http://localhost:8080',
@@ -20,6 +28,8 @@ module.exports = {
     refreshSecret: process.env.JWT_REFRESH_SECRET,
     refreshExpire: process.env.JWT_REFRESH_EXPIRE || '7d',
   },
+  // Khoá HMAC để băm đáp án câu hỏi xác minh
+  answerHashSecret: process.env.ANSWER_HASH_SECRET || 'dev-only-answer-hash-secret',
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
