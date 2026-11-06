@@ -20,7 +20,6 @@ const notificationTone = {
   review: 'bg-primary-soft text-primary',
   warning: 'bg-warning-soft text-warning',
   report: 'bg-danger-soft text-danger',
-  escalation: 'bg-info-soft text-info',
   system: 'bg-neutral-soft text-neutral',
 }
 
@@ -267,16 +266,18 @@ export default function NotificationsWorkspace({ notificationState, setNotificat
                     <p className="mt-1 max-w-195 text-caption leading-relaxed text-ink-secondary">
                       {notification.body}
                     </p>
-                    <Link
-                      className="mt-2 inline-flex items-center gap-1 text-caption font-bold text-primary hover:underline"
-                      to={notification.href}
-                      onClick={() =>
-                        update((state) => markNotificationRead(state, notification.id))
-                      }
-                    >
-                      {notification.actionLabel}
-                      <Icon name="next" size={14} />
-                    </Link>
+                    {notification.href && notification.actionLabel && (
+                      <Link
+                        className="mt-2 inline-flex items-center gap-1 text-caption font-bold text-primary hover:underline"
+                        to={notification.href}
+                        onClick={() =>
+                          update((state) => markNotificationRead(state, notification.id))
+                        }
+                      >
+                        {notification.actionLabel}
+                        <Icon name="next" size={14} />
+                      </Link>
+                    )}
                   </div>
 
                   <div className="flex items-start gap-1 max-sm:col-start-2">

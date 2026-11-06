@@ -18,15 +18,7 @@ const auditLogSchema = new Schema(
     entityType: {
       type: String,
       required: true,
-      enum: [
-        'User',
-        'Post',
-        'Report',
-        'EscalationTicket',
-        'SystemConfig',
-        'QuickReply',
-        'Category',
-      ],
+      enum: ['User', 'Post', 'Report', 'SystemConfig', 'QuickReply', 'Category'],
     },
     entityId: { type: Schema.Types.ObjectId, default: null },
 

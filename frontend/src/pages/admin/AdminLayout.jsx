@@ -2,7 +2,6 @@ import { useState } from 'react'
 import BackofficeLayout from '../../components/backoffice/BackofficeLayout'
 import { createAdminMessages } from '../../data/adminMessages'
 import { createAdminNotifications } from '../../data/adminNotifications'
-import { createEscalationLogs, createEscalationState } from '../../data/escalations'
 import { createWorkspacePosts, workspacePostMatches } from '../../data/workspacePosts'
 import { readQuickReplies } from '../../lib/backoffice/quickReplies'
 
@@ -12,7 +11,6 @@ const navigation = [
   { path: '/categories', label: 'Danh mục', icon: 'category' },
   { path: '/posts', label: 'Tất cả bài đăng', icon: 'list' },
   { path: '/settings', label: 'Cấu hình hệ thống', icon: 'settings' },
-  { path: '/escalations', label: 'Escalation', icon: 'shield' },
   { path: '/audit-log', label: 'Nhật ký thao tác', icon: 'history' },
   { path: '/messages', label: 'Tin nhắn', icon: 'chat' },
   { path: '/notifications', label: 'Thông báo', icon: 'bell' },
@@ -21,10 +19,6 @@ const navigation = [
 export default function AdminLayout() {
   const [posts, setPosts] = useState(createWorkspacePosts)
   const [messageState, setMessageState] = useState(createAdminMessages)
-  const [escalationState, setEscalationState] = useState(() => {
-    const state = createEscalationState()
-    return { ...state, logs: createEscalationLogs(state.tickets) }
-  })
   const [quickReplies, setQuickReplies] = useState(() => readQuickReplies(window.localStorage))
   const [notificationState, setNotificationState] = useState(createAdminNotifications)
   const unreadMessages = messageState.threads.reduce((total, thread) => total + thread.unread, 0)
@@ -50,8 +44,6 @@ export default function AdminLayout() {
         posts,
         setPosts,
         matchPairs: workspacePostMatches,
-        escalationState,
-        setEscalationState,
         quickReplies,
         setQuickReplies,
         notificationState,

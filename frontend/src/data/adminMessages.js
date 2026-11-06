@@ -10,15 +10,6 @@ export function createAdminMessages(now = Date.now()) {
   return {
     contacts: [
       {
-        id: 'mod-linh',
-        name: 'Linh Nguyễn',
-        initials: 'LN',
-        role: 'moderator',
-        email: 'linh.mod@example.com',
-        description: 'Moderator · Kiểm duyệt cộng đồng',
-        color: 'purple',
-      },
-      {
         id: 'mod-nam',
         name: 'Hoàng Nam',
         initials: 'HN',
@@ -29,41 +20,6 @@ export function createAdminMessages(now = Date.now()) {
       },
     ],
     threads: [
-      {
-        id: 'admin-thread-linh',
-        contactId: 'mod-linh',
-        unread: 0,
-        priority: true,
-        resolved: false,
-        createdAt: ago(120),
-        context: {
-          label: 'Escalation cần hỗ trợ',
-          title: 'Rà soát xác nhận trao trả quá hạn',
-          code: '#401',
-          path: '/admin/escalations',
-          icon: 'shield',
-        },
-        messages: [
-          message(
-            'al-1',
-            'peer',
-            'Chào admin, nhờ bạn hỗ trợ rà soát hồ sơ #401. Người dùng đã xác nhận nhận lại ví nhưng bên nhặt chưa phản hồi.',
-            120
-          ),
-          message(
-            'al-2',
-            'me',
-            'Mình đã tiếp nhận. Bạn bổ sung giúp mình căn cứ trao trả và lịch sử liên hệ hai bên nhé.',
-            95
-          ),
-          message(
-            'al-3',
-            'peer',
-            'Mình đã bổ sung vào hồ sơ. Nhờ admin xem lại trước khi xác nhận hộ.',
-            8
-          ),
-        ],
-      },
       {
         id: 'admin-thread-nam',
         contactId: 'mod-nam',
@@ -90,6 +46,6 @@ export function createAdminMessages(now = Date.now()) {
       },
     ],
     drafts: {},
-    activeId: 'admin-thread-linh',
+    activeId: 'admin-thread-nam',
   }
 }

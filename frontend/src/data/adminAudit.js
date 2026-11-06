@@ -18,19 +18,6 @@ export function createAdminAudit(now = Date.now()) {
       createdAt: ago(0.12),
     },
     {
-      id: 'AUD-1002',
-      actor: 'Kiểm duyệt viên',
-      actorRole: 'Moderator',
-      action: 'verify',
-      entityType: 'EscalationTicket',
-      entityId: '671b00000000000000000401',
-      detail: {
-        displayCode: 'ESC-401',
-        summary: 'Gắn nhãn đã xác minh',
-      },
-      createdAt: ago(0.45),
-    },
-    {
       id: 'AUD-1003',
       actor: 'Quản trị viên',
       actorRole: 'Admin',
@@ -56,19 +43,6 @@ export function createAdminAudit(now = Date.now()) {
         reason: 'Phát hiện thông tin cần được kiểm tra thêm.',
       },
       createdAt: ago(1.7),
-    },
-    {
-      id: 'AUD-1005',
-      actor: 'Kiểm duyệt viên',
-      actorRole: 'Moderator',
-      action: 'remind',
-      entityType: 'EscalationTicket',
-      entityId: '671b00000000000000000402',
-      detail: {
-        displayCode: 'ESC-402',
-        summary: 'Gửi email nhắc hai bên',
-      },
-      createdAt: ago(2.4),
     },
     {
       id: 'AUD-1006',
@@ -98,19 +72,6 @@ export function createAdminAudit(now = Date.now()) {
       createdAt: ago(4.3),
     },
     {
-      id: 'AUD-1008',
-      actor: 'Kiểm duyệt viên',
-      actorRole: 'Moderator',
-      action: 'returned',
-      entityType: 'EscalationTicket',
-      entityId: '671b00000000000000000407',
-      detail: {
-        displayCode: 'ESC-407',
-        summary: 'Xác nhận hộ đã trao trả',
-      },
-      createdAt: ago(5.2),
-    },
-    {
       id: 'AUD-1009',
       actor: 'Quản trị viên',
       actorRole: 'Admin',
@@ -122,20 +83,6 @@ export function createAdminAudit(now = Date.now()) {
         summary: 'Thu hồi quyền Moderator',
       },
       createdAt: ago(6.4),
-    },
-    {
-      id: 'AUD-1010',
-      actor: 'Kiểm duyệt viên',
-      actorRole: 'Moderator',
-      action: 'incorrect',
-      entityType: 'EscalationTicket',
-      entityId: '671b00000000000000000405',
-      detail: {
-        displayCode: 'ESC-405',
-        summary: 'Xác nhận hộ kết quả matching không chính xác',
-        reason: 'Thông tin hai bài đăng không đủ cơ sở để xác nhận.',
-      },
-      createdAt: ago(8.1),
     },
     {
       id: 'AUD-1011',
