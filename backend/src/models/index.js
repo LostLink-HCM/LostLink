@@ -1,7 +1,10 @@
 module.exports = {
   User: require('./User'),
+  Session: require('./Session'),
   Badge: require('./Badge'),
   EmailToken: require('./EmailToken'),
+  UserFollow: require('./UserFollow'),
+  UserBlock: require('./UserBlock'),
 
   Category: require('./Category'),
   CategoryAttribute: require('./CategoryAttribute'),
@@ -12,6 +15,9 @@ module.exports = {
   CategoryMatchRelationMember: require('./CategoryMatchRelationMember'),
 
   Post: require('./Post'),
+  PostLike: require('./PostLike'),
+  SavedPost: require('./SavedPost'),
+  PostFollow: require('./PostFollow'),
   VerificationChallenge: require('./VerificationChallenge'),
 
   MatchSuggestion: require('./MatchSuggestion'),

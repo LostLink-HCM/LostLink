@@ -4,6 +4,9 @@ const Notification = require('./Notification')
 
 const { Schema } = mongoose
 
+// So sánh không phân biệt hoa thường
+const USERNAME_COLLATION = { locale: 'en', strength: 2 }
+
 const userBadgeSchema = new Schema(
   {
     badge: { type: Schema.Types.ObjectId, ref: 'Badge', required: true },
@@ -12,13 +15,13 @@ const userBadgeSchema = new Schema(
   { _id: false }
 )
 
-// Tài khoản người dùng
+// Tài khoản người dùng. Thích, lưu, theo dõi, chặn nằm ở collection riêng
+// (post_likes, saved_posts, post_follows, user_follows, user_blocks)
 const userSchema = new Schema(
   {
     username: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
       minlength: [3, 'Tên người dùng tối thiểu 3 ký tự.'],
       maxlength: [30, 'Tên người dùng tối đa 30 ký tự.'],
@@ -28,7 +31,7 @@ const userSchema = new Schema(
     // Trống nếu đăng nhập bằng Google
     passwordHash: { type: String, select: false },
 
-    googleId: { type: String, default: null, index: true, sparse: true },
+    googleId: { type: String, default: null },
 
     role: {
       type: String,
@@ -37,7 +40,7 @@ const userSchema = new Schema(
       index: true,
     },
 
-    // Hồ sơ cá nhân (U02)
+    // Hồ sơ cá nhân
     avatarUrl: { type: String, default: '' },
     bio: { type: String, default: '', maxlength: 500 },
     favoriteArea: { type: String, default: '' },
@@ -60,27 +63,32 @@ const userSchema = new Schema(
 
     emailVerifiedAt: { type: Date, default: null },
 
+    // Thời điểm đồng ý Điều khoản sử dụng và Chính sách bảo mật
+    termsAcceptedAt: { type: Date, default: null },
+
     // Thời điểm đăng nhập thành công gần nhất của tài khoản
     lastLoginAt: { type: Date, default: null },
 
     // Thời điểm gần nhất người dùng thực hiện hoạt động trên hệ thống
     lastActiveAt: { type: Date, default: null },
 
-    tokenVersion: { type: Number, default: 0 },
-
     // Yêu cầu xoá tài khoản, xoá hẳn sau 3 ngày
     deleteRequestedAt: { type: Date, default: null },
 
     badges: [userBadgeSchema],
-
-    // Tương tác với bài đăng và người dùng khác
-    likedPosts: [{ type: Schema.Types.ObjectId, ref: 'Post' }],
-    savedPosts: [{ type: Schema.Types.ObjectId, ref: 'Post' }],
-    followedPosts: [{ type: Schema.Types.ObjectId, ref: 'Post' }],
-    followingUsers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
-    blockedUsers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
   },
   { timestamps: true, collection: 'users' }
 )
 
-module.exports = mongoose.model('User', userSchema)
+userSchema.index({ username: 1 }, { unique: true, collation: USERNAME_COLLATION })
+
+// Chỉ đánh unique trên tài khoản đã liên kết Google, bỏ qua các giá trị null
+userSchema.index(
+  { googleId: 1 },
+  { unique: true, partialFilterExpression: { googleId: { $type: 'string' } } }
+)
+
+const User = mongoose.model('User', userSchema)
+User.USERNAME_COLLATION = USERNAME_COLLATION
+
+module.exports = User
