@@ -8,6 +8,7 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "seed": "node src/seeds/index.js",
+    "seed:demo": "node src/seeds/index.js --demo",
     "db:sync-indexes": "node src/scripts/syncIndexes.js",
     "lint": "oxlint",
     "test": "node --test --test-global-setup=tests/setup/globalSetup.js --require ./tests/setup/env.js --test-timeout=60000 \"tests/**/*.test.js\"",

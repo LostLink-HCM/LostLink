@@ -1,0 +1,182 @@
+const { AttributeValue, Category, CategoryAttribute, Comment, Post, User } = require('../models')
+const POSTS = require('./data/posts')
+const POST_IMAGES = require('./data/postImages')
+
+const HOUR = 60 * 60 * 1000
+const MINUTE = 60 * 1000
+
+// Vị trí công khai lệch khoảng 150–250 m so với vị trí thật, cố định theo thứ tự bài
+// để mỗi lần seed ra cùng kết quả
+const blur = (lat, lng, index) => {
+  const angle = (index * 137.5 * Math.PI) / 180
+  const meters = 150 + (index % 5) * 25
+  return [lng + (meters / 108000) * Math.cos(angle), lat + (meters / 111000) * Math.sin(angle)]
+}
+
+const point = (coordinates) => ({ type: 'Point', coordinates })
+
+// { 'Ví & tiền': { 'Chất liệu': { id, values: { Da: id } } } }
+const loadAttributeIndex = async () => {
+  const index = {}
+  const categories = await Category.find()
+  for (const category of categories) {
+    index[category.name] = { id: category._id, attributes: {} }
+    const attributes = await CategoryAttribute.find({ category: category._id })
+    for (const attribute of attributes) {
+      const values = await AttributeValue.find({ attribute: attribute._id })
+      index[category.name].attributes[attribute.name] = {
+        id: attribute._id,
+        values: Object.fromEntries(values.map((value) => [value.value, value._id])),
+      }
+    }
+  }
+  return index
+}
+
+const buildAttributes = (categoryIndex, definition) =>
+  Object.entries(definition.attributes ?? {}).map(([name, value]) => {
+    const attribute = categoryIndex.attributes[name]
+    if (!attribute?.values[value]) {
+      throw new Error(`"${definition.title}": không có thuộc tính ${name} = ${value}`)
+    }
+    return { attribute: attribute.id, attributeValue: attribute.values[value] }
+  })
+
+// Lịch sử trạng thái: đăng (chờ duyệt) → Moderator duyệt hoặc từ chối → các bước sau
+const buildHistory = (definition, owner, moderator, createdAt, now) => {
+  const history = [{ status: 'pending', changedBy: owner._id, changedAt: createdAt }]
+  const reviewedAt = new Date(createdAt.getTime() + 15 * MINUTE)
+  const status = definition.status ?? 'searching'
+  if (status === 'pending') return history
+  if (status === 'rejected') {
+    history.push({
+      status: 'rejected',
+      changedBy: moderator._id,
+      note: 'Không phải tin mất hoặc nhặt được đồ',
+      changedAt: reviewedAt,
+    })
+    return history
+  }
+  history.push({ status: 'searching', changedBy: moderator._id, changedAt: reviewedAt })
+  if (status === 'contacted') {
+    history.push({
+      status: 'contacted',
+      changedBy: null,
+      changedAt: new Date(reviewedAt.getTime() + HOUR),
+    })
+  }
+  if (status === 'closed') {
+    history.push({ status: 'closed', changedBy: owner._id, changedAt: new Date(now - 24 * HOUR) })
+  }
+  if (status === 'returned') {
+    history.push({
+      status: 'returned',
+      changedBy: owner._id,
+      changedAt: new Date(now - definition.returnedHoursAgo * HOUR),
+    })
+  }
+  return history
+}
+
+// Tài khoản cần có sẵn: tác giả bài, người bình luận và một Moderator (người duyệt bài).
+// Chỉ đọc, không tạo hay sửa tài khoản, nên dùng được cả với tài khoản sẵn có trên production
+const findSeedAccounts = async () => {
+  const usernames = [
+    ...new Set(POSTS.flatMap((p) => [p.author, ...(p.comments ?? []).map((c) => c[0])])),
+  ]
+  const users = await User.find({ username: { $in: usernames } })
+  const userByName = Object.fromEntries(users.map((user) => [user.username, user]))
+  const missing = usernames.filter((name) => !userByName[name])
+  if (missing.length) throw new Error(`Thiếu tài khoản: ${missing.join(', ')}`)
+  const moderator = await User.findOne({ role: 'moderator' })
+  if (!moderator) throw new Error('Thiếu tài khoản moderator')
+  return { userByName, moderator }
+}
+
+const seedPosts = async () => {
+  const now = Date.now()
+  const { userByName, moderator } = await findSeedAccounts()
+  const attributeIndex = await loadAttributeIndex()
+
+  // Chỉ xoá đúng các bài mẫu (cùng tác giả và tiêu đề) rồi tạo lại, để chạy nhiều lần vẫn ra
+  // cùng dữ liệu mà không đụng tới bài thật của các tài khoản này
+  const authorIds = [...new Set(POSTS.map((p) => p.author))].map((name) => userByName[name]._id)
+  const oldPostIds = await Post.find({
+    owner: { $in: authorIds },
+    title: { $in: POSTS.map((p) => p.title) },
+  }).distinct('_id')
+  await Comment.deleteMany({ post: { $in: oldPostIds } })
+  await Post.deleteMany({ _id: { $in: oldPostIds } })
+
+  let listed = 0
+  for (const [index, definition] of POSTS.entries()) {
+    const owner = userByName[definition.author]
+    const categoryIndex = attributeIndex[definition.category]
+    if (!categoryIndex) throw new Error(`Không có danh mục ${definition.category}`)
+
+    const createdAt = new Date(now - definition.postedHoursAgo * HOUR)
+    const timeFrom = new Date(createdAt.getTime() - definition.happenedHoursBefore * HOUR)
+    const timeTo = new Date(
+      Math.min(timeFrom.getTime() + definition.windowHours * HOUR, createdAt.getTime())
+    )
+    const statusHistory = buildHistory(definition, owner, moderator, createdAt, now)
+    const comments = definition.comments ?? []
+
+    const post = await Post.create({
+      owner: owner._id,
+      type: definition.type,
+      category: categoryIndex.id,
+      title: definition.title,
+      description: definition.description,
+      timeFrom,
+      timeTo,
+      area: definition.area,
+      placeName: definition.placeName,
+      locType: 'point',
+      locExact: point([definition.lng, definition.lat]),
+      locPublic: point(blur(definition.lat, definition.lng, index)),
+      status: definition.status ?? 'searching',
+      isHidden: Boolean(definition.hiddenReason),
+      hiddenReason: definition.hiddenReason ?? '',
+      viewCount: definition.views,
+      likeCount: definition.likes,
+      commentCount: comments.length,
+      contents: definition.contents ?? [],
+      attributes: buildAttributes(categoryIndex, definition),
+      images: (POST_IMAGES[definition.image] ?? []).map((image, order) => ({
+        url: image.url,
+        order,
+      })),
+      statusHistory,
+    })
+
+    // Mongoose tự đặt createdAt là lúc chạy seed, ghi đè bằng thời điểm đăng giả lập
+    const updatedAt = statusHistory.at(-1).changedAt
+    await Post.collection.updateOne({ _id: post._id }, { $set: { createdAt, updatedAt } })
+
+    for (const [author, body, minutesAfter] of comments) {
+      const comment = await Comment.create({ post: post._id, user: userByName[author]._id, body })
+      const at = new Date(Math.min(createdAt.getTime() + minutesAfter * MINUTE, now))
+      await Comment.collection.updateOne(
+        { _id: comment._id },
+        { $set: { createdAt: at, updatedAt: at } }
+      )
+    }
+
+    // Cùng điều kiện với danh sách công khai: đã duyệt, không bị ẩn, bài đã trao trả chỉ hiện trong 7 ngày
+    const returnedLongAgo = post.status === 'returned' && definition.returnedHoursAgo > 7 * 24
+    if (
+      ['searching', 'contacted', 'returned'].includes(post.status) &&
+      !post.isHidden &&
+      !returnedLongAgo
+    ) {
+      listed += 1
+    }
+  }
+
+  console.log(
+    `  ✓ ${POSTS.length} bài đăng (${listed} bài công khai, ${POSTS.length - listed} bài ẩn/chờ duyệt/từ chối/đã đóng)`
+  )
+}
+
+module.exports = { seedPosts, findSeedAccounts }
