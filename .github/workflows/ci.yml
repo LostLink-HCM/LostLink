@@ -195,9 +195,11 @@ jobs:
     needs: [format, backend, frontend, e2e, audit, docker, secrets]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    # GitHub tự ghi một lần deploy vào mục Deployments / Environments của repo
+    # GitHub tự ghi một lần deploy vào mục Deployments / Environments của repo. Dùng lại
+    # environment "main - lostlink-api" (cùng kiểu tên Render đặt, giữ lịch sử deploy cũ)
+    # để mục Deployments chỉ có một dòng cho backend
     environment:
-      name: lostlink-api
+      name: main - lostlink-api
       url: https://lostlink-api-158f.onrender.com/api/health
     permissions:
       contents: read
