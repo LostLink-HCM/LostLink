@@ -10,4 +10,11 @@ const listPosts = asyncHandler(async (req, res) => {
   res.json({ success: true, data })
 })
 
-module.exports = { listPosts }
+// Chi tiết một bài theo loại tin và slug, vd GET /api/posts/lost/mat-vi-da-mau-nau
+const getPost = asyncHandler(async (req, res) => {
+  const { type, slug } = matchedData(req, { locations: ['params'] })
+  const data = await postService.getPostDetail({ type, slug }, req.user ?? null)
+  res.json({ success: true, data })
+})
+
+module.exports = { listPosts, getPost }

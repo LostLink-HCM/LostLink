@@ -83,6 +83,9 @@ describe('UC23 - Ràng buộc bài đăng', () => {
       type: 'lost',
       category: category._id,
       title: 'Mất ví da màu nâu',
+      // validateSync không chạy hook tạo mã và slug (bất đồng bộ) nên đặt sẵn
+      code: 'L011126001',
+      slug: 'mat-vi-da-mau-nau',
       timeFrom: new Date('2026-11-01T08:00:00Z'),
       ...fields,
     })

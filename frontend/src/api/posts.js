@@ -8,3 +8,6 @@ export const listPosts = (params) => {
   )
   return api.get(`/posts?${query}`)
 }
+
+// Chi tiết một bài theo loại tin (lost/found) và slug. Mỗi lần gọi server tính một lượt xem
+export const getPost = (type, slug) => api.get(`/posts/${type}/${encodeURIComponent(slug)}`)

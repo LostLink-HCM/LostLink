@@ -1,4 +1,6 @@
 const { AttributeValue, Category, CategoryAttribute, Comment, Post, User } = require('../models')
+const { refreshReturnCount } = require('../services/returnService')
+const { formatPostCode, postCodePrefix } = require('../utils/postCode')
 const POSTS = require('./data/posts')
 const POST_IMAGES = require('./data/postImages')
 
@@ -93,6 +95,24 @@ const findSeedAccounts = async () => {
   return { userByName, moderator }
 }
 
+// Mã bài theo thời điểm đăng giả lập (vd L071126001): số thứ tự theo đúng thứ tự đăng trong ngày
+// của từng loại tin, nối tiếp các bài khác đã có trong ngày đó. Trả về mã theo vị trí trong POSTS
+const assignCodes = async (now) => {
+  const oldestFirst = [...POSTS.keys()].sort(
+    (a, b) => POSTS[b].postedHoursAgo - POSTS[a].postedHoursAgo
+  )
+  const lastSequence = {}
+  const codes = []
+  for (const index of oldestFirst) {
+    const { type, postedHoursAgo } = POSTS[index]
+    const prefix = postCodePrefix(type, new Date(now - postedHoursAgo * HOUR))
+    lastSequence[prefix] ??= await Post.lastCodeSequence(prefix)
+    lastSequence[prefix] += 1
+    codes[index] = formatPostCode(prefix, lastSequence[prefix])
+  }
+  return codes
+}
+
 const seedPosts = async () => {
   const now = Date.now()
   const { userByName, moderator } = await findSeedAccounts()
@@ -108,6 +128,7 @@ const seedPosts = async () => {
   await Comment.deleteMany({ post: { $in: oldPostIds } })
   await Post.deleteMany({ _id: { $in: oldPostIds } })
 
+  const codes = await assignCodes(now)
   let listed = 0
   for (const [index, definition] of POSTS.entries()) {
     const owner = userByName[definition.author]
@@ -123,6 +144,7 @@ const seedPosts = async () => {
     const comments = definition.comments ?? []
 
     const post = await Post.create({
+      code: codes[index],
       owner: owner._id,
       type: definition.type,
       category: categoryIndex.id,
@@ -177,6 +199,9 @@ const seedPosts = async () => {
   console.log(
     `  ✓ ${POSTS.length} bài đăng (${listed} bài công khai, ${POSTS.length - listed} bài ẩn/chờ duyệt/từ chối/đã đóng)`
   )
+
+  // Số lần trao trả của các tác giả đếm lại từ bài đã trao trả vừa tạo
+  for (const id of authorIds) await refreshReturnCount(id)
 }
 
 module.exports = { seedPosts, findSeedAccounts }

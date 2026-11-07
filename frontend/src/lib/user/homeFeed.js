@@ -19,6 +19,13 @@ export const DEFAULT_FILTERS = {
 
 export const TYPE_LABELS = { lost: 'Mất đồ', found: 'Nhặt được' }
 
+// Loại tin trên URL chi tiết bài: /mat-do/<slug>, /nhat-duoc/<slug>
+export const TYPE_PATHS = { lost: 'mat-do', found: 'nhat-duoc' }
+
+// Đường dẫn chi tiết bài. Bài mẫu (dữ liệu giả, chưa có slug) vẫn mở ở /posts/:id
+export const postPath = (post) =>
+  post.slug ? `/${TYPE_PATHS[post.type]}/${post.slug}` : `/posts/${post.id}`
+
 // Đặc điểm công khai của bài. Bài Nhặt được giấu "Bên trong có" vì đó là chi tiết
 // chỉ chủ nhân biết, dùng cho câu hỏi xác minh và ghép cặp
 export function publicTraits(post) {
@@ -183,6 +190,7 @@ export function formatTimeWindow(timeFrom, timeTo, now = Date.now()) {
 // Card từ API → dữ liệu PostCard đang dùng. Bài không ảnh hiện ảnh minh họa của danh mục
 export const toFeedPost = (card, now = Date.now()) => ({
   id: card.id,
+  slug: card.slug,
   type: card.type,
   status: card.status,
   category: card.category?.name ?? 'Khác',
@@ -198,4 +206,37 @@ export const toFeedPost = (card, now = Date.now()) => ({
   views: card.counts.views,
   commentCount: card.counts.comments,
   images: card.coverImage ? [card.coverImage] : [],
+})
+
+// Chi tiết bài từ API → dữ liệu trang Chi tiết bài đăng
+export const toDetailPost = (detail, now = Date.now()) => ({
+  id: detail.id,
+  slug: detail.slug,
+  type: detail.type,
+  status: detail.status,
+  category: detail.category?.name ?? 'Khác',
+  categorySlug: detail.category?.slug ?? 'khac',
+  title: detail.title,
+  desc: detail.description,
+  traits: detail.attributes.map(({ name, value }) => ({ label: name, value })),
+  images: detail.images,
+  area: detail.area,
+  address: detail.placeName,
+  timeWindow: formatTimeWindow(detail.timeFrom, detail.timeTo, now),
+  createdAt: detail.createdAt,
+  author: detail.author?.username ?? '',
+  authorStats: {
+    reputation: detail.author?.reputationScore ?? 0,
+    returned: detail.author?.returnCount ?? 0,
+  },
+  likes: detail.counts.likes,
+  views: detail.counts.views,
+  commentCount: detail.counts.comments,
+  comments: detail.comments.map((comment) => ({
+    id: comment.id,
+    author: comment.author?.username ?? 'Người dùng LostLink',
+    text: comment.body,
+    createdAt: comment.createdAt,
+  })),
+  viewer: detail.viewer,
 })

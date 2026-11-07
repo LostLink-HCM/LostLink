@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { RequireAuth } from './auth/guards.jsx'
 import HomePage from './pages/user/HomePage.jsx'
 import TrendingPage from './pages/user/TrendingPage.jsx'
+import MockPostDetailPage from './pages/user/MockPostDetailPage.jsx'
 import PostDetailPage from './pages/user/PostDetailPage.jsx'
 import VerifyPage from './pages/user/VerifyPage.jsx'
 import ReviewPage from './pages/user/ReviewPage.jsx'
@@ -63,7 +64,11 @@ function App() {
               </RequireAuth>
             }
           />
-          <Route path="posts/:id" element={<PostDetailPage />} />
+          {/* Chi tiết bài thật theo loại tin và slug, vd /mat-do/mat-vi-da-mau-nau */}
+          <Route path="mat-do/:slug" element={<PostDetailPage type="lost" />} />
+          <Route path="nhat-duoc/:slug" element={<PostDetailPage type="found" />} />
+          {/* Bài mẫu của các màn hình chưa nối API (Ghép cặp, Tin nhắn, Hồ sơ) */}
+          <Route path="posts/:id" element={<MockPostDetailPage />} />
           <Route path="leaderboard" element={<LeaderboardPage />} />
           <Route
             path="matches"

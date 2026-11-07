@@ -46,6 +46,9 @@ const userSchema = new Schema(
     favoriteArea: { type: String, default: '' },
 
     reputationScore: { type: Number, default: 0 },
+    // Số lần người này trả đồ cho người khác thành công. Lưu sẵn để hiện nhanh ở chi tiết bài,
+    // hồ sơ, bảng vinh danh; giá trị đếm từ các bài đã trao trả thật (xem returnService)
+    returnCount: { type: Number, default: 0, min: 0 },
 
     // Thiết lập thông báo, notificationTypes rỗng nghĩa là nhận tất cả các loại
     emailOptIn: { type: Boolean, default: true },

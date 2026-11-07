@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import { getPost } from '../../api/posts'
 import { useAuth } from '../../auth/AuthContext'
 import Icon from '../../components/common/Icon'
 import Avatar from '../../components/user/Avatar'
@@ -14,10 +15,9 @@ import TypeTag from '../../components/user/home/TypeTag'
 import CommentSection from '../../components/user/post/CommentSection'
 import PostActionSheet from '../../components/user/post/PostActionSheet'
 import PostGallery from '../../components/user/post/PostGallery'
-import { formatCount, publicTraits, timeAgo } from '../../lib/user/homeFeed'
+import { formatCount, timeAgo, toDetailPost } from '../../lib/user/homeFeed'
 import { isMatchable, suggestionsFor } from '../../lib/user/matches'
 import { profilePath } from '../../lib/user/profiles'
-import { reputationOf } from '../../lib/user/reputation'
 
 const formatDate = (iso, options) => new Date(iso).toLocaleDateString('vi-VN', options)
 
@@ -25,80 +25,112 @@ const formatDate = (iso, options) => new Date(iso).toLocaleDateString('vi-VN', o
 const mapUrl = (place) =>
   `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`
 
-export default function PostDetailPage() {
-  const { id } = useParams()
-  const { user } = useAuth()
-  const navigate = useNavigate()
-  const ctx = useOutletContext()
-  const { posts, comments, now, liked, saved, followed, requireMember } = ctx
+const pageClass = 'mx-auto max-w-360 px-4 pt-5 pb-10 sm:px-6 lg:px-10 lg:pt-7'
+const LOAD_ERROR = 'Không thể tải bài đăng, vui lòng thử lại.'
 
-  const [sheetOpen, setSheetOpen] = useState(false)
-  const closeSheet = useCallback(() => setSheetOpen(false), [])
+// Tải chi tiết bài theo loại tin và slug. Mỗi lần gọi API server tính một lượt xem, nên giữ
+// lời gọi trong ref: StrictMode chạy effect hai lần vẫn chỉ gọi một lần cho mỗi lần mở bài.
+// Đợi khôi phục phiên đăng nhập xong mới gọi, nếu không request đi không kèm token: chủ bài bị
+// coi là Guest (vẫn thấy nút nhận đồ, Báo cáo) và lượt xem của chính họ bị tính.
+// Đăng xuất hoặc đổi tài khoản ngay trên trang thì tải lại để các nút đúng với người đang xem
+function usePostDetail(type, slug) {
+  const { user, ready } = useAuth()
+  const [retry, setRetry] = useState(0)
+  const key = `${type}/${slug}#${user?.id ?? 'guest'}#${retry}`
+  const [state, setState] = useState({ key: null, post: null, error: null })
+  const request = useRef({ key: null, promise: null })
 
-  const post = posts.find((item) => String(item.id) === id)
-  const postComments = useMemo(
-    () => comments.filter((item) => String(item.postId) === id),
-    [comments, id]
-  )
-
-  // Mỗi lần mở bài tính một lượt xem; ref chặn StrictMode chạy effect hai lần
-  const { addView } = ctx
-  const countedId = useRef(null)
   useEffect(() => {
-    if (countedId.current === id) return
-    countedId.current = id
-    addView(Number(id))
-  }, [id, addView])
+    if (!ready) return undefined
+    if (request.current.key !== key) request.current = { key, promise: getPost(type, slug) }
+    let active = true
+    request.current.promise
+      .then((res) => active && setState({ key, post: toDetailPost(res.data), error: null }))
+      .catch((error) => active && setState({ key, post: null, error }))
+    return () => {
+      active = false
+    }
+  }, [ready, key, type, slug])
+
+  const loading = state.key !== key
+  return { ...state, loading, reload: () => setRetry((count) => count + 1) }
+}
+
+// UC04 Xem chi tiết bài đăng, mở ở /mat-do/<slug> hoặc /nhat-duoc/<slug>
+export default function PostDetailPage({ type }) {
+  const { slug } = useParams()
+  const { post, error, loading, reload } = usePostDetail(type, slug)
 
   useEffect(() => {
     window.scrollTo(0, 0)
-  }, [id])
+  }, [type, slug])
 
-  // Bài không tồn tại hoặc đã bị ẩn (luồng ngoại lệ khi xem chi tiết)
-  if (!post) {
+  if (loading) return <DetailSkeleton />
+
+  if (error) {
+    // 2.a Bài không tồn tại, chưa duyệt hoặc đã bị ẩn; 2.b lỗi tải khác
+    const missing = error.status === 404
     return (
-      <div className="mx-auto max-w-360 px-4 pt-5 pb-10 sm:px-6 lg:px-10 lg:pt-7">
+      <div className={pageClass}>
         <BackLink to="/">Quay lại danh sách</BackLink>
         <Card>
           <EmptyState
-            icon="search"
-            title="Không tìm thấy bài đăng"
-            description="Bài đăng không tồn tại hoặc đã bị ẩn."
+            icon={missing ? 'search' : 'warning'}
+            title={missing ? 'Không tìm thấy bài đăng' : LOAD_ERROR}
+            description={missing ? 'Bài đăng không tồn tại hoặc đã bị ẩn.' : undefined}
           />
+          {!missing && (
+            <div className="flex justify-center pb-10">
+              <Button onClick={reload}>Thử lại</Button>
+            </div>
+          )}
         </Card>
       </div>
     )
   }
 
+  return <PostDetail key={post.id} post={post} />
+}
+
+function PostDetail({ post }) {
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const ctx = useOutletContext()
+  const { now, requireMember } = ctx
+
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const closeSheet = useCallback(() => setSheetOpen(false), [])
+
+  // Thích, Lưu, Theo dõi chưa có API: bấm thì đảo trạng thái server trả về (giữ ở phía client)
+  const flipped = (set) => set.has(post.id)
+  const isLiked = post.viewer.liked !== flipped(ctx.liked)
+  const isSaved = post.viewer.saved !== flipped(ctx.saved)
+  const isFollowed = post.viewer.following !== flipped(ctx.followed)
+  const likeCount = post.likes + (isLiked ? 1 : 0) - (post.viewer.liked ? 1 : 0)
+
+  // Bình luận từ server, cộng bình luận vừa viết trên máy (chưa có API bình luận)
+  const localComments = useMemo(
+    () => ctx.comments.filter((item) => String(item.postId) === String(post.id)),
+    [ctx.comments, post.id]
+  )
+  const comments = [...post.comments, ...localComments]
+
   const lost = post.type === 'lost'
-  const traits = publicTraits(post)
-  const isLiked = liked.has(post.id)
-  // Người chưa có lịch sử điểm vẫn hiện 0 điểm, 0 lần trao trả
-  const author = reputationOf(post.author) ?? { reputation: 0, returned: 0 }
+  const isMine = post.viewer.isOwner
+  const claimLabel = lost ? 'Tôi đang giữ món này' : 'Đây là đồ của tôi'
 
   // Xem hồ sơ cần đăng nhập, Guest được đưa sang đăng nhập rồi quay lại bài này
   const openProfile = () => {
     if (requireMember()) navigate(profilePath(post.author))
   }
-
-  const isSaved = saved.has(post.id)
-  const isFollowed = followed.has(post.id)
-  const claimLabel = lost ? 'Tôi đang giữ món này' : 'Đây là đồ của tôi'
-
   const report = () => {
     if (requireMember()) navigate(`/posts/${post.id}/report`)
   }
-
-  const claim = () => {
-    if (!lost && post.question) {
-      if (requireMember()) navigate(`/posts/${post.id}/verify`)
-    } else ctx.contactAbout(post)
-  }
+  const claim = () => ctx.contactAbout(post)
 
   // Bài của chính mình: không nhận đồ hay báo cáo, thay bằng lối vào gợi ý ghép cặp
-  const isMine = post.author === user?.username
   const showMatches = isMine && isMatchable(post)
-  const matchCount = showMatches ? suggestionsFor(post, posts, ctx.matches).length : 0
+  const matchCount = showMatches ? suggestionsFor(post, ctx.posts, ctx.matches).length : 0
   const matchesPath = `/matches?post=${post.id}`
 
   // Trên mobile các hành động gom vào nút ⋯ thay cho hai khối ở cột phải
@@ -127,13 +159,14 @@ export default function PostDetailPage() {
       ]
 
   return (
-    <div className="mx-auto max-w-360 px-4 pt-5 pb-10 sm:px-6 lg:px-10 lg:pt-7">
+    <div className={pageClass}>
       <BackLink to="/">Quay lại danh sách</BackLink>
 
       {/* Mobile: ảnh, thông tin rồi bình luận, hành động nằm trong nút ⋯; desktop: cột phải dính bên cạnh */}
       <main className="grid grid-cols-1 items-start gap-x-6 gap-y-4 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-4 lg:col-start-1">
-          <PostGallery images={post.images} title={post.title} />
+          {/* 4.a Bài không có ảnh thì không hiện khu vực ảnh */}
+          {post.images.length > 0 && <PostGallery images={post.images} title={post.title} />}
 
           <Card as="article" className="relative p-5 lg:p-6">
             {sheetActions.length > 0 && (
@@ -174,7 +207,7 @@ export default function PostDetailPage() {
               {post.desc}
             </p>
 
-            {traits.length > 0 && (
+            {post.traits.length > 0 && (
               <section aria-labelledby="traits-heading" className="mb-5">
                 <h2
                   id="traits-heading"
@@ -183,7 +216,7 @@ export default function PostDetailPage() {
                   Đặc điểm
                 </h2>
                 <dl className="m-0 flex flex-wrap gap-2">
-                  {traits.map(({ label, value }) => (
+                  {post.traits.map(({ label, value }) => (
                     <div
                       key={label}
                       className="flex items-center gap-1.5 rounded-full bg-line-subtle px-3 py-1.5 text-caption"
@@ -220,12 +253,13 @@ export default function PostDetailPage() {
             <div className="flex flex-wrap items-center gap-3 border-t border-line-subtle pt-4">
               <LikeButton
                 liked={isLiked}
-                count={post.likes + (isLiked ? 1 : 0)}
+                count={likeCount}
                 onClick={() => ctx.toggleLike(post.id)}
                 withLabel
               />
               <span className="ml-auto text-tiny text-ink-subtle">
-                {formatCount(postComments.length)} bình luận · {formatCount(post.views)} lượt xem
+                {formatCount(post.commentCount + localComments.length)} bình luận ·{' '}
+                {formatCount(post.views)} lượt xem
               </span>
             </div>
           </Card>
@@ -244,8 +278,8 @@ export default function PostDetailPage() {
             </div>
             <dl className="m-0 mb-4 grid grid-cols-2 gap-2">
               {[
-                ['Điểm uy tín', author.reputation, true],
-                ['Đã trao trả', author.returned],
+                ['Điểm uy tín', post.authorStats.reputation, true],
+                ['Đã trao trả', post.authorStats.returned],
               ].map(([label, value, accent]) => (
                 <div
                   key={label}
@@ -255,7 +289,7 @@ export default function PostDetailPage() {
                   <dd
                     className={cx('m-0 text-lead font-bold', accent ? 'text-primary' : 'text-ink')}
                   >
-                    {value}
+                    {formatCount(value)}
                   </dd>
                 </div>
               ))}
@@ -289,7 +323,7 @@ export default function PostDetailPage() {
             </Card>
           )}
 
-          {/* Khối nhận đồ / báo đang giữ đồ */}
+          {/* 7.b Bài của chính mình thì không có khối nhận đồ và báo cáo */}
           {!isMine && (
             <Card as="section" padding="md">
               <h2 className="m-0 mb-1.5 text-body font-bold text-ink">
@@ -339,8 +373,9 @@ export default function PostDetailPage() {
         </aside>
 
         <div className="min-w-0 lg:col-start-1">
+          {/* 6.a Chưa có bình luận thì CommentSection hiện "Chưa có bình luận nào" */}
           <CommentSection
-            comments={postComments}
+            comments={comments}
             user={user}
             now={now}
             onAdd={(text) => ctx.addComment(post.id, text)}
@@ -351,6 +386,26 @@ export default function PostDetailPage() {
       </main>
 
       <PostActionSheet open={sheetOpen} onClose={closeSheet} actions={sheetActions} />
+    </div>
+  )
+}
+
+function DetailSkeleton() {
+  return (
+    <div className={pageClass} role="status" aria-label="Đang tải bài đăng">
+      <div className="mb-4 h-5 w-40 animate-pulse rounded bg-line-subtle" />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="flex flex-col gap-4">
+          <div className="aspect-4/3 animate-pulse rounded-2xl bg-line-subtle sm:aspect-auto sm:h-80 lg:h-90" />
+          <div className="flex flex-col gap-3 rounded-2xl bg-surface p-6">
+            <div className="h-3 w-1/3 animate-pulse rounded bg-line-subtle" />
+            <div className="h-6 w-3/4 animate-pulse rounded bg-line-subtle" />
+            <div className="h-3 w-full animate-pulse rounded bg-line-subtle" />
+            <div className="h-3 w-5/6 animate-pulse rounded bg-line-subtle" />
+          </div>
+        </div>
+        <div className="hidden h-56 animate-pulse rounded-2xl bg-line-subtle lg:block" />
+      </div>
     </div>
   )
 }
