@@ -17,6 +17,8 @@ if (missing.length) {
 module.exports = {
   nodeEnv,
   port: Number(process.env.PORT) || 5000,
+  // Mã commit của bản đang chạy, CI gắn vào image lúc build. Chạy local thì là 'dev'
+  appVersion: process.env.APP_VERSION || 'dev',
   mongoUri: process.env.MONGO_URI,
   clientUrl: process.env.CLIENT_URL || 'http://localhost:8080',
   // Số proxy đứng trước app (Render = 1)

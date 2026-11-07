@@ -140,6 +140,7 @@ jobs:
       - name: Build image
         run: >-
           docker build --tag "$IMAGE"
+          --build-arg "GIT_SHA=${{ github.sha }}"
           --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}"
           --label "org.opencontainers.image.revision=${{ github.sha }}"
           ${{ matrix.dir }}
@@ -194,12 +195,17 @@ jobs:
     needs: [format, backend, frontend, e2e, audit, docker, secrets]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # GitHub tự ghi một lần deploy vào mục Deployments / Environments của repo
+    environment:
+      name: lostlink-api
+      url: https://lostlink-api-158f.onrender.com/api/health
     permissions:
       contents: read
       packages: write
     env:
       LOCAL_IMAGE: lostlink-backend:${{ github.sha }}
       REGISTRY_IMAGE: ghcr.io/lostlink-hcm/lostlink-api
+      API_URL: https://lostlink-api-158f.onrender.com
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -225,3 +231,21 @@ jobs:
           image=$(printf '%s' "$REGISTRY_IMAGE:${{ github.sha }}" | jq -sRr @uri)
           curl -fsS -X POST "${RENDER_DEPLOY_HOOK_URL}&imgURL=${image}" > /dev/null
           echo "Deploy triggered for $REGISTRY_IMAGE:${{ github.sha }}"
+          echo "TRIGGERED=1" >> "$GITHUB_ENV"
+      # Deploy Hook chỉ nhận lệnh rồi trả về ngay, chờ tới khi Render chạy đúng commit này
+      # thì job mới xanh. Render deploy lỗi (thiếu biến môi trường, app không khởi động) thì job đỏ
+      - name: Wait for Render to serve this commit
+        if: env.TRIGGERED == '1'
+        timeout-minutes: 12
+        run: |
+          for attempt in $(seq 1 40); do
+            version=$(curl -fsS --max-time 60 "$API_URL/api/health" | jq -r '.version // empty' || true)
+            if [ "$version" = "${{ github.sha }}" ]; then
+              echo "Render is serving ${{ github.sha }}"
+              exit 0
+            fi
+            echo "Attempt $attempt: live version is '${version:-unavailable}', waiting..."
+            sleep 15
+          done
+          echo "::error::Render did not serve ${{ github.sha }} within the time limit, check the Events tab on Render"
+          exit 1

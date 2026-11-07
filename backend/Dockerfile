@@ -8,7 +8,10 @@ RUN npm ci --omit=dev
 
 # ---- Runtime: chỉ cần `node`, không cần npm ----
 FROM node:24-alpine
+# Mã commit do CI truyền vào (--build-arg GIT_SHA=...), /api/health trả lại để kiểm tra bản đang chạy
+ARG GIT_SHA=dev
 ENV NODE_ENV=production
+ENV APP_VERSION=$GIT_SHA
 WORKDIR /app
 
 # Cập nhật gói hệ điều hành và gỡ npm/corepack/yarn đi kèm image Node:

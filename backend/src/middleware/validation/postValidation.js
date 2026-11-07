@@ -1,6 +1,8 @@
-const { query } = require('express-validator')
+const { param, query, validationResult } = require('express-validator')
 
 const { AREAS } = require('../../config/areas')
+const Post = require('../../models/Post')
+const ApiError = require('../../utils/ApiError')
 const { isVnDate } = require('../../utils/vnTime')
 
 // Tham số để trống (?type=) coi như không gửi. Mỗi tham số phải là một chuỗi:
@@ -47,4 +49,15 @@ const listPostsRules = [
     .toInt(),
 ]
 
-module.exports = { listPostsRules }
+// Đường dẫn chi tiết bài: loại tin lost/found và slug đúng định dạng
+const postPathRules = [
+  param('type').isIn(['lost', 'found']),
+  param('slug').isLength({ max: 100 }).bail().matches(Post.SLUG_PATTERN),
+]
+
+const rejectInvalidPostPath = (req, res, next) => {
+  if (validationResult(req).isEmpty()) return next()
+  next(new ApiError(404, 'Bài đăng không tồn tại hoặc đã bị ẩn.', undefined, 'POST_NOT_FOUND'))
+}
+
+module.exports = { listPostsRules, postPathRules, rejectInvalidPostPath }

@@ -111,13 +111,15 @@ describe('UC01 - Xem danh sách tin mới', () => {
       'id',
       'imageCount',
       'placeName',
+      'slug',
       'status',
       'timeFrom',
       'timeTo',
       'title',
       'type',
     ])
-    assert.deepEqual(card.author, { username: 'nguoidang', avatarUrl: '' })
+    assert.deepEqual(card.author, { username: 'nguoidang', avatarUrl: null })
+    assert.equal(card.slug, 'vi-da-nau')
     assert.deepEqual(card.category, { slug: 'vi-tien', name: 'Ví & tiền', icon: '' })
     assert.equal(card.coverImage, 'https://example.com/1.jpg')
     assert.equal(card.imageCount, 2)

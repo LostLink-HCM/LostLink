@@ -1,6 +1,12 @@
 const mongoose = require('mongoose')
 
-const { lowercaseText, normalizeText } = require('../utils/text')
+const {
+  POST_CODE_PATTERN,
+  formatPostCode,
+  postCodePrefix,
+  sequenceOf,
+} = require('../utils/postCode')
+const { lowercaseText, normalizeText, slugify } = require('../utils/text')
 
 const { Schema } = mongoose
 
@@ -11,6 +17,9 @@ const MAX_IMAGES = 9
 const HOT_LIKE_WEIGHT = 20
 const TITLE_MAX = 120
 const DESCRIPTION_MAX = 1000
+const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/
+// Loại tin trên URL chi tiết bài: /mat-do/<slug>, /nhat-duoc/<slug>
+const TYPE_SLUGS = { lost: 'mat-do', found: 'nhat-duoc' }
 
 // Vị trí dạng GeoJSON: điểm (ghim, GPS, địa chỉ) hoặc đoạn đường
 const geoSchema = new Schema(
@@ -69,6 +78,24 @@ const postSchema = new Schema(
       required: true,
       trim: true,
       maxlength: [TITLE_MAX, 'Tiêu đề tối đa 120 ký tự.'],
+    },
+    // Mã bài cho Moderator/Admin tra cứu
+    code: {
+      type: String,
+      required: true,
+      unique: true,
+      immutable: true,
+      match: [POST_CODE_PATTERN, 'Mã bài đăng không đúng định dạng.'],
+    },
+    // Định danh bài trên URL thay cho mã, tạo từ tiêu đề lúc đăng và giữ nguyên khi sửa tiêu đề
+    // để liên kết đã chia sẻ không bị hỏng. Trùng thì thêm số: vi-da, vi-da-2, vi-da-3
+    slug: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      lowercase: true,
+      match: [SLUG_PATTERN, 'Slug chỉ gồm chữ thường không dấu, số và dấu gạch ngang.'],
     },
     description: {
       type: String,
@@ -141,6 +168,40 @@ const postSchema = new Schema(
   { timestamps: true, collection: 'posts' }
 )
 
+// Tạo slug cho bài mới từ tiêu đề, trùng thì thêm số. Loại tin đã có trên URL nên bỏ phần
+// lặp ở đầu: "Nhặt được chìa khóa" ở /nhat-duoc/chia-khoa, không phải /nhat-duoc/nhat-duoc-chia-khoa.
+// Tiêu đề không có chữ cái hay số nào (vd toàn ký hiệu) thì dùng "bai-dang"
+// Số thứ tự lớn nhất đã dùng của một tiền tố mã (loại tin + ngày), chưa có bài nào thì 0
+postSchema.statics.lastCodeSequence = async function lastCodeSequence(prefix) {
+  const last = await this.findOne({ code: new RegExp(`^${prefix}[0-9]{3}$`) })
+    .sort({ code: -1 })
+    .select('code')
+    .lean()
+  return last ? sequenceOf(last.code) : 0
+}
+
+// Bài mới chưa có mã thì cấp số tiếp theo của loại tin trong ngày đăng (giờ Việt Nam)
+postSchema.pre('validate', async function assignCode() {
+  if (this.code || !this.type) return
+  const prefix = postCodePrefix(this.type, this.createdAt ?? new Date())
+  this.code = formatPostCode(prefix, (await this.constructor.lastCodeSequence(prefix)) + 1)
+})
+
+postSchema.pre('validate', async function assignSlug() {
+  if (this.slug || !this.title) return
+  const typePrefix = `${TYPE_SLUGS[this.type]}-`
+  let base = slugify(this.title)
+  if (base.startsWith(typePrefix)) base = base.slice(typePrefix.length)
+  base = base || 'bai-dang'
+  // base chỉ gồm a-z, 0-9 và "-" nên ghép thẳng vào RegExp được
+  const taken = new Set(
+    await this.constructor.find({ slug: new RegExp(`^${base}(-[0-9]+)?$`) }).distinct('slug')
+  )
+  let slug = base
+  for (let n = 2; taken.has(slug); n += 1) slug = `${base}-${n}`
+  this.slug = slug
+})
+
 postSchema.pre('validate', function computeDerivedFields() {
   this.hotScore = this.viewCount + this.likeCount * HOT_LIKE_WEIGHT
   const text = [this.title, this.description, this.area, this.placeName].join(' ')
@@ -157,6 +218,8 @@ postSchema.index({ locExact: '2dsphere' })
 const Post = mongoose.model('Post', postSchema)
 Post.STATUSES = POST_STATUSES
 Post.HOT_LIKE_WEIGHT = HOT_LIKE_WEIGHT
+Post.TYPE_SLUGS = TYPE_SLUGS
+Post.SLUG_PATTERN = SLUG_PATTERN
 
 // Mức tăng hotScore tương ứng khi cộng lượt xem/thích bằng $inc, vd thích: hotScoreDelta({ likes: 1 })
 Post.hotScoreDelta = ({ views = 0, likes = 0 }) => views + likes * HOT_LIKE_WEIGHT

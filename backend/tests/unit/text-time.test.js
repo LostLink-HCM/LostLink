@@ -1,8 +1,15 @@
 const assert = require('node:assert/strict')
 const { describe, test } = require('node:test')
 
-const { escapeRegex, hasDiacritics, lowercaseText, normalizeText } = require('../../src/utils/text')
+const {
+  escapeRegex,
+  hasDiacritics,
+  lowercaseText,
+  normalizeText,
+  slugify,
+} = require('../../src/utils/text')
 const { endOfVnDay, isVnDate, startOfVnDay } = require('../../src/utils/vnTime')
+const { formatPostCode, postCodePrefix } = require('../../src/utils/postCode')
 
 describe('UC02 - Chuẩn hóa từ khóa tiếng Việt', () => {
   test('bỏ dấu, đổi đ thành d, viết thường và gộp khoảng trắng', () => {
@@ -22,6 +29,23 @@ describe('UC02 - Chuẩn hóa từ khóa tiếng Việt', () => {
   })
 })
 
+describe('UC04 - Tạo slug cho URL bài đăng', () => {
+  test('bỏ dấu, chỉ giữ chữ thường, số và gạch ngang', () => {
+    assert.equal(
+      slugify('Mất ví Louis Vuitton (màu nâu) ở Q.1!'),
+      'mat-vi-louis-vuitton-mau-nau-o-q-1'
+    )
+    assert.equal(slugify('  Đường Điện Biên Phủ  '), 'duong-dien-bien-phu')
+    assert.equal(slugify('!!! ???'), '')
+  })
+
+  test('slug dài thì cắt ở ranh giới từ, không để gạch ngang ở cuối', () => {
+    assert.equal(slugify('mot hai ba bon', 9), 'mot-hai')
+    assert.equal(slugify('abcdefghijkl', 5), 'abcde')
+    assert.ok(slugify('chữ '.repeat(60)).length <= 80)
+  })
+})
+
 describe('UC02 - Mốc ngày theo giờ Việt Nam', () => {
   test('đầu và cuối ngày tính theo UTC+7', () => {
     assert.equal(startOfVnDay('2026-11-03').toISOString(), '2026-11-02T17:00:00.000Z')
@@ -33,5 +57,21 @@ describe('UC02 - Mốc ngày theo giờ Việt Nam', () => {
     for (const value of ['2026-02-30', '2026-13-01', '03/11/2026', '2026-1-3', '', undefined]) {
       assert.equal(isVnDate(value), false, String(value))
     }
+  })
+})
+
+describe('Mã bài đăng', () => {
+  test('L cho Mất đồ, F cho Nhặt được, ngày đăng DDMMYY theo giờ Việt Nam', () => {
+    assert.equal(postCodePrefix('lost', '2026-11-07T03:00:00Z'), 'L071126')
+    assert.equal(postCodePrefix('found', '2026-11-07T03:00:00Z'), 'F071126')
+    // 23:30 ngày 06/11 giờ UTC đã là 06:30 ngày 07/11 giờ Việt Nam
+    assert.equal(postCodePrefix('lost', '2026-11-06T23:30:00Z'), 'L071126')
+    assert.equal(postCodePrefix('lost', '2026-11-06T16:59:59Z'), 'L061126')
+  })
+
+  test('số thứ tự 3 chữ số, quá 999 bài trong ngày thì báo lỗi', () => {
+    assert.equal(formatPostCode('L071126', 1), 'L071126001')
+    assert.equal(formatPostCode('F071126', 42), 'F071126042')
+    assert.throws(() => formatPostCode('L071126', 1000))
   })
 })

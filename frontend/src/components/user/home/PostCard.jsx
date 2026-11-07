@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { formatCount, timeAgo } from '../../../lib/user/homeFeed'
+import { formatCount, postPath, timeAgo } from '../../../lib/user/homeFeed'
 import { profilePath } from '../../../lib/user/profiles'
 import Icon from '../../common/Icon'
 import { cardClass } from '../Card'
@@ -58,7 +58,7 @@ export default function PostCard({ post, commentCount, liked, onToggleLike, now 
 
         <h3 className="m-0 mb-1.5 text-lead leading-snug font-bold tracking-tight text-ink sm:text-title">
           <Link
-            to={`/posts/${post.id}`}
+            to={postPath(post)}
             className={cx(
               'text-inherit no-underline after:absolute after:inset-0 after:rounded-2xl hover:text-primary',
               focusRing
