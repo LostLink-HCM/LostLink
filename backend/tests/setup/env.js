@@ -8,6 +8,8 @@ process.env.JWT_REFRESH_EXPIRE = '7d'
 process.env.ANSWER_HASH_SECRET = 'test-answer-secret'
 process.env.GOOGLE_CLIENT_ID = 'test-google-client'
 process.env.CLIENT_URL = 'http://localhost:8080'
+// Giả lập mã commit mà CI gắn vào image, /api/health trả lại giá trị này
+process.env.APP_VERSION = 'test-commit-sha'
 // Tin 1 proxy để test giả lập IP khác nhau qua X-Forwarded-For, mỗi test có hạn mức riêng
 process.env.TRUST_PROXY = '1'
 // Không gửi email hay báo lỗi ra ngoài khi chạy test. Đặt chuỗi rỗng chứ không xoá,
