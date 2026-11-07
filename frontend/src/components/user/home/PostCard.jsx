@@ -20,12 +20,22 @@ export default function PostCard({ post, commentCount, liked, onToggleLike, now 
         'relative flex gap-3.5 p-3.5 transition hover:border-line-strong hover:shadow-[0_10px_28px_-14px_rgb(22_35_58/0.25)] sm:gap-5 sm:p-4.5'
       )}
     >
-      <img
-        src={post.images[0]}
-        alt=""
-        loading="lazy"
-        className="h-28 w-24 shrink-0 rounded-xl bg-line-subtle object-cover sm:h-48 sm:w-44"
-      />
+      {post.images[0] ? (
+        <img
+          src={post.images[0]}
+          alt=""
+          loading="lazy"
+          className="h-28 w-24 shrink-0 rounded-xl bg-line-subtle object-cover sm:h-48 sm:w-44"
+        />
+      ) : (
+        // Bài không có ảnh: hiện ảnh minh họa của danh mục
+        <img
+          src={`/images/categories/${post.categorySlug ?? 'khac'}.svg`}
+          alt=""
+          loading="lazy"
+          className="h-28 w-24 shrink-0 rounded-xl bg-primary-subtle object-contain p-4 sm:h-48 sm:w-44 sm:p-8"
+        />
+      )}
 
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-tiny text-ink-subtle">

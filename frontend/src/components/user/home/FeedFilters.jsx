@@ -40,11 +40,15 @@ const dateClass =
   'h-9 w-full rounded-xl border border-line bg-surface px-2.5 text-caption text-ink outline-none focus:border-primary focus:ring-3 focus:ring-primary/12 aria-invalid:border-danger'
 
 // Chỉnh trên bản nháp, bấm "Áp dụng bộ lọc" mới lọc danh sách
-export default function FeedFilters({ draft, onChange, onApply, onReset, error, idPrefix }) {
-  const [expanded, setExpanded] = useState(false)
-  // Thu gọn chỉ còn một hàng là lựa chọn hiện tại ('' = Tất cả danh mục)
-  const categories = expanded ? ['', ...CATEGORIES] : [draft.category]
-
+export default function FeedFilters({
+  draft,
+  activeCount = 0,
+  onChange,
+  onApply,
+  onReset,
+  error,
+  idPrefix,
+}) {
   const setDate = (key) => (e) => onChange({ [key]: e.target.value, range: 'custom' })
 
   return (
@@ -56,18 +60,27 @@ export default function FeedFilters({ draft, onChange, onApply, onReset, error, 
       }}
       className="flex flex-col gap-5 [--text-body:11.5px] [--text-caption:10px] [--text-small:10.5px]"
     >
-      <div className="flex items-center justify-between">
+      {/* Giữ chiều cao cố định để nút xuất hiện không đẩy các mục bên dưới */}
+      <div className="flex min-h-7 items-center justify-between">
         <h2 className="m-0 text-body font-bold text-ink">Bộ lọc</h2>
-        <button
-          type="button"
-          onClick={onReset}
-          className={cx(
-            'cursor-pointer rounded-md border-0 bg-transparent px-1 text-caption font-medium text-primary hover:underline',
-            focusRing
-          )}
-        >
-          Xóa lọc
-        </button>
+        {/* Chỉ hiện khi đã chọn ít nhất một tiêu chí khác mặc định */}
+        {activeCount > 0 && (
+          <button
+            type="button"
+            onClick={onReset}
+            aria-label={`Xóa lọc, đang chọn ${activeCount} tiêu chí`}
+            className={cx(
+              'group inline-flex cursor-pointer items-center gap-1 rounded-full border border-primary/30 bg-primary-soft py-1 pr-1 pl-2.5 text-caption font-semibold text-primary shadow-[0_2px_8px_-2px_rgb(46_109_180/0.35)] transition-colors hover:bg-primary hover:text-white motion-safe:animate-ll-fade',
+              focusRing
+            )}
+          >
+            <Icon name="reset" size={12} />
+            Xóa lọc
+            <span className="grid min-w-4.5 place-items-center rounded-full bg-primary px-1 text-[9px] leading-4.5 font-bold text-white transition-colors group-hover:bg-white group-hover:text-primary">
+              {activeCount}
+            </span>
+          </button>
+        )}
       </div>
 
       <fieldset className="m-0 border-0 p-0">
@@ -96,75 +109,25 @@ export default function FeedFilters({ draft, onChange, onApply, onReset, error, 
         </div>
       </fieldset>
 
-      <fieldset className="m-0 border-0 p-0">
-        <legend className={legendClass}>Danh mục</legend>
-        <div className="flex flex-col gap-0.5">
-          {categories.map((name) => {
-            const active = draft.category === name
-            return (
-              <button
-                key={name || 'all'}
-                type="button"
-                aria-pressed={active}
-                // Chọn xong tự thu gọn, còn lại đúng hàng vừa chọn
-                onClick={() => {
-                  onChange({ category: name })
-                  setExpanded(false)
-                }}
-                className={cx(
-                  'flex cursor-pointer items-center gap-2.5 rounded-xl border-0 px-2 py-1.5 text-left text-caption transition-colors',
-                  active
-                    ? 'bg-primary-soft font-semibold text-primary'
-                    : 'bg-transparent font-medium text-ink hover:bg-surface-muted',
-                  focusRing
-                )}
-              >
-                <span
-                  className={cx(
-                    'grid size-8 shrink-0 place-items-center rounded-lg',
-                    active ? 'bg-surface text-primary' : 'bg-line-subtle text-ink-muted'
-                  )}
-                >
-                  <CategoryIcon name={name || 'Tất cả'} />
-                </span>
-                {name || 'Tất cả danh mục'}
-              </button>
-            )
-          })}
-          <button
-            type="button"
-            aria-expanded={expanded}
-            onClick={() => setExpanded((v) => !v)}
-            className={cx(
-              'mt-1 flex cursor-pointer items-center gap-1 self-start rounded-lg border-0 bg-transparent px-2 py-1 text-caption font-medium text-primary hover:bg-primary-subtle',
-              focusRing
-            )}
-          >
-            {expanded ? 'Thu gọn' : `Xem tất cả ${CATEGORIES.length} danh mục`}
-            <Icon name="next" size={14} className={expanded ? '-rotate-90' : 'rotate-90'} />
-          </button>
-        </div>
-      </fieldset>
+      <PickList
+        legend="Danh mục"
+        value={draft.category}
+        options={CATEGORIES}
+        allLabel="Tất cả danh mục"
+        unit="danh mục"
+        renderIcon={(name) => <CategoryIcon name={name || 'Tất cả'} />}
+        onPick={(category) => onChange({ category })}
+      />
 
-      <fieldset className="m-0 border-0 p-0">
-        <legend className={legendClass}>Khu vực</legend>
-        <label htmlFor={`${idPrefix}-area`} className="sr-only">
-          Khu vực
-        </label>
-        <select
-          id={`${idPrefix}-area`}
-          value={draft.area}
-          onChange={(e) => onChange({ area: e.target.value })}
-          className="h-10 w-full cursor-pointer rounded-xl border border-line bg-surface-muted px-3 text-caption text-ink outline-none focus:border-primary focus:ring-3 focus:ring-primary/12"
-        >
-          <option value="">Tất cả khu vực</option>
-          {AREAS.map((area) => (
-            <option key={area} value={area}>
-              {area}
-            </option>
-          ))}
-        </select>
-      </fieldset>
+      <PickList
+        legend="Khu vực"
+        value={draft.area}
+        options={AREAS}
+        allLabel="Tất cả khu vực"
+        unit="khu vực"
+        renderIcon={(area) => <Icon name={area ? 'pin' : 'locate'} size={16} />}
+        onPick={(area) => onChange({ area })}
+      />
 
       <fieldset className="m-0 border-0 p-0">
         <legend className={legendClass}>Khoảng thời gian</legend>
@@ -221,5 +184,63 @@ export default function FeedFilters({ draft, onChange, onApply, onReset, error, 
         Áp dụng bộ lọc
       </Button>
     </form>
+  )
+}
+
+// Danh sách chọn một: thu gọn chỉ còn hàng đang chọn ('' = Tất cả), bấm "Xem tất cả" để mở,
+// chọn xong tự thu gọn. Dùng chung cho Danh mục và Khu vực
+function PickList({ legend, value, options, allLabel, unit, renderIcon, onPick }) {
+  const [expanded, setExpanded] = useState(false)
+  const shown = expanded ? ['', ...options] : [value]
+
+  return (
+    <fieldset className="m-0 border-0 p-0">
+      <legend className={legendClass}>{legend}</legend>
+      <div className="flex flex-col gap-0.5">
+        {shown.map((option) => {
+          const active = value === option
+          return (
+            <button
+              key={option || 'all'}
+              type="button"
+              aria-pressed={active}
+              onClick={() => {
+                onPick(option)
+                setExpanded(false)
+              }}
+              className={cx(
+                'flex cursor-pointer items-center gap-2.5 rounded-xl border-0 px-2 py-1.5 text-left text-caption transition-colors',
+                active
+                  ? 'bg-primary-soft font-semibold text-primary'
+                  : 'bg-transparent font-medium text-ink hover:bg-surface-muted',
+                focusRing
+              )}
+            >
+              <span
+                className={cx(
+                  'grid size-8 shrink-0 place-items-center rounded-lg',
+                  active ? 'bg-surface text-primary' : 'bg-line-subtle text-ink-muted'
+                )}
+              >
+                {renderIcon(option)}
+              </span>
+              {option || allLabel}
+            </button>
+          )
+        })}
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((v) => !v)}
+          className={cx(
+            'mt-1 flex cursor-pointer items-center gap-1 self-start rounded-lg border-0 bg-transparent px-2 py-1 text-caption font-medium text-primary hover:bg-primary-subtle',
+            focusRing
+          )}
+        >
+          {expanded ? 'Thu gọn' : `Xem tất cả ${options.length} ${unit}`}
+          <Icon name="next" size={14} className={expanded ? '-rotate-90' : 'rotate-90'} />
+        </button>
+      </div>
+    </fieldset>
   )
 }
