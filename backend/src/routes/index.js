@@ -2,6 +2,7 @@ const { Router } = require('express')
 const mongoose = require('mongoose')
 
 const authRoutes = require('./authRoutes')
+const postRoutes = require('./postRoutes')
 
 const router = Router()
 
@@ -17,5 +18,6 @@ router.get('/health', (req, res) => {
 })
 
 router.use('/auth', authRoutes)
+router.use('/posts', postRoutes)
 
 module.exports = router

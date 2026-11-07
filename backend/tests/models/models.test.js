@@ -77,7 +77,7 @@ describe('UC21, UC22, UC31, UC32, UC34 - Thích, lưu, theo dõi, chặn', () =>
 
 describe('UC23 - Ràng buộc bài đăng', () => {
   const buildPost = async (fields = {}) => {
-    const category = await Category.create({ name: `Danh mục ${id()}` })
+    const category = await Category.create({ name: `Danh mục ${id()}`, slug: `dm-${id()}` })
     return new Post({
       owner: id(),
       type: 'lost',
@@ -106,12 +106,23 @@ describe('UC23 - Ràng buộc bài đăng', () => {
     assert.equal(err.errors.timeTo.message, 'Thời điểm kết thúc phải sau thời điểm bắt đầu.')
   })
 
-  test('tìm kiếm toàn văn không bỏ từ tiếng Việt trùng với từ dừng tiếng Anh', async () => {
-    await (await buildPost({ title: 'Rơi ví do đi vội' })).save()
+  test('tự tính hotScore và chữ tìm kiếm không dấu khi lưu', async () => {
+    const post = await buildPost({
+      title: 'Mất VÍ da Đỏ',
+      description: 'Rơi ở  chợ',
+      area: 'Quận 1',
+      placeName: 'Bến Thành',
+      viewCount: 120,
+      likeCount: 3,
+    })
+    await post.save()
 
-    const found = await Post.find({ $text: { $search: 'do' } })
-
-    assert.equal(found.length, 1)
+    const saved = await Post.findById(post._id).select('+searchText +searchTextVi')
+    assert.equal(saved.hotScore, 120 + 3 * 20)
+    assert.equal(saved.searchText, 'mat vi da do roi o cho quan 1 ben thanh')
+    assert.equal(saved.searchTextVi, 'mất ví da đỏ rơi ở chợ quận 1 bến thành')
+    // Không lộ ra khi đọc bình thường
+    assert.equal((await Post.findById(post._id)).searchText, undefined)
   })
 })
 

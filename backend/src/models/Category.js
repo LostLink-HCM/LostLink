@@ -6,6 +6,18 @@ const { Schema } = mongoose
 const categorySchema = new Schema(
   {
     name: { type: String, required: true, trim: true, unique: true },
+    // Dùng trên URL bộ lọc
+    slug: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      lowercase: true,
+      match: [
+        /^[a-z0-9]+(-[a-z0-9]+)*$/,
+        'Slug chỉ gồm chữ thường không dấu, số và dấu gạch ngang.',
+      ],
+    },
     icon: { type: String, trim: true, default: '' },
     order: { type: Number, default: 0 },
 

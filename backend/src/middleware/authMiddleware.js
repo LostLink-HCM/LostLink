@@ -24,6 +24,9 @@ const protect = asyncHandler(async (req, res, next) => {
   next()
 })
 
+// Cho API công khai mà người đăng nhập thấy khác Guest (vd ẩn bài của người đã chặn).
+const optionalAuth = (req, res, next) => (extractToken(req) ? protect(req, res, next) : next())
+
 // Dùng sau protect, vd: router.patch('/reports/:id', protect, can('report:review'), ...)
 const can = (permission) => (req, res, next) => {
   if (!req.user || !hasPermission(req.user.role, permission)) {
@@ -32,4 +35,4 @@ const can = (permission) => (req, res, next) => {
   next()
 }
 
-module.exports = { protect, can }
+module.exports = { protect, optionalAuth, can }
