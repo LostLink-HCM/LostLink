@@ -1,4 +1,5 @@
 import { CATEGORY_ATTRIBUTES } from '../../data/composePost'
+import { CATEGORY_SLUGS } from '../../data/homeFeed'
 
 export const TIME_RANGES = [
   { value: '24h', label: '24 giờ qua', hours: 24 },
@@ -111,3 +112,90 @@ export function timeAgo(iso, now = Date.now()) {
 }
 
 export const formatCount = (value) => value.toLocaleString('vi-VN')
+
+// ----- Dữ liệu từ API /api/posts -----
+
+const PAGE_SIZE = 12
+const VN_TIME_ZONE = 'Asia/Ho_Chi_Minh'
+const DAY_MS = 24 * 60 * 60 * 1000
+
+// Bộ lọc đang áp dụng → tham số gửi lên server. Từ ngày/Đến ngày chỉ gửi khi chọn khoảng tự chọn
+export function buildPostQuery(filters, keyword, { hot = false, page = 1 } = {}) {
+  const custom = filters.range === 'custom'
+  return {
+    type: filters.type,
+    category: CATEGORY_SLUGS[filters.category] ?? '',
+    area: filters.area,
+    range: filters.range,
+    from: custom ? filters.from : '',
+    to: custom ? filters.to : '',
+    q: keyword.trim(),
+    sort: hot ? 'hot' : 'new',
+    page,
+    limit: PAGE_SIZE,
+  }
+}
+
+// Số tiêu chí lọc đang khác mặc định: loại tin, danh mục, khu vực, khoảng thời gian
+// (chọn Từ ngày - Đến ngày tính là một tiêu chí)
+export const countActiveFilters = (filters) =>
+  [
+    filters.type !== DEFAULT_FILTERS.type,
+    filters.category !== DEFAULT_FILTERS.category,
+    filters.area !== DEFAULT_FILTERS.area,
+    filters.range !== DEFAULT_FILTERS.range,
+  ].filter(Boolean).length
+
+// Bộ lọc mặc định và không có từ khóa: danh sách rỗng nghĩa là "chưa có bài", không phải "không tìm thấy"
+export const isDefaultView = (filters, keyword) =>
+  !keyword.trim() && countActiveFilters(filters) === 0
+
+// Ngày theo giờ Việt Nam dạng yyyy-mm-dd để so sánh hôm nay/hôm qua
+const vnDayKey = (date) => new Intl.DateTimeFormat('en-CA', { timeZone: VN_TIME_ZONE }).format(date)
+
+const vnClock = (date) =>
+  new Intl.DateTimeFormat('vi-VN', {
+    timeZone: VN_TIME_ZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date)
+
+function vnDayLabel(date, now) {
+  const key = vnDayKey(date)
+  if (key === vnDayKey(now)) return 'Hôm nay'
+  if (key === vnDayKey(new Date(now - DAY_MS))) return 'Hôm qua'
+  const [year, month, day] = key.split('-')
+  return year === vnDayKey(now).slice(0, 4) ? `${day}/${month}` : `${day}/${month}/${year}`
+}
+
+// Khoảng thời gian mất/nhặt theo giờ Việt Nam, vd "Hôm nay, 19:00 – 20:00"
+export function formatTimeWindow(timeFrom, timeTo, now = Date.now()) {
+  const from = new Date(timeFrom)
+  const to = timeTo ? new Date(timeTo) : null
+  if (!to || to.getTime() === from.getTime()) return `${vnDayLabel(from, now)}, ${vnClock(from)}`
+  if (vnDayKey(from) === vnDayKey(to)) {
+    return `${vnDayLabel(from, now)}, ${vnClock(from)} – ${vnClock(to)}`
+  }
+  return `${vnDayLabel(from, now)} ${vnClock(from)} – ${vnDayLabel(to, now)} ${vnClock(to)}`
+}
+
+// Card từ API → dữ liệu PostCard đang dùng. Bài không ảnh hiện ảnh minh họa của danh mục
+export const toFeedPost = (card, now = Date.now()) => ({
+  id: card.id,
+  type: card.type,
+  status: card.status,
+  category: card.category?.name ?? 'Khác',
+  categorySlug: card.category?.slug ?? 'khac',
+  title: card.title,
+  desc: card.excerpt,
+  area: card.area,
+  address: card.placeName,
+  timeWindow: formatTimeWindow(card.timeFrom, card.timeTo, now),
+  author: card.author?.username ?? '',
+  createdAt: card.createdAt,
+  likes: card.counts.likes,
+  views: card.counts.views,
+  commentCount: card.counts.comments,
+  images: card.coverImage ? [card.coverImage] : [],
+})

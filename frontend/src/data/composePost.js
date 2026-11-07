@@ -173,10 +173,10 @@ export const PLACES = [
   { label: 'Trạm xe buýt Nguyễn Thị Minh Khai', area: 'Quận 3', x: 36, y: 46 },
   { label: 'Crescent Mall', area: 'Quận 7', x: 62, y: 72 },
   { label: 'Đại học Bách Khoa, 268 Lý Thường Kiệt', area: 'Quận 10', x: 28, y: 54 },
-  { label: 'Landmark 81', area: 'Bình Thạnh', x: 68, y: 30 },
-  { label: 'Công viên Gia Định', area: 'Gò Vấp', x: 44, y: 18 },
-  { label: 'Sân bay Tân Sơn Nhất', area: 'Tân Bình', x: 30, y: 22 },
-  { label: 'Đại học Sư phạm Kỹ thuật, 1 Võ Văn Ngân', area: 'TP. Thủ Đức', x: 80, y: 20 },
+  { label: 'Landmark 81', area: 'Quận Bình Thạnh', x: 68, y: 30 },
+  { label: 'Công viên Gia Định', area: 'Quận Gò Vấp', x: 44, y: 18 },
+  { label: 'Sân bay Tân Sơn Nhất', area: 'Quận Tân Bình', x: 30, y: 22 },
+  { label: 'Đại học Sư phạm Kỹ thuật, 1 Võ Văn Ngân', area: 'Thành phố Thủ Đức', x: 80, y: 20 },
 ]
 
 // line: hai đầu đoạn đường (%) trên bản đồ minh họa
@@ -218,7 +218,7 @@ export const ROAD_SEGMENTS = [
     road: 'Xô Viết Nghệ Tĩnh',
     from: 'Điện Biên Phủ',
     to: 'Ung Văn Khiêm',
-    area: 'Bình Thạnh',
+    area: 'Quận Bình Thạnh',
     line: [58, 40, 64, 18],
   },
   {
@@ -226,7 +226,7 @@ export const ROAD_SEGMENTS = [
     road: 'Võ Văn Ngân',
     from: 'Đặng Văn Bi',
     to: 'Kha Vạn Cân',
-    area: 'TP. Thủ Đức',
+    area: 'Thành phố Thủ Đức',
     line: [70, 26, 92, 16],
   },
 ]

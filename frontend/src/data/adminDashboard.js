@@ -1,9 +1,9 @@
 export const ADMIN_AREAS = [
-  { id: 'thu-duc', label: 'TP. Thủ Đức', city: 'TP. Hồ Chí Minh', weight: 1.5 },
+  { id: 'thu-duc', label: 'Thành phố Thủ Đức', city: 'TP. Hồ Chí Minh', weight: 1.5 },
   { id: 'quan-1', label: 'Quận 1', city: 'TP. Hồ Chí Minh', weight: 1.2 },
-  { id: 'binh-thanh', label: 'Bình Thạnh', city: 'TP. Hồ Chí Minh', weight: 1 },
+  { id: 'binh-thanh', label: 'Quận Bình Thạnh', city: 'TP. Hồ Chí Minh', weight: 1 },
   { id: 'quan-7', label: 'Quận 7', city: 'TP. Hồ Chí Minh', weight: 0.85 },
-  { id: 'tan-binh', label: 'Tân Bình', city: 'TP. Hồ Chí Minh', weight: 0.65 },
+  { id: 'tan-binh', label: 'Quận Tân Bình', city: 'TP. Hồ Chí Minh', weight: 0.65 },
 ]
 
 export const ADMIN_CATEGORIES = [

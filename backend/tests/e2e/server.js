@@ -49,6 +49,12 @@ async function main() {
   const app = require('../../src/app')
   await connectDatabase()
 
+  // Dữ liệu mẫu giống môi trường local (tài khoản, 8 danh mục, 47 bài) cho các test trang chủ
+  const { seedUsers } = require('../../src/seeds/userSeed')
+  const { seedCategories } = require('../../src/seeds/categorySeed')
+  const { seedPosts } = require('../../src/seeds/postSeed')
+  for (const seed of [seedUsers, seedCategories, seedPosts]) await seed()
+
   startMailbox()
   app.listen(API_PORT, () => console.log(`E2E API on http://localhost:${API_PORT}`))
 

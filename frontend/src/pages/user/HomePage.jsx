@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { NavLink, useOutletContext } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import Icon from '../../components/common/Icon'
@@ -11,7 +11,14 @@ import PostCard from '../../components/user/home/PostCard'
 import RightRail from '../../components/user/home/RightRail'
 import SearchBox from '../../components/user/home/SearchBox'
 import StickyPanel from '../../components/user/home/StickyPanel'
-import { DEFAULT_FILTERS, filterPosts, sortByHot, validateFilters } from '../../lib/user/homeFeed'
+import useInfiniteScroll from '../../hooks/useInfiniteScroll'
+import usePostFeed from '../../hooks/usePostFeed'
+import {
+  DEFAULT_FILTERS,
+  countActiveFilters,
+  isDefaultView,
+  validateFilters,
+} from '../../lib/user/homeFeed'
 
 // Trên mobile không có thanh điều hướng nên chuyển giữa hai trang bằng tab
 const FEEDS = [
@@ -22,28 +29,31 @@ const FEEDS = [
 // Dùng chung cho Trang chủ và Tin hot gần đây (hot), cùng bộ lọc, chỉ khác cách sắp xếp
 export default function HomePage({ hot = false }) {
   const { user } = useAuth()
-  const { posts, comments, now, search, keyword, filters, liked, toggleLike, blockedUsers } =
-    useOutletContext()
+  const { now, search, keyword, filters, liked, toggleLike } = useOutletContext()
   const { draft, setDraft, applied, setApplied } = filters
   const [filterError, setFilterError] = useState('')
   const [drawerOpen, setDrawerOpen] = useState(false)
 
-  // Bỏ bài của người mình đã chặn
-  const shown = useMemo(() => {
-    const list = filterPosts(
-      posts.filter((post) => !blockedUsers.has(post.author)),
-      applied,
-      keyword,
-      now
-    )
-    return hot ? sortByHot(list) : list
-  }, [posts, blockedUsers, applied, keyword, now, hot])
+  // Lọc, tìm kiếm, sắp xếp và ẩn bài của người đã chặn đều làm ở server
+  const feed = usePostFeed({ filters: applied, keyword, hot, viewerId: user?.id })
 
-  const commentCounts = useMemo(() => {
-    const counts = {}
-    for (const item of comments) counts[item.postId] = (counts[item.postId] ?? 0) + 1
-    return counts
-  }, [comments])
+  // Áp dụng/xóa bộ lọc hoặc tìm từ khóa khi đang cuộn giữa danh sách thì đưa về đầu trang
+  // để thấy kết quả mới từ bài đầu tiên. Bỏ qua lần hiển thị đầu tiên của trang
+  const firstRender = useRef(true)
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false
+      return
+    }
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' })
+  }, [applied, keyword])
+
+  // Danh mục đang lọc không còn tồn tại: bỏ riêng bộ lọc danh mục, giữ các tiêu chí khác
+  const showAllCategories = () => {
+    setDraft((prev) => ({ ...prev, category: '' }))
+    setApplied((prev) => ({ ...prev, category: '' }))
+  }
 
   useEffect(() => {
     if (!drawerOpen) return
@@ -56,6 +66,8 @@ export default function HomePage({ hot = false }) {
 
   const filterProps = {
     draft,
+    // Hiện "Xóa lọc" khi đang chọn dở hoặc đã áp dụng bất kỳ tiêu chí nào khác mặc định
+    activeCount: Math.max(countActiveFilters(draft), countActiveFilters(applied)),
     error: filterError,
     onChange: (patch) => {
       setDraft((prev) => ({ ...prev, ...patch }))
@@ -121,29 +133,19 @@ export default function HomePage({ hot = false }) {
             <FeedFilters {...filterProps} idPrefix="filter" />
           </StickyPanel>
 
-          <section aria-label="Danh sách bài đăng" className="min-w-0">
-            {shown.length ? (
-              <div className="flex flex-col gap-4">
-                {shown.map((post) => (
-                  <PostCard
-                    key={post.id}
-                    post={post}
-                    now={now}
-                    commentCount={commentCounts[post.id] ?? 0}
-                    liked={liked.has(post.id)}
-                    onToggleLike={() => toggleLike(post.id)}
-                  />
-                ))}
-              </div>
-            ) : (
-              <Card>
-                <EmptyState
-                  icon="search"
-                  title="Không tìm thấy bài đăng phù hợp"
-                  description="Thử từ khoá khác, mở rộng khoảng thời gian hoặc bấm “Xóa lọc”."
-                />
-              </Card>
-            )}
+          <section
+            aria-label="Danh sách bài đăng"
+            aria-busy={feed.status === 'loading'}
+            className="min-w-0"
+          >
+            <FeedList
+              feed={feed}
+              now={now}
+              liked={liked}
+              toggleLike={toggleLike}
+              defaultView={isDefaultView(applied, keyword)}
+              onShowAllCategories={showAllCategories}
+            />
           </section>
 
           <StickyPanel aria-label="Cộng đồng" className="hidden xl:block">
@@ -186,5 +188,108 @@ export default function HomePage({ hot = false }) {
         </div>
       )}
     </>
+  )
+}
+
+// Danh mục đang lọc vừa bị xoá: gợi ý bỏ bộ lọc danh mục để xem tiếp
+const CATEGORY_GONE = 'CATEGORY_NOT_FOUND'
+
+function FeedList({ feed, now, liked, toggleLike, defaultView, onShowAllCategories }) {
+  // Cuộn gần tới cuối danh sách thì tự tải trang sau, không cần bấm nút
+  const sentinel = useInfiniteScroll({
+    enabled: feed.canLoadMore,
+    onReach: feed.loadMore,
+    itemCount: feed.items.length,
+  })
+
+  if (feed.status === 'loading') {
+    return (
+      <div className="flex flex-col gap-4" role="status" aria-label="Đang tải danh sách bài đăng">
+        {[0, 1, 2].map((key) => (
+          <FeedSkeleton key={key} />
+        ))}
+      </div>
+    )
+  }
+
+  // không tải được trang đầu
+  if (feed.status === 'error') {
+    return (
+      <Card>
+        <EmptyState icon="warning" title={feed.error} />
+        <div className="flex justify-center pb-10">
+          {feed.errorCode === CATEGORY_GONE ? (
+            <Button onClick={onShowAllCategories}>Xem tất cả danh mục</Button>
+          ) : (
+            <Button onClick={feed.reload}>Thử lại</Button>
+          )}
+        </div>
+      </Card>
+    )
+  }
+
+  if (!feed.items.length) {
+    return (
+      <Card>
+        {defaultView ? (
+          <EmptyState icon="search" title="Chưa có bài đăng phù hợp" />
+        ) : (
+          <EmptyState
+            icon="search"
+            title="Không tìm thấy bài đăng phù hợp"
+            description="Thử từ khoá khác, mở rộng khoảng thời gian hoặc bấm “Xóa lọc”."
+          />
+        )}
+      </Card>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {feed.items.map((post) => (
+        <PostCard
+          key={post.id}
+          post={post}
+          now={now}
+          commentCount={post.commentCount}
+          liked={liked.has(post.id)}
+          onToggleLike={() => toggleLike(post.id)}
+        />
+      ))}
+
+      {/* Mốc vô hình cuối danh sách, đi vào vùng gần màn hình thì tải tiếp */}
+      <div ref={sentinel} aria-hidden="true" />
+
+      <div aria-live="polite" className="text-center text-caption text-ink-subtle">
+        {feed.status === 'loadingMore' && <FeedSkeleton />}
+        {/* Tải thêm bị lỗi: giữ nguyên danh sách và vị trí cuộn, dừng tự tải tới khi người dùng chọn */}
+        {feed.error && (
+          <div role="alert" className="flex flex-col items-center gap-2 py-2">
+            <p className="m-0 text-danger">{feed.error}</p>
+            {feed.errorCode === CATEGORY_GONE ? (
+              <Button onClick={onShowAllCategories}>Xem tất cả danh mục</Button>
+            ) : (
+              <Button onClick={feed.retryMore}>Thử lại</Button>
+            )}
+          </div>
+        )}
+        {!feed.hasMore && !feed.error && (
+          <p className="m-0 py-2">Đã hiển thị hết {feed.total.toLocaleString('vi-VN')} bài đăng</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function FeedSkeleton() {
+  return (
+    <div className={cx(cardClass, 'flex h-40 gap-4 p-4 text-left sm:h-56')}>
+      <div className="h-full w-24 shrink-0 animate-pulse rounded-xl bg-line-subtle sm:w-44" />
+      <div className="flex flex-1 flex-col gap-3 py-1">
+        <div className="h-3 w-1/3 animate-pulse rounded bg-line-subtle" />
+        <div className="h-4 w-3/4 animate-pulse rounded bg-line-subtle" />
+        <div className="h-3 w-full animate-pulse rounded bg-line-subtle" />
+      </div>
+    </div>
   )
 }

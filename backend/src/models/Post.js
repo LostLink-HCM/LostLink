@@ -1,11 +1,14 @@
 const mongoose = require('mongoose')
 
+const { lowercaseText, normalizeText } = require('../utils/text')
+
 const { Schema } = mongoose
 
 // 6 trạng thái bài đăng: chờ duyệt, bị từ chối, đang tìm, đã liên hệ, đã trao trả, đã đóng
 const POST_STATUSES = ['pending', 'rejected', 'searching', 'contacted', 'returned', 'closed']
 
 const MAX_IMAGES = 9
+const HOT_LIKE_WEIGHT = 20
 const TITLE_MAX = 120
 const DESCRIPTION_MAX = 1000
 
@@ -102,6 +105,15 @@ const postSchema = new Schema(
     likeCount: { type: Number, default: 0 },
     commentCount: { type: Number, default: 0 },
 
+    // Độ nổi bật cho Tin hot: lượt xem + lượt thích × 20. Lưu sẵn để sắp xếp có index.
+    // Khi tăng lượt xem/thích bằng $inc thì tăng hotScore cùng lúc (xem hotScoreDelta)
+    hotScore: { type: Number, default: 0 },
+
+    // Tiêu đề, mô tả, khu vực, địa điểm viết thường, dùng cho tìm kiếm từ khóa:
+    // searchText đã bỏ dấu (khi gõ không dấu), searchTextVi giữ dấu (khi gõ có dấu)
+    searchText: { type: String, default: '', select: false },
+    searchTextVi: { type: String, default: '', select: false },
+
     // Món bên trong (ví, túi)
     contents: [{ type: String, trim: true }],
     attributes: {
@@ -129,12 +141,24 @@ const postSchema = new Schema(
   { timestamps: true, collection: 'posts' }
 )
 
+postSchema.pre('validate', function computeDerivedFields() {
+  this.hotScore = this.viewCount + this.likeCount * HOT_LIKE_WEIGHT
+  const text = [this.title, this.description, this.area, this.placeName].join(' ')
+  this.searchText = normalizeText(text)
+  this.searchTextVi = lowercaseText(text)
+})
+
+// Danh sách công khai: mới nhất trước hoặc nổi bật trước
+postSchema.index({ status: 1, isHidden: 1, createdAt: -1 })
+postSchema.index({ status: 1, isHidden: 1, hotScore: -1, createdAt: -1 })
 postSchema.index({ type: 1, status: 1, createdAt: -1 })
-postSchema.index({ status: 1, viewCount: -1, likeCount: -1 })
-postSchema.index({ title: 'text', description: 'text' }, { default_language: 'none' })
 postSchema.index({ locExact: '2dsphere' })
 
 const Post = mongoose.model('Post', postSchema)
 Post.STATUSES = POST_STATUSES
+Post.HOT_LIKE_WEIGHT = HOT_LIKE_WEIGHT
+
+// Mức tăng hotScore tương ứng khi cộng lượt xem/thích bằng $inc, vd thích: hotScoreDelta({ likes: 1 })
+Post.hotScoreDelta = ({ views = 0, likes = 0 }) => views + likes * HOT_LIKE_WEIGHT
 
 module.exports = Post

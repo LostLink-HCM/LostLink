@@ -173,7 +173,7 @@ export function createUserMessages(now = Date.now()) {
         type: 'found',
         title: 'Chó Poodle nâu đeo vòng cổ đỏ đi lạc ở Thảo Điền',
         category: 'Thú cưng',
-        area: 'TP. Thủ Đức',
+        area: 'Thành phố Thủ Đức',
         image: photo('lostlink-dog'),
       },
       status: 'returned',
