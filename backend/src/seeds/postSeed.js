@@ -17,6 +17,23 @@ const blur = (lat, lng, index) => {
 
 const point = (coordinates) => ({ type: 'Point', coordinates })
 
+// Vị trí của bài mẫu: ghim (lat, lng; công khai lệch 150-250 m) hoặc đoạn đường (road: hai đầu
+// [lat, lng]; công khai nguyên đoạn, giống khi đăng bài thật)
+const locationOf = (definition, index) => {
+  if (definition.road) {
+    const line = {
+      type: 'LineString',
+      coordinates: definition.road.map(([lat, lng]) => [lng, lat]),
+    }
+    return { locType: 'road_segment', locExact: line, locPublic: line }
+  }
+  return {
+    locType: 'point',
+    locExact: point([definition.lng, definition.lat]),
+    locPublic: point(blur(definition.lat, definition.lng, index)),
+  }
+}
+
 // { 'Ví & tiền': { 'Chất liệu': { id, values: { Da: id } } } }
 const loadAttributeIndex = async () => {
   const index = {}
@@ -154,9 +171,8 @@ const seedPosts = async () => {
       timeTo,
       area: definition.area,
       placeName: definition.placeName,
-      locType: 'point',
-      locExact: point([definition.lng, definition.lat]),
-      locPublic: point(blur(definition.lat, definition.lng, index)),
+      placeNameTo: definition.placeNameTo ?? '',
+      ...locationOf(definition, index),
       status: definition.status ?? 'searching',
       isHidden: Boolean(definition.hiddenReason),
       hiddenReason: definition.hiddenReason ?? '',

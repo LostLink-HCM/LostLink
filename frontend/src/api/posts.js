@@ -11,3 +11,14 @@ export const listPosts = (params) => {
 
 // Chi tiết một bài theo loại tin (lost/found) và slug. Mỗi lần gọi server tính một lượt xem
 export const getPost = (type, slug) => api.get(`/posts/${type}/${encodeURIComponent(slug)}`)
+
+// form: FormData gồm data (JSON nội dung bài) và images
+export const createPost = (form) => api.post('/posts', form)
+
+// Bản nháp của người đang đăng nhập, chưa có thì data là null
+export const getDraft = () => api.get('/posts/draft')
+
+// draft: { step, form }, không kèm ảnh. Lưu mới thì thay bản cũ
+export const saveDraft = (draft) => api.put('/posts/draft', draft)
+
+export const deleteDraft = () => api.delete('/posts/draft')

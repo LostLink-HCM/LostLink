@@ -23,4 +23,11 @@ const authLimiter = limiter(20)
 // API chung 300 yêu cầu/15 phút/IP. Bỏ qua health check để Render theo dõi liên tục được
 const apiLimiter = limiter(300, { skip: (req) => req.path === '/health' })
 
-module.exports = { authLimiter, apiLimiter }
+// API bản đồ 200 yêu cầu/15 phút/tài khoản, đủ cho gõ gợi ý địa chỉ (frontend đã debounce)
+// mà không để một tài khoản tiêu hết hạn mức transaction VietMap. Dùng sau protect
+const geoLimiter = limiter(200, { keyGenerator: (req) => `user:${req.user.id}` })
+
+// Đăng bài 10 lần/15 phút/tài khoản để chặn spam. Dùng sau protect
+const postCreateLimiter = limiter(10, { keyGenerator: (req) => `user:${req.user.id}` })
+
+module.exports = { authLimiter, apiLimiter, geoLimiter, postCreateLimiter }

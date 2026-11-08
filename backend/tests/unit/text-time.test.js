@@ -8,7 +8,13 @@ const {
   normalizeText,
   slugify,
 } = require('../../src/utils/text')
-const { endOfVnDay, isVnDate, startOfVnDay } = require('../../src/utils/vnTime')
+const {
+  endOfVnDay,
+  isVnDate,
+  startOfVnDay,
+  todayVn,
+  vnTimeRange,
+} = require('../../src/utils/vnTime')
 const { formatPostCode, postCodePrefix } = require('../../src/utils/postCode')
 
 describe('UC02 - Chuẩn hóa từ khóa tiếng Việt', () => {
@@ -73,5 +79,35 @@ describe('Mã bài đăng', () => {
     assert.equal(formatPostCode('L071126', 1), 'L071126001')
     assert.equal(formatPostCode('F071126', 42), 'F071126042')
     assert.throws(() => formatPostCode('L071126', 1000))
+  })
+})
+
+describe('UC U05 - Khoảng thời gian mất/nhặt theo giờ Việt Nam', () => {
+  const iso = (value) => new Date(value).toISOString()
+
+  test('không chọn buổi thì là cả ngày', () => {
+    const { from, to } = vnTimeRange('2026-11-05')
+    assert.equal(from.toISOString(), iso('2026-11-05T00:00:00+07:00'))
+    assert.equal(to.toISOString(), iso('2026-11-05T23:59:59.999+07:00'))
+  })
+
+  test('mỗi buổi là một khung giờ, Ban đêm kéo sang 6 giờ sáng hôm sau', () => {
+    const range = (dayPart) => {
+      const { from, to } = vnTimeRange('2026-11-05', dayPart)
+      return [from.toISOString(), to.toISOString()]
+    }
+    assert.deepEqual(range('morning'), [
+      iso('2026-11-05T06:00:00+07:00'),
+      iso('2026-11-05T10:59:59.999+07:00'),
+    ])
+    assert.deepEqual(range('night'), [
+      iso('2026-11-05T22:00:00+07:00'),
+      iso('2026-11-06T05:59:59.999+07:00'),
+    ])
+  })
+
+  test('hôm nay theo giờ Việt Nam: 23 giờ UTC đã là ngày hôm sau', () => {
+    assert.equal(todayVn(Date.parse('2026-11-05T16:59:59Z')), '2026-11-05')
+    assert.equal(todayVn(Date.parse('2026-11-05T17:00:00Z')), '2026-11-06')
   })
 })

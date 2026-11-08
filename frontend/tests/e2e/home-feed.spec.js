@@ -55,7 +55,7 @@ test.describe('UC02 - Lọc và tìm kiếm bài đăng', () => {
     await expect(cards(page)).toHaveCount(12)
 
     const panel = filters(page)
-    await panel.getByRole('button', { name: 'Xem tất cả 17 khu vực' }).click()
+    await panel.getByRole('button', { name: 'Xem tất cả 22 khu vực' }).click()
     await panel.getByRole('button', { name: 'Quận Bình Thạnh', exact: true }).click()
     // Chọn xong danh sách khu vực tự thu gọn, chỉ còn khu vực vừa chọn
     await expect(

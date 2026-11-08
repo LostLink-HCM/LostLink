@@ -120,6 +120,18 @@ export function timeAgo(iso, now = Date.now()) {
 
 export const formatCount = (value) => value.toLocaleString('vi-VN')
 
+// Không có địa điểm thì chỉ hiện khu vực; tên địa điểm chưa kèm quận thì ghép thêm
+export const placeLabel = (post) => {
+  if (!post.address) return post.area
+  return post.address.includes(post.area) ? post.address : `${post.address}, ${post.area}`
+}
+
+// Ghim một dòng, đoạn đường hai dòng Từ / Đến
+export const placeLines = (post) =>
+  post.locType === 'road_segment'
+    ? [`Từ: ${post.address || post.area}`, `Đến: ${post.addressTo || post.area}`]
+    : [placeLabel(post)]
+
 // ----- Dữ liệu từ API /api/posts -----
 
 const PAGE_SIZE = 12
@@ -199,6 +211,8 @@ export const toFeedPost = (card, now = Date.now()) => ({
   desc: card.excerpt,
   area: card.area,
   address: card.placeName,
+  addressTo: card.placeNameTo ?? '',
+  locType: card.locType,
   timeWindow: formatTimeWindow(card.timeFrom, card.timeTo, now),
   author: card.author?.username ?? '',
   createdAt: card.createdAt,
@@ -222,6 +236,8 @@ export const toDetailPost = (detail, now = Date.now()) => ({
   images: detail.images,
   area: detail.area,
   address: detail.placeName,
+  addressTo: detail.placeNameTo ?? '',
+  locType: detail.locType,
   timeWindow: formatTimeWindow(detail.timeFrom, detail.timeTo, now),
   createdAt: detail.createdAt,
   author: detail.author?.username ?? '',
