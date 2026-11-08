@@ -15,6 +15,7 @@ module.exports = {
   CategoryMatchRelationMember: require('./CategoryMatchRelationMember'),
 
   Post: require('./Post'),
+  PostDraft: require('./PostDraft'),
   PostLike: require('./PostLike'),
   SavedPost: require('./SavedPost'),
   PostFollow: require('./PostFollow'),
