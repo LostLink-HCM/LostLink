@@ -49,4 +49,9 @@ module.exports = {
     apiKey: process.env.CLOUDINARY_API_KEY,
     apiSecret: process.env.CLOUDINARY_API_SECRET,
   },
+  // Key dùng riêng cho server (gợi ý địa chỉ, tra toạ độ), không gửi xuống trình duyệt.
+  // Key hiển thị bản đồ ở frontend là key khác, giới hạn theo domain trong VietMap Console
+  vietmap: {
+    apiKey: process.env.VIETMAP_API_KEY,
+  },
 }
