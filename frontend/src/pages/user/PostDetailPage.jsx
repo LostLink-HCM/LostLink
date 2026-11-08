@@ -15,7 +15,7 @@ import TypeTag from '../../components/user/home/TypeTag'
 import CommentSection from '../../components/user/post/CommentSection'
 import PostActionSheet from '../../components/user/post/PostActionSheet'
 import PostGallery from '../../components/user/post/PostGallery'
-import { formatCount, timeAgo, toDetailPost } from '../../lib/user/homeFeed'
+import { formatCount, placeLabel, placeLines, timeAgo, toDetailPost } from '../../lib/user/homeFeed'
 import { isMatchable, suggestionsFor } from '../../lib/user/matches'
 import { profilePath } from '../../lib/user/profiles'
 
@@ -56,7 +56,7 @@ function usePostDetail(type, slug) {
   return { ...state, loading, reload: () => setRetry((count) => count + 1) }
 }
 
-// UC04 Xem chi tiết bài đăng, mở ở /mat-do/<slug> hoặc /nhat-duoc/<slug>
+// Chi tiết bài đăng, mở ở /mat-do/<slug> hoặc /nhat-duoc/<slug>
 export default function PostDetailPage({ type }) {
   const { slug } = useParams()
   const { post, error, loading, reload } = usePostDetail(type, slug)
@@ -234,18 +234,23 @@ function PostDetail({ post }) {
               <span className="font-semibold text-ink">{post.timeWindow}</span>
             </p>
             <a
-              href={mapUrl(`${post.address}, ${post.area}, TP. Hồ Chí Minh`)}
+              href={mapUrl(`${placeLabel(post)}, TP. Hồ Chí Minh`)}
               target="_blank"
               rel="noopener noreferrer"
               title="Xem trên bản đồ"
               className={cx(
-                'mb-5 inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-surface-muted px-3 py-1.5 text-caption text-ink-secondary no-underline transition-colors hover:border-primary/40 hover:text-primary',
+                'mb-5 inline-flex max-w-full items-center gap-1.5 rounded-2xl border border-line bg-surface-muted px-3 py-1.5 text-caption text-ink-secondary no-underline transition-colors hover:border-primary/40 hover:text-primary',
                 focusRing
               )}
             >
               <Icon name="pin" size={14} className="shrink-0" />
-              <span className="truncate">
-                {post.address}, {post.area}
+              {/* Đoạn đường hiện hai dòng Từ / Đến; bấm vào mở bản đồ tại điểm đầu */}
+              <span className="flex min-w-0 flex-col">
+                {placeLines(post).map((line) => (
+                  <span key={line} className="truncate">
+                    {line}
+                  </span>
+                ))}
               </span>
               <span className="sr-only">(mở bản đồ trong tab mới)</span>
             </a>

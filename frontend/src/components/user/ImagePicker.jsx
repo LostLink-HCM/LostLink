@@ -17,6 +17,8 @@ export default function ImagePicker({
   max = MAX_IMAGES,
   cover = true,
   hint,
+  // false khi form đã đánh dấu * cho trường bắt buộc
+  showOptional = true,
 }) {
   const inputId = useId()
   const [rejected, setRejected] = useState([])
@@ -33,7 +35,8 @@ export default function ImagePicker({
     <section aria-labelledby={`${inputId}-title`}>
       <div className="mb-2 flex items-baseline justify-between gap-3">
         <h3 id={`${inputId}-title`} className="m-0 text-small font-semibold text-ink">
-          {title} <span className="font-normal text-ink-muted">· không bắt buộc</span>
+          {title}
+          {showOptional && <span className="font-normal text-ink-muted"> · không bắt buộc</span>}
         </h3>
         <span className="text-caption text-ink-subtle">
           {images.length}/{max}

@@ -1,301 +1,498 @@
-import { useEffect, useId, useRef, useState } from 'react'
-import { LOCATION_MODES, PLACES, ROAD_SEGMENTS } from '../../../data/composePost'
+import { Fragment, lazy, Suspense, useId, useRef, useState } from 'react'
+import { getPlace, reversePoint, searchPlaces } from '../../../api/geo'
 import { AREAS } from '../../../data/homeFeed'
-import { describeLocation } from '../../../lib/user/composePost'
-import { normalize } from '../../../lib/user/homeFeed'
+import { distanceMeters, formatDistance } from '../../../lib/user/composePost'
 import Icon from '../../common/Icon'
+import Button from '../Button'
+import Note from '../Note'
 import { cx, focusRing } from '../classes'
-import LocationMap from './LocationMap'
-import { inputClass, labelClass, tileClass } from './styles'
-import { FieldError, StepHeading } from './ui'
+import { chipClass, inputClass, labelClass } from './styles'
+import { FieldError, RequiredMark, StepHeading } from './ui'
 
-const MODE_ICONS = { gps: 'locate', pin: 'pin', address: 'search', road: 'route' }
-const CENTER = { x: 50, y: 50 }
-const MAX_SUGGESTIONS = 5
+// Thư viện bản đồ khá nặng nên chỉ tải khi tới bước Vị trí
+const VietMapView = lazy(() => import('./VietMapView'))
 
-const EMPTY_TEXT = {
-  '': 'Chọn một cách xác định vị trí ở trên',
-  gps: 'Đang chờ lấy vị trí hiện tại',
-  address: 'Chọn một địa chỉ gợi ý để xem trên bản đồ',
-  road: 'Chọn đoạn đường để xem trên bản đồ',
-}
+const SEARCH_MIN = 2
+// GPS lệch hơn mức này thì nhắc kéo ghim lại
+const GPS_ACCURACY_WARN_M = 100
+const OUTSIDE_MESSAGE = 'Điểm này nằm ngoài TP.HCM. LostLink hiện chỉ hỗ trợ khu vực TP.HCM.'
 
 const gpsMessage = (error) =>
   error.code === error.PERMISSION_DENIED
-    ? 'Bạn đã từ chối quyền truy cập vị trí. Hãy chọn cách khác: kéo ghim, gõ địa chỉ hoặc chọn đoạn đường.'
-    : 'Không lấy được vị trí hiện tại. Hãy thử lại hoặc chọn cách khác.'
+    ? 'Bạn đã từ chối quyền truy cập vị trí. Hãy tìm địa chỉ hoặc bấm lên bản đồ để đặt ghim.'
+    : 'Không lấy được vị trí của bạn. Hãy thử lại, tìm địa chỉ hoặc bấm lên bản đồ.'
 
-// Một trong bốn cách xác định vị trí, kèm khu vực để lọc bài
+const geoMessage = (error) => (error.code === 'OUTSIDE_HCM' ? OUTSIDE_MESSAGE : error.message)
+
+// Đặt địa điểm cho một đầu đoạn đường (0: điểm đầu, 1: điểm cuối)
+const withPlace = (places, index, place) => {
+  const next = [places[0] ?? '', places[1] ?? '']
+  next[index] = place
+  return next
+}
+
+// Khu vực lưu riêng cho ghim và đoạn đường, bật/tắt đoạn đường không phải hỏi lại VietMap
+const areaFields = (current, slot, area, auto) => {
+  const forRoad = slot !== 'point'
+  const saved = forRoad
+    ? { roadArea: area, roadAreaAuto: auto }
+    : { pointArea: area, pointAreaAuto: auto }
+  const active = (current.mode === 'road') === forRoad
+  return active ? { ...saved, area, areaAuto: auto } : saved
+}
+
+function MapFallback() {
+  return (
+    <div className="grid h-72 place-items-center rounded-2xl border border-line bg-surface-muted text-caption text-ink-muted sm:h-96">
+      Đang tải bản đồ…
+    </div>
+  )
+}
+
+// Gợi ý phía trên bản đồ theo thao tác đang làm
+function hintOf(location) {
+  if (location.mode === 'road') {
+    if (location.road.length === 0) return 'Bấm lên bản đồ để chọn điểm đầu của đoạn đường.'
+    if (location.road.length === 1) return 'Bấm tiếp để chọn điểm cuối của đoạn đường.'
+    return 'Kéo hai đầu để chỉnh cho đúng đoạn đường, hoặc bấm Vẽ lại.'
+  }
+  if (!location.point) {
+    return 'Tìm địa chỉ, dùng vị trí của bạn, hoặc bấm lên bản đồ để đặt ghim.'
+  }
+  return 'Kéo ghim để chỉnh lại cho đúng chỗ.'
+}
+
+// Tìm địa chỉ, GPS hay bấm bản đồ đều đặt cùng một ghim kéo được; đoạn đường là hai đầu mút.
+// Chỉ tìm khi bấm Tìm, lỗi chỉ hiện khi bấm Tiếp tục
 export default function LocationStep({ type, location, errors, onChange }) {
   const id = useId()
   const [locating, setLocating] = useState(false)
-  const [gpsError, setGpsError] = useState('')
-  const [suggestOpen, setSuggestOpen] = useState(false)
+  // Thông báo sau thao tác: từ chối GPS, ngoài TP.HCM, lỗi tìm kiếm
+  const [notice, setNotice] = useState(null)
+  const [search, setSearch] = useState({ status: 'idle', results: [] })
+  const [choosing, setChoosing] = useState('')
+  const [satellite, setSatellite] = useState(false)
+  // Điểm đang chờ VietMap trả địa chỉ: 'point', 0, 1
+  const [pending, setPending] = useState({})
 
-  // Kết quả GPS về sau khi người dùng đã đổi cách khác thì bỏ qua
-  const modeRef = useRef(location.mode)
-  useEffect(() => {
-    modeRef.current = location.mode
-  }, [location.mode])
+  // Mỗi điểm chỉ nhận kết quả của lần hỏi mới nhất
+  const requestRef = useRef({})
+  // Đầu nào của đoạn đường đang ở ngoài TP.HCM
+  const roadOutsideRef = useRef([false, false])
 
   const lost = type === 'lost'
-  const road = location.mode === 'road' && ROAD_SEGMENTS.find((r) => r.id === location.roadId)
-  const query = normalize(location.place)
-  const suggestions =
-    location.mode === 'address' && suggestOpen && query
-      ? PLACES.filter((place) => normalize(`${place.label} ${place.area}`).includes(query)).slice(
-          0,
-          MAX_SUGGESTIONS
-        )
-      : []
-  const ready = location.coords || location.point || road || location.place.trim()
+  const roadMode = location.mode === 'road'
+  const hasLocation = roadMode ? location.road.length > 0 : Boolean(location.point)
+  const areaPending = Boolean(roadMode ? pending[0] : pending.point)
+  // Chỉ cho chọn khu vực tay khi không tự nhận được theo vị trí
+  const showAreaSelect = hasLocation && !areaPending && !(location.areaAuto && location.area)
+
+  const describe = async (point, slot, { keepPlace = false } = {}) => {
+    const request = (requestRef.current[slot] = (requestRef.current[slot] ?? 0) + 1)
+    const latest = () => requestRef.current[slot] === request
+    const setsArea = slot === 'point' || slot === 0
+    setPending((prev) => ({ ...prev, [slot]: true }))
+    try {
+      const { data } = await reversePoint(point)
+      if (!latest()) return
+      // Người đăng thấy địa chỉ đầy đủ, bản công khai do server tạo
+      const place = data.detail || ''
+      if (slot !== 'point') roadOutsideRef.current[slot] = false
+      onChange((current) => ({
+        ...(setsArea && areaFields(current, slot, data.area || '', Boolean(data.area))),
+        ...(slot === 'point'
+          ? { pointOutside: false, ...(!keepPlace && { place }) }
+          : {
+              roadOutside: roadOutsideRef.current.some(Boolean),
+              ...(!keepPlace && { roadPlaces: withPlace(current.roadPlaces, slot, place) }),
+            }),
+      }))
+    } catch (error) {
+      if (!latest()) return
+      const outside = error.code === 'OUTSIDE_HCM'
+      // Không rõ khu vực thì cho chọn tay; ngoài TP.HCM thì giữ điểm và tô đỏ
+      if (slot !== 'point' && outside) roadOutsideRef.current[slot] = true
+      onChange((current) => ({
+        ...(setsArea && areaFields(current, slot, '', false)),
+        ...(slot === 'point'
+          ? { ...(!keepPlace && { place: '' }), ...(outside && { pointOutside: true }) }
+          : {
+              ...(!keepPlace && { roadPlaces: withPlace(current.roadPlaces, slot, '') }),
+              ...(outside && { roadOutside: true }),
+            }),
+      }))
+      setNotice({ tone: 'danger', text: geoMessage(error) })
+    } finally {
+      if (latest()) setPending((prev) => ({ ...prev, [slot]: false }))
+    }
+  }
+
+  // source: gps, pin hoặc address
+  const setPoint = (point, source, extra = {}) => {
+    setNotice(null)
+    onChange({
+      mode: source,
+      pointSource: source,
+      point,
+      pointOutside: false,
+      place: '',
+      placePublic: '',
+      accuracy: null,
+      ...extra,
+    })
+  }
 
   const locate = () => {
     if (!('geolocation' in navigator)) {
-      setGpsError('Trình duyệt không hỗ trợ lấy vị trí. Hãy chọn cách khác.')
+      setNotice({ tone: 'warning', text: 'Trình duyệt không hỗ trợ lấy vị trí.' })
       return
     }
     setLocating(true)
-    setGpsError('')
+    setNotice(null)
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
         setLocating(false)
-        if (modeRef.current !== 'gps') return
-        onChange({ coords: { lat: coords.latitude, lng: coords.longitude }, point: CENTER })
+        const point = { lat: coords.latitude, lng: coords.longitude }
+        setPoint(point, 'gps', { accuracy: Math.round(coords.accuracy) })
+        describe(point, 'point')
       },
       (error) => {
         setLocating(false)
-        setGpsError(gpsMessage(error))
+        setNotice({ tone: 'warning', text: gpsMessage(error) })
       },
       { enableHighAccuracy: true, timeout: 10000 }
     )
   }
 
-  const chooseMode = (mode) => {
-    if (mode === location.mode) return
-    setGpsError('')
-    setSuggestOpen(false)
-    modeRef.current = mode
-    onChange({ mode, place: '', roadId: '', coords: null, point: mode === 'pin' ? CENTER : null })
-    if (mode === 'gps') locate()
+  // Bấm lên bản đồ: chế độ đoạn đường thì thêm đầu mút, còn lại là đặt ghim
+  const clickMap = (point) => {
+    if (roadMode) {
+      if (location.road.length >= 2) return
+      const index = location.road.length
+      setNotice(null)
+      onChange((current) => ({
+        road: [...current.road, point],
+        roadPlaces: withPlace(current.roadPlaces, index, ''),
+      }))
+      describe(point, index)
+      return
+    }
+    setPoint(point, 'pin')
+    describe(point, 'point')
   }
 
-  // Chọn khu vực trước thì danh sách đoạn đường chỉ còn đường trong khu vực đó
-  const roads = location.area
-    ? ROAD_SEGMENTS.filter((segment) => segment.area === location.area)
-    : ROAD_SEGMENTS
-
-  const changeArea = (area) => {
-    const keepRoad =
-      !location.roadId || ROAD_SEGMENTS.some((r) => r.id === location.roadId && r.area === area)
-    onChange(keepRoad ? { area } : { area, roadId: '' })
+  const dragPoint = (point) => {
+    setPoint(point, 'pin')
+    describe(point, 'point')
   }
 
-  const pickPlace = (place) => {
-    onChange({ place: place.label, area: place.area, point: { x: place.x, y: place.y } })
-    setSuggestOpen(false)
+  const dragRoadEnd = (index, point) => {
+    setNotice(null)
+    onChange((current) => ({
+      road: current.road.map((item, i) => (i === index ? point : item)),
+      roadPlaces: withPlace(current.roadPlaces, index, ''),
+    }))
+    describe(point, index)
   }
 
-  const placeNameInput = (
-    <div>
-      <label htmlFor={`${id}-place`} className={labelClass}>
-        Tên địa điểm <span className="font-normal text-ink-muted">· không bắt buộc</span>
-      </label>
-      <input
-        id={`${id}-place`}
-        value={location.place}
-        onChange={(e) => onChange({ place: e.target.value })}
-        placeholder="Ví dụ: Cổng sau ký túc xá khu A"
-        className={cx(inputClass, 'h-11')}
-      />
-    </div>
-  )
+  const resetRoad = () => {
+    roadOutsideRef.current = [false, false]
+    requestRef.current[0] = (requestRef.current[0] ?? 0) + 1
+    requestRef.current[1] = (requestRef.current[1] ?? 0) + 1
+    setPending((prev) => ({ ...prev, 0: false, 1: false }))
+    setNotice(null)
+    onChange({ road: [], roadPlaces: [], roadOutside: false })
+  }
+
+  // Bật/tắt đoạn đường, khu vực đổi theo vị trí đang dùng
+  const toggleRoad = () => {
+    setNotice(null)
+    const toRoad = !roadMode
+    const target = toRoad ? location.road[0] : location.point
+    const savedArea = toRoad ? location.roadArea : location.pointArea
+    const savedAuto = toRoad ? location.roadAreaAuto : location.pointAreaAuto
+    const known = target && savedArea !== undefined
+    onChange({
+      mode: toRoad ? 'road' : location.point ? location.pointSource || 'pin' : '',
+      ...(known && { area: savedArea, areaAuto: Boolean(savedAuto) }),
+    })
+    // Chưa có khu vực đã lưu (vd vừa mở bản nháp) thì hỏi lại VietMap
+    if (target && !known) describe(target, toRoad ? 0 : 'point', { keepPlace: true })
+  }
+
+  const runSearch = async () => {
+    const text = location.query.trim()
+    if (text.length < SEARCH_MIN) {
+      setSearch({ status: 'idle', results: [] })
+      setNotice({ tone: 'warning', text: `Nhập ít nhất ${SEARCH_MIN} ký tự rồi bấm Tìm.` })
+      return
+    }
+    setNotice(null)
+    setSearch({ status: 'loading', results: [] })
+    try {
+      const { data } = await searchPlaces(text)
+      setSearch({ status: 'done', results: data })
+    } catch (error) {
+      setSearch({ status: 'idle', results: [] })
+      setNotice({ tone: 'warning', text: geoMessage(error) })
+    }
+  }
+
+  const choosePlace = async (result) => {
+    setChoosing(result.refId)
+    try {
+      const { data } = await getPlace(result.refId)
+      setSearch({ status: 'idle', results: [] })
+      setPoint({ lat: data.lat, lng: data.lng }, 'address', {
+        // Người đăng thấy địa chỉ đầy đủ, bản công khai (giữ tên địa danh) gửi lên server
+        place: result.detail,
+        placePublic: result.place,
+        // Quận ngoài danh sách khu vực thì chọn tay
+        area: result.area || '',
+        areaAuto: Boolean(result.area),
+        pointArea: result.area || '',
+        pointAreaAuto: Boolean(result.area),
+      })
+    } catch (error) {
+      setNotice({ tone: 'warning', text: geoMessage(error) })
+    } finally {
+      setChoosing('')
+    }
+  }
+
+  const roadLength =
+    location.road.length === 2 ? distanceMeters(location.road[0], location.road[1]) : null
+  const gpsInaccurate =
+    !roadMode &&
+    location.mode === 'gps' &&
+    location.accuracy > GPS_ACCURACY_WARN_M &&
+    !location.pointOutside
+
+  const muted = (text) => <span className="text-ink-muted">{text}</span>
+  const strong = (text) => <strong className="font-semibold text-ink">{text}</strong>
+
+  // Không lấy được địa chỉ thì ghi khu vực
+  const pointPlaceText = () => {
+    if (!location.point) return muted('chưa chọn vị trí')
+    if (pending.point) return muted('đang xác định…')
+    if (location.pointOutside) return muted('nằm ngoài TP.HCM')
+    const text = location.place || location.area
+    return text ? strong(text) : muted('chưa xác định được')
+  }
+
+  const roadPlaceText = (index) => {
+    if (!location.road[index]) {
+      return muted(index === 0 ? 'chưa chọn điểm đầu' : 'chưa chọn điểm cuối')
+    }
+    if (pending[index]) return muted('đang xác định…')
+    const text = location.roadPlaces[index] || location.area
+    return text ? strong(text) : muted('chưa xác định được')
+  }
 
   return (
     <>
-      <StepHeading
-        title={lost ? 'Bạn mất đồ ở đâu?' : 'Bạn nhặt được ở đâu?'}
-        description="Vị trí chính xác được giữ kín. Người khác chỉ nhìn thấy một vùng rộng quanh đó."
-      />
+      <StepHeading title={lost ? 'Bạn mất đồ ở đâu?' : 'Bạn nhặt được ở đâu?'} required />
+
+      <label htmlFor={`${id}-search`} className={labelClass}>
+        Tìm địa chỉ
+      </label>
+      <div className="flex gap-2">
+        <input
+          id={`${id}-search`}
+          type="search"
+          value={location.query}
+          autoComplete="off"
+          onChange={(e) => onChange({ query: e.target.value })}
+          onKeyDown={(e) => {
+            // Enter tìm địa chỉ thay vì sang bước tiếp theo
+            if (e.key !== 'Enter') return
+            e.preventDefault()
+            runSearch()
+          }}
+          placeholder="Tên đường, địa danh…"
+          className={cx(inputClass, 'h-10 flex-1')}
+        />
+        <Button
+          variant="primary"
+          size="lg"
+          onClick={runSearch}
+          disabled={search.status === 'loading'}
+          className="shrink-0"
+        >
+          <Icon name="search" size={16} />
+          {search.status === 'loading' ? 'Đang tìm…' : 'Tìm'}
+        </Button>
+      </div>
+
+      {search.status === 'done' && (
+        <div className="mt-2 rounded-xl border border-line bg-surface p-1">
+          {search.results.length === 0 ? (
+            <p className="m-0 px-3 py-2.5 text-small text-ink-muted">
+              Không tìm thấy địa chỉ nào trong TP.HCM. Thử gõ cụ thể hơn, ví dụ thêm tên đường hoặc
+              quận.
+            </p>
+          ) : (
+            <ul aria-label="Kết quả tìm địa chỉ" className="m-0 list-none p-0">
+              {search.results.map((result) => (
+                <li key={result.refId}>
+                  <button
+                    type="button"
+                    onClick={() => choosePlace(result)}
+                    disabled={Boolean(choosing)}
+                    className={cx(
+                      'flex w-full cursor-pointer items-start gap-2.5 rounded-lg border-0 bg-transparent px-3 py-2.5 text-left text-small text-ink hover:bg-primary-subtle disabled:cursor-wait',
+                      focusRing
+                    )}
+                  >
+                    <Icon name="pin" size={16} className="mt-0.5 shrink-0 text-ink-subtle" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-medium">{result.name}</span>
+                      <span className="block text-caption text-ink-muted">
+                        {choosing === result.refId ? 'Đang mở trên bản đồ…' : result.display}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       <div
         role="group"
-        aria-label="Cách xác định vị trí"
-        className="grid grid-cols-2 gap-2 lg:grid-cols-4"
+        aria-label="Công cụ bản đồ"
+        className="mt-3 flex flex-wrap items-center gap-2"
       >
-        {LOCATION_MODES.map((mode) => {
-          const active = location.mode === mode.value
-          return (
-            <button
-              key={mode.value}
-              type="button"
-              aria-pressed={active}
-              onClick={() => chooseMode(mode.value)}
-              className={cx(
-                tileClass(active),
-                'min-h-11 items-center gap-2 px-3 py-2 text-small font-medium'
-              )}
-            >
-              <Icon name={MODE_ICONS[mode.value]} size={18} className="shrink-0" />
-              {mode.label}
-            </button>
-          )
-        })}
-      </div>
-
-      <div className="mt-4 max-w-xs">
-        <label htmlFor={`${id}-area`} className={labelClass}>
-          Khu vực
-        </label>
-        <select
-          id={`${id}-area`}
-          value={location.area}
-          onChange={(e) => changeArea(e.target.value)}
-          aria-invalid={errors.area ? true : undefined}
-          aria-describedby={errors.area ? `${id}-area-error` : undefined}
-          className={cx(inputClass, 'h-11 cursor-pointer')}
+        <button
+          type="button"
+          onClick={locate}
+          disabled={locating}
+          className={cx(chipClass(false), 'disabled:cursor-wait disabled:opacity-60')}
         >
-          <option value="">Chọn quận, huyện…</option>
-          {AREAS.map((area) => (
-            <option key={area} value={area}>
-              {area}
-            </option>
-          ))}
-        </select>
-        <FieldError id={`${id}-area-error`}>{errors.area}</FieldError>
+          <Icon name="locate" size={15} />
+          {locating ? 'Đang lấy vị trí…' : 'Vị trí của tôi'}
+        </button>
+        <button
+          type="button"
+          aria-pressed={roadMode}
+          onClick={toggleRoad}
+          className={chipClass(roadMode)}
+        >
+          <Icon name="route" size={15} />
+          Đánh dấu đoạn đường
+        </button>
+        {roadMode && location.road.length > 0 && (
+          <button type="button" onClick={resetRoad} className={chipClass(false)}>
+            <Icon name="history" size={15} />
+            Vẽ lại
+          </button>
+        )}
+        <button
+          type="button"
+          aria-pressed={satellite}
+          onClick={() => setSatellite((on) => !on)}
+          className={cx(chipClass(satellite), 'sm:ml-auto')}
+        >
+          Ảnh vệ tinh
+        </button>
       </div>
 
-      <div className="mt-4 flex flex-col gap-4">
-        {location.mode === 'gps' && (
+      <ul className="m-0 mt-3 mb-2 list-disc pl-5 text-caption text-ink-muted marker:text-primary">
+        <li>{hintOf(location)}</li>
+      </ul>
+      <FieldError>{errors.location}</FieldError>
+
+      {notice && (
+        <Note icon="info" tone={notice.tone} className="mb-3">
+          {notice.text}
+        </Note>
+      )}
+      {gpsInaccurate && (
+        <Note icon="info" tone="warning" className="mb-3">
+          Vị trí của bạn có thể lệch khoảng {formatDistance(location.accuracy)}. Hãy kéo ghim tới
+          đúng chỗ mất hoặc nhặt được đồ.
+        </Note>
+      )}
+
+      <Suspense fallback={<MapFallback />}>
+        <VietMapView
+          mode={roadMode ? 'road' : 'point'}
+          point={location.point}
+          pointOutside={location.pointOutside}
+          road={location.road}
+          roadOutside={location.roadOutside}
+          satellite={satellite}
+          onMapClick={clickMap}
+          onPointDrag={dragPoint}
+          onRoadDrag={dragRoadEnd}
+        />
+      </Suspense>
+
+      <div className="mt-3 rounded-xl border border-line bg-surface-muted px-3.5 py-2.5 text-small text-ink-secondary">
+        {roadMode ? (
           <>
-            <div
-              role="status"
-              className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface-muted px-4 py-3 text-small"
-            >
-              <Icon
-                name="locate"
-                size={16}
-                className={location.coords ? 'text-success' : 'text-ink-subtle'}
-              />
-              <span
-                className={cx(
-                  'min-w-0 flex-1',
-                  gpsError ? 'text-danger-ink' : 'text-ink-secondary'
-                )}
-              >
-                {locating
-                  ? 'Đang lấy vị trí hiện tại…'
-                  : location.coords
-                    ? `Đã lấy vị trí hiện tại (${location.coords.lat.toFixed(5)}, ${location.coords.lng.toFixed(5)})`
-                    : gpsError || 'Chưa lấy được vị trí.'}
-              </span>
-              <button
-                type="button"
-                onClick={locate}
-                disabled={locating}
-                className={cx(
-                  'h-8 cursor-pointer rounded-full border border-line bg-surface px-3.5 text-caption font-semibold text-primary hover:bg-primary-subtle disabled:cursor-wait disabled:opacity-60',
-                  focusRing
-                )}
-              >
-                {location.coords ? 'Lấy lại' : 'Thử lại'}
-              </button>
-            </div>
-            {placeNameInput}
-          </>
-        )}
-
-        {location.mode === 'pin' && placeNameInput}
-
-        {location.mode === 'address' && (
-          <div className="relative">
-            <label htmlFor={`${id}-address`} className={labelClass}>
-              Địa chỉ
-            </label>
-            <input
-              id={`${id}-address`}
-              value={location.place}
-              autoComplete="off"
-              onChange={(e) => {
-                onChange({ place: e.target.value, point: null })
-                setSuggestOpen(true)
-              }}
-              onKeyDown={(e) => {
-                // Enter chọn gợi ý đầu tiên thay vì gửi form
-                if (e.key !== 'Enter') return
-                e.preventDefault()
-                if (suggestions[0]) pickPlace(suggestions[0])
-              }}
-              placeholder="Gõ tên đường, địa danh… ví dụ: Bến Thành"
-              aria-invalid={errors.location ? true : undefined}
-              aria-describedby={errors.location ? `${id}-location-error` : undefined}
-              className={cx(inputClass, 'h-11')}
-            />
-            {suggestions.length > 0 && (
-              <ul
-                aria-label="Địa chỉ gợi ý"
-                className="absolute inset-x-0 top-full z-10 m-0 mt-1.5 list-none overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-dialog"
-              >
-                {suggestions.map((place) => (
-                  <li key={place.label}>
-                    <button
-                      type="button"
-                      onClick={() => pickPlace(place)}
-                      className={cx(
-                        'flex w-full cursor-pointer items-center gap-2.5 rounded-lg border-0 bg-transparent px-3 py-2.5 text-left text-small text-ink hover:bg-primary-subtle',
-                        focusRing
-                      )}
-                    >
-                      <Icon name="pin" size={16} className="shrink-0 text-ink-subtle" />
-                      <span className="min-w-0 truncate">{place.label}</span>
-                      <span className="ml-auto shrink-0 text-caption text-ink-muted">
-                        {place.area}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+            <p className="m-0 font-semibold text-ink">
+              Địa điểm
+              <RequiredMark />
+            </p>
+            <dl className="m-0 mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-0.5">
+              {['Từ', 'Đến'].map((label, index) => (
+                <Fragment key={label}>
+                  <dt className="text-ink-muted">{label}:</dt>
+                  <dd className="m-0">{roadPlaceText(index)}</dd>
+                </Fragment>
+              ))}
+            </dl>
+            {roadLength !== null && (
+              <p className="m-0 mt-1 text-caption text-ink-muted">
+                Đoạn đường dài khoảng {formatDistance(roadLength)}.
+              </p>
             )}
-          </div>
+          </>
+        ) : (
+          <p className="m-0">
+            <span className="font-semibold text-ink">
+              Địa điểm
+              <RequiredMark />:
+            </span>{' '}
+            {pointPlaceText()}
+          </p>
         )}
 
-        {location.mode === 'road' && (
-          <div>
-            <label htmlFor={`${id}-road`} className={labelClass}>
-              Đoạn đường
+        {showAreaSelect && (
+          <div className="mt-2.5 max-w-xs">
+            <label htmlFor={`${id}-area`} className={labelClass}>
+              Chưa xác định được khu vực, hãy chọn
+              <RequiredMark />
             </label>
             <select
-              id={`${id}-road`}
-              value={location.roadId}
-              onChange={(e) => {
-                const segment = ROAD_SEGMENTS.find((r) => r.id === e.target.value)
-                onChange({ roadId: e.target.value, area: segment?.area ?? location.area })
-              }}
-              aria-invalid={errors.location ? true : undefined}
-              aria-describedby={errors.location ? `${id}-location-error` : undefined}
-              className={cx(inputClass, 'h-11 cursor-pointer')}
+              id={`${id}-area`}
+              value={location.area}
+              onChange={(e) =>
+                onChange({
+                  area: e.target.value,
+                  areaAuto: false,
+                  ...(roadMode
+                    ? { roadArea: e.target.value, roadAreaAuto: false }
+                    : { pointArea: e.target.value, pointAreaAuto: false }),
+                })
+              }
+              aria-required="true"
+              aria-invalid={errors.area ? true : undefined}
+              aria-describedby={errors.area ? `${id}-area-error` : undefined}
+              className={cx(inputClass, 'h-10 cursor-pointer')}
             >
-              <option value="">Chọn đoạn đường…</option>
-              {roads.map((segment) => (
-                <option key={segment.id} value={segment.id}>
-                  {segment.road} (đoạn {segment.from} – {segment.to}) · {segment.area}
+              <option value="">Chọn quận, huyện…</option>
+              {AREAS.map((area) => (
+                <option key={area} value={area}>
+                  {area}
                 </option>
               ))}
             </select>
+            <FieldError id={`${id}-area-error`}>{errors.area}</FieldError>
           </div>
         )}
-      </div>
-      <FieldError id={`${id}-location-error`}>{errors.location}</FieldError>
-
-      <div className="mt-4">
-        <LocationMap
-          point={location.point}
-          road={road || null}
-          label={ready ? describeLocation(location) : ''}
-          emptyText={EMPTY_TEXT[location.mode] ?? EMPTY_TEXT['']}
-          draggable={location.mode === 'pin'}
-          onMove={(point) => onChange({ point })}
-        />
       </div>
     </>
   )

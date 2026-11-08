@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { formatCount, postPath, timeAgo } from '../../../lib/user/homeFeed'
+import { formatCount, placeLines, postPath, timeAgo } from '../../../lib/user/homeFeed'
 import { profilePath } from '../../../lib/user/profiles'
 import Icon from '../../common/Icon'
 import { cardClass } from '../Card'
@@ -72,9 +72,14 @@ export default function PostCard({ post, commentCount, liked, onToggleLike, now 
         </p>
 
         <div className="mb-3.5 flex flex-wrap gap-1.5 max-sm:hidden">
-          <span className="inline-flex h-7.5 items-center gap-1.5 rounded-full bg-line-subtle px-3 text-tiny text-ink-secondary">
-            <Icon name="pin" size={13} />
-            {post.address}, {post.area}
+          <span className="inline-flex min-h-7.5 items-center gap-1.5 rounded-2xl bg-line-subtle px-3 py-1 text-tiny text-ink-secondary">
+            <Icon name="pin" size={13} className="shrink-0" />
+            {/* Đoạn đường hiện hai dòng Từ / Đến */}
+            <span className="flex flex-col leading-snug">
+              {placeLines(post).map((line) => (
+                <span key={line}>{line}</span>
+              ))}
+            </span>
           </span>
           <span className="inline-flex h-7.5 items-center gap-1.5 rounded-full bg-line-subtle px-3 text-tiny text-ink-secondary">
             <Icon name="calendar" size={13} />

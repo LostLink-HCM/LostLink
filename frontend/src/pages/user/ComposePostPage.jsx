@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
+import { listCategories } from '../../api/categories'
+import { createPost, deleteDraft, getDraft, saveDraft } from '../../api/posts'
 import { useAuth } from '../../auth/AuthContext'
 import Icon from '../../components/common/Icon'
 import ClassifyStep from '../../components/user/compose/ClassifyStep'
@@ -16,12 +18,17 @@ import Dialog from '../../components/user/Dialog'
 import EmptyState from '../../components/user/EmptyState'
 import {
   EMPTY_FORM,
-  clearDraft,
+  buildPostForm,
+  clearLocalDraft,
   findInvalidStep,
   getSteps,
-  loadDraft,
+  isFormEmpty,
+  loadLocalDraft,
+  mapApiErrors,
   prefillDescription,
-  saveDraft,
+  reconcileClassification,
+  restoreDraft,
+  serializeDraft,
   validateStep,
 } from '../../lib/user/composePost'
 
@@ -41,22 +48,85 @@ const formatSavedAt = (iso) =>
     month: '2-digit',
   })
 
-// Form Đăng bài nhiều bước. Phần giao diện: chưa gọi API, bản nháp lưu ở trình duyệt
+// Form Đăng bài nhiều bước, bản nháp lưu trên server (không kèm ảnh)
 export default function ComposePostPage() {
   const { user } = useAuth()
   const { notify } = useOutletContext()
   const navigate = useNavigate()
 
-  // Có bản nháp thì nạp vào để đăng tiếp
-  const [draft, setDraft] = useState(() => loadDraft(user.id))
-  const [form, setForm] = useState(() => draft?.form ?? EMPTY_FORM)
-  const [step, setStep] = useState(() => draft?.step ?? 0)
-  const [reached, setReached] = useState(() => draft?.step ?? 0)
+  // Tải bản nháp xong mới hiện form để không ghi đè chữ đang gõ
+  const [draft, setDraft] = useState(null)
+  const [draftLoading, setDraftLoading] = useState(true)
+  const [savingDraft, setSavingDraft] = useState(false)
+  const [form, setForm] = useState(EMPTY_FORM)
+  const [step, setStep] = useState(0)
+  const [reached, setReached] = useState(0)
   const [errors, setErrors] = useState({})
   const [reviewing, setReviewing] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [errorTick, setErrorTick] = useState(0)
+  const [submitting, setSubmitting] = useState(false)
+  const [categories, setCategories] = useState({ status: 'loading', items: [] })
   const formRef = useRef(null)
+
+  // Để bản nháp nạp sau danh mục vẫn được đối chiếu
+  const categoriesRef = useRef(null)
+
+  // Danh mục, thuộc tính trong bản nháp không còn tồn tại thì bỏ
+  const fetchCategories = useCallback(
+    () =>
+      listCategories()
+        .then(({ data }) => {
+          categoriesRef.current = data
+          setCategories({ status: 'ready', items: data })
+          setForm((prev) => {
+            const patch = reconcileClassification(prev, data)
+            return patch ? { ...prev, ...patch } : prev
+          })
+        })
+        .catch(() => setCategories({ status: 'error', items: [] })),
+    []
+  )
+
+  useEffect(() => {
+    fetchCategories()
+  }, [fetchCategories])
+
+  // Nạp bản nháp trên server; chưa có mà trình duyệt còn bản nháp cũ thì nạp bản đó
+  useEffect(() => {
+    let active = true
+    const apply = (restored) => {
+      const categoryItems = categoriesRef.current
+      const patch = categoryItems && reconcileClassification(restored.form, categoryItems)
+      setForm(patch ? { ...restored.form, ...patch } : restored.form)
+      setStep(restored.step)
+      setReached(restored.step)
+      setDraft({ savedAt: restored.savedAt })
+    }
+    getDraft()
+      .then(({ data }) => {
+        if (!active) return
+        const restored = data ? restoreDraft(data) : loadLocalDraft(user.id)
+        if (restored) apply(restored)
+      })
+      .catch(() => {
+        if (!active) return
+        const local = loadLocalDraft(user.id)
+        if (local) apply(local)
+        else notify('Không tải được bản nháp, bạn vẫn có thể soạn bài mới.')
+      })
+      .finally(() => active && setDraftLoading(false))
+    return () => {
+      active = false
+    }
+  }, [user.id, notify])
+
+  const retryCategories = () => {
+    setCategories({ status: 'loading', items: [] })
+    fetchCategories()
+  }
+
+  const category = categories.items.find((item) => item.slug === form.category)
 
   // Thu hồi URL xem trước của ảnh khi rời trang
   const imagesRef = useRef(form.images)
@@ -91,7 +161,7 @@ export default function ComposePostPage() {
           <EmptyState
             icon="lock"
             title="Tài khoản tạm thời không được đăng bài"
-            description="Tài khoản của bạn đang bị hạn chế, vui lòng chờ Moderator xử lý."
+            description="Tài khoản của bạn đang bị hạn chế, vui lòng chờ LostLink xử lý."
           />
           <div className="flex justify-center">
             <Link to="/" className={buttonClass({ size: 'xl' })}>
@@ -116,9 +186,17 @@ export default function ComposePostPage() {
     clearErrors(Object.keys(patch))
   }
 
+  // patch là object hoặc hàm nhận vị trí mới nhất
   const updateLocation = (patch) => {
-    setForm((prev) => ({ ...prev, location: { ...prev.location, ...patch } }))
-    clearErrors(Object.keys(patch).map((key) => LOCATION_ERROR_KEYS[key] ?? 'location'))
+    setForm((prev) => {
+      const changes = typeof patch === 'function' ? patch(prev.location) : patch
+      return { ...prev, location: { ...prev.location, ...changes } }
+    })
+    clearErrors(
+      typeof patch === 'function'
+        ? ['location']
+        : Object.keys(patch).map((key) => LOCATION_ERROR_KEYS[key] ?? 'location')
+    )
   }
 
   const updateQuestion = (patch) => {
@@ -144,7 +222,7 @@ export default function ComposePostPage() {
 
   const goTo = (index) => {
     if (steps[index]?.key === 'content') {
-      const prefill = prefillDescription(form)
+      const prefill = prefillDescription(form, category)
       if (prefill) setForm((prev) => ({ ...prev, ...prefill }))
     }
     setStep(index)
@@ -160,7 +238,7 @@ export default function ComposePostPage() {
 
   // Kiểm tra toàn bộ, thiếu ở đâu thì quay về bước đó
   const openReview = (target = form) => {
-    const invalid = findInvalidStep(target)
+    const invalid = findInvalidStep(target, category)
     if (invalid) {
       setStep(invalid.index)
       showErrors(invalid.errors)
@@ -171,7 +249,7 @@ export default function ComposePostPage() {
   }
 
   const next = () => {
-    const stepErrors = validateStep(stepKey, form)
+    const stepErrors = validateStep(stepKey, form, category)
     if (Object.keys(stepErrors).length) {
       showErrors(stepErrors)
       return
@@ -190,22 +268,37 @@ export default function ComposePostPage() {
     openReview(target)
   }
 
-  // Lưu nháp ở bất kỳ bước nào rồi kết thúc
-  const handleSaveDraft = () => {
-    if (!saveDraft(user.id, form, current)) {
-      notify('Không lưu được bản nháp, vui lòng thử lại.')
+  // Lưu nháp (trừ ảnh) rồi về Trang chủ; lỗi thì giữ nguyên form
+  const handleSaveDraft = async () => {
+    if (isFormEmpty(form)) {
+      notify('Chưa có nội dung để lưu nháp.')
       return
     }
-    notify(
-      form.images.length
-        ? 'Đã lưu nháp. Ảnh chưa được lưu kèm, bạn chọn lại khi đăng tiếp nhé.'
-        : 'Đã lưu nháp. Mở lại Đăng bài để đăng tiếp.'
-    )
-    navigate('/')
+    setSavingDraft(true)
+    try {
+      await saveDraft({ step: current, form: serializeDraft(form) })
+      clearLocalDraft(user.id)
+      notify(
+        form.images.length
+          ? 'Đã lưu nháp. Ảnh không được lưu trong bản nháp, vui lòng chọn lại ảnh khi đăng tiếp.'
+          : 'Đã lưu nháp.'
+      )
+      navigate('/')
+    } catch (error) {
+      notify(error.code === 'DRAFT_EMPTY' ? error.message : 'Đã có lỗi xảy ra, vui lòng thử lại.')
+    } finally {
+      setSavingDraft(false)
+    }
   }
 
-  const discardDraft = () => {
-    clearDraft(user.id)
+  const discardDraft = async () => {
+    try {
+      await deleteDraft()
+    } catch {
+      notify('Đã có lỗi xảy ra, vui lòng thử lại.')
+      return
+    }
+    clearLocalDraft(user.id)
     form.images.forEach((image) => URL.revokeObjectURL(image.url))
     setDraft(null)
     setForm(EMPTY_FORM)
@@ -215,12 +308,30 @@ export default function ComposePostPage() {
     setConfirmDiscard(false)
   }
 
-  // Chưa có API tạo bài: giả lập lưu thành công, bài chờ Moderator duyệt
-  const submit = () => {
-    clearDraft(user.id)
-    setReviewing(false)
-    notify('Đăng bài thành công! Bài đang chờ Moderator duyệt.')
-    navigate('/')
+  // Đăng bài rồi về Trang chủ; server báo lỗi field nào thì quay về đúng bước đó
+  const submit = async () => {
+    setSubmitting(true)
+    try {
+      // Server tự xoá bản nháp khi đăng thành công
+      await createPost(buildPostForm(form))
+      clearLocalDraft(user.id)
+      setReviewing(false)
+      notify('Đăng bài thành công! Bài đang chờ LostLink duyệt.')
+      navigate('/')
+    } catch (error) {
+      setReviewing(false)
+      const mapped = mapApiErrors(error.details ?? [])
+      if (mapped) {
+        const index = steps.findIndex((item) => item.key === mapped.stepKey)
+        if (index >= 0) {
+          setStep(index)
+          showErrors(mapped.errors)
+        }
+      }
+      notify(error.message || 'Không đăng được bài, vui lòng thử lại.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const editFromReview = (index) => {
@@ -231,8 +342,12 @@ export default function ComposePostPage() {
   return (
     <div className={pageClass}>
       <h1 className="m-0 text-heading font-bold tracking-tight text-ink">Đăng bài mới</h1>
-      <p className="m-0 mt-1 mb-5 text-small text-ink-muted">
-        Bài mới sẽ được Moderator duyệt trước khi hiển thị công khai.
+      <p className="m-0 mt-1 mb-4 text-small text-ink-muted">
+        Bài mới sẽ được LostLink duyệt trước khi hiển thị công khai. Mục có dấu{' '}
+        <span aria-hidden="true" className="text-danger">
+          *
+        </span>
+        <span className="sr-only">sao</span> là bắt buộc.
       </p>
 
       {draft && (
@@ -259,66 +374,106 @@ export default function ComposePostPage() {
         </div>
       )}
 
-      <StepIndicator steps={steps} current={current} reached={reached} onSelect={goTo} />
-
-      <form
-        ref={formRef}
-        noValidate
-        onSubmit={(e) => {
-          e.preventDefault()
-          next()
-        }}
-      >
-        <Card className="p-5 sm:p-7">
-          {stepKey === 'classify' && <ClassifyStep form={form} errors={errors} onChange={update} />}
-          {stepKey === 'content' && (
-            <ContentStep
-              form={form}
-              errors={errors}
-              onChange={update}
-              onAddImages={addImages}
-              onRemoveImage={removeImage}
-            />
-          )}
-          {stepKey === 'time' && <TimeStep form={form} errors={errors} onChange={update} />}
-          {stepKey === 'location' && (
-            <LocationStep
-              type={form.type}
-              location={form.location}
-              errors={errors}
-              onChange={updateLocation}
-            />
-          )}
-          {stepKey === 'question' && (
-            <QuestionStep
-              question={form.question}
-              errors={errors}
-              onChange={updateQuestion}
-              onSkip={skipQuestion}
-            />
-          )}
+      {draftLoading ? (
+        <Card className="p-4 sm:p-6">
+          <p role="status" className="m-0 py-10 text-center text-small text-ink-muted">
+            Đang tải bản nháp…
+          </p>
         </Card>
+      ) : (
+        <>
+          <StepIndicator steps={steps} current={current} reached={reached} onSelect={goTo} />
 
-        <div className="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Button size="xl" onClick={back}>
-            <Icon name="back" size={16} />
-            {current === 0 ? 'Huỷ' : 'Quay lại'}
-          </Button>
-          <div className="flex gap-3">
-            <Button size="xl" onClick={handleSaveDraft} className="flex-1 sm:flex-none">
-              Lưu nháp
-            </Button>
-            <Button type="submit" variant="primary" size="xl" className="flex-1 sm:flex-none">
-              {isLast ? 'Xem lại & đăng bài' : 'Tiếp tục'}
-              <Icon name="next" size={16} />
-            </Button>
-          </div>
-        </div>
-      </form>
+          <form
+            ref={formRef}
+            noValidate
+            onSubmit={(e) => {
+              e.preventDefault()
+              next()
+            }}
+          >
+            <Card className="p-4 sm:p-6">
+              {stepKey === 'classify' && categories.status === 'ready' && (
+                <ClassifyStep
+                  form={form}
+                  categories={categories.items}
+                  category={category}
+                  errors={errors}
+                  onChange={update}
+                />
+              )}
+              {stepKey === 'classify' && categories.status === 'loading' && (
+                <p role="status" className="m-0 py-10 text-center text-small text-ink-muted">
+                  Đang tải danh mục…
+                </p>
+              )}
+              {stepKey === 'classify' && categories.status === 'error' && (
+                <div className="flex flex-col items-center gap-3 py-8 text-center">
+                  <p role="alert" className="m-0 text-small text-ink-secondary">
+                    Không tải được danh mục, vui lòng thử lại.
+                  </p>
+                  <Button onClick={retryCategories}>Thử lại</Button>
+                </div>
+              )}
+              {stepKey === 'content' && (
+                <ContentStep
+                  form={form}
+                  errors={errors}
+                  onChange={update}
+                  onAddImages={addImages}
+                  onRemoveImage={removeImage}
+                />
+              )}
+              {stepKey === 'time' && <TimeStep form={form} errors={errors} onChange={update} />}
+              {stepKey === 'location' && (
+                <LocationStep
+                  type={form.type}
+                  location={form.location}
+                  errors={errors}
+                  onChange={updateLocation}
+                />
+              )}
+              {stepKey === 'question' && (
+                <QuestionStep
+                  question={form.question}
+                  suggestions={category?.suggestedQuestions}
+                  errors={errors}
+                  onChange={updateQuestion}
+                  onSkip={skipQuestion}
+                />
+              )}
+            </Card>
+
+            <div className="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <Button size="lg" onClick={back}>
+                <Icon name="back" size={16} />
+                {current === 0 ? 'Huỷ' : 'Quay lại'}
+              </Button>
+              <div className="flex gap-3">
+                <Button
+                  size="lg"
+                  onClick={handleSaveDraft}
+                  disabled={savingDraft}
+                  aria-busy={savingDraft || undefined}
+                  className="flex-1 sm:flex-none"
+                >
+                  {savingDraft ? 'Đang lưu…' : 'Lưu nháp'}
+                </Button>
+                <Button type="submit" variant="primary" size="lg" className="flex-1 sm:flex-none">
+                  {isLast ? 'Xem lại & đăng bài' : 'Tiếp tục'}
+                  <Icon name="next" size={16} />
+                </Button>
+              </div>
+            </div>
+          </form>
+        </>
+      )}
 
       {reviewing && (
         <ReviewDialog
           form={form}
+          category={category}
+          submitting={submitting}
           onEdit={editFromReview}
           onClose={() => setReviewing(false)}
           onSubmit={submit}

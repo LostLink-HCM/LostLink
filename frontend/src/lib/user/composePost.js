@@ -1,4 +1,4 @@
-import { CATEGORY_ATTRIBUTES, DAY_PARTS, ROAD_SEGMENTS } from '../../data/composePost'
+import { DAY_PARTS, TIME_PRESETS } from '../../data/composePost'
 import { normalize } from './homeFeed'
 
 // Giới hạn tối đa 9 ảnh, mỗi ảnh không quá 5 MB
@@ -11,10 +11,41 @@ export const TITLE_MAX = 120
 export const DESCRIPTION_MAX = 1000
 export const MIN_OPTIONS = 2
 export const MAX_OPTIONS = 5
+// Khớp ROAD_MIN_M, ROAD_MAX_M ở backend
+export const ROAD_MIN_M = 20
+export const ROAD_MAX_M = 5000
+
+// Ghim và đoạn đường lưu song song nên bật/tắt đoạn đường không mất cái còn lại.
+// mode: gps, pin, address (một điểm) hoặc road
+export const EMPTY_LOCATION = {
+  mode: '',
+  // Cách đặt ghim gần nhất, để tắt đoạn đường thì quay về ghim
+  pointSource: '',
+  // Chữ đang gõ ở ô tìm địa chỉ
+  query: '',
+  // place: địa chỉ đầy đủ người đăng thấy (tự điền, không nhập tay). placePublic: bản công khai
+  // khi chọn từ kết quả tìm kiếm; các cách khác do server tạo từ toạ độ
+  place: '',
+  placePublic: '',
+  area: '',
+  // Khu vực tự nhận theo toạ độ (không cho đổi) hay người dùng chọn tay
+  areaAuto: false,
+  point: null,
+  // Độ lệch GPS (mét)
+  accuracy: null,
+  // Hai đầu đoạn đường { lat, lng } và địa chỉ đầy đủ của từng đầu
+  road: [],
+  roadPlaces: [],
+  // Ngoài TP.HCM (server đã báo OUTSIDE_HCM)
+  pointOutside: false,
+  roadOutside: false,
+}
 
 export const EMPTY_FORM = {
   type: '',
+  // slug danh mục
   category: '',
+  // { [id thuộc tính]: id giá trị }
   attributes: {},
   contents: [],
   title: '',
@@ -26,8 +57,7 @@ export const EMPTY_FORM = {
   dayPart: '',
   // Tên mốc gần đúng đã bấm (Sáng hôm qua…), đổi ngày hoặc buổi bằng tay thì bỏ
   timePreset: '',
-  // point: vị trí ghim (%) trên bản đồ; coords: toạ độ GPS thật
-  location: { mode: '', place: '', area: '', point: null, coords: null, roadId: '' },
+  location: EMPTY_LOCATION,
   question: { skipped: false, text: '', options: ['', '', ''], correct: null },
 }
 
@@ -54,7 +84,7 @@ export function daysAgo(days) {
 }
 
 // Buổi trong ngày ứng với giờ hiện tại
-function currentDayPart(hour = new Date().getHours()) {
+function currentDayPart(hour) {
   if (hour >= 6 && hour < 11) return 'morning'
   if (hour >= 11 && hour < 14) return 'noon'
   if (hour >= 14 && hour < 18) return 'afternoon'
@@ -62,20 +92,89 @@ function currentDayPart(hour = new Date().getHours()) {
   return 'night'
 }
 
-export const applyTimePreset = (preset) => ({
-  date: daysAgo(preset.daysAgo),
-  dayPart: preset.dayPart === 'now' ? currentDayPart() : preset.dayPart,
+// Ngày và buổi của bây giờ; 0:00-6:00 là Ban đêm của hôm trước (khớp backend)
+function nowSlot(now = new Date()) {
+  const hour = now.getHours()
+  if (hour < 6) {
+    const yesterday = new Date(now)
+    yesterday.setDate(yesterday.getDate() - 1)
+    return { date: toDateInput(yesterday), dayPart: 'night' }
+  }
+  return { date: toDateInput(now), dayPart: currentDayPart(hour) }
+}
+
+function presetSlot(preset, keepDayPart = '', now = new Date()) {
+  if (preset.dayPart === 'now') return nowSlot(now)
+  const date = new Date(now)
+  date.setDate(date.getDate() - preset.daysAgo)
+  return { date: toDateInput(date), dayPart: preset.dayPart || keepDayPart }
+}
+
+// Buổi chưa bắt đầu của hôm nay
+export function isFutureDayPart(date, dayPart, now = new Date()) {
+  const part = DAY_PARTS.find((item) => item.value === dayPart)
+  return Boolean(part) && date === toDateInput(now) && now.getHours() < part.startHour
+}
+
+// Mốc chưa tới, vd Tối nay khi mới sáng sớm
+export function isFuturePreset(preset, now = new Date()) {
+  const { date, dayPart } = presetSlot(preset, '', now)
+  return isFutureDayPart(date, dayPart, now)
+}
+
+// Ngày và buổi độc lập: mốc chỉ có ngày giữ buổi đang chọn, mốc có buổi thì đặt luôn buổi
+export const applyTimePreset = (preset, keepDayPart = '') => ({
+  ...presetSlot(preset, keepDayPart),
   timePreset: preset.label,
 })
+
+const presetMatches = (preset, date, dayPart) => {
+  const slot = presetSlot(preset, dayPart)
+  return slot.date === date && slot.dayPart === dayPart
+}
+
+// Giữ mốc cũ nếu còn khớp, không thì tìm mốc khớp (Sáng hôm qua + Buổi chiều → Chiều hôm qua)
+export function resolveTimePreset(date, dayPart, current = '') {
+  const kept = TIME_PRESETS.find((preset) => preset.label === current)
+  if (kept && presetMatches(kept, date, dayPart)) return current
+  const match = TIME_PRESETS.find(
+    (preset) => preset.dayPart !== 'now' && presetMatches(preset, date, dayPart)
+  )
+  return match?.label ?? ''
+}
+
+// Khoảng cách gần đúng giữa hai điểm { lat, lng }, đơn vị mét
+export function distanceMeters(a, b) {
+  const rad = Math.PI / 180
+  const x = (b.lng - a.lng) * rad * Math.cos(((a.lat + b.lat) / 2) * rad)
+  const y = (b.lat - a.lat) * rad
+  return Math.sqrt(x * x + y * y) * 6371000
+}
+
+export const formatDistance = (meters) =>
+  meters < 1000 ? `${Math.round(meters)} m` : `${(meters / 1000).toFixed(1)} km`
 
 // Chỉ giữ các lỗi có nội dung
 const onlyErrors = (entries) => Object.fromEntries(Object.entries(entries).filter(([, v]) => v))
 
-const locationErrors = {
-  gps: (loc) => !loc.coords && 'Chưa lấy được vị trí hiện tại.',
-  pin: (loc) => !loc.point && 'Kéo ghim tới nơi bạn mất hoặc nhặt được đồ.',
-  address: (loc) => !loc.place.trim() && 'Nhập hoặc chọn một địa chỉ.',
-  road: (loc) => !loc.roadId && 'Chọn đoạn đường.',
+const OUTSIDE_MESSAGE = 'Vị trí nằm ngoài TP.HCM, hãy chọn lại một điểm trong TP.HCM.'
+
+function roadError({ road, roadOutside }) {
+  if (road.length < 2) return 'Bấm lên bản đồ để chọn điểm đầu và điểm cuối của đoạn đường.'
+  if (roadOutside) return OUTSIDE_MESSAGE
+  const length = distanceMeters(road[0], road[1])
+  if (length < ROAD_MIN_M || length > ROAD_MAX_M) {
+    return `Đoạn đường phải dài từ ${ROAD_MIN_M} m đến ${ROAD_MAX_M / 1000} km.`
+  }
+  return ''
+}
+
+function locationError(location) {
+  if (location.mode === 'road') return roadError(location)
+  if (!location.point) {
+    return 'Chọn vị trí: tìm địa chỉ, dùng vị trí của bạn hoặc bấm lên bản đồ để đặt ghim.'
+  }
+  return location.pointOutside ? OUTSIDE_MESSAGE : ''
 }
 
 function questionErrors({ question }) {
@@ -93,11 +192,20 @@ function questionErrors({ question }) {
   }
 }
 
-// Kiểm tra từng bước: thiếu tiêu đề, danh mục, thời gian, vị trí hoặc đáp án đúng
+// Thuộc tính bắt buộc của danh mục (vd Loại giấy tờ) chưa chọn
+function attributeError(form, category) {
+  const missing = category?.attributes.find(
+    (attribute) => attribute.isRequired && !form.attributes[attribute.id]
+  )
+  return missing ? `Chọn ${missing.name.toLocaleLowerCase('vi')}.` : ''
+}
+
+// Kiểm tra khi bấm Tiếp tục, không kiểm tra lúc gõ. category dùng cho thuộc tính bắt buộc
 const validators = {
-  classify: (form) => ({
+  classify: (form, category) => ({
     type: !form.type && 'Chọn loại tin: Mất đồ hay Nhặt được.',
     category: !form.category && 'Chọn danh mục cho món đồ.',
+    attributes: form.category && attributeError(form, category),
   }),
   content: (form) => ({
     title: !form.title.trim()
@@ -110,26 +218,54 @@ const validators = {
     date: !form.date
       ? 'Chọn ngày mất hoặc nhặt được đồ.'
       : form.date > toDateInput(new Date()) && 'Ngày không được ở tương lai.',
+    dayPart: isFutureDayPart(form.date, form.dayPart) && 'Khoảng thời gian này chưa tới.',
   }),
   location: ({ location }) => ({
-    location: !location.mode
-      ? 'Chọn một cách xác định vị trí.'
-      : locationErrors[location.mode](location),
+    location: locationError(location),
     area: !location.area && 'Chọn khu vực.',
   }),
   question: questionErrors,
 }
 
-export const validateStep = (key, form) => onlyErrors(validators[key](form))
+export const validateStep = (key, form, category) => onlyErrors(validators[key](form, category))
 
 // Bước đầu tiên còn lỗi để đưa người dùng quay lại
-export function findInvalidStep(form) {
+export function findInvalidStep(form, category) {
   const steps = getSteps(form.type)
   for (let index = 0; index < steps.length; index += 1) {
-    const errors = validateStep(steps[index].key, form)
+    const errors = validateStep(steps[index].key, form, category)
     if (Object.keys(errors).length) return { index, errors }
   }
   return null
+}
+
+// Đổi field lỗi của backend về bước và khoá lỗi của form
+const API_FIELD_ERRORS = [
+  [/^type$/, 'classify', 'type'],
+  [/^category$/, 'classify', 'category'],
+  [/^(attributes|contents)/, 'classify', 'attributes'],
+  [/^title$/, 'content', 'title'],
+  [/^description$/, 'content', 'description'],
+  [/^images$/, 'content', 'images'],
+  [/^date$/, 'time', 'date'],
+  [/^dayPart$/, 'time', 'dayPart'],
+  [/^location\.area$/, 'location', 'area'],
+  [/^location/, 'location', 'location'],
+  [/^question\.text$/, 'question', 'question'],
+  [/^question\.options/, 'question', 'options'],
+  [/^question\.correct$/, 'question', 'correct'],
+]
+
+export function mapApiErrors(details) {
+  let stepKey = null
+  const errors = {}
+  for (const { field, message } of details) {
+    const match = API_FIELD_ERRORS.find(([pattern]) => pattern.test(field))
+    if (!match) continue
+    stepKey ??= match[1]
+    errors[match[2]] ??= message
+  }
+  return stepKey ? { stepKey, errors } : null
 }
 
 // Bỏ ảnh sai định dạng, quá 5 MB hoặc vượt số lượng
@@ -152,18 +288,26 @@ export function checkImages(files, currentCount, max = MAX_IMAGES) {
   return { accepted, errors }
 }
 
-// Thuộc tính đã chọn ở bước Phân loại, mỗi dòng "- Nhãn: giá trị" theo thứ tự của danh mục
-export function describeAttributes({ category, attributes, contents }) {
-  const lines = (CATEGORY_ATTRIBUTES[category] ?? [])
-    .filter((attribute) => attributes[attribute.key])
-    .map((attribute) => `- ${attribute.label}: ${attributes[attribute.key]}`)
-  if (contents.length) lines.push(`- Bên trong có: ${contents.join(', ')}`)
+// Thuộc tính đã chọn: [{ name, value }] theo thứ tự của danh mục
+export function selectedAttributes(form, category) {
+  return (category?.attributes ?? [])
+    .map((attribute) => ({
+      name: attribute.name,
+      value: attribute.values.find((value) => value.id === form.attributes[attribute.id])?.value,
+    }))
+    .filter((item) => item.value)
+}
+
+// Mỗi thuộc tính một dòng "- Tên: giá trị"
+export function describeAttributes(form, category) {
+  const lines = selectedAttributes(form, category).map((item) => `- ${item.name}: ${item.value}`)
+  if (form.contents.length) lines.push(`- Bên trong có: ${form.contents.join(', ')}`)
   return lines.join('\n')
 }
 
 // Điền sẵn thuộc tính vào mô tả, dòng đầu để trống cho người dùng viết.
-export function prefillDescription(form) {
-  const block = describeAttributes(form)
+export function prefillDescription(form, category) {
+  const block = describeAttributes(form, category)
   const { description, attributeBlock } = form
   if (block === attributeBlock) return null
   if (!description.trim()) return { description: block && `\n${block}`, attributeBlock: block }
@@ -184,53 +328,219 @@ export function describeTime({ date, dayPart, timePreset }) {
     month: '2-digit',
     year: 'numeric',
   })
-  if (timePreset) return `${timePreset} (${day})`
   const part = DAY_PARTS.find((item) => item.value === dayPart)
+  if (timePreset) {
+    // Vd "Hôm kia, buổi tối (06/11/2026)"
+    const dateOnly = TIME_PRESETS.find((preset) => preset.label === timePreset)?.dayPart === ''
+    const extra = dateOnly && part ? `, ${part.label.toLocaleLowerCase('vi')}` : ''
+    return `${timePreset}${extra} (${day})`
+  }
   return part ? `${part.label}, ${day}` : day
 }
 
+// Ghim một dòng, đoạn đường hai dòng Từ / Đến; không có địa chỉ thì ghi khu vực
 export function describeLocation(location) {
-  const road = location.mode === 'road' && ROAD_SEGMENTS.find((r) => r.id === location.roadId)
-  const place = road
-    ? `Đường ${road.road}, đoạn ${road.from} – ${road.to}`
-    : location.place.trim() ||
-      (location.mode === 'gps' ? 'Vị trí hiện tại' : 'Vị trí ghim trên bản đồ')
-  return [place, location.area].filter(Boolean).join(', ')
+  if (location.mode === 'road') {
+    const [from, to] = location.roadPlaces
+    return `Từ: ${from || location.area}
+Đến: ${to || location.area}`
+  }
+  return location.place || location.area
 }
 
-const draftKey = (userId) => `lostlink:post-draft:${userId}`
+// Dữ liệu gửi lên API đăng bài. Ảnh gửi kèm trong FormData, không nằm trong JSON
+export function buildPostPayload(form) {
+  const { location, question } = form
+  const payload = {
+    type: form.type,
+    category: form.category,
+    attributes: Object.entries(form.attributes).map(([attribute, value]) => ({
+      attribute,
+      value,
+    })),
+    contents: form.contents,
+    title: form.title.trim(),
+    description: form.description.trim(),
+    date: form.date,
+    dayPart: form.dayPart,
+    location: {
+      mode: location.mode,
+      area: location.area,
+      ...(location.mode === 'road'
+        ? { road: location.road }
+        : { point: location.point, placeName: location.placePublic }),
+    },
+  }
 
-export function loadDraft(userId) {
-  try {
-    const raw = localStorage.getItem(draftKey(userId))
-    if (!raw) return null
-    const draft = JSON.parse(raw)
-    const form = {
-      ...EMPTY_FORM,
-      ...draft.form,
-      images: [],
-      location: { ...EMPTY_FORM.location, ...draft.form.location },
-      question: { ...EMPTY_FORM.question, ...draft.form.question },
+  if (form.type === 'found' && !question.skipped) {
+    // Bỏ phương án trống, giữ đúng vị trí đáp án đúng
+    const options = question.options.map((text, index) => ({ text: text.trim(), index }))
+    const filled = options.filter((option) => option.text)
+    payload.question = {
+      text: question.text.trim(),
+      options: filled.map((option) => option.text),
+      correct: filled.findIndex((option) => option.index === question.correct),
     }
-    const step = Math.min(Number(draft.step) || 0, getSteps(form.type).length - 1)
-    return { form, step, savedAt: draft.savedAt }
+  }
+  return payload
+}
+
+export function buildPostForm(form) {
+  const data = new FormData()
+  data.append('data', JSON.stringify(buildPostPayload(form)))
+  form.images.forEach((image) => data.append('images', image.file, image.name))
+  return data
+}
+
+// Bỏ phân loại, thuộc tính, đồ bên trong của bản nháp không còn khớp danh mục hiện có
+export function reconcileClassification(form, categories) {
+  const category = categories.find((item) => item.slug === form.category)
+  if (!category) {
+    return form.category ? { category: '', attributes: {}, contents: [] } : null
+  }
+  const attributes = Object.fromEntries(
+    Object.entries(form.attributes).filter(([attributeId, valueId]) =>
+      category.attributes.some(
+        (attribute) =>
+          attribute.id === attributeId && attribute.values.some((value) => value.id === valueId)
+      )
+    )
+  )
+  const contents = form.contents.filter((item) => category.contentItems.includes(item))
+  const changed =
+    Object.keys(attributes).length !== Object.keys(form.attributes).length ||
+    contents.length !== form.contents.length
+  return changed ? { attributes, contents } : null
+}
+
+const isPoint = (value) => value != null && Number.isFinite(value.lat) && Number.isFinite(value.lng)
+
+const text = (value) => (typeof value === 'string' ? value : '')
+const POINT_SOURCES = ['gps', 'pin', 'address']
+
+// Bản nháp rất cũ lưu vị trí theo % trên bản đồ minh hoạ thì bỏ
+function restoreLocation(saved = {}) {
+  const location = { ...EMPTY_LOCATION, ...saved }
+  const point = isPoint(location.point) ? location.point : null
+  const road = Array.isArray(location.road) ? location.road.filter(isPoint).slice(0, 2) : []
+  const pointSource = POINT_SOURCES.includes(location.pointSource)
+    ? location.pointSource
+    : POINT_SOURCES.includes(location.mode) && point
+      ? location.mode
+      : ''
+  return {
+    mode: location.mode === 'road' ? 'road' : point ? pointSource || 'pin' : '',
+    pointSource,
+    query: text(location.query),
+    place: text(location.place),
+    placePublic: text(location.placePublic),
+    area: text(location.area),
+    areaAuto: Boolean(location.areaAuto) && Boolean(text(location.area)),
+    point,
+    accuracy: Number.isFinite(location.accuracy) ? location.accuracy : null,
+    road,
+    roadPlaces: Array.isArray(location.roadPlaces)
+      ? location.roadPlaces.slice(0, road.length).map(text)
+      : [],
+    pointOutside: Boolean(location.pointOutside),
+    roadOutside: Boolean(location.roadOutside),
+  }
+}
+
+// ----- Lưu nháp: bản nháp lưu trên server, không kèm ảnh
+
+// Khớp hasContent ở backend; ảnh không lưu trong bản nháp nên không tính
+export function isFormEmpty(form) {
+  const { location, question } = form
+  return !(
+    form.type ||
+    form.category ||
+    Object.keys(form.attributes).length ||
+    form.contents.length ||
+    form.title.trim() ||
+    form.description.trim() ||
+    form.date ||
+    form.dayPart ||
+    location.point ||
+    location.road.length ||
+    location.query.trim() ||
+    location.place.trim() ||
+    location.area ||
+    question.text.trim() ||
+    question.options.some((option) => option.trim())
+  )
+}
+
+// Toàn bộ form trừ ảnh, thuộc tính đổi sang mảng
+export function serializeDraft(form) {
+  const draft = {
+    ...form,
+    attributes: Object.entries(form.attributes).map(([attribute, value]) => ({ attribute, value })),
+  }
+  delete draft.images
+  return draft
+}
+
+const toAttributeMap = (attributes) => {
+  if (Array.isArray(attributes)) {
+    return Object.fromEntries(attributes.map((item) => [item.attribute, item.value]))
+  }
+  return attributes && typeof attributes === 'object' ? attributes : {}
+}
+
+function restoreQuestion(saved = {}) {
+  const options = Array.isArray(saved.options)
+    ? saved.options.filter((o) => typeof o === 'string')
+    : []
+  return {
+    skipped: Boolean(saved.skipped),
+    text: text(saved.text),
+    // Ít nhất MIN_OPTIONS ô, chưa có phương án thì như form mới
+    options: options.length
+      ? [...options, ...Array(Math.max(0, MIN_OPTIONS - options.length)).fill('')]
+      : EMPTY_FORM.question.options,
+    correct:
+      Number.isInteger(saved.correct) && saved.correct < options.length ? saved.correct : null,
+  }
+}
+
+// Bản nháp thành dữ liệu form, mở đúng bước đang làm dở
+export function restoreDraft(draft) {
+  const saved = draft.form ?? {}
+  const form = {
+    ...EMPTY_FORM,
+    type: text(saved.type),
+    category: text(saved.category),
+    attributes: toAttributeMap(saved.attributes),
+    contents: Array.isArray(saved.contents) ? saved.contents : [],
+    title: text(saved.title),
+    description: text(saved.description),
+    attributeBlock: text(saved.attributeBlock),
+    date: text(saved.date),
+    dayPart: text(saved.dayPart),
+    timePreset: text(saved.timePreset),
+    images: [],
+    location: restoreLocation(saved.location),
+    question: restoreQuestion(saved.question),
+  }
+  const step = Math.min(Math.max(Number(draft.step) || 0, 0), getSteps(form.type).length - 1)
+  return { form, step, savedAt: draft.savedAt }
+}
+
+// Bản nháp cũ ở trình duyệt (trước khi có API): chỉ đọc để chuyển lên server
+const localDraftKey = (userId) => `lostlink:post-draft:${userId}`
+
+export function loadLocalDraft(userId) {
+  try {
+    const raw = localStorage.getItem(localDraftKey(userId))
+    return raw ? restoreDraft(JSON.parse(raw)) : null
   } catch {
     return null
   }
 }
 
-export function saveDraft(userId, form, step) {
+export function clearLocalDraft(userId) {
   try {
-    const draft = { form: { ...form, images: [] }, step, savedAt: new Date().toISOString() }
-    localStorage.setItem(draftKey(userId), JSON.stringify(draft))
-    return true
-  } catch {
-    return false
-  }
-}
-
-export function clearDraft(userId) {
-  try {
-    localStorage.removeItem(draftKey(userId))
+    localStorage.removeItem(localDraftKey(userId))
   } catch {}
 }

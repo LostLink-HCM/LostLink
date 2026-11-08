@@ -22,18 +22,20 @@ export class ApiError extends Error {
 // Phát khi refresh thất bại để AuthProvider đưa người dùng về trạng thái chưa đăng nhập
 export const SESSION_EXPIRED_EVENT = 'auth:session-expired'
 
-// auth: false cho các API công khai (login, register...), không gửi token và không tự refresh
+// auth: false cho API công khai: không gửi token, không tự refresh.
+// body là FormData thì gửi nguyên, trình duyệt tự đặt Content-Type multipart
 async function send(path, { method = 'GET', body, auth = true } = {}) {
   const token = auth ? getAccessToken() : null
+  const isForm = body instanceof FormData
   let res
   try {
     res = await fetch(BASE + path, {
       method,
       headers: {
-        'Content-Type': 'application/json',
+        ...(!isForm && { 'Content-Type': 'application/json' }),
         ...(token && { Authorization: `Bearer ${token}` }),
       },
-      body: body ? JSON.stringify(body) : undefined,
+      body: isForm ? body : body ? JSON.stringify(body) : undefined,
       credentials: 'include',
     })
   } catch {
@@ -87,4 +89,6 @@ async function request(path, options = {}) {
 export const api = {
   get: (path, options) => request(path, options),
   post: (path, body, options) => request(path, { ...options, method: 'POST', body }),
+  put: (path, body, options) => request(path, { ...options, method: 'PUT', body }),
+  delete: (path, options) => request(path, { ...options, method: 'DELETE' }),
 }

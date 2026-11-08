@@ -1,0 +1,11 @@
+/* Lời nhắc thao tác phủ lên bản đồ: chữ nhỏ, nền nhạt, tắt sau khoảng 0,8 giây
+   (SDK mặc định khoảng 2 giây). Nạp sau CSS của SDK để ghi đè */
+.vietmapgl-cooperative-gesture-screen {
+  background: rgb(0 0 0 / 0.25);
+  font-size: 15px;
+  transition: opacity 0.3s ease 0.5s;
+}
+
+.vietmapgl-cooperative-gesture-screen.vietmapgl-show {
+  transition: opacity 0.05s;
+}
