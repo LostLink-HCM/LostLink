@@ -4,6 +4,7 @@ const env = require('../config/env')
 
 const authRoutes = require('./authRoutes')
 const postRoutes = require('./postRoutes')
+const moderationRoutes = require('./moderationRoutes')
 const geoRoutes = require('./geoRoutes')
 const categoryRoutes = require('./categoryRoutes')
 
@@ -24,6 +25,7 @@ router.get('/health', (req, res) => {
 
 router.use('/auth', authRoutes)
 router.use('/posts', postRoutes)
+router.use('/moderator', moderationRoutes)
 router.use('/geo', geoRoutes)
 router.use('/categories', categoryRoutes)
 

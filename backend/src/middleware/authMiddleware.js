@@ -35,6 +35,18 @@ const can = (permission) => (req, res, next) => {
   next()
 }
 
+const requireRole =
+  (...roles) =>
+  (req, res, next) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      return next(
+        ApiError.forbidden('Bạn không có quyền truy cập chức năng này.', 'ROLE_FORBIDDEN')
+      )
+    }
+    next()
+  }
+
+module.exports = { protect, optionalAuth, can, requireRole }
 // Tài khoản bị hạn chế (HT06) không được đăng bài, gửi yêu cầu liên hệ. Dùng sau protect
 const notRestricted = (req, res, next) => {
   if (req.user?.status === 'restricted') {
@@ -48,4 +60,4 @@ const notRestricted = (req, res, next) => {
   next()
 }
 
-module.exports = { protect, optionalAuth, can, notRestricted }
+module.exports = { protect, optionalAuth, can, requireRole, notRestricted }

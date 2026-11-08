@@ -5,7 +5,7 @@ export default function DateRange({ from, to, onChange, children }) {
   const errorId = useId()
   const invalid = Boolean(from && to && from > to)
   const inputClassName = cx(
-    'h-9 w-full min-w-0 rounded-lg border border-line-strong bg-surface px-3 text-small text-ink',
+    'h-9 w-full min-w-0 rounded-lg border border-line-strong bg-surface px-3 text-small font-normal text-ink',
     'placeholder:text-ink-subtle aria-invalid:border-danger',
     focusRing
   )
