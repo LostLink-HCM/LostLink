@@ -4,6 +4,7 @@ const env = require('../config/env')
 
 const authRoutes = require('./authRoutes')
 const postRoutes = require('./postRoutes')
+const moderationRoutes = require('./moderationRoutes')
 
 const router = Router()
 
@@ -22,5 +23,6 @@ router.get('/health', (req, res) => {
 
 router.use('/auth', authRoutes)
 router.use('/posts', postRoutes)
+router.use('/moderator', moderationRoutes)
 
 module.exports = router

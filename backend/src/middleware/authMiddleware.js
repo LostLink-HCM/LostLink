@@ -35,4 +35,15 @@ const can = (permission) => (req, res, next) => {
   next()
 }
 
-module.exports = { protect, optionalAuth, can }
+const requireRole =
+  (...roles) =>
+  (req, res, next) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      return next(
+        ApiError.forbidden('Bạn không có quyền truy cập chức năng này.', 'ROLE_FORBIDDEN')
+      )
+    }
+    next()
+  }
+
+module.exports = { protect, optionalAuth, can, requireRole }

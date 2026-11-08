@@ -50,7 +50,13 @@ function Meta({ icon, children }) {
 }
 
 export default function Review() {
-  const { posts, setPosts } = useOutletContext()
+  const {
+    reviewPosts: posts,
+    setPosts,
+    reviewLoading,
+    reviewError,
+    reloadReviewPosts,
+  } = useOutletContext()
   const [modal, setModal] = useState(null)
   const [reason, setReason] = useState(REJECT_REASONS[0])
   const [customReason, setCustomReason] = useState('')
@@ -200,6 +206,19 @@ export default function Review() {
         Số lượng: <strong className="px-1 text-lead text-primary">{filtered.length}</strong> bài
         đăng
       </p>
+      {reviewLoading && <Notice>Đang tải hàng đợi kiểm duyệt…</Notice>}
+      {!reviewLoading && reviewError && (
+        <div>
+          <Notice>{reviewError}</Notice>
+          <Button onClick={reloadReviewPosts}>Thử tải lại</Button>
+        </div>
+      )}
+      {!reviewLoading && !reviewError && (
+        <Notice>
+          Danh sách đã được tải từ hệ thống. Xem chi tiết và duyệt/từ chối sẽ được kết nối ở các
+          bước tiếp theo.
+        </Notice>
+      )}
       {notice && <Notice>{notice}</Notice>}
 
       <DataTable
@@ -213,6 +232,8 @@ export default function Review() {
           ['Thao tác', 'w-[17%]'],
         ]}
         empty={
+          !reviewLoading &&
+          !reviewError &&
           !visible.length && (
             <EmptyState
               title="Không có bài đăng nào cần duyệt trong danh sách này."
@@ -233,7 +254,8 @@ export default function Review() {
               <td className={cell}>
                 <button
                   type="button"
-                  className="mb-1.5 block cursor-pointer text-left text-small font-semibold leading-relaxed text-ink hover:text-primary"
+                  disabled
+                  className="mb-1.5 block cursor-not-allowed text-left text-small font-semibold leading-relaxed text-ink"
                   onClick={() => setModal({ id: post.id, kind: 'detail' })}
                 >
                   {post.title}
@@ -255,18 +277,21 @@ export default function Review() {
                     icon="eye"
                     tone="view"
                     label={`Đọc bài ${code}`}
+                    disabled
                     onClick={() => setModal({ id: post.id, kind: 'detail' })}
                   />
                   <IconButton
                     icon="check"
                     tone="success"
                     label={`Duyệt bài ${code}`}
+                    disabled
                     onClick={() => openApprove(post.id)}
                   />
                   <IconButton
                     icon="close"
                     tone="danger"
                     label={`Từ chối bài ${code}`}
+                    disabled
                     onClick={() => openReject(post.id)}
                   />
                 </div>

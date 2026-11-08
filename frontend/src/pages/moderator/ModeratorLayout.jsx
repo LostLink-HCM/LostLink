@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import BackofficeLayout from '../../components/backoffice/BackofficeLayout'
 import { createWorkspacePosts, workspacePostMatches } from '../../data/workspacePosts'
 import { moderatorReports } from '../../data/moderatorReports'
 import { createModeratorMessages } from '../../data/moderatorMessages'
 import { createModeratorNotifications } from '../../data/moderatorNotifications'
 import { readQuickReplies } from '../../lib/backoffice/quickReplies'
+import { listModeratorPendingPosts } from '../../lib/moderator/reviewPosts'
 
 const navigation = [
   { path: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -17,11 +18,30 @@ const navigation = [
 
 export default function ModeratorLayout() {
   const [posts, setPosts] = useState(createWorkspacePosts)
+  const [reviewPosts, setReviewPosts] = useState([])
+  const [reviewLoading, setReviewLoading] = useState(true)
+  const [reviewError, setReviewError] = useState('')
   const [reports, setReports] = useState(moderatorReports)
   const [messageState, setMessageState] = useState(createModeratorMessages)
   const [quickReplies, setQuickReplies] = useState(() => readQuickReplies(window.localStorage))
   const [notificationState, setNotificationState] = useState(createModeratorNotifications)
-  const pendingCount = posts.filter((post) => post.status === 'pending').length
+  const loadReviewPosts = useCallback(async () => {
+    setReviewLoading(true)
+    setReviewError('')
+    try {
+      setReviewPosts(await listModeratorPendingPosts())
+    } catch (error) {
+      setReviewError(error.message)
+    } finally {
+      setReviewLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadReviewPosts()
+  }, [loadReviewPosts])
+
+  const pendingCount = reviewPosts.length
 
   return (
     <BackofficeLayout
@@ -36,6 +56,10 @@ export default function ModeratorLayout() {
       outletContext={{
         posts,
         setPosts,
+        reviewPosts,
+        reviewLoading,
+        reviewError,
+        reloadReviewPosts: loadReviewPosts,
         matchPairs: workspacePostMatches,
         reports,
         setReports,
