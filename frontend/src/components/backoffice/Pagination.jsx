@@ -1,18 +1,30 @@
 import IconButton from './IconButton'
 import { cx, focusRing } from './classes'
 
-export default function Pagination({ page, total, pageSize, onChange, noun = 'mục' }) {
+export default function Pagination({
+  page,
+  total,
+  pageSize,
+  onChange,
+  noun = 'mục',
+  showSummary = true,
+}) {
   const pages = Math.max(1, Math.ceil(total / pageSize))
   const first = total ? (page - 1) * pageSize + 1 : 0
 
   return (
     <nav
       aria-label="Phân trang"
-      className="mt-4 flex flex-wrap items-center justify-between gap-4 text-small text-ink-subtle"
+      className={cx(
+        'mt-4 flex flex-wrap items-center gap-4 text-small text-ink-subtle',
+        showSummary ? 'justify-between' : 'justify-end'
+      )}
     >
-      <span>
-        Hiển thị {first}–{Math.min(page * pageSize, total)} trong số {total} {noun}
-      </span>
+      {showSummary && (
+        <span>
+          Hiển thị {first}–{Math.min(page * pageSize, total)} trong số {total} {noun}
+        </span>
+      )}
       <div className="flex gap-1.5">
         <IconButton
           icon="back"

@@ -1,4 +1,4 @@
-const { query } = require('express-validator')
+const { body, param, query } = require('express-validator')
 
 const { AREAS } = require('../../config/areas')
 const { isVnDate } = require('../../utils/vnTime')
@@ -7,6 +7,21 @@ const optionalString = (field, message) =>
   query(field).optional({ values: 'falsy' }).isString().withMessage(message).bail().trim()
 
 const DATE_MESSAGE = 'Ngày không hợp lệ, định dạng đúng là YYYY-MM-DD.'
+
+const pendingPostPathRules = [param('id').isMongoId().withMessage('Mã bài đăng không hợp lệ.')]
+
+const rejectPendingPostBodyRules = [
+  body('reason')
+    .isString()
+    .withMessage('Lý do từ chối phải là chuỗi.')
+    .bail()
+    .trim()
+    .notEmpty()
+    .withMessage('Vui lòng nhập lý do từ chối.')
+    .bail()
+    .isLength({ max: 1000 })
+    .withMessage('Lý do từ chối tối đa 1000 ký tự.'),
+]
 
 const listPendingPostsRules = [
   optionalString('type', 'Loại tin không hợp lệ.')
@@ -28,4 +43,4 @@ const listPendingPostsRules = [
     .withMessage('Từ khóa tối đa 100 ký tự.'),
 ]
 
-module.exports = { listPendingPostsRules }
+module.exports = { listPendingPostsRules, pendingPostPathRules, rejectPendingPostBodyRules }

@@ -99,4 +99,67 @@ const listPendingPosts = async ({ type, category, area, from, to, q }) => {
   return { items: posts.map(toReviewPost), total: posts.length }
 }
 
-module.exports = { listPendingPosts }
+const getPendingPostDetails = async (id) => {
+  const post = await Post.findOne({ _id: id, status: 'pending' })
+    .populate('category', 'slug name icon')
+    .populate('owner', 'username avatarUrl reputationScore')
+    .lean()
+
+  if (!post) {
+    throw new ApiError(
+      404,
+      'Bài chờ duyệt không tồn tại hoặc đã được xử lý.',
+      undefined,
+      'PENDING_POST_NOT_FOUND'
+    )
+  }
+
+  return {
+    ...toReviewPost(post),
+    description: post.description,
+    locType: post.locType,
+    placeNameTo: post.placeNameTo || '',
+    images: [...(post.images ?? [])].sort((a, b) => a.order - b.order).map((image) => image.url),
+  }
+}
+
+const changePendingPostStatus = async ({ id, moderatorId, status, note = '' }) => {
+  const post = await Post.findOneAndUpdate(
+    { _id: id, status: 'pending' },
+    {
+      $set: { status },
+      $push: {
+        statusHistory: {
+          status,
+          changedBy: moderatorId,
+          note,
+          changedAt: new Date(),
+        },
+      },
+    },
+    { new: true, runValidators: true }
+  ).select('_id code status')
+
+  if (!post) {
+    const exists = await Post.exists({ _id: id })
+    if (!exists) {
+      throw new ApiError(404, 'Bài đăng không tồn tại.', undefined, 'POST_NOT_FOUND')
+    }
+    throw ApiError.conflict('Bài đăng không còn ở trạng thái chờ duyệt.', 'POST_NOT_PENDING')
+  }
+
+  return { id: String(post._id), code: post.code, status: post.status }
+}
+
+const approvePendingPost = (id, moderatorId) =>
+  changePendingPostStatus({ id, moderatorId, status: 'searching' })
+
+const rejectPendingPost = (id, moderatorId, reason) =>
+  changePendingPostStatus({ id, moderatorId, status: 'rejected', note: reason })
+
+module.exports = {
+  listPendingPosts,
+  getPendingPostDetails,
+  approvePendingPost,
+  rejectPendingPost,
+}

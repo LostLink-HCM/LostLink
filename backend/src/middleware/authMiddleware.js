@@ -61,4 +61,3 @@ const notRestricted = (req, res, next) => {
 }
 
 module.exports = { protect, optionalAuth, can, requireRole, notRestricted }
-

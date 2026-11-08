@@ -38,8 +38,24 @@ export default function ModeratorLayout() {
   }, [])
 
   useEffect(() => {
-    void loadReviewPosts()
-  }, [loadReviewPosts])
+    let isActive = true
+
+    const loadInitialReviewPosts = async () => {
+      try {
+        const result = await listModeratorPendingPosts()
+        if (isActive) setReviewPosts(result)
+      } catch (error) {
+        if (isActive) setReviewError(error.message)
+      } finally {
+        if (isActive) setReviewLoading(false)
+      }
+    }
+
+    void loadInitialReviewPosts()
+    return () => {
+      isActive = false
+    }
+  }, [])
 
   const pendingCount = reviewPosts.length
 
@@ -57,6 +73,7 @@ export default function ModeratorLayout() {
         posts,
         setPosts,
         reviewPosts,
+        setReviewPosts,
         reviewLoading,
         reviewError,
         reloadReviewPosts: loadReviewPosts,

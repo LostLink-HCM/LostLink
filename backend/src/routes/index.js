@@ -29,5 +29,4 @@ router.use('/moderator', moderationRoutes)
 router.use('/geo', geoRoutes)
 router.use('/categories', categoryRoutes)
 
-
 module.exports = router
