@@ -5,11 +5,11 @@ import Button from '../Button'
 import IconButton from '../IconButton'
 import Note from '../Note'
 import { cx, focusRing } from '../classes'
-import { inputClass, labelClass } from './styles'
-import { FieldError, StepHeading } from './ui'
+import { chipClass, inputClass, labelClass } from './styles'
+import { FieldError, RequiredMark, StepHeading } from './ui'
 
-// Chỉ tin Nhặt được: câu hỏi trắc nghiệm để nhận ra chủ nhân
-export default function QuestionStep({ question, errors, onChange, onSkip }) {
+// Câu hỏi xác minh của tin Nhặt được; suggestions: câu hỏi gợi ý theo danh mục
+export default function QuestionStep({ question, suggestions = [], errors, onChange, onSkip }) {
   const id = useId()
 
   if (question.skipped) {
@@ -21,7 +21,7 @@ export default function QuestionStep({ question, errors, onChange, onSkip }) {
             Bạn đã bỏ qua câu hỏi xác minh. Ai muốn nhận đồ sẽ gửi một lời nhắn xin liên hệ, và bạn
             tự quyết định đồng ý hay không.
           </p>
-          <Button size="xl" onClick={() => onChange({ skipped: false })}>
+          <Button size="lg" onClick={() => onChange({ skipped: false })}>
             <Icon name="edit" size={16} />
             Đặt câu hỏi
           </Button>
@@ -51,29 +51,53 @@ export default function QuestionStep({ question, errors, onChange, onSkip }) {
         description="Chỉ người thật sự đánh mất món này mới trả lời được. Mỗi người chỉ được trả lời một lần, trả lời đúng thì hai bên mới nhắn tin được với nhau."
       />
 
-      <div className="rounded-2xl border border-line bg-surface-muted p-4 sm:p-5">
-        <p className="m-0 mb-4 text-caption leading-relaxed text-ink-muted">
+      <div className="rounded-2xl border border-line bg-surface-muted p-3.5 sm:p-4">
+        <p className="m-0 mb-3 text-caption leading-relaxed text-ink-muted">
           Nên hỏi về thứ chỉ chủ nhân biết: món bên trong, số thẻ, chữ viết tay. Đừng ghi những chi
           tiết đó vào mô tả công khai.
         </p>
 
+        {suggestions.length > 0 && (
+          <div className="mb-4">
+            <p className="m-0 mb-2 text-caption font-semibold text-ink-secondary">
+              Gợi ý cho danh mục này
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {suggestions.map((text) => (
+                <button
+                  key={text}
+                  type="button"
+                  aria-pressed={question.text === text}
+                  onClick={() => onChange({ text })}
+                  className={chipClass(question.text === text)}
+                >
+                  {text}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <label htmlFor={`${id}-question`} className={labelClass}>
           Câu hỏi
+          <RequiredMark />
         </label>
         <input
           id={`${id}-question`}
           value={question.text}
           onChange={(e) => onChange({ text: e.target.value })}
           placeholder="Ví dụ: Bên trong ví có bao nhiêu thẻ ngân hàng?"
+          aria-required="true"
           aria-invalid={errors.question ? true : undefined}
           aria-describedby={errors.question ? `${id}-question-error` : undefined}
-          className={cx(inputClass, 'h-11')}
+          className={cx(inputClass, 'h-10')}
         />
         <FieldError id={`${id}-question-error`}>{errors.question}</FieldError>
 
-        <fieldset className="m-0 mt-5 border-0 p-0">
+        <fieldset className="m-0 mt-4 border-0 p-0">
           <legend className={labelClass}>
-            Các phương án <span className="font-normal text-ink-muted">· chọn đáp án đúng</span>
+            Các phương án
+            <RequiredMark /> <span className="font-normal text-ink-muted">· chọn đáp án đúng</span>
           </legend>
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
             {question.options.map((option, index) => {
@@ -99,7 +123,7 @@ export default function QuestionStep({ question, errors, onChange, onSkip }) {
                     onChange={(e) => setOption(index, e.target.value)}
                     placeholder={`Phương án ${index + 1}`}
                     aria-label={`Phương án ${index + 1}`}
-                    className="h-9 min-w-0 flex-1 border-0 bg-transparent text-body text-ink outline-none placeholder:text-ink-subtle"
+                    className="h-8 min-w-0 flex-1 border-0 bg-transparent text-body text-ink outline-none placeholder:text-ink-subtle"
                   />
                   {correct && (
                     <span className="shrink-0 rounded-full bg-primary-soft px-2.5 py-1 text-tiny font-semibold text-primary">

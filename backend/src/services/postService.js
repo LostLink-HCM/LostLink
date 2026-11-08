@@ -1,7 +1,23 @@
-const { Category, Comment, Post, PostFollow, PostLike, SavedPost, UserBlock } = require('../models')
+const {
+  AttributeValue,
+  Category,
+  CategoryAttribute,
+  Comment,
+  Post,
+  PostFollow,
+  PostDraft,
+  PostLike,
+  SavedPost,
+  UserBlock,
+  VerificationChallenge,
+} = require('../models')
+const imageService = require('./imageService')
+const vietmapService = require('./vietmapService')
 const ApiError = require('../utils/ApiError')
+const { hashAnswer } = require('../utils/crypto')
+const { blurPoint, distanceMeters, toGeoLine, toGeoPoint } = require('../utils/geo')
 const { escapeRegex, hasDiacritics, lowercaseText } = require('../utils/text')
-const { endOfVnDay, startOfVnDay } = require('../utils/vnTime')
+const { endOfVnDay, startOfVnDay, vnTimeRange } = require('../utils/vnTime')
 
 const HOUR = 60 * 60 * 1000
 const RANGE_HOURS = { '24h': 24, '7d': 24 * 7, '30d': 24 * 30 }
@@ -96,6 +112,8 @@ const toPostCard = (post) => ({
   imageCount: post.images?.length ?? 0,
   area: post.area,
   placeName: post.placeName,
+  placeNameTo: post.placeNameTo ?? '',
+  locType: post.locType,
   timeFrom: post.timeFrom,
   timeTo: post.timeTo,
   createdAt: post.createdAt,
@@ -103,7 +121,7 @@ const toPostCard = (post) => ({
   counts: { likes: post.likeCount, comments: post.commentCount, views: post.viewCount },
 })
 
-// UC01 Xem danh sách tin mới, UC02 Lọc và tìm kiếm, UC03 Xem tin hot
+// Xem danh sách tin mới, Lọc và tìm kiếm, Xem tin hot
 const listPublicPosts = async (params, viewer = null) => {
   const now = Date.now()
   const { type, category, area, q, sort = 'new', page = 1, limit = 12 } = params
@@ -162,6 +180,8 @@ const toPostDetail = (post, comments, viewer) => ({
   images: [...post.images].sort((a, b) => a.order - b.order).map((image) => image.url),
   area: post.area,
   placeName: post.placeName,
+  placeNameTo: post.placeNameTo ?? '',
+  locType: post.locType,
   location: post.locPublic
     ? { type: post.locPublic.type, coordinates: post.locPublic.coordinates }
     : null,
@@ -236,4 +256,183 @@ const getPostDetail = async ({ type, slug }, viewer = null) => {
   return toPostDetail(post, comments, viewerInfo)
 }
 
-module.exports = { listPublicPosts, getPostDetail, toPostCard }
+// ----- UC U05 Đăng bài mất đồ / nhặt được
+
+// Đoạn đường quá ngắn thì nên dùng ghim, quá dài thì không còn giúp khoanh vùng
+const ROAD_MIN_M = 20
+const ROAD_MAX_M = 5000
+
+const invalidField = (field, message, code) =>
+  new ApiError(422, message, [{ field, message }], code)
+
+// Danh mục còn tồn tại, mỗi thuộc tính thuộc đúng danh mục và chỉ chọn một giá trị của chính nó,
+// đủ thuộc tính bắt buộc, đồ bên trong nằm trong checklist của danh mục
+const resolveClassification = async ({ category: slug, attributes = [], contents = [] }) => {
+  const category = await Category.findOne({ slug }).select('_id contentItems').lean()
+  if (!category) {
+    throw invalidField('category', 'Danh mục này không còn tồn tại.', 'CATEGORY_NOT_FOUND')
+  }
+
+  const categoryAttributes = await CategoryAttribute.find({ category: category._id })
+    .select('_id name isRequired')
+    .lean()
+  const attributeById = new Map(categoryAttributes.map((item) => [String(item._id), item]))
+  const chosen = new Set()
+  for (const { attribute: attributeId } of attributes) {
+    const attribute = attributeById.get(attributeId)
+    if (!attribute) throw invalidField('attributes', 'Thuộc tính không thuộc danh mục đã chọn.')
+    if (chosen.has(attributeId)) {
+      throw invalidField('attributes', `Thuộc tính "${attribute.name}" chỉ được chọn một giá trị.`)
+    }
+    chosen.add(attributeId)
+  }
+
+  const values = attributes.length
+    ? await AttributeValue.find({ _id: { $in: attributes.map((item) => item.value) } })
+        .select('_id attribute')
+        .lean()
+    : []
+  const valueById = new Map(values.map((item) => [String(item._id), item]))
+  for (const { attribute: attributeId, value: valueId } of attributes) {
+    if (String(valueById.get(valueId)?.attribute) !== attributeId) {
+      const { name } = attributeById.get(attributeId)
+      throw invalidField('attributes', `Giá trị của thuộc tính "${name}" không hợp lệ.`)
+    }
+  }
+
+  const missing = categoryAttributes.find(
+    (item) => item.isRequired && !chosen.has(String(item._id))
+  )
+  if (missing) throw invalidField('attributes', `Chọn ${missing.name.toLocaleLowerCase('vi')}.`)
+
+  const uniqueContents = [...new Set(contents)]
+  const unknownItem = uniqueContents.find((item) => !category.contentItems.includes(item))
+  if (unknownItem) {
+    throw invalidField('contents', `"${unknownItem}" không có trong danh sách của danh mục này.`)
+  }
+
+  return {
+    categoryId: category._id,
+    attributes: attributes.map((item) => ({
+      attribute: item.attribute,
+      attributeValue: item.value,
+    })),
+    contents: uniqueContents,
+  }
+}
+
+// Khu vực lấy theo toạ độ (VietMap), không theo lựa chọn của người dùng, để bài ghim ở Quận 7
+// không bị lọc nhầm vào Quận 10. Chỉ dùng khu vực người dùng chọn khi không xác định được
+// (VietMap gián đoạn, hoặc quận không có trong danh sách khu vực)
+const areaOf = (located, chosen) => located?.area || chosen
+
+// Vị trí chính xác chỉ dùng để ghép cặp. Vị trí công khai của điểm bị làm lệch 150-250 m;
+// đoạn đường vốn đã là một vùng rộng nên hiển thị nguyên đoạn, khu vực theo điểm đầu.
+// Địa điểm công khai cũng lấy theo toạ độ (người dùng không nhập tay): ghim bỏ số nhà; đoạn đường
+// giữ đầy đủ số nhà vì hai đầu là mốc trên đường phố. Chọn từ kết quả tìm địa chỉ thì giữ tên
+// địa danh đã chọn (reverse của toạ độ chỉ ra địa chỉ gần nhất).
+// Không lấy được địa chỉ (VietMap gián đoạn) thì để trống, bài chỉ hiện khu vực
+const resolveLocation = async ({ mode, area, placeName = '', point, road }) => {
+  if (mode === 'road') {
+    const length = distanceMeters(road[0], road[1])
+    if (length < ROAD_MIN_M || length > ROAD_MAX_M) {
+      throw invalidField(
+        'location',
+        `Đoạn đường phải dài từ ${ROAD_MIN_M} m đến ${ROAD_MAX_M / 1000} km.`
+      )
+    }
+    const [start, end] = await Promise.all(
+      road.map(({ lat, lng }) => vietmapService.ensureInHcm(lat, lng))
+    )
+    const line = toGeoLine(road)
+    return {
+      area: areaOf(start, area),
+      placeName: start?.detail ?? '',
+      placeNameTo: end?.detail ?? '',
+      locType: 'road_segment',
+      locExact: line,
+      locPublic: line,
+    }
+  }
+
+  const located = await vietmapService.ensureInHcm(point.lat, point.lng)
+  return {
+    area: areaOf(located, area),
+    placeName: mode === 'address' && placeName ? placeName : (located?.place ?? ''),
+    placeNameTo: '',
+    locType: 'point',
+    locExact: toGeoPoint(point),
+    locPublic: toGeoPoint(blurPoint(point)),
+  }
+}
+
+// Đáp án đúng chỉ lưu dạng HMAC của _id phương án (NF02)
+const buildChallenge = (postId, { text, options, correct }) => {
+  const challenge = new VerificationChallenge({
+    post: postId,
+    question: text,
+    options: options.map((option) => ({ text: option })),
+  })
+  challenge.correctOptionHash = hashAnswer(challenge._id, challenge.options[correct]._id)
+  return challenge
+}
+
+// input là dữ liệu đã qua createPostRules (matchedData), files là ảnh multer giữ trong bộ nhớ.
+// Kiểm tra hết dữ liệu và vị trí trước, ảnh tải lên Cloudinary sau cùng để không phải xoá ảnh
+// khi dữ liệu sai. Lưu thất bại thì xoá bài, câu hỏi và ảnh đã tải lên
+const createPost = async (input, owner, files = []) => {
+  const { categoryId, attributes, contents } = await resolveClassification(input)
+  const location = await resolveLocation(input.location)
+  const { from, to } = vnTimeRange(input.date, input.dayPart)
+
+  const uploaded = files.length ? await imageService.uploadPostImages(files) : []
+  const post = new Post({
+    owner: owner._id,
+    type: input.type,
+    category: categoryId,
+    title: input.title,
+    description: input.description ?? '',
+    timeFrom: from,
+    // Ban đêm hôm nay kéo sang sáng mai: không ghi thời điểm chưa tới
+    timeTo: new Date(Math.min(to.getTime(), Date.now())),
+    ...location,
+    attributes,
+    contents,
+    images: uploaded.map((image, order) => ({ url: image.url, order })),
+    status: 'pending',
+    statusHistory: [{ status: 'pending', changedBy: owner._id }],
+  })
+
+  try {
+    await post.save()
+    // Bỏ qua câu hỏi (question null) thì matchedData vẫn có object rỗng, nên dựa vào text
+    if (input.type === 'found' && input.question?.text) {
+      await buildChallenge(post._id, input.question).save()
+    }
+  } catch (error) {
+    await Promise.all([
+      post.isNew ? null : Post.deleteOne({ _id: post._id }),
+      uploaded.length ? imageService.deleteImages(uploaded.map((image) => image.publicId)) : null,
+    ])
+    throw error
+  }
+
+  // UC24 luồng 6.b: đăng bài thành công thì xoá bản nháp. Bài đã lưu rồi nên lỗi ở bước này
+  // chỉ ghi log, không làm hỏng lần đăng bài
+  try {
+    await PostDraft.deleteOne({ user: owner._id })
+  } catch (error) {
+    console.error('Không xoá được bản nháp sau khi đăng bài', error)
+  }
+
+  // Chỉ trả định danh để frontend điều hướng, bài đang chờ duyệt nên chưa có trang công khai
+  return {
+    id: post._id,
+    code: post.code,
+    slug: post.slug,
+    type: post.type,
+    status: post.status,
+  }
+}
+
+module.exports = { listPublicPosts, getPostDetail, toPostCard, createPost }

@@ -28,4 +28,36 @@ const startOfVnDay = (value) => new Date(parseYmd(value).getTime() - VN_OFFSET_M
 // 23:59:59.999 giờ Việt Nam của ngày đó
 const endOfVnDay = (value) => new Date(startOfVnDay(value).getTime() + DAY_MS - 1)
 
-module.exports = { VN_OFFSET_MS, isVnDate, startOfVnDay, endOfVnDay }
+// Ngày hôm nay theo giờ Việt Nam, dạng YYYY-MM-DD
+const todayVn = (now = Date.now()) => new Date(now + VN_OFFSET_MS).toISOString().slice(0, 10)
+
+// Buổi trong ngày người dùng chọn khi đăng bài, tính bằng giờ kể từ 00:00 ngày đã chọn.
+// Ban đêm kéo sang 6 giờ sáng hôm sau. Khớp với DAY_PARTS ở frontend/src/data/composePost.js
+const DAY_PART_HOURS = {
+  morning: [6, 11],
+  noon: [11, 14],
+  afternoon: [14, 18],
+  evening: [18, 22],
+  night: [22, 30],
+}
+
+// Khoảng thời gian mất/nhặt: cả ngày nếu không chọn buổi, ngược lại là khung giờ của buổi đó
+const vnTimeRange = (date, dayPart) => {
+  const start = startOfVnDay(date).getTime()
+  if (!dayPart) return { from: new Date(start), to: new Date(start + DAY_MS - 1) }
+  const [fromHour, toHour] = DAY_PART_HOURS[dayPart]
+  return {
+    from: new Date(start + fromHour * 60 * 60 * 1000),
+    to: new Date(start + toHour * 60 * 60 * 1000 - 1),
+  }
+}
+
+module.exports = {
+  VN_OFFSET_MS,
+  DAY_PART_HOURS,
+  isVnDate,
+  startOfVnDay,
+  endOfVnDay,
+  todayVn,
+  vnTimeRange,
+}

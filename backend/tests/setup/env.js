@@ -17,3 +17,5 @@ process.env.TRUST_PROXY = '1'
 process.env.BREVO_API_KEY = ''
 process.env.EMAIL_HOST = ''
 process.env.SENTRY_DSN = ''
+// Test không gọi VietMap thật, fetch được giả lập trong từng test
+process.env.VIETMAP_API_KEY = 'test-vietmap-key'

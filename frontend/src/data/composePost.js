@@ -1,4 +1,4 @@
-// Dữ liệu mẫu cho form Đăng bài
+// Dữ liệu cố định của form Đăng bài. CATEGORY_ATTRIBUTES, PLACES chỉ còn dùng ở các trang chưa nối API
 
 const COLORS = [
   'Đen',
@@ -110,36 +110,14 @@ export const CATEGORY_ATTRIBUTES = {
   Khác: [color],
 }
 
-// Danh mục vật chứa có thêm checklist "Bên trong có", ghép cặp theo phần giao nhau
-export const CONTAINER_ITEMS = {
-  'Ví & tiền': [
-    'Tiền mặt',
-    'CCCD/CMND',
-    'Bằng lái xe',
-    'Thẻ ngân hàng',
-    'Thẻ sinh viên',
-    'Ảnh',
-    'Danh thiếp',
-  ],
-  'Túi & balo': [
-    'Ví',
-    'Điện thoại',
-    'Laptop',
-    'Giấy tờ tùy thân',
-    'Chìa khóa',
-    'Sách vở',
-    'Mỹ phẩm',
-    'Quần áo',
-  ],
-}
-
 // Mốc thời gian gần đúng trong ngày, giờ dùng để tính khoảng timeFrom - timeTo
+// startHour khớp DAY_PART_HOURS ở backend (Ban đêm kéo sang 6 giờ sáng hôm sau)
 export const DAY_PARTS = [
-  { value: 'morning', label: 'Buổi sáng', hint: '6:00 – 11:00' },
-  { value: 'noon', label: 'Buổi trưa', hint: '11:00 – 14:00' },
-  { value: 'afternoon', label: 'Buổi chiều', hint: '14:00 – 18:00' },
-  { value: 'evening', label: 'Buổi tối', hint: '18:00 – 22:00' },
-  { value: 'night', label: 'Ban đêm', hint: '22:00 – 6:00' },
+  { value: 'morning', label: 'Buổi sáng', hint: '6:00 – 11:00', startHour: 6 },
+  { value: 'noon', label: 'Buổi trưa', hint: '11:00 – 14:00', startHour: 11 },
+  { value: 'afternoon', label: 'Buổi chiều', hint: '14:00 – 18:00', startHour: 14 },
+  { value: 'evening', label: 'Buổi tối', hint: '18:00 – 22:00', startHour: 18 },
+  { value: 'night', label: 'Ban đêm', hint: '22:00 – 6:00', startHour: 22 },
 ]
 
 // Mốc gần đúng như bản cũ: lùi bao nhiêu ngày và buổi nào ('now' = buổi hiện tại)
@@ -158,14 +136,7 @@ export const TIME_PRESETS = [
   { label: 'Một tháng trước', daysAgo: 30, dayPart: '' },
 ]
 
-export const LOCATION_MODES = [
-  { value: 'gps', label: 'Dùng vị trí hiện tại' },
-  { value: 'pin', label: 'Kéo ghim trên bản đồ' },
-  { value: 'address', label: 'Gõ địa chỉ' },
-  { value: 'road', label: 'Chọn đoạn đường' },
-]
-
-// Kết quả tìm địa chỉ mẫu; x, y là vị trí (%) trên bản đồ minh họa
+// Địa điểm mẫu cho bản đồ minh hoạ ở Cài đặt vùng cảnh báo (x, y theo %)
 export const PLACES = [
   { label: 'Phố đi bộ Nguyễn Huệ', area: 'Quận 1', x: 54, y: 44 },
   { label: 'Chợ Bến Thành', area: 'Quận 1', x: 46, y: 52 },
@@ -177,56 +148,4 @@ export const PLACES = [
   { label: 'Công viên Gia Định', area: 'Quận Gò Vấp', x: 44, y: 18 },
   { label: 'Sân bay Tân Sơn Nhất', area: 'Quận Tân Bình', x: 30, y: 22 },
   { label: 'Đại học Sư phạm Kỹ thuật, 1 Võ Văn Ngân', area: 'Thành phố Thủ Đức', x: 80, y: 20 },
-]
-
-// line: hai đầu đoạn đường (%) trên bản đồ minh họa
-export const ROAD_SEGMENTS = [
-  {
-    id: 'nguyen-hue',
-    road: 'Nguyễn Huệ',
-    from: 'Lê Lợi',
-    to: 'Tôn Đức Thắng',
-    area: 'Quận 1',
-    line: [50, 36, 58, 56],
-  },
-  {
-    id: 'le-loi',
-    road: 'Lê Lợi',
-    from: 'Pasteur',
-    to: 'Nam Kỳ Khởi Nghĩa',
-    area: 'Quận 1',
-    line: [38, 50, 56, 44],
-  },
-  {
-    id: 'nguyen-thi-minh-khai',
-    road: 'Nguyễn Thị Minh Khai',
-    from: 'Hai Bà Trưng',
-    to: 'Cách Mạng Tháng 8',
-    area: 'Quận 3',
-    line: [24, 52, 46, 38],
-  },
-  {
-    id: 'nguyen-van-linh',
-    road: 'Nguyễn Văn Linh',
-    from: 'Nguyễn Hữu Thọ',
-    to: 'Huỳnh Tấn Phát',
-    area: 'Quận 7',
-    line: [44, 78, 76, 70],
-  },
-  {
-    id: 'xo-viet-nghe-tinh',
-    road: 'Xô Viết Nghệ Tĩnh',
-    from: 'Điện Biên Phủ',
-    to: 'Ung Văn Khiêm',
-    area: 'Quận Bình Thạnh',
-    line: [58, 40, 64, 18],
-  },
-  {
-    id: 'vo-van-ngan',
-    road: 'Võ Văn Ngân',
-    from: 'Đặng Văn Bi',
-    to: 'Kha Vạn Cân',
-    area: 'Thành phố Thủ Đức',
-    line: [70, 26, 92, 16],
-  },
 ]

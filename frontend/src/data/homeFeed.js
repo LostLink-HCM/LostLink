@@ -39,6 +39,11 @@ export const AREAS = [
   'Quận Tân Bình',
   'Quận Tân Phú',
   'Thành phố Thủ Đức',
+  'Huyện Bình Chánh',
+  'Huyện Cần Giờ',
+  'Huyện Củ Chi',
+  'Huyện Hóc Môn',
+  'Huyện Nhà Bè',
 ]
 
 const HOUR = 60 * 60 * 1000

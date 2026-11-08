@@ -4,7 +4,7 @@ import { cx } from '../classes'
 import ImagePicker from '../ImagePicker'
 import { inputClass } from './styles'
 import Note from '../Note'
-import { FieldError, StepHeading } from './ui'
+import { FieldError, RequiredMark, StepHeading } from './ui'
 
 function Counter({ value, max }) {
   return (
@@ -28,10 +28,11 @@ export default function ContentStep({ form, errors, onChange, onAddImages, onRem
     <>
       <StepHeading title="Kể về món đồ" />
 
-      <div className="mb-5">
-        <div className="mb-2 flex items-baseline justify-between gap-3">
+      <div className="mb-4">
+        <div className="mb-1.5 flex items-baseline justify-between gap-3">
           <label htmlFor={`${id}-title`} className="text-small font-semibold text-ink">
             Tiêu đề
+            <RequiredMark />
           </label>
           <Counter value={form.title} max={TITLE_MAX} />
         </div>
@@ -40,15 +41,16 @@ export default function ContentStep({ form, errors, onChange, onAddImages, onRem
           value={form.title}
           maxLength={TITLE_MAX}
           onChange={(e) => onChange({ title: e.target.value })}
+          aria-required="true"
           aria-invalid={errors.title ? true : undefined}
           aria-describedby={errors.title ? `${id}-title-error` : undefined}
-          className={cx(inputClass, 'h-11')}
+          className={cx(inputClass, 'h-10')}
         />
         <FieldError id={`${id}-title-error`}>{errors.title}</FieldError>
       </div>
 
-      <div className="mb-6">
-        <div className="mb-2 flex items-baseline justify-between gap-3">
+      <div className="mb-5">
+        <div className="mb-1.5 flex items-baseline justify-between gap-3">
           <label htmlFor={`${id}-desc`} className="text-small font-semibold text-ink">
             Mô tả chi tiết
           </label>
@@ -62,7 +64,7 @@ export default function ContentStep({ form, errors, onChange, onAddImages, onRem
           onFocus={focusFirstLine}
           aria-invalid={errors.description ? true : undefined}
           aria-describedby={errors.description ? `${id}-desc-error` : undefined}
-          className={cx(inputClass, 'min-h-36 resize-y py-3 leading-relaxed')}
+          className={cx(inputClass, 'min-h-32 resize-y py-2.5 leading-relaxed')}
         />
         <FieldError id={`${id}-desc-error`}>{errors.description}</FieldError>
         {found && (
@@ -78,7 +80,9 @@ export default function ContentStep({ form, errors, onChange, onAddImages, onRem
         onAdd={onAddImages}
         onRemove={onRemoveImage}
         hint="Thêm hình ảnh giúp mọi người nhận ra món đồ nhanh hơn."
+        showOptional={false}
       />
+      <FieldError>{errors.images}</FieldError>
     </>
   )
 }

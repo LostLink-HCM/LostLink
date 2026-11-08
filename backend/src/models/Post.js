@@ -116,7 +116,10 @@ const postSchema = new Schema(
     },
 
     area: { type: String, default: '', trim: true },
+    // Địa điểm công khai do hệ thống tạo từ toạ độ: ghim là tên đường (bỏ số nhà) hoặc địa danh,
+    // phường, quận. Đoạn đường: placeName là điểm đầu, placeNameTo là điểm cuối, có số nhà
     placeName: { type: String, default: '', trim: true },
+    placeNameTo: { type: String, default: '', trim: true },
 
     locType: { type: String, enum: ['point', 'road_segment'], default: 'point' },
     locExact: { type: geoSchema, default: null },
@@ -204,7 +207,7 @@ postSchema.pre('validate', async function assignSlug() {
 
 postSchema.pre('validate', function computeDerivedFields() {
   this.hotScore = this.viewCount + this.likeCount * HOT_LIKE_WEIGHT
-  const text = [this.title, this.description, this.area, this.placeName].join(' ')
+  const text = [this.title, this.description, this.area, this.placeName, this.placeNameTo].join(' ')
   this.searchText = normalizeText(text)
   this.searchTextVi = lowercaseText(text)
 })
@@ -220,6 +223,8 @@ Post.STATUSES = POST_STATUSES
 Post.HOT_LIKE_WEIGHT = HOT_LIKE_WEIGHT
 Post.TYPE_SLUGS = TYPE_SLUGS
 Post.SLUG_PATTERN = SLUG_PATTERN
+Post.TITLE_MAX = TITLE_MAX
+Post.DESCRIPTION_MAX = DESCRIPTION_MAX
 
 // Mức tăng hotScore tương ứng khi cộng lượt xem/thích bằng $inc, vd thích: hotScoreDelta({ likes: 1 })
 Post.hotScoreDelta = ({ views = 0, likes = 0 }) => views + likes * HOT_LIKE_WEIGHT

@@ -1,5 +1,9 @@
-import { CATEGORY_ATTRIBUTES } from '../../../data/composePost'
-import { describeLocation, describeTime, getSteps } from '../../../lib/user/composePost'
+import {
+  describeLocation,
+  describeTime,
+  getSteps,
+  selectedAttributes,
+} from '../../../lib/user/composePost'
 import TypeTag from '../home/TypeTag'
 import Button from '../Button'
 import Dialog from '../Dialog'
@@ -21,46 +25,55 @@ function Section({ title, onEdit, children }) {
   )
 }
 
-// Xem lại toàn bộ trước khi đăng, bấm Sửa để quay về đúng bước
-export default function ReviewDialog({ form, onEdit, onClose, onSubmit }) {
+// Xem lại trước khi đăng, bấm Sửa để quay về bước đó. Đang gửi thì khoá các nút
+export default function ReviewDialog({ form, category, submitting, onEdit, onClose, onSubmit }) {
   const steps = getSteps(form.type)
   const stepIndex = (key) => steps.findIndex((step) => step.key === key)
-  const attributeLabels = Object.fromEntries(
-    (CATEGORY_ATTRIBUTES[form.category] ?? []).map((attr) => [attr.key, attr.label])
-  )
-  const attributes = Object.entries(form.attributes)
+  const attributes = selectedAttributes(form, category)
   const { question } = form
+  const close = submitting ? () => {} : onClose
+  const edit = (key) => () => !submitting && onEdit(stepIndex(key))
 
   return (
     <Dialog
       title="Xem lại bài đăng"
       size="lg"
-      onClose={onClose}
+      onClose={close}
       footer={
         <>
-          <Button onClick={onClose}>Tiếp tục sửa</Button>
-          <Button variant="primary" onClick={onSubmit} data-autofocus>
-            Đăng bài
+          <Button onClick={close} disabled={submitting}>
+            Tiếp tục sửa
+          </Button>
+          <Button
+            variant="primary"
+            onClick={onSubmit}
+            disabled={submitting}
+            aria-busy={submitting || undefined}
+            data-autofocus
+          >
+            {submitting
+              ? form.images.length
+                ? 'Đang tải ảnh và đăng bài…'
+                : 'Đang đăng bài…'
+              : 'Đăng bài'}
           </Button>
         </>
       }
     >
       <Note className="mb-3.5">
-        Bài đăng sẽ ở trạng thái Chờ xét duyệt và chỉ hiển thị công khai sau khi Moderator duyệt.
+        Bài đăng sẽ ở trạng thái Chờ xét duyệt và chỉ hiển thị công khai sau khi LostLink duyệt.
       </Note>
 
-      <Section title="Phân loại" onEdit={() => onEdit(stepIndex('classify'))}>
+      <Section title="Phân loại" onEdit={edit('classify')}>
         <div className="flex flex-wrap items-center gap-2">
           <TypeTag type={form.type} className="py-1" />
           <span className="rounded-full bg-line-subtle px-2.5 py-1 text-tiny text-ink-secondary">
-            {form.category}
+            {category?.name}
           </span>
         </div>
         {attributes.length > 0 && (
           <p className="m-0 mt-2 text-small text-ink-secondary">
-            {attributes
-              .map(([key, value]) => `${attributeLabels[key] ?? key}: ${value}`)
-              .join(' · ')}
+            {attributes.map((item) => `${item.name}: ${item.value}`).join(' · ')}
           </p>
         )}
         {form.contents.length > 0 && (
@@ -75,7 +88,7 @@ export default function ReviewDialog({ form, onEdit, onClose, onSubmit }) {
         )}
       </Section>
 
-      <Section title="Nội dung" onEdit={() => onEdit(stepIndex('content'))}>
+      <Section title="Nội dung" onEdit={edit('content')}>
         <p className="m-0 text-body font-semibold text-ink">{form.title}</p>
         <p className="m-0 mt-1 line-clamp-4 text-small whitespace-pre-line text-ink-secondary">
           {form.description || 'Không có mô tả.'}
@@ -97,16 +110,18 @@ export default function ReviewDialog({ form, onEdit, onClose, onSubmit }) {
         )}
       </Section>
 
-      <Section title="Thời gian" onEdit={() => onEdit(stepIndex('time'))}>
+      <Section title="Thời gian" onEdit={edit('time')}>
         <p className="m-0 text-small text-ink">{describeTime(form)}</p>
       </Section>
 
-      <Section title="Vị trí" onEdit={() => onEdit(stepIndex('location'))}>
-        <p className="m-0 text-small text-ink">{describeLocation(form.location)}</p>
+      <Section title="Vị trí" onEdit={edit('location')}>
+        <p className="m-0 text-small whitespace-pre-line text-ink">
+          {describeLocation(form.location)}
+        </p>
       </Section>
 
       {form.type === 'found' && (
-        <Section title="Câu hỏi xác minh" onEdit={() => onEdit(stepIndex('question'))}>
+        <Section title="Câu hỏi xác minh" onEdit={edit('question')}>
           {question.skipped ? (
             <p className="m-0 text-small text-ink-secondary">
               Không đặt câu hỏi, người muốn nhận đồ sẽ gửi yêu cầu liên hệ.
