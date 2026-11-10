@@ -1,6 +1,12 @@
 const { Post, Review, User, UserBlock } = require('../models')
 const ApiError = require('../utils/ApiError')
-const { activeTalksOf, ownerControls, publicCondition, toPostCard } = require('./postService')
+const {
+  activeTalksOf,
+  ownerControls,
+  publicCondition,
+  toPostCard,
+  withViewerState,
+} = require('./postService')
 
 // Bài của tôi: Đang tìm, Đã liên hệ; Chờ duyệt, Bị từ chối chỉ chủ bài thấy (tab Chờ duyệt)
 const LISTED_STATUSES = ['searching', 'contacted']
@@ -92,7 +98,10 @@ const getMyProfile = async (viewer) => {
   return {
     // Khu vực hay để ý chỉ chủ tài khoản thấy
     profile: { id: user._id, ...toPublicProfile(user), favoriteArea: user.favoriteArea },
-    posts: posts.filter((post) => LISTED_STATUSES.includes(post.status)).map(toMyPost),
+    posts: await withViewerState(
+      posts.filter((post) => LISTED_STATUSES.includes(post.status)).map(toMyPost),
+      viewer
+    ),
     reviewingPosts: posts.filter((post) => REVIEWING_STATUSES.includes(post.status)).map(toMyPost),
     ...feedback,
   }
@@ -110,7 +119,11 @@ const getUserProfile = async (username, viewer) => {
     reviewsAbout(user._id),
   ])
 
-  return { profile: toPublicProfile(user), posts: posts.map(toPostCard), ...feedback }
+  return {
+    profile: toPublicProfile(user),
+    posts: await withViewerState(posts.map(toPostCard), viewer),
+    ...feedback,
+  }
 }
 
 module.exports = { getMyProfile, getUserProfile, userNotFound }

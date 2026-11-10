@@ -12,6 +12,7 @@ const {
   VerificationChallenge,
 } = require('../models')
 const imageService = require('./imageService')
+const { notify } = require('./notificationService')
 const returnService = require('./returnService')
 const {
   ACTIVE_MATCH_STATES,
@@ -61,11 +62,6 @@ const deleteUnusedImages = async (urls) => {
   const publicIds = urls.map(imageService.publicIdFromUrl).filter(Boolean)
   if (publicIds.length) await imageService.deleteImages(publicIds)
 }
-
-const notify = (userIds, fields) =>
-  userIds.length
-    ? Notification.insertMany(userIds.map((user) => ({ user, ...fields })))
-    : Promise.resolve()
 
 // ----- Sửa bài
 
@@ -288,13 +284,13 @@ const deletePost = async (id, user) => {
     ),
     ...talks.map((talk) =>
       notify(
-        talk.participants.map((item) => item.user).filter((userId) => !userId.equals(user._id)),
+        talk.participants.map((item) => item.user),
         {
           type: 'post_deleted',
           actor: user._id,
           refType: 'Conversation',
           refId: talk._id,
-          preview: `Bài "${post.title}" đã bị người đăng xoá, hội thoại về món đồ này đã đóng.`,
+          text: `Bài "${post.title}" đã bị người đăng xoá, hội thoại về món đồ này đã đóng.`,
         }
       )
     ),
@@ -329,9 +325,7 @@ const changePostStatus = async (id, user, status) => {
     throw statusChanged()
   }
 
-  const followers = await PostFollow.find({ post: post._id, user: { $ne: user._id } }).distinct(
-    'user'
-  )
+  const followers = await PostFollow.find({ post: post._id }).distinct('user')
   const notice = STATUS_NOTICES[status]
   await Promise.all([
     staleMatchesOf(post._id),
@@ -345,7 +339,7 @@ const changePostStatus = async (id, user, status) => {
       actor: user._id,
       refType: 'Post',
       refId: post._id,
-      preview: `Bài "${post.title}" ${notice.text}.`,
+      text: `Bài "${post.title}" ${notice.text}.`,
     }),
     status === 'returned' ? returnService.refreshReturnersOf(post) : null,
   ])

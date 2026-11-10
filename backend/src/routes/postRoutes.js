@@ -1,7 +1,10 @@
 const { Router } = require('express')
 
 const ctrl = require('../controllers/postController')
+const commentCtrl = require('../controllers/commentController')
+const interactionCtrl = require('../controllers/interactionController')
 const validate = require('../middleware/validate')
+const { commentBodyRules } = require('../middleware/validation/commentValidation')
 const { notRestricted, optionalAuth, protect } = require('../middleware/authMiddleware')
 const { parsePostForm } = require('../middleware/postForm')
 const { postCreateLimiter, postEditLimiter } = require('../middleware/rateLimiter')
@@ -65,5 +68,16 @@ router.patch(
   validate,
   ctrl.changePostStatus
 )
+
+// Thích, lưu, theo dõi bài: PUT bật, DELETE tắt
+const byId = [protect, postIdRules, rejectInvalidPostPath]
+router.put('/:id/like', ...byId, interactionCtrl.like)
+router.delete('/:id/like', ...byId, interactionCtrl.unlike)
+router.put('/:id/save', ...byId, interactionCtrl.save)
+router.delete('/:id/save', ...byId, interactionCtrl.unsave)
+router.put('/:id/follow', ...byId, interactionCtrl.follow)
+router.delete('/:id/follow', ...byId, interactionCtrl.unfollow)
+
+router.post('/:id/comments', ...byId, commentBodyRules, validate, commentCtrl.addComment)
 
 module.exports = router

@@ -8,6 +8,8 @@ const moderationRoutes = require('./moderationRoutes')
 const geoRoutes = require('./geoRoutes')
 const categoryRoutes = require('./categoryRoutes')
 const userRoutes = require('./userRoutes')
+const commentRoutes = require('./commentRoutes')
+const notificationRoutes = require('./notificationRoutes')
 
 const router = Router()
 
@@ -30,5 +32,7 @@ router.use('/moderator', moderationRoutes)
 router.use('/geo', geoRoutes)
 router.use('/categories', categoryRoutes)
 router.use('/users', userRoutes)
+router.use('/comments', commentRoutes)
+router.use('/notifications', notificationRoutes)
 
 module.exports = router

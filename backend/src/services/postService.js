@@ -136,6 +136,24 @@ const toPostCard = (post) => ({
   counts: { likes: post.likeCount, comments: post.commentCount, views: post.viewCount },
 })
 
+// Gắn trạng thái Thích, Lưu, Theo dõi của người xem vào card (Guest không có)
+const withViewerState = async (cards, viewer) => {
+  if (!viewer || !cards.length) return cards
+  const where = { user: viewer._id, post: { $in: cards.map((card) => card.id) } }
+  const [liked, saved, following] = await Promise.all(
+    [PostLike, SavedPost, PostFollow].map(
+      async (Model) => new Set((await Model.find(where).distinct('post')).map(String))
+    )
+  )
+  return cards.map((card) => {
+    const id = String(card.id)
+    return {
+      ...card,
+      viewer: { liked: liked.has(id), saved: saved.has(id), following: following.has(id) },
+    }
+  })
+}
+
 // Xem danh sách tin mới, Lọc và tìm kiếm, Xem tin hot
 const listPublicPosts = async (params, viewer = null) => {
   const now = Date.now()
@@ -166,7 +184,7 @@ const listPublicPosts = async (params, viewer = null) => {
   ])
 
   return {
-    items: posts.map(toPostCard),
+    items: await withViewerState(posts.map(toPostCard), viewer),
     page,
     limit,
     total,
@@ -214,6 +232,7 @@ const toPostDetail = (post, comments, viewer) => ({
   comments: comments.map((comment) => ({
     id: comment._id,
     body: comment.body,
+    editedAt: comment.editedAt ?? null,
     createdAt: comment.createdAt,
     author: toAuthor(comment.user),
   })),
@@ -441,6 +460,26 @@ const buildChallenge = (postId, { text, options, correct }) => {
   return challenge
 }
 
+const CODE_RETRIES = 10
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+// Hai bài lưu cùng lúc có thể trùng mã hoặc slug: xoá để cấp lại rồi lưu lại
+const saveWithFreshCode = async (post) => {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await post.save()
+    } catch (error) {
+      const field = Object.keys(error.keyPattern ?? {})[0]
+      if (error.code !== 11000 || !['code', 'slug'].includes(field) || attempt >= CODE_RETRIES) {
+        throw error
+      }
+      post[field] = undefined
+      await wait(Math.random() * 20 * attempt)
+    }
+  }
+}
+
 // input là dữ liệu đã qua createPostRules (matchedData), files là ảnh multer giữ trong bộ nhớ.
 // Kiểm tra hết dữ liệu và vị trí trước, ảnh tải lên Cloudinary sau cùng để không phải xoá ảnh
 // khi dữ liệu sai. Lưu thất bại thì xoá bài, câu hỏi và ảnh đã tải lên
@@ -468,7 +507,7 @@ const createPost = async (input, owner, files = []) => {
   })
 
   try {
-    await post.save()
+    await saveWithFreshCode(post)
     // Bỏ qua câu hỏi (question null) thì matchedData vẫn có object rỗng, nên dựa vào text
     if (input.type === 'found' && input.question?.text) {
       await buildChallenge(post._id, input.question).save()
@@ -507,6 +546,9 @@ module.exports = {
   getPostDetail,
   toPostCard,
   publicCondition,
+  isPublic,
+  withViewerState,
+  toAuthor,
   createPost,
   postNotFound,
   invalidField,
