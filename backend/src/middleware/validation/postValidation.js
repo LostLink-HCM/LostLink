@@ -74,6 +74,7 @@ const QUESTION_MAX = 200
 const OPTION_MAX = 100
 const MIN_OPTIONS = 2
 const MAX_OPTIONS = 5
+const MAX_IMAGES = 9
 
 const isNumberIn = (min, max) => (value) =>
   typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max
@@ -236,9 +237,36 @@ const createPostRules = [
     .withMessage('Chọn đáp án đúng.'),
 ]
 
-// ----- Lưu nháp bài đăng (JSON). Bản nháp được phép thiếu hoặc chưa hợp lệ nên mọi field
-// đều không bắt buộc, nhưng vẫn phải đúng kiểu (chặn object, NoSQL injection) và có giới hạn
-// độ dài để chống lạm dụng. Giới hạn rộng hơn khi đăng bài để không từ chối bản nháp đang gõ dở
+// Sửa bài
+
+const isImageItem = (item) =>
+  item !== null &&
+  typeof item === 'object' &&
+  !Array.isArray(item) &&
+  (typeof item.url === 'string') !== Number.isInteger(item.upload) &&
+  (item.upload === undefined || item.upload >= 0)
+
+const editPostRules = [
+  ...createPostRules,
+  body('images')
+    .optional()
+    .isArray({ max: MAX_IMAGES })
+    .withMessage(`Chỉ được tối đa ${MAX_IMAGES} ảnh.`),
+  body('images.*').custom(isImageItem).withMessage('Danh sách ảnh không hợp lệ.'),
+]
+
+// Đường dẫn theo id bài (sửa, xoá, đổi trạng thái)
+const postIdRules = [param('id').isMongoId()]
+
+const postStatusRules = [
+  body('status')
+    .isString()
+    .bail()
+    .isIn(['closed', 'returned'])
+    .withMessage('Chọn Đóng bài hoặc Đánh dấu đã trao trả.'),
+]
+
+// Lưu nháp bài đăng
 
 const DRAFT_MESSAGE = 'Dữ liệu bản nháp không hợp lệ.'
 const DRAFT_LIMITS = { title: 500, description: 5000, short: 200, long: 2000 }
@@ -357,5 +385,8 @@ module.exports = {
   postPathRules,
   rejectInvalidPostPath,
   createPostRules,
+  editPostRules,
+  postIdRules,
+  postStatusRules,
   draftRules,
 }

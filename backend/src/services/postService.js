@@ -3,6 +3,8 @@ const {
   Category,
   CategoryAttribute,
   Comment,
+  Conversation,
+  MatchSuggestion,
   Post,
   PostFollow,
   PostDraft,
@@ -27,12 +29,17 @@ const EXCERPT_MAX = 160
 const MAX_KEYWORDS = 8
 const DETAIL_COMMENTS_MAX = 50
 const POST_NOT_FOUND = 'Bài đăng không tồn tại hoặc đã bị ẩn.'
+// Gợi ý ghép cặp còn chờ người dùng phản hồi
+const ACTIVE_MATCH_STATES = ['pending', 'confirmed_one']
 
 // Danh sách công khai chỉ có bài đang tìm, đã liên hệ (và đã trao trả trong 7 ngày).
 // Trang chi tiết mở thêm được bài Đã đóng: bị loại khỏi danh sách nhưng không bị ẩn,
 // nên liên kết đã chia sẻ vẫn xem được
 const LISTED_STATUSES = ['searching', 'contacted']
 const DETAIL_STATUSES = ['searching', 'contacted', 'closed']
+// Trạng thái chủ bài được sửa bài; được đóng bài hoặc đánh dấu đã trao trả
+const EDITABLE_STATUSES = ['pending', 'rejected', 'searching']
+const CLOSABLE_STATUSES = ['searching', 'contacted']
 
 const SORTS = {
   new: { createdAt: -1, _id: -1 },
@@ -54,6 +61,14 @@ const publicCondition = (now, statuses = LISTED_STATUSES) => ({
     },
   ],
 })
+
+// Như publicCondition nhưng kiểm tra trên bài đã tải
+const isPublic = (post, now, statuses = DETAIL_STATUSES) => {
+  if (post.isHidden) return false
+  if (statuses.includes(post.status)) return true
+  const returnedAt = post.statusHistory?.findLast((item) => item.status === 'returned')?.changedAt
+  return post.status === 'returned' && Boolean(returnedAt) && returnedAt >= now - RETURNED_LISTED_MS
+}
 
 const createdAtCondition = ({ range = '7d', from, to }, now) => {
   if (range !== 'custom') return { $gte: new Date(now - RANGE_HOURS[range] * HOUR) }
@@ -207,21 +222,69 @@ const toPostDetail = (post, comments, viewer) => ({
   viewer,
 })
 
+// Số gợi ý ghép cặp và hội thoại chưa trao trả xong của từng bài, để cảnh báo trước khi xoá
+const activeTalksOf = async (postIds) => {
+  const [matches, conversations] = await Promise.all([
+    MatchSuggestion.find({
+      $or: [{ postLost: { $in: postIds } }, { postFound: { $in: postIds } }],
+      state: { $in: ACTIVE_MATCH_STATES },
+    })
+      .select('postLost postFound')
+      .lean(),
+    Conversation.find({
+      kind: 'trade',
+      post: { $in: postIds },
+      status: 'open',
+      $nor: [{ confirmedLost: true, confirmedFound: true }],
+    })
+      .select('post')
+      .lean(),
+  ])
+  const counts = new Map(postIds.map((id) => [String(id), 0]))
+  const add = (id) => counts.has(String(id)) && counts.set(String(id), counts.get(String(id)) + 1)
+  matches.forEach((match) => [match.postLost, match.postFound].forEach(add))
+  conversations.forEach((conversation) => add(conversation.post))
+  return counts
+}
+
+// Lý do Moderator từ chối gần nhất
+const rejectReasonOf = (post) =>
+  post.status === 'rejected'
+    ? (post.statusHistory?.findLast((item) => item.status === 'rejected')?.note ?? '')
+    : ''
+
+// Quyền quản lý bài của chủ bài (Sửa, Đóng bài, Xóa) và lưu ý trạng thái
+const ownerControls = (post, activeTalks) => ({
+  canEdit: EDITABLE_STATUSES.includes(post.status),
+  canClose: CLOSABLE_STATUSES.includes(post.status),
+  activeTalks,
+  isHidden: post.isHidden,
+  rejectReason: rejectReasonOf(post),
+})
+
 // Trạng thái Thích/Lưu/Theo dõi của người đang xem, Guest thì đều là false
-const viewerState = async (postId, viewer, isOwner) => {
+const viewerState = async (post, viewer, isOwner) => {
   if (!viewer) return { isOwner: false, liked: false, saved: false, following: false }
-  const where = { user: viewer._id, post: postId }
-  const [liked, saved, following] = await Promise.all([
+  const where = { user: viewer._id, post: post._id }
+  const [liked, saved, following, talks] = await Promise.all([
     PostLike.exists(where),
     SavedPost.exists(where),
     PostFollow.exists(where),
+    isOwner ? activeTalksOf([post._id]) : null,
   ])
-  return { isOwner, liked: Boolean(liked), saved: Boolean(saved), following: Boolean(following) }
+  return {
+    isOwner,
+    liked: Boolean(liked),
+    saved: Boolean(saved),
+    following: Boolean(following),
+    ...(isOwner && { manage: ownerControls(post, talks.get(String(post._id))) }),
+  }
 }
 
-// UC04 Xem chi tiết bài đăng: tìm theo loại tin và slug trên URL (/mat-do/<slug>)
+// Chi tiết bài theo loại tin và slug (/mat-do/<slug>). Người khác chỉ xem bài công khai,
+// chủ bài xem được bài của mình ở mọi trạng thái (vd quay lại bài sau khi sửa)
 const getPostDetail = async ({ type, slug }, viewer = null) => {
-  const post = await Post.findOne({ type, slug, ...publicCondition(Date.now(), DETAIL_STATUSES) })
+  const post = await Post.findOne({ type, slug })
     .populate('category', 'slug name icon')
     .populate('owner', 'username avatarUrl reputationScore returnCount')
     .populate('attributes.attribute', 'name')
@@ -230,6 +293,7 @@ const getPostDetail = async ({ type, slug }, viewer = null) => {
   if (!post) throw postNotFound()
 
   const isOwner = Boolean(viewer && post.owner?._id.equals(viewer._id))
+  if (!isOwner && !isPublic(post, Date.now())) throw postNotFound()
   // Người dùng đã chặn người đăng thì coi như bài không tồn tại, giống danh sách công khai
   const blocked = viewer ? await UserBlock.find({ blocker: viewer._id }).distinct('blocked') : []
   if (post.owner && blocked.some((id) => id.equals(post.owner._id))) throw postNotFound()
@@ -250,13 +314,13 @@ const getPostDetail = async ({ type, slug }, viewer = null) => {
       .limit(DETAIL_COMMENTS_MAX)
       .populate('user', 'username avatarUrl')
       .lean(),
-    viewerState(post._id, viewer, isOwner),
+    viewerState(post, viewer, isOwner),
   ])
 
   return toPostDetail(post, comments, viewerInfo)
 }
 
-// ----- UC U05 Đăng bài mất đồ / nhặt được
+// ----- Đăng bài mất đồ / nhặt được
 
 // Đoạn đường quá ngắn thì nên dùng ghim, quá dài thì không còn giúp khoanh vùng
 const ROAD_MIN_M = 20
@@ -417,7 +481,7 @@ const createPost = async (input, owner, files = []) => {
     throw error
   }
 
-  // UC24 luồng 6.b: đăng bài thành công thì xoá bản nháp. Bài đã lưu rồi nên lỗi ở bước này
+  // Đăng bài thành công thì xoá bản nháp. Bài đã lưu rồi nên lỗi ở bước này
   // chỉ ghi log, không làm hỏng lần đăng bài
   try {
     await PostDraft.deleteOne({ user: owner._id })
@@ -435,4 +499,21 @@ const createPost = async (input, owner, files = []) => {
   }
 }
 
-module.exports = { listPublicPosts, getPostDetail, toPostCard, createPost }
+module.exports = {
+  ACTIVE_MATCH_STATES,
+  EDITABLE_STATUSES,
+  CLOSABLE_STATUSES,
+  listPublicPosts,
+  getPostDetail,
+  toPostCard,
+  publicCondition,
+  createPost,
+  postNotFound,
+  invalidField,
+  resolveClassification,
+  resolveLocation,
+  buildChallenge,
+  activeTalksOf,
+  rejectReasonOf,
+  ownerControls,
+}

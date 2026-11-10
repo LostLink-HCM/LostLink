@@ -52,6 +52,21 @@ const vnTimeRange = (date, dayPart) => {
   }
 }
 
+const HOUR_MS = 60 * 60 * 1000
+
+// Ngược của vnTimeRange: timeFrom → ngày và buổi, để nạp form Sửa bài. 0 giờ là cả ngày;
+// giờ lệch khung thì lấy buổi chứa nó, 0-6 giờ là Ban đêm hôm trước
+const vnDayPartOf = (timeFrom) => {
+  const date = todayVn(new Date(timeFrom).getTime())
+  const hours = (new Date(timeFrom).getTime() - startOfVnDay(date).getTime()) / HOUR_MS
+  if (hours === 0) return { date, dayPart: '' }
+  if (hours < DAY_PART_HOURS.morning[0]) {
+    return { date: todayVn(new Date(timeFrom).getTime() - 24 * HOUR_MS), dayPart: 'night' }
+  }
+  const [dayPart] = Object.entries(DAY_PART_HOURS).find(([, [, to]]) => hours < to)
+  return { date, dayPart }
+}
+
 module.exports = {
   VN_OFFSET_MS,
   DAY_PART_HOURS,
@@ -60,4 +75,5 @@ module.exports = {
   endOfVnDay,
   todayVn,
   vnTimeRange,
+  vnDayPartOf,
 }

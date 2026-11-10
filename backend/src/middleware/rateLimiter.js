@@ -30,4 +30,7 @@ const geoLimiter = limiter(200, { keyGenerator: (req) => `user:${req.user.id}` }
 // Đăng bài 10 lần/15 phút/tài khoản để chặn spam. Dùng sau protect
 const postCreateLimiter = limiter(10, { keyGenerator: (req) => `user:${req.user.id}` })
 
-module.exports = { authLimiter, apiLimiter, geoLimiter, postCreateLimiter }
+// Sửa bài 20 lần/15 phút/tài khoản (có tải ảnh, gọi VietMap). Dùng sau protect
+const postEditLimiter = limiter(20, { keyGenerator: (req) => `user:${req.user.id}` })
+
+module.exports = { authLimiter, apiLimiter, geoLimiter, postCreateLimiter, postEditLimiter }

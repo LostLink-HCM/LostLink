@@ -2,6 +2,7 @@ const { matchedData } = require('express-validator')
 
 const asyncHandler = require('../utils/asyncHandler')
 const draftService = require('../services/draftService')
+const postManageService = require('../services/postManageService')
 const postService = require('../services/postService')
 
 // Trang chủ (sort=new) và Tin hot (sort=hot) dùng chung một API
@@ -44,4 +45,44 @@ const deleteDraft = asyncHandler(async (req, res) => {
   res.json({ success: true })
 })
 
-module.exports = { listPosts, getPost, createPost, getDraft, saveDraft, deleteDraft }
+// Dữ liệu nạp form Sửa bài (chỉ chủ bài)
+const getPostForEdit = asyncHandler(async (req, res) => {
+  const { id } = matchedData(req, { locations: ['params'] })
+  const data = await postManageService.getPostForEdit(id, req.user)
+  res.json({ success: true, data })
+})
+
+// Sửa bài, chỉ đọc field đã khai báo trong editPostRules
+const updatePost = asyncHandler(async (req, res) => {
+  const { id } = matchedData(req, { locations: ['params'] })
+  const input = matchedData(req, { locations: ['body'] })
+  const data = await postManageService.updatePost(id, input, req.user, req.files)
+  res.json({ success: true, data })
+})
+
+const deletePost = asyncHandler(async (req, res) => {
+  const { id } = matchedData(req, { locations: ['params'] })
+  await postManageService.deletePost(id, req.user)
+  res.json({ success: true })
+})
+
+// Đóng bài hoặc đánh dấu đã trao trả
+const changePostStatus = asyncHandler(async (req, res) => {
+  const { id } = matchedData(req, { locations: ['params'] })
+  const { status } = matchedData(req, { locations: ['body'] })
+  const data = await postManageService.changePostStatus(id, req.user, status)
+  res.json({ success: true, data })
+})
+
+module.exports = {
+  listPosts,
+  getPost,
+  createPost,
+  getDraft,
+  saveDraft,
+  deleteDraft,
+  getPostForEdit,
+  updatePost,
+  deletePost,
+  changePostStatus,
+}
