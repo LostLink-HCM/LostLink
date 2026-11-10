@@ -385,11 +385,82 @@ export function buildPostPayload(form) {
   return payload
 }
 
-export function buildPostForm(form) {
+// Ảnh mới gửi kèm FormData. Sửa bài thì data có thêm images: { url } ảnh cũ, { upload } ảnh mới
+export function buildPostForm(form, { edit = false } = {}) {
   const data = new FormData()
-  data.append('data', JSON.stringify(buildPostPayload(form)))
-  form.images.forEach((image) => data.append('images', image.file, image.name))
+  const payload = buildPostPayload(form)
+  const uploads = form.images.filter((image) => image.file)
+  if (edit) {
+    payload.images = form.images.map((image) =>
+      image.file ? { upload: uploads.indexOf(image) } : { url: image.url }
+    )
+  }
+  data.append('data', JSON.stringify(payload))
+  uploads.forEach((image) => data.append('images', image.file, image.name))
   return data
+}
+
+// Đưa một ảnh lên đầu danh sách để làm ảnh bìa
+export const moveToCover = (images, id) => {
+  const image = images.find((item) => item.id === id)
+  return image ? [image, ...images.filter((item) => item.id !== id)] : images
+}
+
+// Bài từ API Sửa bài → dữ liệu form. Đặt sẵn attributeBlock để bước Nội dung không điền lại
+export function formFromPost(post, categories) {
+  const { location: saved } = post
+  const area = saved.area ?? ''
+  const located = { ...EMPTY_LOCATION, area, areaAuto: Boolean(area) }
+  let location = EMPTY_LOCATION
+  if (saved.mode === 'road' && saved.road?.length === 2) {
+    location = {
+      ...located,
+      mode: 'road',
+      road: saved.road,
+      roadPlaces: [saved.placeName ?? '', saved.placeNameTo ?? ''],
+    }
+  } else if (saved.point) {
+    location = {
+      ...located,
+      mode: 'pin',
+      pointSource: 'pin',
+      point: saved.point,
+      place: saved.placeName ?? '',
+    }
+  }
+
+  const question = post.question
+    ? {
+        skipped: false,
+        text: post.question.text,
+        options: post.question.options,
+        correct: post.question.correct,
+      }
+    : { ...EMPTY_FORM.question, skipped: post.type === 'found' }
+
+  const form = {
+    ...EMPTY_FORM,
+    type: post.type,
+    category: post.category,
+    attributes: toAttributeMap(post.attributes),
+    contents: post.contents ?? [],
+    title: post.title,
+    description: post.description ?? '',
+    images: post.images.map((url, index) => ({
+      id: `saved-${index}`,
+      url,
+      name: `ảnh ${index + 1}`,
+    })),
+    date: post.date,
+    dayPart: post.dayPart ?? '',
+    timePreset: resolveTimePreset(post.date, post.dayPart ?? ''),
+    location,
+    question,
+  }
+  const patch = reconcileClassification(form, categories)
+  const next = patch ? { ...form, ...patch } : form
+  const category = categories.find((item) => item.slug === next.category)
+  return { ...next, attributeBlock: describeAttributes(next, category) }
 }
 
 // Bỏ phân loại, thuộc tính, đồ bên trong của bản nháp không còn khớp danh mục hiện có

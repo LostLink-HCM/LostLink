@@ -11,8 +11,17 @@ const Dot = () => (
   <span aria-hidden="true" className="size-0.75 shrink-0 rounded-full bg-line-strong" />
 )
 
-// Cả thẻ bấm được nhờ link ở tiêu đề phủ lên toàn thẻ, nút Thích nằm trên lớp đó
-export default function PostCard({ post, commentCount, liked, onToggleLike, now }) {
+// Cả thẻ bấm được nhờ link phủ toàn thẻ; nút Thích, tags, menu ⋯, footer nằm trên lớp link
+export default function PostCard({
+  post,
+  commentCount,
+  liked,
+  onToggleLike,
+  now,
+  tags,
+  menu,
+  footer,
+}) {
   return (
     <article
       className={cx(
@@ -53,7 +62,12 @@ export default function PostCard({ post, commentCount, liked, onToggleLike, now 
           <span>{post.category}</span>
           <Dot />
           <time dateTime={post.createdAt}>{timeAgo(post.createdAt, now)}</time>
-          <TypeTag type={post.type} className="ml-auto shrink-0" />
+          {/* Nhãn và nút ⋯ đi cùng nhau, hết chỗ thì xuống dòng cả cụm */}
+          <span className="ml-auto flex shrink-0 items-center gap-1.5">
+            <TypeTag type={post.type} />
+            {tags}
+            {menu}
+          </span>
         </div>
 
         <h3 className="m-0 mb-1.5 text-lead leading-snug font-bold tracking-tight text-ink sm:text-title">
@@ -98,6 +112,7 @@ export default function PostCard({ post, commentCount, liked, onToggleLike, now 
             {formatCount(commentCount)} bình luận · {formatCount(post.views)} lượt xem
           </span>
         </div>
+        {footer && <div className="relative z-10 mt-3">{footer}</div>}
       </div>
     </article>
   )

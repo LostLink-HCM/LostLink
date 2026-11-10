@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import { listCategories } from '../../api/categories'
-import { createPost, deleteDraft, getDraft, saveDraft } from '../../api/posts'
+import {
+  createPost,
+  deleteDraft,
+  getDraft,
+  getPostForEdit,
+  saveDraft,
+  updatePost,
+} from '../../api/posts'
 import { useAuth } from '../../auth/AuthContext'
 import Icon from '../../components/common/Icon'
 import ClassifyStep from '../../components/user/compose/ClassifyStep'
@@ -16,15 +23,19 @@ import { buttonClass } from '../../components/user/buttonClass'
 import Card from '../../components/user/Card'
 import Dialog from '../../components/user/Dialog'
 import EmptyState from '../../components/user/EmptyState'
+import Note from '../../components/user/Note'
+import { postPath } from '../../lib/user/homeFeed'
 import {
   EMPTY_FORM,
   buildPostForm,
   clearLocalDraft,
   findInvalidStep,
+  formFromPost,
   getSteps,
   isFormEmpty,
   loadLocalDraft,
   mapApiErrors,
+  moveToCover,
   prefillDescription,
   reconcileClassification,
   restoreDraft,
@@ -48,15 +59,32 @@ const formatSavedAt = (iso) =>
     month: '2-digit',
   })
 
-// Form Đăng bài nhiều bước, bản nháp lưu trên server (không kèm ảnh)
-export default function ComposePostPage() {
+// Lỗi khi mở form Sửa bài, theo mã HTTP
+const EDIT_LOAD_ERRORS = {
+  403: { icon: 'lock', title: 'Bạn không có quyền sửa bài này' },
+  404: { icon: 'search', title: 'Không tìm thấy bài đăng', description: 'Bài đăng không tồn tại.' },
+  409: {
+    icon: 'lock',
+    title: 'Không thể sửa bài ở trạng thái hiện tại',
+    description: 'Chỉ sửa được bài Chờ duyệt, Bị từ chối hoặc Đang tìm.',
+  },
+}
+
+// Form Đăng bài nhiều bước, bản nháp lưu trên server (không kèm ảnh).
+// mode="edit" là form Sửa bài postId, không có bản nháp
+export default function ComposePostPage({ mode = 'create', postId = null }) {
   const { user } = useAuth()
   const { notify } = useOutletContext()
   const navigate = useNavigate()
+  const editing = mode === 'edit'
 
   // Tải bản nháp xong mới hiện form để không ghi đè chữ đang gõ
   const [draft, setDraft] = useState(null)
-  const [draftLoading, setDraftLoading] = useState(true)
+  const [draftLoading, setDraftLoading] = useState(!editing)
+  // Sửa bài: bài từ API, lỗi khi tải, số lần thử lại
+  const [editState, setEditState] = useState({ post: null, error: null, retry: 0 })
+  // Bài đã đổ vào form (chỉ đổ một lần)
+  const [filledFrom, setFilledFrom] = useState(null)
   const [savingDraft, setSavingDraft] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
   const [step, setStep] = useState(0)
@@ -92,8 +120,28 @@ export default function ComposePostPage() {
     fetchCategories()
   }, [fetchCategories])
 
+  // Sửa bài: tải dữ liệu hiện tại của bài
+  useEffect(() => {
+    if (!editing) return undefined
+    let active = true
+    getPostForEdit(postId)
+      .then(({ data }) => active && setEditState((prev) => ({ ...prev, post: data, error: null })))
+      .catch((error) => active && setEditState((prev) => ({ ...prev, post: null, error })))
+    return () => {
+      active = false
+    }
+  }, [editing, postId, editState.retry])
+
+  // Có đủ bài và danh mục thì đổ vào form
+  const editPost = editState.post
+  if (editPost && categories.status === 'ready' && filledFrom !== editPost) {
+    setFilledFrom(editPost)
+    setForm(formFromPost(editPost, categories.items))
+  }
+
   // Nạp bản nháp trên server; chưa có mà trình duyệt còn bản nháp cũ thì nạp bản đó
   useEffect(() => {
+    if (editing) return undefined
     let active = true
     const apply = (restored) => {
       const categoryItems = categoriesRef.current
@@ -119,7 +167,7 @@ export default function ComposePostPage() {
     return () => {
       active = false
     }
-  }, [user.id, notify])
+  }, [user.id, notify, editing])
 
   const retryCategories = () => {
     setCategories({ status: 'loading', items: [] })
@@ -128,12 +176,18 @@ export default function ComposePostPage() {
 
   const category = categories.items.find((item) => item.slug === form.category)
 
-  // Thu hồi URL xem trước của ảnh khi rời trang
+  // Thu hồi URL xem trước của ảnh mới khi rời trang
   const imagesRef = useRef(form.images)
   useEffect(() => {
     imagesRef.current = form.images
   }, [form.images])
-  useEffect(() => () => imagesRef.current.forEach((image) => URL.revokeObjectURL(image.url)), [])
+  useEffect(
+    () => () =>
+      imagesRef.current
+        .filter((image) => image.file)
+        .forEach((image) => URL.revokeObjectURL(image.url)),
+    []
+  )
 
   // Sau mỗi lần báo lỗi, cuộn tới chỗ thiếu đầu tiên (lỗi nằm ngay dưới trường của nó)
   useEffect(() => {
@@ -160,13 +214,45 @@ export default function ComposePostPage() {
         <Card className="pb-8">
           <EmptyState
             icon="lock"
-            title="Tài khoản tạm thời không được đăng bài"
+            title={
+              editing
+                ? 'Tài khoản tạm thời không được sửa bài'
+                : 'Tài khoản tạm thời không được đăng bài'
+            }
             description="Tài khoản của bạn đang bị hạn chế, vui lòng chờ LostLink xử lý."
           />
           <div className="flex justify-center">
             <Link to="/" className={buttonClass({ size: 'xl' })}>
               Về trang chủ
             </Link>
+          </div>
+        </Card>
+      </div>
+    )
+  }
+
+  if (editing && editState.error) {
+    const known = EDIT_LOAD_ERRORS[editState.error.status]
+    return (
+      <div className={pageClass}>
+        <Card className="pb-8">
+          <EmptyState
+            icon={known?.icon ?? 'warning'}
+            title={known?.title ?? 'Không thể tải bài đăng, vui lòng thử lại.'}
+            description={known?.description}
+          />
+          <div className="flex justify-center gap-3">
+            {!known && (
+              <Button
+                size="xl"
+                onClick={() => setEditState((prev) => ({ ...prev, retry: prev.retry + 1 }))}
+              >
+                Thử lại
+              </Button>
+            )}
+            <Button size="xl" onClick={() => navigate(-1)}>
+              Quay lại
+            </Button>
           </div>
         </Card>
       </div>
@@ -216,9 +302,11 @@ export default function ComposePostPage() {
 
   const removeImage = (id) => {
     const image = form.images.find((item) => item.id === id)
-    if (image) URL.revokeObjectURL(image.url)
+    if (image?.file) URL.revokeObjectURL(image.url)
     setForm((prev) => ({ ...prev, images: prev.images.filter((item) => item.id !== id) }))
   }
+
+  const makeCover = (id) => setForm((prev) => ({ ...prev, images: moveToCover(prev.images, id) }))
 
   const goTo = (index) => {
     if (steps[index]?.key === 'content') {
@@ -258,7 +346,9 @@ export default function ComposePostPage() {
     else goTo(current + 1)
   }
 
-  const back = () => (current === 0 ? navigate('/') : goTo(current - 1))
+  // Huỷ sửa bài thì về trang chi tiết bài
+  const cancel = () => navigate(editing && editPost ? postPath(editPost) : '/')
+  const back = () => (current === 0 ? cancel() : goTo(current - 1))
 
   // Bỏ qua câu hỏi thì sang xem lại luôn
   const skipQuestion = () => {
@@ -308,10 +398,17 @@ export default function ComposePostPage() {
     setConfirmDiscard(false)
   }
 
-  // Đăng bài rồi về Trang chủ; server báo lỗi field nào thì quay về đúng bước đó
+  // Đăng xong về Trang chủ, sửa xong về chi tiết bài. Lỗi field nào thì quay về bước đó
   const submit = async () => {
     setSubmitting(true)
     try {
+      if (editing) {
+        const { data } = await updatePost(postId, buildPostForm(form, { edit: true }))
+        setReviewing(false)
+        notify('Đã lưu thay đổi, bài đang chờ LostLink duyệt lại.')
+        navigate(postPath(data))
+        return
+      }
       // Server tự xoá bản nháp khi đăng thành công
       await createPost(buildPostForm(form))
       clearLocalDraft(user.id)
@@ -328,7 +425,12 @@ export default function ComposePostPage() {
           showErrors(mapped.errors)
         }
       }
-      notify(error.message || 'Không đăng được bài, vui lòng thử lại.')
+      notify(
+        error.message ||
+          (editing
+            ? 'Đã có lỗi xảy ra, vui lòng thử lại.'
+            : 'Không đăng được bài, vui lòng thử lại.')
+      )
     } finally {
       setSubmitting(false)
     }
@@ -341,14 +443,25 @@ export default function ComposePostPage() {
 
   return (
     <div className={pageClass}>
-      <h1 className="m-0 text-heading font-bold tracking-tight text-ink">Đăng bài mới</h1>
+      <h1 className="m-0 text-heading font-bold tracking-tight text-ink">
+        {editing ? 'Sửa bài đăng' : 'Đăng bài mới'}
+      </h1>
       <p className="m-0 mt-1 mb-4 text-small text-ink-muted">
-        Bài mới sẽ được LostLink duyệt trước khi hiển thị công khai. Mục có dấu{' '}
+        {editing
+          ? 'Bài sẽ được LostLink duyệt lại sau khi sửa và tạm ẩn cho tới khi được duyệt.'
+          : 'Bài mới sẽ được LostLink duyệt trước khi hiển thị công khai.'}{' '}
+        Mục có dấu{' '}
         <span aria-hidden="true" className="text-danger">
           *
         </span>
         <span className="sr-only">sao</span> là bắt buộc.
       </p>
+
+      {editPost?.rejectReason && (
+        <Note icon="warning" tone="warning" className="mb-4">
+          Bài bị từ chối: {editPost.rejectReason}. Sửa lại rồi lưu để gửi LostLink duyệt lại.
+        </Note>
+      )}
 
       {draft && (
         <div
@@ -374,11 +487,16 @@ export default function ComposePostPage() {
         </div>
       )}
 
-      {draftLoading ? (
+      {draftLoading || (editing && !filledFrom) ? (
         <Card className="p-4 sm:p-6">
           <p role="status" className="m-0 py-10 text-center text-small text-ink-muted">
-            Đang tải bản nháp…
+            {editing ? 'Đang tải bài đăng…' : 'Đang tải bản nháp…'}
           </p>
+          {editing && categories.status === 'error' && (
+            <div className="flex justify-center pb-6">
+              <Button onClick={retryCategories}>Tải lại danh mục</Button>
+            </div>
+          )}
         </Card>
       ) : (
         <>
@@ -400,6 +518,7 @@ export default function ComposePostPage() {
                   category={category}
                   errors={errors}
                   onChange={update}
+                  lockType={editing}
                 />
               )}
               {stepKey === 'classify' && categories.status === 'loading' && (
@@ -422,6 +541,7 @@ export default function ComposePostPage() {
                   onChange={update}
                   onAddImages={addImages}
                   onRemoveImage={removeImage}
+                  onMakeCover={makeCover}
                 />
               )}
               {stepKey === 'time' && <TimeStep form={form} errors={errors} onChange={update} />}
@@ -450,17 +570,19 @@ export default function ComposePostPage() {
                 {current === 0 ? 'Huỷ' : 'Quay lại'}
               </Button>
               <div className="flex gap-3">
-                <Button
-                  size="lg"
-                  onClick={handleSaveDraft}
-                  disabled={savingDraft}
-                  aria-busy={savingDraft || undefined}
-                  className="flex-1 sm:flex-none"
-                >
-                  {savingDraft ? 'Đang lưu…' : 'Lưu nháp'}
-                </Button>
+                {!editing && (
+                  <Button
+                    size="lg"
+                    onClick={handleSaveDraft}
+                    disabled={savingDraft}
+                    aria-busy={savingDraft || undefined}
+                    className="flex-1 sm:flex-none"
+                  >
+                    {savingDraft ? 'Đang lưu…' : 'Lưu nháp'}
+                  </Button>
+                )}
                 <Button type="submit" variant="primary" size="lg" className="flex-1 sm:flex-none">
-                  {isLast ? 'Xem lại & đăng bài' : 'Tiếp tục'}
+                  {isLast ? (editing ? 'Xem lại & lưu' : 'Xem lại & đăng bài') : 'Tiếp tục'}
                   <Icon name="next" size={16} />
                 </Button>
               </div>
@@ -471,6 +593,7 @@ export default function ComposePostPage() {
 
       {reviewing && (
         <ReviewDialog
+          mode={mode}
           form={form}
           category={category}
           submitting={submitting}

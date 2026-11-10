@@ -9,12 +9,15 @@ import BackLink from '../../components/user/BackLink'
 import { buttonClass } from '../../components/user/buttonClass'
 import Card from '../../components/user/Card'
 import EmptyState from '../../components/user/EmptyState'
+import Note from '../../components/user/Note'
 import { cx, focusRing } from '../../components/user/classes'
 import LikeButton from '../../components/user/home/LikeButton'
 import TypeTag from '../../components/user/home/TypeTag'
 import CommentSection from '../../components/user/post/CommentSection'
 import PostActionSheet from '../../components/user/post/PostActionSheet'
 import PostGallery from '../../components/user/post/PostGallery'
+import { ClosePostDialog, DeletePostDialog } from '../../components/user/post/PostManageDialogs'
+import PostStatusTag from '../../components/user/post/PostStatusTag'
 import { formatCount, placeLabel, placeLines, timeAgo, toDetailPost } from '../../lib/user/homeFeed'
 import { isMatchable, suggestionsFor } from '../../lib/user/matches'
 import { profilePath } from '../../lib/user/profiles'
@@ -27,6 +30,28 @@ const mapUrl = (place) =>
 
 const pageClass = 'mx-auto max-w-360 px-4 pt-5 pb-10 sm:px-6 lg:px-10 lg:pt-7'
 const LOAD_ERROR = 'Không thể tải bài đăng, vui lòng thử lại.'
+
+// Lưu ý trạng thái bài cho chủ bài
+function ownerNotice(post) {
+  const { manage } = post.viewer
+  if (manage.isHidden) return ['lock', 'warning', 'Bài đã bị LostLink ẩn khỏi danh sách công khai.']
+  switch (post.status) {
+    case 'pending':
+      return ['history', 'info', 'Bài đang chờ LostLink duyệt, chưa hiển thị công khai.']
+    case 'rejected':
+      return [
+        'warning',
+        'warning',
+        `Bài bị từ chối${manage.rejectReason ? `: ${manage.rejectReason}` : ''}. Sửa bài để gửi duyệt lại.`,
+      ]
+    case 'closed':
+      return ['lock', 'info', 'Bạn đã đóng bài, bài không còn hiện trên danh sách công khai.']
+    case 'returned':
+      return ['check', 'success', 'Bài đã được đánh dấu Đã trao trả và tự ẩn sau 7 ngày.']
+    default:
+      return null
+  }
+}
 
 // Tải chi tiết bài theo loại tin và slug. Mỗi lần gọi API server tính một lượt xem, nên giữ
 // lời gọi trong ref: StrictMode chạy effect hai lần vẫn chỉ gọi một lần cho mỗi lần mở bài.
@@ -89,17 +114,19 @@ export default function PostDetailPage({ type }) {
     )
   }
 
-  return <PostDetail key={post.id} post={post} />
+  return <PostDetail key={post.id} post={post} onChanged={reload} />
 }
 
-function PostDetail({ post }) {
+function PostDetail({ post, onChanged }) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const ctx = useOutletContext()
-  const { now, requireMember } = ctx
+  const { now, requireMember, notify } = ctx
 
   const [sheetOpen, setSheetOpen] = useState(false)
   const closeSheet = useCallback(() => setSheetOpen(false), [])
+  // Hộp thoại của chủ bài: null | 'close' | 'delete'
+  const [dialog, setDialog] = useState(null)
 
   // Thích, Lưu, Theo dõi chưa có API: bấm thì đảo trạng thái server trả về (giữ ở phía client)
   const flipped = (set) => set.has(post.id)
@@ -124,7 +151,8 @@ function PostDetail({ post }) {
     if (requireMember()) navigate(profilePath(post.author))
   }
   const report = () => {
-    if (requireMember()) navigate(`/posts/${post.id}/report`)
+    // Gửi kèm bài vì trang Báo cáo chưa tự tải được bài
+    if (requireMember()) navigate(`/posts/${post.id}/report`, { state: { post } })
   }
   const claim = () => ctx.contactAbout(post)
 
@@ -132,6 +160,40 @@ function PostDetail({ post }) {
   const showMatches = isMine && isMatchable(post)
   const matchCount = showMatches ? suggestionsFor(post, ctx.posts, ctx.matches).length : 0
   const matchesPath = `/matches?post=${post.id}`
+
+  // Sửa, Đóng bài, Xóa của chủ bài, theo quyền server trả về
+  const manage = post.viewer.manage
+  const notice = isMine ? ownerNotice(post) : null
+  const editPost = () => navigate(`/posts/${post.id}/edit`)
+  const ownerActions = isMine
+    ? [
+        manage.canEdit && { label: 'Sửa bài', icon: 'edit', onClick: editPost },
+        manage.canClose && { label: 'Đóng bài', icon: 'lock', onClick: () => setDialog('close') },
+        {
+          label: 'Xóa bài',
+          icon: 'trash',
+          tone: 'danger',
+          onClick: () => setDialog('delete'),
+        },
+      ].filter(Boolean)
+    : []
+
+  const statusChanged = () => {
+    setDialog(null)
+    notify('Cập nhật trạng thái bài thành công.')
+    onChanged()
+  }
+  // Trạng thái đã đổi ở nơi khác (409) thì tải lại bài
+  const changeFailed = (error, message) => {
+    setDialog(null)
+    notify(message)
+    if (error.status === 409) onChanged()
+  }
+  const deleted = () => {
+    setDialog(null)
+    notify('Đã xóa bài đăng.')
+    navigate(profilePath(user.username))
+  }
 
   // Trên mobile các hành động gom vào nút ⋯ thay cho hai khối ở cột phải
   const sheetActions = isMine
@@ -142,6 +204,7 @@ function PostDetail({ post }) {
           tone: 'primary',
           onClick: () => navigate(matchesPath),
         },
+        ...ownerActions,
       ].filter(Boolean)
     : [
         { label: claimLabel, icon: 'check', tone: 'primary', onClick: claim },
@@ -184,8 +247,14 @@ function PostDetail({ post }) {
                 <Icon name="more" size={20} />
               </button>
             )}
+            {notice && (
+              <Note icon={notice[0]} tone={notice[1]} className="mb-4">
+                {notice[2]}
+              </Note>
+            )}
             <div className="mb-3 flex flex-wrap items-center gap-2 pr-10 lg:pr-0">
               <TypeTag type={post.type} className="py-1" />
+              <PostStatusTag status={post.status} className="py-1" />
               <span className="rounded-full bg-line-subtle px-2.5 py-1 text-tiny text-ink-secondary">
                 {post.category}
               </span>
@@ -328,7 +397,33 @@ function PostDetail({ post }) {
             </Card>
           )}
 
-          {/* 7.b Bài của chính mình thì không có khối nhận đồ và báo cáo */}
+          {isMine && (
+            <Card as="section" padding="md" aria-labelledby="manage-heading">
+              <h2 id="manage-heading" className="m-0 mb-1.5 text-body font-bold text-ink">
+                Quản lý bài đăng
+              </h2>
+              <p className="m-0 mb-4 text-caption leading-relaxed text-ink-muted">
+                {manage.canEdit
+                  ? 'Sửa bài thì bài được LostLink duyệt lại trước khi hiện công khai.'
+                  : 'Bài đã có người liên hệ hoặc đã kết thúc nên không sửa được nội dung.'}
+              </p>
+              <div className="flex flex-col gap-2">
+                {ownerActions.map((action) => (
+                  <Button
+                    key={action.label}
+                    block
+                    variant={action.tone === 'danger' ? 'dangerSoft' : 'secondary'}
+                    onClick={action.onClick}
+                  >
+                    <Icon name={action.icon} size={14} />
+                    {action.label}
+                  </Button>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {/* Bài của chính mình thì không có khối nhận đồ và báo cáo */}
           {!isMine && (
             <Card as="section" padding="md">
               <h2 className="m-0 mb-1.5 text-body font-bold text-ink">
@@ -391,6 +486,24 @@ function PostDetail({ post }) {
       </main>
 
       <PostActionSheet open={sheetOpen} onClose={closeSheet} actions={sheetActions} />
+
+      {dialog === 'close' && (
+        <ClosePostDialog
+          post={post}
+          onClose={() => setDialog(null)}
+          onDone={statusChanged}
+          onFailed={changeFailed}
+        />
+      )}
+      {dialog === 'delete' && (
+        <DeletePostDialog
+          post={post}
+          activeTalks={manage.activeTalks}
+          onClose={() => setDialog(null)}
+          onDone={deleted}
+          onFailed={changeFailed}
+        />
+      )}
     </div>
   )
 }

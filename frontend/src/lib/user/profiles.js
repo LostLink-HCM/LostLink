@@ -1,4 +1,4 @@
-import { BADGE_TONES, PROFILES, PUBLIC_REVIEWS } from '../../data/userProfiles'
+import { BADGE_TONES, PROFILES } from '../../data/userProfiles'
 import { quarterLeaders, reputationOf } from './reputation'
 
 export const PROFILE_TABS = [
@@ -32,32 +32,35 @@ export function findProfile(username, { posts, me }) {
   }
 }
 
-// "Người khác nói gì": chỉ lời cảm ơn người viết cho phép hiện công khai,
-// gồm cả lời bạn đã gửi ở trang Đánh giá cho người này
-export function reviewsAbout(username, { threads, myReviews, me }) {
-  const seeded = PUBLIC_REVIEWS.filter((review) => review.about === username && review.isPublic)
-  const mine = threads
-    .filter((thread) => thread.peer.name === username && myReviews[thread.id]?.isPublic)
-    .map((thread) => ({ id: `mine-${thread.id}`, author: me.username, ...myReviews[thread.id] }))
-  return [...mine, ...seeded].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-}
-
-export function averageRating(reviews) {
-  if (!reviews.length) return null
-  return reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
-}
-
 export const formatRating = (value) =>
   value.toLocaleString('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-
-// Bài đăng của người này theo loại tin, mới nhất trước
-export const postsBy = (posts, username, type = '') =>
-  posts
-    .filter((post) => post.author === username && (!type || post.type === type))
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
 
 export function joinedLabel(iso) {
   if (!iso) return ''
   const date = new Date(iso)
   return `Tham gia từ ${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`
 }
+
+// Hồ sơ từ API → dữ liệu ProfileHeader, ReputationCard
+export const toProfileView = (profile, isMe) => ({
+  username: profile.username,
+  initials: profile.username.slice(0, 2).toUpperCase(),
+  bio: profile.bio,
+  joinedAt: profile.createdAt,
+  badges: profile.badges,
+  reputation: profile.reputationScore,
+  returned: profile.returnCount,
+  rank: null,
+  isMe,
+})
+
+// Lời cảm ơn từ API → dữ liệu ReviewList
+export const toReviewItems = (reviews) =>
+  reviews.map((review) => ({
+    id: review.id,
+    author: review.author?.username ?? 'Người dùng LostLink',
+    rating: review.rating,
+    praises: review.praises,
+    comment: review.comment,
+    createdAt: review.createdAt,
+  }))

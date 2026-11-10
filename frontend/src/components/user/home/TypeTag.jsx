@@ -1,5 +1,5 @@
 import { TYPE_LABELS } from '../../../lib/user/homeFeed'
-import { cx } from '../classes'
+import { cx, tagClass } from '../classes'
 
 const tones = {
   lost: 'bg-danger-soft text-danger-ink',
@@ -8,15 +8,5 @@ const tones = {
 
 // Nhãn Mất đồ / Nhặt được dùng chung cho thẻ bài đăng và trang chi tiết
 export default function TypeTag({ type, className }) {
-  return (
-    <span
-      className={cx(
-        'inline-flex items-center rounded-full px-2.5 py-0.5 text-micro font-bold tracking-wide uppercase',
-        tones[type],
-        className
-      )}
-    >
-      {TYPE_LABELS[type]}
-    </span>
-  )
+  return <span className={cx(tagClass, tones[type], className)}>{TYPE_LABELS[type]}</span>
 }
