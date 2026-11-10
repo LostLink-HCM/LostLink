@@ -4,6 +4,9 @@ const {
   CategoryAttribute,
   Comment,
   Post,
+  PostFollow,
+  PostLike,
+  SavedPost,
   User,
   VerificationChallenge,
 } = require('../models')
@@ -169,6 +172,11 @@ const seedPosts = async () => {
     title: { $in: POSTS.map((p) => p.title) },
   }).distinct('_id')
   await Comment.deleteMany({ post: { $in: oldPostIds } })
+  await Promise.all(
+    [PostLike, SavedPost, PostFollow].map((Model) =>
+      Model.deleteMany({ post: { $in: oldPostIds } })
+    )
+  )
   await VerificationChallenge.deleteMany({ post: { $in: oldPostIds } })
   await Post.deleteMany({ _id: { $in: oldPostIds } })
 
