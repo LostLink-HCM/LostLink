@@ -15,7 +15,14 @@ function Counter({ value, max }) {
 }
 
 // Tiêu đề, mô tả và ảnh
-export default function ContentStep({ form, errors, onChange, onAddImages, onRemoveImage }) {
+export default function ContentStep({
+  form,
+  errors,
+  onChange,
+  onAddImages,
+  onRemoveImage,
+  onMakeCover,
+}) {
   const id = useId()
   const found = form.type === 'found'
   const focusFirstLine = (e) => {
@@ -79,6 +86,7 @@ export default function ContentStep({ form, errors, onChange, onAddImages, onRem
         images={form.images}
         onAdd={onAddImages}
         onRemove={onRemoveImage}
+        onMakeCover={onMakeCover}
         hint="Thêm hình ảnh giúp mọi người nhận ra món đồ nhanh hơn."
         showOptional={false}
       />

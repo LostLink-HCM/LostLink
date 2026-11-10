@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useOutletContext, useParams } from 'react-router-dom'
+import { Link, useLocation, useOutletContext, useParams } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import Avatar from '../../components/user/Avatar'
 import BackLink from '../../components/user/BackLink'
@@ -11,6 +11,7 @@ import ImagePicker from '../../components/user/ImagePicker'
 import Note from '../../components/user/Note'
 import { cx, textareaClass } from '../../components/user/classes'
 import AttachedPost from '../../components/user/messages/AttachedPost'
+import { postPath } from '../../lib/user/homeFeed'
 import { peerOf, postSnapshot } from '../../lib/user/messages'
 import { findProfile, profilePath } from '../../lib/user/profiles'
 import {
@@ -28,13 +29,21 @@ const sectionTitle = 'm-0 mb-2.5 p-0 text-body font-bold text-ink'
 
 let nextScreenshotId = 0
 
+// Bài, người dùng thật do trang trước gửi kèm (UserLayout chỉ có dữ liệu mẫu), phải khớp URL
+const sentPost = (state, id) => (state?.post && String(state.post.id) === id ? state.post : null)
+const sentUser = (state, username) =>
+  state?.reportUser?.username === username
+    ? { username, initials: username.slice(0, 2).toUpperCase() }
+    : null
+
 // Đối tượng bị báo cáo: bài đăng (từ trang chi tiết) hoặc người dùng (từ hội thoại, trang cá nhân)
 function useReportTarget() {
   const { id, threadId, username } = useParams()
+  const { state } = useLocation()
   const { posts, chat } = useOutletContext()
 
   if (username) {
-    const profile = findProfile(username, { posts })
+    const profile = findProfile(username, { posts }) ?? sentUser(state, username)
     if (!profile) return null
     return {
       type: 'user',
@@ -60,7 +69,7 @@ function useReportTarget() {
     }
   }
 
-  const post = posts.find((item) => String(item.id) === id)
+  const post = posts.find((item) => String(item.id) === id) ?? sentPost(state, id)
   if (!post) return null
   return {
     type: 'post',
@@ -68,7 +77,7 @@ function useReportTarget() {
     peer: peerOf(post),
     post: postSnapshot(post),
     linkable: true,
-    back: { to: `/posts/${post.id}`, label: 'Quay lại bài đăng' },
+    back: { to: postPath(post), label: 'Quay lại bài đăng' },
   }
 }
 

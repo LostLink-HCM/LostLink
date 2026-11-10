@@ -2,7 +2,6 @@ const cloudinary = require('../config/cloudinary')
 const ApiError = require('../utils/ApiError')
 
 const POST_FOLDER = 'lostlink/posts'
-// Cloudinary tự kiểm tra nội dung file, file giả đuôi ảnh sẽ bị từ chối
 const ALLOWED_FORMATS = ['jpg', 'jpeg', 'png', 'webp']
 
 const uploadOne = (file) =>
@@ -45,4 +44,10 @@ const uploadPostImages = async (files) => {
   throw error
 }
 
-module.exports = { uploadPostImages, deleteImages }
+// Ảnh ngoài thư mục bài đăng (vd ảnh mẫu trên Wikimedia) trả null để không xoá nhầm
+const POST_IMAGE_URL = new RegExp(
+  `^https://res\\.cloudinary\\.com/[^/]+/image/upload/(?:v\\d+/)?(${POST_FOLDER}/[^/.]+)\\.[a-z]+$`
+)
+const publicIdFromUrl = (url) => POST_IMAGE_URL.exec(url)?.[1] ?? null
+
+module.exports = { uploadPostImages, deleteImages, publicIdFromUrl }

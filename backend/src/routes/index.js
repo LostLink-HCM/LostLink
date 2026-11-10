@@ -7,6 +7,7 @@ const postRoutes = require('./postRoutes')
 const moderationRoutes = require('./moderationRoutes')
 const geoRoutes = require('./geoRoutes')
 const categoryRoutes = require('./categoryRoutes')
+const userRoutes = require('./userRoutes')
 
 const router = Router()
 
@@ -28,5 +29,6 @@ router.use('/posts', postRoutes)
 router.use('/moderator', moderationRoutes)
 router.use('/geo', geoRoutes)
 router.use('/categories', categoryRoutes)
+router.use('/users', userRoutes)
 
 module.exports = router

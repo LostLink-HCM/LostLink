@@ -9,6 +9,7 @@ import VerifyPage from './pages/user/VerifyPage.jsx'
 import ReviewPage from './pages/user/ReviewPage.jsx'
 import ReportPage from './pages/user/ReportPage.jsx'
 import ComposePostPage from './pages/user/ComposePostPage.jsx'
+import EditPostPage from './pages/user/EditPostPage.jsx'
 import MessagesPage from './pages/user/MessagesPage.jsx'
 import NotificationsPage from './pages/user/NotificationsPage.jsx'
 import ProfilePage from './pages/user/ProfilePage.jsx'
@@ -60,7 +61,16 @@ function App() {
             path="posts/new"
             element={
               <RequireAuth>
-                <ComposePostPage />
+                <ComposePostPage key="new" />
+              </RequireAuth>
+            }
+          />
+          {/* Sửa bài của chính mình, dùng lại form Đăng bài */}
+          <Route
+            path="posts/:id/edit"
+            element={
+              <RequireAuth>
+                <EditPostPage />
               </RequireAuth>
             }
           />

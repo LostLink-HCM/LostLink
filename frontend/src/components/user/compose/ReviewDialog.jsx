@@ -25,8 +25,22 @@ function Section({ title, onEdit, children }) {
   )
 }
 
-// Xem lại trước khi đăng, bấm Sửa để quay về bước đó. Đang gửi thì khoá các nút
-export default function ReviewDialog({ form, category, submitting, onEdit, onClose, onSubmit }) {
+const LABELS = {
+  create: { submit: 'Đăng bài', busy: 'Đang đăng bài…', busyImages: 'Đang tải ảnh và đăng bài…' },
+  edit: { submit: 'Lưu thay đổi', busy: 'Đang lưu…', busyImages: 'Đang tải ảnh và lưu…' },
+}
+
+// Xem lại trước khi đăng hoặc lưu, bấm Sửa để quay về bước đó. Đang gửi thì khoá các nút
+export default function ReviewDialog({
+  form,
+  category,
+  submitting,
+  onEdit,
+  onClose,
+  onSubmit,
+  mode = 'create',
+}) {
+  const labels = LABELS[mode]
   const steps = getSteps(form.type)
   const stepIndex = (key) => steps.findIndex((step) => step.key === key)
   const attributes = selectedAttributes(form, category)
@@ -52,10 +66,10 @@ export default function ReviewDialog({ form, category, submitting, onEdit, onClo
             data-autofocus
           >
             {submitting
-              ? form.images.length
-                ? 'Đang tải ảnh và đăng bài…'
-                : 'Đang đăng bài…'
-              : 'Đăng bài'}
+              ? form.images.some((image) => image.file)
+                ? labels.busyImages
+                : labels.busy
+              : labels.submit}
           </Button>
         </>
       }

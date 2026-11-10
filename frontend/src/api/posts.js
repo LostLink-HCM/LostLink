@@ -22,3 +22,16 @@ export const getDraft = () => api.get('/posts/draft')
 export const saveDraft = (draft) => api.put('/posts/draft', draft)
 
 export const deleteDraft = () => api.delete('/posts/draft')
+
+// ----- Quản lý bài của chính mình
+
+// Dữ liệu nạp form Sửa bài (chỉ chủ bài)
+export const getPostForEdit = (id) => api.get(`/posts/${id}/edit`)
+
+// form: FormData như đăng bài, data có thêm images (thứ tự ảnh cũ và mới)
+export const updatePost = (id, form) => api.patch(`/posts/${id}`, form)
+
+export const deletePost = (id) => api.delete(`/posts/${id}`)
+
+// status: closed (Đóng bài) hoặc returned (Đã trao trả)
+export const changePostStatus = (id, status) => api.patch(`/posts/${id}/status`, { status })

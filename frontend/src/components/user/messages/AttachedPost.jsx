@@ -3,7 +3,19 @@ import Icon from '../../common/Icon'
 import TypeTag from '../home/TypeTag'
 import { cx, focusRing } from '../classes'
 
+// Bài đính kèm của hội thoại; bài đã bị xoá (post null) thì báo không còn tồn tại
 export default function AttachedPost({ post, linkable }) {
+  if (!post) {
+    return (
+      <div className="flex items-center gap-3 rounded-xl border border-dashed border-line bg-surface-muted p-2.5 text-small text-ink-muted">
+        <span className="grid size-14 shrink-0 place-items-center rounded-lg bg-line-subtle">
+          <Icon name="trash" size={18} />
+        </span>
+        Bài đăng không tồn tại hoặc đã bị người đăng xoá.
+      </div>
+    )
+  }
+
   const body = (
     <>
       <img

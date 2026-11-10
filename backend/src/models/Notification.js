@@ -16,6 +16,9 @@ const NOTIFICATION_TYPES = [
   'comment',
   'post_approved',
   'post_rejected',
+  // Đóng bài (gửi người theo dõi), xoá bài (gửi người đang trao đổi)
+  'post_closed',
+  'post_deleted',
   'area_post',
   'report_result',
   'warning',

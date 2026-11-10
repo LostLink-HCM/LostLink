@@ -262,7 +262,7 @@ export default function MessagesPage() {
     )
   }
 
-  const linkable = (post) => post.id != null && posts.some((item) => item.id === post.id)
+  const linkable = (post) => post?.id != null && posts.some((item) => item.id === post.id)
 
   const tradePanel = active && (
     <TradePanel

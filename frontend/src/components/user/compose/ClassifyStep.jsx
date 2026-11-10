@@ -25,8 +25,15 @@ const TYPE_OPTIONS = [
   },
 ]
 
-// Loại tin, danh mục và thuộc tính; category là danh mục đang chọn
-export default function ClassifyStep({ form, categories, category, errors, onChange }) {
+// Loại tin, danh mục và thuộc tính. lockType: sửa bài thì không đổi được loại tin
+export default function ClassifyStep({
+  form,
+  categories,
+  category,
+  errors,
+  onChange,
+  lockType = false,
+}) {
   const attributes = category?.attributes ?? []
   const containerItems = category?.contentItems ?? []
 
@@ -62,12 +69,14 @@ export default function ClassifyStep({ form, categories, category, errors, onCha
               key={option.value}
               type="button"
               aria-pressed={active}
-              onClick={() => onChange({ type: option.value })}
+              disabled={lockType && !active}
+              onClick={() => !lockType && onChange({ type: option.value })}
               className={cx(
                 'flex min-h-18 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-center transition sm:flex-row sm:justify-start sm:gap-3 sm:px-4 sm:text-left',
                 active
                   ? option.active
                   : 'border-line bg-surface hover:border-line-strong hover:bg-surface-muted',
+                'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-surface',
                 focusRing
               )}
             >
@@ -90,6 +99,11 @@ export default function ClassifyStep({ form, categories, category, errors, onCha
         })}
       </div>
       <FieldError>{errors.type}</FieldError>
+      {lockType && (
+        <p className="m-0 mt-2 text-caption text-ink-muted">
+          Không đổi được loại tin của bài đã đăng. Nếu đăng nhầm loại, hãy xóa bài và đăng bài mới.
+        </p>
+      )}
 
       <div className="my-5 h-px bg-line-subtle" />
 

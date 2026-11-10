@@ -49,6 +49,8 @@ const userSchema = new Schema(
     // Số lần người này trả đồ cho người khác thành công. Lưu sẵn để hiện nhanh ở chi tiết bài,
     // hồ sơ, bảng vinh danh; giá trị đếm từ các bài đã trao trả thật (xem returnService)
     returnCount: { type: Number, default: 0, min: 0 },
+    // Lần trả đồ trên bài đã bị xoá, giữ riêng để returnCount không bị trừ khi chủ bài xoá bài
+    deletedPostReturns: { type: Number, default: 0, min: 0 },
 
     // Thiết lập thông báo, notificationTypes rỗng nghĩa là nhận tất cả các loại
     emailOptIn: { type: Boolean, default: true },

@@ -1,6 +1,16 @@
-const { AttributeValue, Category, CategoryAttribute, Comment, Post, User } = require('../models')
+const {
+  AttributeValue,
+  Category,
+  CategoryAttribute,
+  Comment,
+  Post,
+  User,
+  VerificationChallenge,
+} = require('../models')
+const { buildChallenge } = require('../services/postService')
 const { refreshReturnCount } = require('../services/returnService')
 const { formatPostCode, postCodePrefix } = require('../utils/postCode')
+const { DAY_PART_HOURS, startOfVnDay, todayVn, vnTimeRange } = require('../utils/vnTime')
 const POSTS = require('./data/posts')
 const POST_IMAGES = require('./data/postImages')
 
@@ -16,6 +26,22 @@ const blur = (lat, lng, index) => {
 }
 
 const point = (coordinates) => ({ type: 'Point', coordinates })
+
+// Khung giờ mất/nhặt như form Đăng bài: ngày + buổi, lùi daysBefore ngày so với ngày đăng.
+// Buổi chưa tới lúc đăng thì lấy của hôm trước; kết thúc không quá lúc đăng
+const timeWindowOf = (definition, createdAt) => {
+  const { dayPart, daysBefore = 0 } = definition
+  if (dayPart !== '' && !DAY_PART_HOURS[dayPart]) {
+    throw new Error(`"${definition.title}": dayPart không hợp lệ (${dayPart})`)
+  }
+  const posted = createdAt.getTime()
+  const date = todayVn(posted - daysBefore * 24 * HOUR)
+  let range = vnTimeRange(date, dayPart)
+  if (range.from.getTime() > posted) {
+    range = vnTimeRange(todayVn(startOfVnDay(date).getTime() - 1), dayPart)
+  }
+  return { timeFrom: range.from, timeTo: new Date(Math.min(range.to.getTime(), posted)) }
+}
 
 // Vị trí của bài mẫu: ghim (lat, lng; công khai lệch 150-250 m) hoặc đoạn đường (road: hai đầu
 // [lat, lng]; công khai nguyên đoạn, giống khi đăng bài thật)
@@ -143,6 +169,7 @@ const seedPosts = async () => {
     title: { $in: POSTS.map((p) => p.title) },
   }).distinct('_id')
   await Comment.deleteMany({ post: { $in: oldPostIds } })
+  await VerificationChallenge.deleteMany({ post: { $in: oldPostIds } })
   await Post.deleteMany({ _id: { $in: oldPostIds } })
 
   const codes = await assignCodes(now)
@@ -153,10 +180,7 @@ const seedPosts = async () => {
     if (!categoryIndex) throw new Error(`Không có danh mục ${definition.category}`)
 
     const createdAt = new Date(now - definition.postedHoursAgo * HOUR)
-    const timeFrom = new Date(createdAt.getTime() - definition.happenedHoursBefore * HOUR)
-    const timeTo = new Date(
-      Math.min(timeFrom.getTime() + definition.windowHours * HOUR, createdAt.getTime())
-    )
+    const { timeFrom, timeTo } = timeWindowOf(definition, createdAt)
     const statusHistory = buildHistory(definition, owner, moderator, createdAt, now)
     const comments = definition.comments ?? []
 
@@ -187,6 +211,14 @@ const seedPosts = async () => {
       })),
       statusHistory,
     })
+
+    // Đáp án đúng chỉ lưu dạng băm, như khi đăng bài
+    if (definition.question) {
+      if (definition.type !== 'found') {
+        throw new Error(`"${definition.title}": chỉ tin Nhặt được mới có câu hỏi xác minh`)
+      }
+      await buildChallenge(post._id, definition.question).save()
+    }
 
     // Mongoose tự đặt createdAt là lúc chạy seed, ghi đè bằng thời điểm đăng giả lập
     const updatedAt = statusHistory.at(-1).changedAt
@@ -220,4 +252,4 @@ const seedPosts = async () => {
   for (const id of authorIds) await refreshReturnCount(id)
 }
 
-module.exports = { seedPosts, findSeedAccounts }
+module.exports = { seedPosts, findSeedAccounts, timeWindowOf }

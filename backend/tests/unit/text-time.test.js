@@ -13,8 +13,10 @@ const {
   isVnDate,
   startOfVnDay,
   todayVn,
+  vnDayPartOf,
   vnTimeRange,
 } = require('../../src/utils/vnTime')
+const { publicIdFromUrl } = require('../../src/services/imageService')
 const { formatPostCode, postCodePrefix } = require('../../src/utils/postCode')
 
 describe('UC02 - Chuẩn hóa từ khóa tiếng Việt', () => {
@@ -109,5 +111,47 @@ describe('UC U05 - Khoảng thời gian mất/nhặt theo giờ Việt Nam', () 
   test('hôm nay theo giờ Việt Nam: 23 giờ UTC đã là ngày hôm sau', () => {
     assert.equal(todayVn(Date.parse('2026-11-05T16:59:59Z')), '2026-11-05')
     assert.equal(todayVn(Date.parse('2026-11-05T17:00:00Z')), '2026-11-06')
+  })
+})
+
+describe('UC25 - Nạp lại ngày và buổi khi sửa bài', () => {
+  test('timeFrom đã lưu đổi ngược về đúng ngày và buổi đã chọn khi đăng', () => {
+    for (const dayPart of ['', 'morning', 'noon', 'afternoon', 'evening', 'night']) {
+      const { from } = vnTimeRange('2026-11-05', dayPart)
+      assert.deepEqual(vnDayPartOf(from), { date: '2026-11-05', dayPart })
+    }
+  })
+
+  test('bài cũ có giờ lệch khung thì lấy buổi chứa giờ đó, rạng sáng là Ban đêm hôm trước', () => {
+    assert.deepEqual(vnDayPartOf(new Date('2026-11-05T19:30:00+07:00')), {
+      date: '2026-11-05',
+      dayPart: 'evening',
+    })
+    assert.deepEqual(vnDayPartOf(new Date('2026-11-05T03:15:00+07:00')), {
+      date: '2026-11-04',
+      dayPart: 'night',
+    })
+  })
+})
+
+describe('UC26 - Xoá ảnh của bài trên Cloudinary', () => {
+  test('chỉ nhận ảnh trong thư mục bài đăng của LostLink', () => {
+    assert.equal(
+      publicIdFromUrl(
+        'https://res.cloudinary.com/demo/image/upload/v1712/lostlink/posts/abc123.jpg'
+      ),
+      'lostlink/posts/abc123'
+    )
+    assert.equal(
+      publicIdFromUrl('https://res.cloudinary.com/demo/image/upload/lostlink/posts/abc.webp'),
+      'lostlink/posts/abc'
+    )
+    for (const url of [
+      'https://upload.wikimedia.org/wikipedia/commons/a/ab/Wallet.jpg',
+      'https://res.cloudinary.com/demo/image/upload/v1/lostlink/avatars/a.jpg',
+      'https://evil.example/res.cloudinary.com/demo/image/upload/lostlink/posts/a.jpg',
+    ]) {
+      assert.equal(publicIdFromUrl(url), null, url)
+    }
   })
 })

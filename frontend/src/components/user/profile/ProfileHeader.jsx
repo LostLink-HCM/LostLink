@@ -37,17 +37,23 @@ export default function ProfileHeader({ profile, actions, children }) {
 
           {profile.badges.length > 0 && (
             <ul aria-label="Huy hiệu" className="m-0 mb-2.5 flex list-none flex-wrap gap-1.5 p-0">
-              {profile.badges.map((badge) => (
-                <li
-                  key={badge}
-                  className={cx(
-                    'rounded-full px-2.5 py-1 text-tiny font-semibold',
-                    badgeTones[badgeTone(badge)]
-                  )}
-                >
-                  {badge}
-                </li>
-              ))}
+              {/* Huy hiệu từ API có sẵn tone, dữ liệu mẫu chỉ có tên */}
+              {profile.badges.map((badge) => {
+                const name = typeof badge === 'string' ? badge : badge.name
+                const tone = typeof badge === 'string' ? badgeTone(badge) : badge.tone
+                return (
+                  <li
+                    key={name}
+                    title={badge.description || undefined}
+                    className={cx(
+                      'rounded-full px-2.5 py-1 text-tiny font-semibold',
+                      badgeTones[tone] ?? badgeTones.neutral
+                    )}
+                  >
+                    {name}
+                  </li>
+                )
+              })}
             </ul>
           )}
 

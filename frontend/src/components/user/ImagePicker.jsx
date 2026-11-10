@@ -13,6 +13,8 @@ export default function ImagePicker({
   images,
   onAdd,
   onRemove,
+  // Có thì hiện nút Làm ảnh bìa từ ảnh thứ 2
+  onMakeCover,
   title = 'Hình ảnh',
   max = MAX_IMAGES,
   cover = true,
@@ -58,6 +60,19 @@ export default function ImagePicker({
               <span className="absolute bottom-1.5 left-1.5 rounded-full bg-ink/75 px-2 py-0.5 text-micro font-semibold text-white">
                 Ảnh bìa
               </span>
+            )}
+            {cover && onMakeCover && index > 0 && (
+              <button
+                type="button"
+                aria-label={`Đặt ảnh ${index + 1} làm ảnh bìa`}
+                onClick={() => onMakeCover(image.id)}
+                className={cx(
+                  'absolute bottom-1.5 left-1.5 cursor-pointer rounded-full border-0 bg-ink/60 px-2 py-0.5 text-micro font-semibold text-white transition-colors hover:bg-ink',
+                  focusRing
+                )}
+              >
+                Làm ảnh bìa
+              </button>
             )}
             <button
               type="button"
