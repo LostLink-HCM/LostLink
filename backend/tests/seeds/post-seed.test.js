@@ -1,7 +1,15 @@
 const assert = require('node:assert/strict')
 const { describe, mock, test } = require('node:test')
 
-const { Category, Post, VerificationChallenge } = require('../../src/models')
+const {
+  Category,
+  Comment,
+  Notification,
+  Post,
+  PostLike,
+  VerificationChallenge,
+} = require('../../src/models')
+const { seedNotifications } = require('../../src/seeds/notificationSeed')
 const { seedCategories } = require('../../src/seeds/categorySeed')
 const { seedPosts, timeWindowOf } = require('../../src/seeds/postSeed')
 const { seedUsers } = require('../../src/seeds/userSeed')
@@ -109,5 +117,45 @@ describe('Dữ liệu mẫu khớp quy tắc Đăng bài', () => {
       await VerificationChallenge.countDocuments(),
       POSTS.filter((post) => post.question).length
     )
+  })
+})
+
+describe('Dữ liệu mẫu: thông báo', () => {
+  test('chỉ các loại đã có API, khớp bài và bình luận mẫu, chạy lại không nhân đôi', async () => {
+    await seedAll()
+    await quietly(seedNotifications)
+    const items = await Notification.find().lean()
+
+    const types = new Set(items.map((item) => item.type))
+    for (const type of types) {
+      assert.ok(
+        ['post_approved', 'post_rejected', 'comment', 'like', 'post_closed', 'returned'].includes(
+          type
+        ),
+        type
+      )
+    }
+    assert.ok(types.has('comment') && types.has('post_approved') && types.has('post_rejected'))
+    assert.ok(types.has('post_closed') && types.has('returned') && types.has('like'))
+    // Mỗi thông báo thích đi kèm một lượt thích thật
+    const likes = items.filter((item) => item.type === 'like')
+    assert.equal(await PostLike.countDocuments(), likes.length)
+
+    // Mỗi bình luận của người khác tạo một thông báo cho chủ bài
+    const comments = await Comment.find().populate('post', 'owner').lean()
+    const fromOthers = comments.filter((comment) => !comment.post.owner.equals(comment.user))
+    assert.equal(items.filter((item) => item.type === 'comment').length, fromOthers.length)
+    // Chưa ai mở nên tất cả chưa đọc
+    assert.ok(items.every((item) => !item.isRead))
+
+    // Không ai tự nhận thông báo về hành động của mình
+    assert.ok(items.every((item) => !item.actor || !item.actor.equals(item.user)))
+
+    await quietly(seedPosts)
+    await quietly(seedNotifications)
+    assert.equal(await Notification.countDocuments(), items.length)
+    const posts = new Set((await Post.find().distinct('_id')).map(String))
+    const refs = await Notification.find().distinct('refId')
+    assert.ok(refs.every((id) => posts.has(String(id))))
   })
 })

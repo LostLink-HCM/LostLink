@@ -276,6 +276,7 @@ describe('UC04 - Xem chi tiết bài đăng', () => {
       'author',
       'body',
       'createdAt',
+      'editedAt',
       'id',
     ])
 

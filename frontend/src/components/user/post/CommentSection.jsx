@@ -24,18 +24,31 @@ const validate = (text) => {
   return ''
 }
 
+// onEdit, onDelete trả về lỗi (có thể là Promise), rỗng là thành công
 function CommentItem({ comment, mine, now, onEdit, onDelete }) {
   const [editing, setEditing] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [text, setText] = useState(comment.text)
   const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
 
-  const save = () => {
-    const message = validate(text)
+  const save = async () => {
+    let message = validate(text)
+    if (!message) {
+      setBusy(true)
+      message = (await onEdit(comment.id, text.trim())) || ''
+      setBusy(false)
+    }
     setError(message)
-    if (message) return
-    onEdit(comment.id, text.trim())
-    setEditing(false)
+    if (!message) setEditing(false)
+  }
+
+  const remove = async () => {
+    setBusy(true)
+    const message = (await onDelete(comment.id)) || ''
+    setBusy(false)
+    setConfirming(false)
+    setError(message)
   }
 
   return (
@@ -77,8 +90,8 @@ function CommentItem({ comment, mine, now, onEdit, onDelete }) {
             />
             {error && <p className="m-0 text-caption text-danger-ink">{error}</p>}
             <div className="flex gap-2">
-              <Button variant="primary" size="sm" onClick={save}>
-                Lưu
+              <Button variant="primary" size="sm" onClick={save} disabled={busy}>
+                {busy ? 'Đang lưu…' : 'Lưu'}
               </Button>
               <Button
                 size="sm"
@@ -97,13 +110,18 @@ function CommentItem({ comment, mine, now, onEdit, onDelete }) {
             {comment.text}
           </p>
         )}
+        {!editing && error && (
+          <p role="alert" className="m-0 mt-1 text-caption text-danger-ink">
+            {error}
+          </p>
+        )}
 
         {mine && !editing && (
           <div className="mt-1.5 flex items-center gap-3">
             {confirming ? (
               <>
                 <span className="text-tiny text-ink-muted">Xoá bình luận này?</span>
-                <Button variant="dangerSoft" size="sm" onClick={() => onDelete(comment.id)}>
+                <Button variant="dangerSoft" size="sm" onClick={remove} disabled={busy}>
                   Xoá
                 </Button>
                 <Button size="sm" onClick={() => setConfirming(false)}>
@@ -132,10 +150,18 @@ export default function CommentSection({ comments, user, now, onAdd, onEdit, onD
   const location = useLocation()
   const [text, setText] = useState('')
   const [error, setError] = useState('')
+  const [sending, setSending] = useState(false)
 
-  const submit = (e) => {
+  // onAdd trả về lỗi (có thể là Promise); lỗi thì giữ nội dung đã nhập
+  const submit = async (e) => {
     e.preventDefault()
-    const message = validate(text) || onAdd(text.trim())
+    if (sending) return
+    let message = validate(text)
+    if (!message) {
+      setSending(true)
+      message = (await onAdd(text.trim())) || ''
+      setSending(false)
+    }
     setError(message)
     if (!message) setText('')
   }
@@ -177,8 +203,14 @@ export default function CommentSection({ comments, user, now, onAdd, onEdit, onD
                   {text.length}/{MAX_LENGTH}
                 </span>
               )}
-              <Button type="submit" variant="primary" size="sm">
-                Gửi bình luận
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                disabled={sending}
+                aria-busy={sending || undefined}
+              >
+                {sending ? 'Đang gửi…' : 'Gửi bình luận'}
               </Button>
             </div>
           </div>

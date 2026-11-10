@@ -1,5 +1,6 @@
 const { Category, Post, User } = require('../models')
 const ApiError = require('../utils/ApiError')
+const { notify } = require('./notificationService')
 const { escapeRegex, lowercaseText, normalizeText } = require('../utils/text')
 const { endOfVnDay, startOfVnDay } = require('../utils/vnTime')
 
@@ -137,8 +138,8 @@ const changePendingPostStatus = async ({ id, moderatorId, status, note = '' }) =
         },
       },
     },
-    { new: true, runValidators: true }
-  ).select('_id code status')
+    { returnDocument: 'after', runValidators: true }
+  ).select('_id code status owner title')
 
   if (!post) {
     const exists = await Post.exists({ _id: id })
@@ -147,6 +148,15 @@ const changePendingPostStatus = async ({ id, moderatorId, status, note = '' }) =
     }
     throw ApiError.conflict('Bài đăng không còn ở trạng thái chờ duyệt.', 'POST_NOT_PENDING')
   }
+
+  // Báo kết quả duyệt cho chủ bài, bị từ chối thì kèm lý do
+  await notify([post.owner], {
+    type: status === 'searching' ? 'post_approved' : 'post_rejected',
+    actor: moderatorId,
+    refType: 'Post',
+    refId: post._id,
+    text: status === 'searching' ? post.title : note,
+  })
 
   return { id: String(post._id), code: post.code, status: post.status }
 }

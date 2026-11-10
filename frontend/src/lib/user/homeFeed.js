@@ -220,6 +220,8 @@ export const toFeedPost = (card, now = Date.now()) => ({
   views: card.counts.views,
   commentCount: card.counts.comments,
   images: card.coverImage ? [card.coverImage] : [],
+  // Trạng thái của người xem, Guest không có
+  viewer: card.viewer ?? null,
 })
 
 // Chi tiết bài từ API → dữ liệu trang Chi tiết bài đăng
@@ -253,6 +255,7 @@ export const toDetailPost = (detail, now = Date.now()) => ({
     author: comment.author?.username ?? 'Người dùng LostLink',
     text: comment.body,
     createdAt: comment.createdAt,
+    editedAt: comment.editedAt,
   })),
   viewer: detail.viewer,
 })

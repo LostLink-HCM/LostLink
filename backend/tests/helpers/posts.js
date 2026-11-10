@@ -59,6 +59,8 @@ const authed = (client, accessToken) => {
     get: (path) => withToken(client.get(path)),
     delete: (path) => withToken(client.delete(path)),
     patch: (path, body) => withToken(client.patch(path)).send(body),
+    post: (path, body) => withToken(client.post(path)).send(body),
+    put: (path, body) => withToken(client.put(path)).send(body),
     patchForm: (path, payload, images) =>
       multipart(client.patch(path), accessToken, payload, images),
     postForm: (path, payload, images) => multipart(client.post(path), accessToken, payload, images),

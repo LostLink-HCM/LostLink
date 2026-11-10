@@ -615,3 +615,19 @@ describe('Hạn mức đăng bài', () => {
     assert.equal(results[10], 429)
   })
 })
+
+describe('Mã bài và slug khi đăng cùng lúc', () => {
+  test('nhiều bài cùng tiêu đề đăng đồng thời vẫn có mã và slug riêng', async () => {
+    const results = await Promise.all(
+      Array.from({ length: 5 }, () => send(lostWallet({ title: 'Mất ví trùng tên' })))
+    )
+
+    assert.deepEqual(
+      results.map((res) => res.status),
+      Array(5).fill(201)
+    )
+    const posts = await Post.find().select('code slug').lean()
+    assert.equal(new Set(posts.map((post) => post.code)).size, 5)
+    assert.equal(new Set(posts.map((post) => post.slug)).size, 5)
+  })
+})

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
-import { getPost } from '../../api/posts'
+import { addComment, deleteComment, editComment, getPost } from '../../api/posts'
 import { useAuth } from '../../auth/AuthContext'
 import Icon from '../../components/common/Icon'
 import Avatar from '../../components/user/Avatar'
@@ -128,19 +128,17 @@ function PostDetail({ post, onChanged }) {
   // Hộp thoại của chủ bài: null | 'close' | 'delete'
   const [dialog, setDialog] = useState(null)
 
-  // Thích, Lưu, Theo dõi chưa có API: bấm thì đảo trạng thái server trả về (giữ ở phía client)
-  const flipped = (set) => set.has(post.id)
-  const isLiked = post.viewer.liked !== flipped(ctx.liked)
-  const isSaved = post.viewer.saved !== flipped(ctx.saved)
-  const isFollowed = post.viewer.following !== flipped(ctx.followed)
-  const likeCount = post.likes + (isLiked ? 1 : 0) - (post.viewer.liked ? 1 : 0)
+  const { interactions } = ctx
+  const {
+    liked: isLiked,
+    likes: likeCount,
+    saved: isSaved,
+    following: isFollowed,
+  } = interactions.stateOf(post)
 
-  // Bình luận từ server, cộng bình luận vừa viết trên máy (chưa có API bình luận)
-  const localComments = useMemo(
-    () => ctx.comments.filter((item) => String(item.postId) === String(post.id)),
-    [ctx.comments, post.id]
-  )
-  const comments = [...post.comments, ...localComments]
+  // Bình luận từ server, thêm/sửa/xoá cập nhật ngay trên trang
+  const [comments, setComments] = useState(post.comments)
+  const [commentCount, setCommentCount] = useState(post.commentCount)
 
   const lost = post.type === 'lost'
   const isMine = post.viewer.isOwner
@@ -189,6 +187,48 @@ function PostDetail({ post, onChanged }) {
     notify(message)
     if (error.status === 409) onChanged()
   }
+  // Trả về lỗi để hiện dưới ô nhập, rỗng là thành công
+  const commentError = (error) =>
+    [422, 429].includes(error.status)
+      ? (error.details?.[0]?.message ?? error.message)
+      : 'Đã có lỗi xảy ra, vui lòng thử lại.'
+  const toCommentItem = (data) => ({
+    id: data.id,
+    author: data.author?.username ?? user.username,
+    text: data.body,
+    createdAt: data.createdAt,
+    editedAt: data.editedAt,
+  })
+  const submitComment = async (text) => {
+    try {
+      const { data } = await addComment(post.id, text)
+      setComments((prev) => [...prev, toCommentItem(data)])
+      setCommentCount((count) => count + 1)
+      return ''
+    } catch (error) {
+      return commentError(error)
+    }
+  }
+  const saveComment = async (id, text) => {
+    try {
+      const { data } = await editComment(id, text)
+      setComments((prev) => prev.map((item) => (item.id === id ? toCommentItem(data) : item)))
+      return ''
+    } catch (error) {
+      return commentError(error)
+    }
+  }
+  const removeComment = async (id) => {
+    try {
+      await deleteComment(id)
+      setComments((prev) => prev.filter((item) => item.id !== id))
+      setCommentCount((count) => Math.max(0, count - 1))
+      return ''
+    } catch (error) {
+      return commentError(error)
+    }
+  }
+
   const deleted = () => {
     setDialog(null)
     notify('Đã xóa bài đăng.')
@@ -211,12 +251,12 @@ function PostDetail({ post, onChanged }) {
         {
           label: isSaved ? 'Bỏ lưu bài' : 'Lưu bài',
           icon: 'bookmark',
-          onClick: () => ctx.toggleSaved(post.id),
+          onClick: () => interactions.toggleSaved(post),
         },
         {
           label: isFollowed ? 'Bỏ theo dõi' : 'Theo dõi bài',
           icon: 'bell',
-          onClick: () => ctx.toggleFollowed(post.id),
+          onClick: () => interactions.toggleFollowed(post),
         },
         { label: 'Báo cáo bài đăng này', icon: 'flag', tone: 'danger', onClick: report },
       ]
@@ -328,12 +368,11 @@ function PostDetail({ post, onChanged }) {
               <LikeButton
                 liked={isLiked}
                 count={likeCount}
-                onClick={() => ctx.toggleLike(post.id)}
+                onClick={() => interactions.toggleLike(post)}
                 withLabel
               />
               <span className="ml-auto text-tiny text-ink-subtle">
-                {formatCount(post.commentCount + localComments.length)} bình luận ·{' '}
-                {formatCount(post.views)} lượt xem
+                {formatCount(commentCount)} bình luận · {formatCount(post.views)} lượt xem
               </span>
             </div>
           </Card>
@@ -440,14 +479,14 @@ function PostDetail({ post, onChanged }) {
               <div className="mt-2.5 flex gap-2">
                 <Button
                   pressed={isSaved}
-                  onClick={() => ctx.toggleSaved(post.id)}
+                  onClick={() => interactions.toggleSaved(post)}
                   className="flex-1"
                 >
                   {isSaved ? 'Đã lưu' : 'Lưu bài'}
                 </Button>
                 <Button
                   pressed={isFollowed}
-                  onClick={() => ctx.toggleFollowed(post.id)}
+                  onClick={() => interactions.toggleFollowed(post)}
                   className="flex-1"
                 >
                   <Icon name="bell" size={14} />
@@ -478,9 +517,9 @@ function PostDetail({ post, onChanged }) {
             comments={comments}
             user={user}
             now={now}
-            onAdd={(text) => ctx.addComment(post.id, text)}
-            onEdit={ctx.editComment}
-            onDelete={ctx.deleteComment}
+            onAdd={submitComment}
+            onEdit={saveComment}
+            onDelete={removeComment}
           />
         </div>
       </main>

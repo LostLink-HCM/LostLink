@@ -77,6 +77,9 @@ const userSchema = new Schema(
     // Thời điểm gần nhất người dùng thực hiện hoạt động trên hệ thống
     lastActiveAt: { type: Date, default: null },
 
+    // Lần bình luận gần nhất, để giãn cách 15 giây
+    lastCommentAt: { type: Date, default: null },
+
     // Yêu cầu xoá tài khoản, xoá hẳn sau 3 ngày
     deleteRequestedAt: { type: Date, default: null },
 

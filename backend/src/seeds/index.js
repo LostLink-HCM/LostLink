@@ -3,6 +3,7 @@ const env = require('../config/env')
 const { connectDatabase, disconnectDatabase } = require('../config/database')
 const { User } = require('../models')
 const { seedCategories } = require('./categorySeed')
+const { seedNotifications } = require('./notificationSeed')
 const { findSeedAccounts, seedPosts } = require('./postSeed')
 const { seedUsers } = require('./userSeed')
 
@@ -10,7 +11,9 @@ const { seedUsers } = require('./userSeed')
 // npm run seed:demo: chỉ danh mục và bài mẫu, dùng tài khoản đã có sẵn, không tạo
 // hay đổi mật khẩu tài khoản nào nên chạy được trên production
 const demo = process.argv.includes('--demo')
-const seeders = demo ? [seedCategories, seedPosts] : [seedUsers, seedCategories, seedPosts]
+const seeders = demo
+  ? [seedCategories, seedPosts, seedNotifications]
+  : [seedUsers, seedCategories, seedPosts, seedNotifications]
 
 // Kiểm tra đủ tài khoản trước khi ghi, thiếu thì dừng khi chưa đổi gì trong DB
 const checkAccounts = async () => {

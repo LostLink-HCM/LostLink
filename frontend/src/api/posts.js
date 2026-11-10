@@ -35,3 +35,18 @@ export const deletePost = (id) => api.delete(`/posts/${id}`)
 
 // status: closed (Đóng bài) hoặc returned (Đã trao trả)
 export const changePostStatus = (id, status) => api.patch(`/posts/${id}/status`, { status })
+
+// ----- Thích, lưu, theo dõi: PUT bật, DELETE tắt
+
+export const likePost = (id) => api.put(`/posts/${id}/like`)
+export const unlikePost = (id) => api.delete(`/posts/${id}/like`)
+export const savePost = (id) => api.put(`/posts/${id}/save`)
+export const unsavePost = (id) => api.delete(`/posts/${id}/save`)
+export const followPost = (id) => api.put(`/posts/${id}/follow`)
+export const unfollowPost = (id) => api.delete(`/posts/${id}/follow`)
+
+// ----- Bình luận
+
+export const addComment = (postId, body) => api.post(`/posts/${postId}/comments`, { body })
+export const editComment = (id, body) => api.patch(`/comments/${id}`, { body })
+export const deleteComment = (id) => api.delete(`/comments/${id}`)

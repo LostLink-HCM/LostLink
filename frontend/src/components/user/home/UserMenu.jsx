@@ -95,6 +95,15 @@ export default function UserMenu() {
             Bảng vinh danh
           </Link>
           <Link
+            to="/saved"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className={cx(rowClass, 'text-ink-secondary hover:bg-primary-subtle', focusRing)}
+          >
+            <Icon name="bookmark" size={16} />
+            Đã lưu
+          </Link>
+          <Link
             to="/settings"
             role="menuitem"
             onClick={() => setOpen(false)}

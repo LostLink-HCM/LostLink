@@ -415,6 +415,9 @@ module.exports = [
     contents: ['Laptop', 'Giấy tờ tùy thân'],
     views: 380,
     likes: 11,
+    comments: [
+      ['minhkhoi.td', 'Quán đó có camera ở quầy, bạn xin xem lại giờ mình rời đi xem sao.', 90],
+    ],
   },
   {
     image: 'timbuk2',
@@ -722,6 +725,10 @@ module.exports = [
     attributes: { 'Loại giấy tờ': 'Thẻ sinh viên' },
     views: 140,
     likes: 6,
+    comments: [
+      ['ducanh.bk', 'Nhà xe trường mình có hộp đồ thất lạc ở chốt bảo vệ, bạn ra hỏi thử nhé.', 30],
+      ['thuylinh.hn', 'Mình học cùng khu, nếu thấy bao dây đeo lá sẽ nhắn bạn ngay.', 140],
+    ],
   },
   {
     image: null,

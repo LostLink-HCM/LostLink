@@ -29,7 +29,7 @@ const FEEDS = [
 // Dùng chung cho Trang chủ và Tin hot gần đây (hot), cùng bộ lọc, chỉ khác cách sắp xếp
 export default function HomePage({ hot = false }) {
   const { user } = useAuth()
-  const { now, search, keyword, filters, liked, toggleLike } = useOutletContext()
+  const { now, search, keyword, filters, interactions } = useOutletContext()
   const { draft, setDraft, applied, setApplied } = filters
   const [filterError, setFilterError] = useState('')
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -141,8 +141,7 @@ export default function HomePage({ hot = false }) {
             <FeedList
               feed={feed}
               now={now}
-              liked={liked}
-              toggleLike={toggleLike}
+              interactions={interactions}
               defaultView={isDefaultView(applied, keyword)}
               onShowAllCategories={showAllCategories}
             />
@@ -194,7 +193,7 @@ export default function HomePage({ hot = false }) {
 // Danh mục đang lọc vừa bị xoá: gợi ý bỏ bộ lọc danh mục để xem tiếp
 const CATEGORY_GONE = 'CATEGORY_NOT_FOUND'
 
-function FeedList({ feed, now, liked, toggleLike, defaultView, onShowAllCategories }) {
+function FeedList({ feed, now, interactions, defaultView, onShowAllCategories }) {
   // Cuộn gần tới cuối danh sách thì tự tải trang sau, không cần bấm nút
   const sentinel = useInfiniteScroll({
     enabled: feed.canLoadMore,
@@ -246,16 +245,20 @@ function FeedList({ feed, now, liked, toggleLike, defaultView, onShowAllCategori
 
   return (
     <div className="flex flex-col gap-4">
-      {feed.items.map((post) => (
-        <PostCard
-          key={post.id}
-          post={post}
-          now={now}
-          commentCount={post.commentCount}
-          liked={liked.has(post.id)}
-          onToggleLike={() => toggleLike(post.id)}
-        />
-      ))}
+      {feed.items.map((post) => {
+        const state = interactions.stateOf(post)
+        return (
+          <PostCard
+            key={post.id}
+            post={post}
+            now={now}
+            commentCount={post.commentCount}
+            liked={state.liked}
+            likeCount={state.likes}
+            onToggleLike={() => interactions.toggleLike(post)}
+          />
+        )
+      })}
 
       {/* Mốc vô hình cuối danh sách, đi vào vùng gần màn hình thì tải tiếp */}
       <div ref={sentinel} aria-hidden="true" />
