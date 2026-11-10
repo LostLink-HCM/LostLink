@@ -436,8 +436,15 @@ describe('UC U05 - Đăng bài: dữ liệu không hợp lệ', () => {
     // Cố định 7 giờ sáng giờ Việt Nam để Buổi tối hôm nay luôn là tương lai
     const sevenAm = new Date(`${todayVn()}T07:00:00+07:00`).getTime()
     t.mock.timers.enable({ apis: ['Date'], now: sevenAm })
+    // Đăng nhập lại theo giờ giả lập: token cũ ký theo giờ thật sẽ hết hạn nếu test chạy
+    // trước 6:45 sáng (giờ Việt Nam)
+    const { client, accessToken } = await loginAs()
 
-    const res = await send(lostWallet({ date: todayVn(sevenAm), dayPart: 'evening' }))
+    const res = await submit(
+      client,
+      accessToken,
+      lostWallet({ date: todayVn(sevenAm), dayPart: 'evening' })
+    )
 
     assertFieldError(res, 'dayPart', 'Khoảng thời gian này chưa tới.')
   })
