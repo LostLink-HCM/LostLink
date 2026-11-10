@@ -21,7 +21,8 @@ import {
   reopenThread,
   startRequest,
 } from '../../lib/user/messages'
-import { unreadCount } from '../../lib/user/notifications'
+import { usePostInteractions } from '../../hooks/usePostInteractions'
+import { useUnreadNotifications } from '../../hooks/useUnreadNotifications'
 
 // Khu người dùng dùng xanh thương hiệu thay cho xanh đậm của khu quản trị
 const userTheme = [
@@ -86,6 +87,11 @@ export default function UserLayout() {
     navigate('/login', { state: { from: location.pathname } })
     return false
   }
+
+  // Thích, lưu, theo dõi qua API và số thông báo chưa đọc
+  const interactions = usePostInteractions({ requireMember, notify: setToast })
+  const { unread: unreadNotifications, setUnread: setUnreadNotifications } =
+    useUnreadNotifications(user)
 
   const memberToggle = (setter) => (id) => {
     if (requireMember()) setter((prev) => toggleIn(prev, id))
@@ -244,7 +250,7 @@ export default function UserLayout() {
       <SiteHeader
         search={search}
         unreadMessages={unreadMessages}
-        unreadNotifications={unreadCount(notifications.items)}
+        unreadNotifications={unreadNotifications}
       />
 
       <Outlet
@@ -287,6 +293,8 @@ export default function UserLayout() {
           submitReport,
           notifications,
           setNotifications,
+          setUnreadNotifications,
+          interactions,
           watchAreas,
           setWatchAreas,
           account,

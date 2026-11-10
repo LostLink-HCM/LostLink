@@ -16,6 +16,7 @@ export default function PostCard({
   post,
   commentCount,
   liked,
+  likeCount,
   onToggleLike,
   now,
   tags,
@@ -104,7 +105,8 @@ export default function PostCard({
         <div className="mt-auto flex items-center gap-3 border-t border-line-subtle pt-3">
           <LikeButton
             liked={liked}
-            count={post.likes + (liked ? 1 : 0)}
+            // likeCount từ API đã gồm lượt của mình, dữ liệu mẫu thì cộng thêm
+            count={likeCount ?? post.likes + (liked ? 1 : 0)}
             onClick={onToggleLike}
             className="relative z-10"
           />

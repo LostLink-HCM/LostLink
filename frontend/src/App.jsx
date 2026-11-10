@@ -13,6 +13,7 @@ import EditPostPage from './pages/user/EditPostPage.jsx'
 import MessagesPage from './pages/user/MessagesPage.jsx'
 import NotificationsPage from './pages/user/NotificationsPage.jsx'
 import ProfilePage from './pages/user/ProfilePage.jsx'
+import SavedPostsPage from './pages/user/SavedPostsPage.jsx'
 import LeaderboardPage from './pages/user/LeaderboardPage.jsx'
 import MatchesPage from './pages/user/MatchesPage.jsx'
 import UserLayout from './pages/user/UserLayout.jsx'
@@ -93,6 +94,14 @@ function App() {
             element={
               <RequireAuth>
                 <NotificationsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="saved"
+            element={
+              <RequireAuth>
+                <SavedPostsPage />
               </RequireAuth>
             }
           />

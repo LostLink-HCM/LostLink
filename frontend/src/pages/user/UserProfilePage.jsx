@@ -47,7 +47,7 @@ export default function UserProfilePage({ username }) {
   const back = useBack()
   const { user } = useAuth()
   const ctx = useOutletContext()
-  const { now, liked, toggleLike, saved, followed, notify } = ctx
+  const { now, interactions, notify } = ctx
   const { followedUsers, toggleFollowUser, blockedUsers, blockUser, unblockUser } = ctx
   const load = useCallback(() => getUserProfile(username), [username])
   const { data, error, loading, reload } = useProfileData(load)
@@ -82,19 +82,6 @@ export default function UserProfilePage({ username }) {
     setConfirming(null)
   }
 
-  // Menu đóng ngay sau khi chọn nên báo kết quả lưu, theo dõi
-  const toggleWithNotice = (set, toggle, on, off) => (post) => () => {
-    toggle(post.id)
-    notify(set.has(post.id) ? off : on)
-  }
-  const toggleSaved = toggleWithNotice(saved, ctx.toggleSaved, 'Đã lưu bài.', 'Đã bỏ lưu bài.')
-  const toggleFollowed = toggleWithNotice(
-    followed,
-    ctx.toggleFollowed,
-    'Đã theo dõi bài.',
-    'Đã bỏ theo dõi bài.'
-  )
-
   // Thao tác với bài như trang chi tiết, đã chặn thì không liên hệ
   const viewerActions = (post) =>
     [
@@ -105,14 +92,14 @@ export default function UserProfilePage({ username }) {
           onClick: () => ctx.contactAbout(post),
         },
       {
-        label: saved.has(post.id) ? 'Bỏ lưu bài' : 'Lưu bài',
+        label: interactions.stateOf(post).saved ? 'Bỏ lưu bài' : 'Lưu bài',
         icon: 'bookmark',
-        onClick: toggleSaved(post),
+        onClick: () => interactions.toggleSaved(post),
       },
       {
-        label: followed.has(post.id) ? 'Bỏ theo dõi bài' : 'Theo dõi bài',
+        label: interactions.stateOf(post).following ? 'Bỏ theo dõi bài' : 'Theo dõi bài',
         icon: 'bell',
-        onClick: toggleFollowed(post),
+        onClick: () => interactions.toggleFollowed(post),
       },
       {
         label: 'Báo cáo bài đăng',
@@ -127,8 +114,9 @@ export default function UserProfilePage({ username }) {
       key={post.id}
       post={post}
       commentCount={post.commentCount}
-      liked={liked.has(post.id)}
-      onToggleLike={() => toggleLike(post.id)}
+      liked={interactions.stateOf(post).liked}
+      likeCount={interactions.stateOf(post).likes}
+      onToggleLike={() => interactions.toggleLike(post)}
       now={now}
       tags={<PostStatusTag status={post.status} />}
       menu={<PostMenu title={post.title} actions={viewerActions(post)} />}

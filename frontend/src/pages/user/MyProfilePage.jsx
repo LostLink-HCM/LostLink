@@ -66,7 +66,7 @@ const ownerActions = (post, { onEdit, onClose, onDelete }) =>
 export default function MyProfilePage() {
   const navigate = useNavigate()
   const back = useBack()
-  const { now, liked, toggleLike, notify } = useOutletContext()
+  const { now, interactions, notify } = useOutletContext()
   const { data, error, loading, reload } = useProfileData(getMyProfile)
   const [tab, setTab] = useState('')
   // { kind: 'close' | 'delete', post }
@@ -102,8 +102,9 @@ export default function MyProfilePage() {
       key={post.id}
       post={post}
       commentCount={post.commentCount}
-      liked={liked.has(post.id)}
-      onToggleLike={() => toggleLike(post.id)}
+      liked={interactions.stateOf(post).liked}
+      likeCount={interactions.stateOf(post).likes}
+      onToggleLike={() => interactions.toggleLike(post)}
       now={now}
       menu={
         <PostMenu
