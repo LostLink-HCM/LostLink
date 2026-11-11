@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- Build: Vite nhúng biến VITE_* vào bundle lúc build ----
-FROM node:24-alpine AS build
+FROM node:25-alpine AS build
 WORKDIR /app
 
 COPY package.json package-lock.json .npmrc ./
