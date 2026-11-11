@@ -11,14 +11,18 @@ const listFromApi = async (api, params = {}) => {
   return (await res.json()).data
 }
 
-// Cuộn xuống cuối trang tới khi danh sách báo đã tải hết
+const PAGE_SIZE = 12
+
+// Cuộn xuống cuối trang tới khi danh sách báo đã tải hết. Thời gian chờ theo số trang cần tải,
+// vì số bài mẫu thay đổi theo dữ liệu seed
 const scrollToEnd = async (page, total) => {
+  const pages = Math.ceil(total / PAGE_SIZE)
   await expect(async () => {
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
     await expect(page.getByText(`Đã hiển thị hết ${total} bài đăng`)).toBeVisible({
       timeout: 1_000,
     })
-  }).toPass({ timeout: 20_000 })
+  }).toPass({ timeout: Math.max(20_000, pages * 3_000) })
 }
 
 test.beforeEach(async ({ page }) => {
@@ -38,7 +42,7 @@ test.describe('UC01 - Xem danh sách tin mới', () => {
     expect(total).toBeGreaterThan(12)
 
     await page.goto('/')
-    await expect(cards(page)).toHaveCount(12)
+    await expect(cards(page)).toHaveCount(PAGE_SIZE)
     await expect(page.getByRole('button', { name: /Xóa lọc/ })).toHaveCount(0)
 
     await scrollToEnd(page, total)
@@ -65,6 +69,9 @@ test.describe('UC02 - Lọc và tìm kiếm bài đăng', () => {
     await panel.getByRole('button', { name: '30 ngày qua' }).click()
     await panel.getByRole('button', { name: 'Áp dụng bộ lọc' }).click()
 
+    // Kết quả lọc có thể dài hơn một trang, cuộn hết rồi mới so với API
+    await expect(page.getByRole('button', { name: /Xóa lọc/ })).toBeVisible()
+    if (expected.total > PAGE_SIZE) await scrollToEnd(page, expected.total)
     await expect(cards(page)).toHaveCount(expected.total)
     expect((await cardTitles(page)).sort()).toEqual(expected.items.map((p) => p.title).sort())
 

@@ -44,7 +44,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       # Test chạy với MongoDB trong bộ nhớ, giữ file MongoDB đã tải giữa các lần chạy
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: /home/runner/.cache/mongodb-binaries
           key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('backend/package-lock.json') }}
@@ -85,13 +85,13 @@ jobs:
             frontend/package-lock.json
       - run: npm ci --prefix backend
       - run: npm ci --prefix frontend
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: /home/runner/.cache/mongodb-binaries
           key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('backend/package-lock.json') }}
       - name: Install Chromium
         working-directory: frontend
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
       # Playwright tự khởi động backend (MongoDB trong bộ nhớ) và bản build của frontend
       - name: Run E2E tests
         working-directory: frontend
