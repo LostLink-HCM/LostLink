@@ -3,6 +3,7 @@ const {
   Category,
   CategoryAttribute,
   Comment,
+  MatchSuggestion,
   Post,
   PostFollow,
   PostLike,
@@ -16,6 +17,7 @@ const { formatPostCode, postCodePrefix } = require('../utils/postCode')
 const { DAY_PART_HOURS, startOfVnDay, todayVn, vnTimeRange } = require('../utils/vnTime')
 const POSTS = require('./data/posts')
 const POST_IMAGES = require('./data/postImages')
+const MATCH_SUGGESTIONS = require('./data/matchSuggestions')
 
 const HOUR = 60 * 60 * 1000
 const MINUTE = 60 * 1000
@@ -171,6 +173,9 @@ const seedPosts = async () => {
     owner: { $in: authorIds },
     title: { $in: POSTS.map((p) => p.title) },
   }).distinct('_id')
+  await MatchSuggestion.deleteMany({
+    $or: [{ postLost: { $in: oldPostIds } }, { postFound: { $in: oldPostIds } }],
+  })
   await Comment.deleteMany({ post: { $in: oldPostIds } })
   await Promise.all(
     [PostLike, SavedPost, PostFollow].map((Model) =>
@@ -182,6 +187,7 @@ const seedPosts = async () => {
 
   const codes = await assignCodes(now)
   let listed = 0
+  const seededPostsByTitle = new Map()
   for (const [index, definition] of POSTS.entries()) {
     const owner = userByName[definition.author]
     const categoryIndex = attributeIndex[definition.category]
@@ -219,6 +225,7 @@ const seedPosts = async () => {
       })),
       statusHistory,
     })
+    seededPostsByTitle.set(definition.title, post)
 
     // Đáp án đúng chỉ lưu dạng băm, như khi đăng bài
     if (definition.question) {
@@ -252,9 +259,32 @@ const seedPosts = async () => {
     }
   }
 
+  const matchSuggestions = MATCH_SUGGESTIONS.map((suggestion) => {
+    const postLost = seededPostsByTitle.get(suggestion.lostTitle)
+    const postFound = seededPostsByTitle.get(suggestion.foundTitle)
+    if (!postLost || !postFound) {
+      throw new Error(
+        `Không tìm thấy bài để seed ghép nối: "${suggestion.lostTitle}" / "${suggestion.foundTitle}"`
+      )
+    }
+    if (postLost.type !== 'lost' || postFound.type !== 'found') {
+      throw new Error(`Ghép nối phải gồm bài Mất đồ và Nhặt được: "${suggestion.lostTitle}"`)
+    }
+
+    return {
+      postLost: postLost._id,
+      postFound: postFound._id,
+      score: suggestion.score,
+      breakdown: suggestion.breakdown,
+      state: suggestion.state,
+    }
+  })
+  await MatchSuggestion.insertMany(matchSuggestions)
+
   console.log(
     `  ✓ ${POSTS.length} bài đăng (${listed} bài công khai, ${POSTS.length - listed} bài ẩn/chờ duyệt/từ chối/đã đóng)`
   )
+  console.log(`  ✓ ${matchSuggestions.length} gợi ý ghép nối`)
 
   // Số lần trao trả của các tác giả đếm lại từ bài đã trao trả vừa tạo
   for (const id of authorIds) await refreshReturnCount(id)
