@@ -19,7 +19,12 @@ import {
   postsToRows,
   validateHideReason,
 } from '../../lib/backoffice/posts'
-import { getBackofficePost, listBackofficePosts } from '../../lib/backoffice/postsApi'
+import {
+  getBackofficePost,
+  listBackofficePosts,
+  updateBackofficePostStatus,
+  updateBackofficePostVisibility,
+} from '../../lib/backoffice/postsApi'
 import { downloadCsv } from '../../lib/csv'
 import usePaginatedFilter from '../../hooks/usePaginatedFilter'
 
@@ -117,7 +122,7 @@ function getMatchesForPost(post) {
   return post?.matchingPosts || []
 }
 
-function VisibilityDialog({ post, onSubmit, onClose }) {
+function VisibilityDialog({ post, onSubmit, onClose, submitting, serverError }) {
   const [reason, setReason] = useState('')
   const [error, setError] = useState('')
   const reasonRef = useRef(null)
@@ -137,24 +142,39 @@ function VisibilityDialog({ post, onSubmit, onClose }) {
     <Dialog
       size="sm"
       title={title}
-      onClose={onClose}
+      onClose={() => {
+        if (!submitting) onClose()
+      }}
       footer={
         <>
-          <Button data-autofocus={post.hidden || undefined} onClick={onClose}>
+          <Button data-autofocus={post.hidden || undefined} onClick={onClose} disabled={submitting}>
             Hủy
           </Button>
           <Button
             type="submit"
             form="post-visibility-form"
             variant={post.hidden ? 'primary' : 'danger'}
+            disabled={submitting}
           >
-            <Icon name={post.hidden ? 'eye' : 'eyeOff'} size={16} />
-            {title}
+            {submitting ? (
+              <span
+                aria-hidden="true"
+                className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+              />
+            ) : (
+              <Icon name={post.hidden ? 'eye' : 'eyeOff'} size={16} />
+            )}
+            {submitting ? 'Đang lưu…' : title}
           </Button>
         </>
       }
     >
       <form id="post-visibility-form" className="flex flex-col gap-3" onSubmit={submit} noValidate>
+        {serverError && (
+          <p role="alert" className="rounded-lg bg-danger-soft/50 p-3 text-small text-danger-ink">
+            {serverError}
+          </p>
+        )}
         <p className="text-lead font-semibold leading-relaxed [overflow-wrap:anywhere]">
           {post.title}
         </p>
@@ -178,6 +198,7 @@ function VisibilityDialog({ post, onSubmit, onClose }) {
                 rows={4}
                 maxLength={500}
                 value={reason}
+                disabled={submitting}
                 onChange={(e) => {
                   setReason(e.target.value)
                   setError('')
@@ -195,6 +216,10 @@ function VisibilityDialog({ post, onSubmit, onClose }) {
 export default function PostsWorkspace() {
   const [modal, setModal] = useState(null)
   const [nextStatus, setNextStatus] = useState('')
+  const [statusReason, setStatusReason] = useState('')
+  const [statusReasonError, setStatusReasonError] = useState('')
+  const [actionError, setActionError] = useState('')
+  const [actionPending, setActionPending] = useState(false)
   const [notice, setNotice] = useState('')
   const [noticeTone, setNoticeTone] = useState('info')
   const [retryCount, setRetryCount] = useState(0)
@@ -337,23 +362,58 @@ export default function PostsWorkspace() {
     setNotice(`Đã xuất ${filtered.length} bài đăng ra CSV.`)
     setNoticeTone('success')
   }
-  const saveStatus = () => {
-    if (!selected) return
-    updateCurrentListPost(selected.id, { status: nextStatus })
-    setNotice(`Đã cập nhật trạng thái bài ${selected.postCode}.`)
-    setNoticeTone('success')
-    setModal(null)
+  const saveStatus = async () => {
+    if (!selected || actionPending) return
+    if (nextStatus === selected.status) {
+      setActionError('Vui lòng chọn trạng thái khác với trạng thái hiện tại.')
+      return
+    }
+    const normalizedReason = statusReason.trim()
+    if (nextStatus === 'rejected' && !normalizedReason) {
+      setStatusReasonError('Vui lòng nhập lý do từ chối.')
+      return
+    }
+
+    setActionPending(true)
+    setActionError('')
+    setStatusReasonError('')
+    try {
+      const result = await updateBackofficePostStatus(
+        selected.id,
+        nextStatus,
+        nextStatus === 'rejected' ? normalizedReason : ''
+      )
+      updateCurrentListPost(selected.id, { status: result.status })
+      setNotice(`Đã cập nhật trạng thái bài ${result.code || selected.postCode}.`)
+      setNoticeTone('success')
+      setModal(null)
+    } catch (error) {
+      setActionError(error.message || 'Không thể cập nhật trạng thái bài đăng.')
+    } finally {
+      setActionPending(false)
+    }
   }
-  const saveVisibility = (reason) => {
-    if (!selected) return
+  const saveVisibility = async (reason) => {
+    if (!selected || actionPending) return
     const hidden = !selected.hidden
-    updateCurrentListPost(selected.id, {
-      hidden,
-      ...(hidden ? { hiddenReason: reason.trim() } : {}),
-    })
-    setNotice(`Đã ${hidden ? 'ẩn' : 'hiện lại'} bài đăng ${selected.postCode}.`)
-    setNoticeTone('success')
-    setModal(null)
+    setActionPending(true)
+    setActionError('')
+    try {
+      const result = await updateBackofficePostVisibility(selected.id, hidden, reason.trim())
+      updateCurrentListPost(selected.id, {
+        hidden: result.isHidden,
+        hiddenReason: result.hiddenReason || '',
+      })
+      setNotice(
+        `Đã ${result.isHidden ? 'ẩn' : 'hiện lại'} bài đăng ${result.code || selected.postCode}.`
+      )
+      setNoticeTone('success')
+      setModal(null)
+    } catch (error) {
+      setActionError(error.message || 'Không thể cập nhật trạng thái hiển thị bài đăng.')
+    } finally {
+      setActionPending(false)
+    }
   }
 
   return (
@@ -593,6 +653,9 @@ export default function PostsWorkspace() {
                   label={`Cập nhật trạng thái bài #${post.id}`}
                   onClick={() => {
                     setNextStatus(post.status)
+                    setStatusReason('')
+                    setStatusReasonError('')
+                    setActionError('')
                     setModal({ kind: 'edit', id: post.id })
                   }}
                 />
@@ -600,7 +663,10 @@ export default function PostsWorkspace() {
                   icon={post.hidden ? 'eye' : 'eyeOff'}
                   tone={post.hidden ? 'success' : 'danger'}
                   label={`${post.hidden ? 'Hiện lại' : 'Ẩn'} bài đăng #${post.id}`}
-                  onClick={() => setModal({ kind: 'visibility', id: post.id })}
+                  onClick={() => {
+                    setActionError('')
+                    setModal({ kind: 'visibility', id: post.id })
+                  }}
                 />
               </div>
             </td>
@@ -724,20 +790,42 @@ export default function PostsWorkspace() {
         <Dialog
           size="sm"
           title="Cập nhật trạng thái"
-          onClose={() => setModal(null)}
+          onClose={() => {
+            if (!actionPending) setModal(null)
+          }}
           footer={
             <>
-              <Button onClick={() => setModal(null)}>Hủy</Button>
-              <Button variant="primary" onClick={saveStatus}>
-                Cập nhật
+              <Button onClick={() => setModal(null)} disabled={actionPending}>
+                Hủy
+              </Button>
+              <Button
+                variant="primary"
+                onClick={saveStatus}
+                disabled={actionPending || nextStatus === selected.status}
+              >
+                {actionPending ? (
+                  <span
+                    aria-hidden="true"
+                    className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+                  />
+                ) : null}
+                {actionPending ? 'Đang lưu…' : 'Cập nhật'}
               </Button>
             </>
           }
         >
+          {actionError && (
+            <p
+              role="alert"
+              className="mb-3 rounded-lg bg-danger-soft/50 p-3 text-small text-danger-ink"
+            >
+              {actionError}
+            </p>
+          )}
           <p className="mb-3 text-lead font-semibold leading-relaxed [overflow-wrap:anywhere]">
             {selected.title}
           </p>
-          <fieldset>
+          <fieldset disabled={actionPending}>
             <legend className="mb-2 text-small text-ink-muted">
               Chọn trạng thái mới cho bài đăng
             </legend>
@@ -752,7 +840,12 @@ export default function PostsWorkspace() {
                     name="postStatus"
                     value={value}
                     checked={nextStatus === value}
-                    onChange={() => setNextStatus(value)}
+                    onChange={() => {
+                      setNextStatus(value)
+                      if (value !== 'rejected') setStatusReason('')
+                      setStatusReasonError('')
+                      setActionError('')
+                    }}
                     className="accent-primary"
                   />
                   <Badge tone={STATUS_TONES[value]}>{label}</Badge>
@@ -760,6 +853,31 @@ export default function PostsWorkspace() {
               ))}
             </div>
           </fieldset>
+          {nextStatus === 'rejected' && (
+            <Field
+              label="Lý do từ chối"
+              required
+              error={statusReasonError}
+              hint={`${statusReason.length}/1000 ký tự`}
+              className="mt-3"
+            >
+              {(a) => (
+                <Textarea
+                  {...a}
+                  rows={4}
+                  maxLength={1000}
+                  value={statusReason}
+                  disabled={actionPending}
+                  onChange={(event) => {
+                    setStatusReason(event.target.value)
+                    setStatusReasonError('')
+                    setActionError('')
+                  }}
+                  placeholder="Nhập lý do từ chối bài đăng…"
+                />
+              )}
+            </Field>
+          )}
         </Dialog>
       )}
 
@@ -768,7 +886,11 @@ export default function PostsWorkspace() {
           key={selected.id}
           post={selected}
           onSubmit={saveVisibility}
-          onClose={() => setModal(null)}
+          submitting={actionPending}
+          serverError={actionError}
+          onClose={() => {
+            if (!actionPending) setModal(null)
+          }}
         />
       )}
     </div>

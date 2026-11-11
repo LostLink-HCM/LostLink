@@ -82,3 +82,19 @@ export async function getBackofficePost(id) {
   const response = await api.get('/backoffice/posts/' + encodeURIComponent(id))
   return toBackofficePost(response.data)
 }
+
+export async function updateBackofficePostStatus(id, status, reason = '') {
+  const response = await api.patch('/backoffice/posts/' + encodeURIComponent(id) + '/status', {
+    status,
+    reason,
+  })
+  return response.data
+}
+
+export async function updateBackofficePostVisibility(id, isHidden, reason = '') {
+  const response = await api.patch('/backoffice/posts/' + encodeURIComponent(id) + '/visibility', {
+    isHidden,
+    reason,
+  })
+  return response.data
+}
