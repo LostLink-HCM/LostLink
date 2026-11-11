@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1
 
 # ---- Cài dependency production ----
-FROM node:24-alpine AS deps
+FROM node:25-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json .npmrc ./
 RUN npm ci --omit=dev
 
 # ---- Runtime: chỉ cần `node`, không cần npm ----
-FROM node:24-alpine
+FROM node:25-alpine
 # Mã commit do CI truyền vào (--build-arg GIT_SHA=...), /api/health trả lại để kiểm tra bản đang chạy
 ARG GIT_SHA=dev
 ENV NODE_ENV=production
