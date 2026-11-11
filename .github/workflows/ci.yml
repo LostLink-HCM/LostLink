@@ -91,7 +91,7 @@ jobs:
           key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('backend/package-lock.json') }}
       - name: Install Chromium
         working-directory: frontend
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
       # Playwright tự khởi động backend (MongoDB trong bộ nhớ) và bản build của frontend
       - name: Run E2E tests
         working-directory: frontend
