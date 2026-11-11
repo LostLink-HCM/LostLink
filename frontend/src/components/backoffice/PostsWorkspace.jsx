@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Badge from './Badge'
 import Button from './Button'
 import DataTable, { cell } from './DataTable'
@@ -15,12 +15,11 @@ import TypeBadge from './TypeBadge'
 import {
   EMPTY_FILTERS,
   STATUS_LABELS,
-  filterPosts,
   hasInvalidRange,
   postsToRows,
-  setPostHidden,
   validateHideReason,
 } from '../../lib/backoffice/posts'
+import { getBackofficePost, listBackofficePosts } from '../../lib/backoffice/postsApi'
 import { downloadCsv } from '../../lib/csv'
 import usePaginatedFilter from '../../hooks/usePaginatedFilter'
 
@@ -30,9 +29,12 @@ const STATUS_TONES = {
   pending: 'warning',
   searching: 'primary',
   contacted: 'info',
-  completed: 'success',
   rejected: 'danger',
+  returned: 'success',
+  closed: 'info',
 }
+
+const identityFilter = (items) => items
 
 function Status({ value, hidden }) {
   return (
@@ -111,17 +113,8 @@ function MatchingPosts({ matches, onView }) {
   )
 }
 
-function getMatchesForPost(postId, matchPairs, posts) {
-  return matchPairs
-    .filter((match) => match.postLost === postId || match.postFound === postId)
-    .map((match) => ({
-      ...match,
-      post: posts.find(
-        (post) => post.id === (match.postLost === postId ? match.postFound : match.postLost)
-      ),
-    }))
-    .filter((match) => match.post)
-    .sort((a, b) => b.score - a.score)
+function getMatchesForPost(post) {
+  return post?.matchingPosts || []
 }
 
 function VisibilityDialog({ post, onSubmit, onClose }) {
@@ -199,27 +192,136 @@ function VisibilityDialog({ post, onSubmit, onClose }) {
   )
 }
 
-export default function PostsWorkspace({ posts, setPosts, matchPairs }) {
+export default function PostsWorkspace() {
   const [modal, setModal] = useState(null)
   const [nextStatus, setNextStatus] = useState('')
   const [notice, setNotice] = useState('')
+  const [noticeTone, setNoticeTone] = useState('info')
+  const [retryCount, setRetryCount] = useState(0)
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [listState, setListState] = useState({ key: null, items: [], error: '' })
+  const [categoryOptions, setCategoryOptions] = useState([])
+  const [districtOptions, setDistrictOptions] = useState([])
+  const [detailState, setDetailState] = useState({ id: null, post: null, error: '' })
+  const detailRequest = useRef(0)
   const {
     filters,
     setFilter,
     resetFilters: resetFilterState,
     setPage,
     currentPage,
-    filteredItems: filtered,
-    visibleItems: visible,
   } = usePaginatedFilter({
-    items: posts,
+    items: listState.items,
     initialFilters: EMPTY_FILTERS,
-    filterFn: filterPosts,
+    filterFn: identityFilter,
     pageSize: PAGE_SIZE,
   })
   const invalidRange = hasInvalidRange(filters)
-  const selected = modal && posts.find((post) => post.id === modal.id)
-  const matchingPosts = selected ? getMatchesForPost(selected.id, matchPairs, posts) : []
+  const requestFilters = useMemo(
+    () => ({
+      status: filters.status,
+      category: filters.category,
+      type: filters.type,
+      district: filters.district,
+      from: filters.from,
+      to: filters.to,
+      query: debouncedQuery,
+    }),
+    [
+      filters.status,
+      filters.category,
+      filters.type,
+      filters.district,
+      filters.from,
+      filters.to,
+      debouncedQuery,
+    ]
+  )
+  const requestKey = JSON.stringify([requestFilters, retryCount])
+  const listIsCurrent = listState.key === requestKey
+  const queryDebouncing = filters.query.trim() !== debouncedQuery
+  const loading = !invalidRange && (queryDebouncing || !listIsCurrent)
+  const posts = invalidRange || queryDebouncing || !listIsCurrent ? [] : listState.items
+  const filtered = posts
+  const visible = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const listError = !queryDebouncing && listIsCurrent ? listState.error : ''
+  const detailId = modal?.kind === 'detail' ? modal.id : null
+  const detailIsCurrent = detailState.id === detailId
+  const selectedDetail = detailIsCurrent ? detailState.post : null
+  const selectedFromList = modal && posts.find((post) => post.id === modal.id)
+  const selected = modal?.kind === 'detail' ? selectedDetail || selectedFromList : selectedFromList
+  const detailPost = modal?.kind === 'detail' ? selected : null
+  const detailLoading = Boolean(detailId && !detailIsCurrent)
+  const detailError = detailIsCurrent ? detailState.error : ''
+  const matchingPosts = detailPost ? getMatchesForPost(detailPost) : []
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedQuery(filters.query.trim()), 300)
+    return () => window.clearTimeout(timeout)
+  }, [filters.query])
+
+  useEffect(() => {
+    if (invalidRange || queryDebouncing) return undefined
+    let active = true
+    listBackofficePosts(requestFilters)
+      .then((items) => {
+        if (!active) return
+        setListState({ key: requestKey, items, error: '' })
+        setCategoryOptions((previous) => {
+          const options = new Map(previous.map((item) => [item.slug, item]))
+          items.forEach((post) => {
+            if (post.categorySlug) {
+              options.set(post.categorySlug, {
+                slug: post.categorySlug,
+                name: post.category,
+              })
+            }
+          })
+          return [...options.values()].sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+        })
+        setDistrictOptions((previous) =>
+          [...new Set([...previous, ...items.map((post) => post.district).filter(Boolean)])].sort(
+            (a, b) => a.localeCompare(b, 'vi')
+          )
+        )
+      })
+      .catch((error) => {
+        if (active) setListState({ key: requestKey, items: [], error: error.message })
+      })
+    return () => {
+      active = false
+    }
+  }, [invalidRange, queryDebouncing, requestFilters, requestKey])
+
+  useEffect(() => {
+    if (!detailId) return undefined
+    const requestId = ++detailRequest.current
+    getBackofficePost(detailId)
+      .then((post) => {
+        if (requestId === detailRequest.current) setDetailState({ id: detailId, post, error: '' })
+      })
+      .catch((error) => {
+        if (requestId === detailRequest.current) {
+          setDetailState({ id: detailId, post: null, error: error.message })
+        }
+      })
+    return () => {
+      detailRequest.current += 1
+    }
+  }, [detailId])
+
+  const updateCurrentListPost = (id, update) => {
+    setListState((previous) =>
+      previous.key === requestKey
+        ? {
+            ...previous,
+            items: previous.items
+              .map((post) => (post.id === id ? { ...post, ...update } : post))
+              .filter((post) => !filters.status || post.status === filters.status),
+          }
+        : previous
+    )
+  }
 
   const changeFilter = (key, value) => {
     setFilter(key, value)
@@ -228,22 +330,29 @@ export default function PostsWorkspace({ posts, setPosts, matchPairs }) {
   const resetFilters = () => {
     resetFilterState()
     setNotice('')
+    setNoticeTone('info')
   }
   const exportCsv = () => {
     downloadCsv('LostLink_Danh_sach_bai_dang.csv', postsToRows(filtered))
     setNotice(`Đã xuất ${filtered.length} bài đăng ra CSV.`)
+    setNoticeTone('success')
   }
   const saveStatus = () => {
-    setPosts((previous) =>
-      previous.map((post) => (post.id === selected.id ? { ...post, status: nextStatus } : post))
-    )
-    setNotice(`Đã cập nhật trạng thái bài #${selected.id}.`)
+    if (!selected) return
+    updateCurrentListPost(selected.id, { status: nextStatus })
+    setNotice(`Đã cập nhật trạng thái bài ${selected.postCode}.`)
+    setNoticeTone('success')
     setModal(null)
   }
   const saveVisibility = (reason) => {
+    if (!selected) return
     const hidden = !selected.hidden
-    setPosts((previous) => setPostHidden(previous, selected.id, hidden, reason))
-    setNotice(`Đã ${hidden ? 'ẩn' : 'hiện lại'} bài đăng #${selected.id}.`)
+    updateCurrentListPost(selected.id, {
+      hidden,
+      ...(hidden ? { hiddenReason: reason.trim() } : {}),
+    })
+    setNotice(`Đã ${hidden ? 'ẩn' : 'hiện lại'} bài đăng ${selected.postCode}.`)
+    setNoticeTone('success')
     setModal(null)
   }
 
@@ -259,6 +368,7 @@ export default function PostsWorkspace({ posts, setPosts, matchPairs }) {
               <Input
                 {...a}
                 type="search"
+                maxLength={100}
                 value={filters.query}
                 onChange={(e) => changeFilter('query', e.target.value)}
                 placeholder="Tiêu đề, người đăng, khu vực…"
@@ -289,8 +399,10 @@ export default function PostsWorkspace({ posts, setPosts, matchPairs }) {
                 onChange={(e) => changeFilter('category', e.target.value)}
               >
                 <option value="">Tất cả danh mục</option>
-                {[...new Set(posts.map((p) => p.category))].map((category) => (
-                  <option key={category}>{category}</option>
+                {categoryOptions.map((category) => (
+                  <option key={category.slug} value={category.slug}>
+                    {category.name}
+                  </option>
                 ))}
               </Select>
             )}
@@ -316,7 +428,7 @@ export default function PostsWorkspace({ posts, setPosts, matchPairs }) {
                 onChange={(e) => changeFilter('district', e.target.value)}
               >
                 <option value="">Tất cả khu vực</option>
-                {[...new Set(posts.map((p) => p.district))].map((district) => (
+                {districtOptions.map((district) => (
                   <option key={district}>{district}</option>
                 ))}
               </Select>
@@ -335,7 +447,7 @@ export default function PostsWorkspace({ posts, setPosts, matchPairs }) {
             <Button
               variant="primary"
               onClick={exportCsv}
-              disabled={invalidRange || !filtered.length}
+              disabled={invalidRange || loading || Boolean(listError) || !filtered.length}
             >
               <Icon name="download" />
               Xuất CSV
@@ -345,10 +457,37 @@ export default function PostsWorkspace({ posts, setPosts, matchPairs }) {
       </section>
 
       <p className="mt-4 mb-2.5 text-small text-ink-muted" aria-live="polite">
-        Số lượng: <strong className="px-1 text-lead text-primary">{filtered.length}</strong> bài
-        đăng
+        {loading ? (
+          'Đang tải danh sách bài đăng…'
+        ) : (
+          <>
+            Số lượng: <strong className="px-1 text-lead text-primary">{filtered.length}</strong> bài
+            đăng
+          </>
+        )}
       </p>
-      {notice && <Notice>{notice}</Notice>}
+      {notice &&
+        (noticeTone === 'error' ? (
+          <p
+            role="alert"
+            className="mb-3.5 rounded-lg border border-danger-soft bg-danger-soft/50 px-4 py-3 text-small leading-relaxed text-danger-ink"
+          >
+            {notice}
+          </p>
+        ) : (
+          <Notice>{notice}</Notice>
+        ))}
+      {listError && (
+        <div
+          role="alert"
+          className="mb-3.5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger-soft bg-danger-soft/50 px-4 py-3 text-small text-danger-ink"
+        >
+          <span>{listError}</span>
+          <Button size="sm" onClick={() => setRetryCount((count) => count + 1)}>
+            Thử lại
+          </Button>
+        </div>
+      )}
 
       <DataTable
         caption="Danh sách bài đăng của cộng đồng"
@@ -365,18 +504,31 @@ export default function PostsWorkspace({ posts, setPosts, matchPairs }) {
         empty={
           !visible.length && (
             <div className="pb-8 text-center">
-              <EmptyState
-                icon="list"
-                title={
-                  invalidRange ? 'Khoảng thời gian chưa hợp lệ' : 'Không tìm thấy bài đăng phù hợp'
-                }
-                description={
-                  invalidRange
-                    ? 'Vui lòng kiểm tra lại ngày bắt đầu và ngày kết thúc.'
-                    : 'Thử thay đổi bộ lọc hoặc chọn khoảng thời gian khác.'
-                }
-              />
-              <Button onClick={resetFilters}>Xóa bộ lọc</Button>
+              {loading ? (
+                <p className="py-16 text-small text-ink-muted">Đang tải danh sách bài đăng…</p>
+              ) : listError ? (
+                <>
+                  <EmptyState icon="warning" title="Không tải được danh sách bài đăng" />
+                  <Button onClick={() => setRetryCount((count) => count + 1)}>Thử lại</Button>
+                </>
+              ) : (
+                <>
+                  <EmptyState
+                    icon="list"
+                    title={
+                      invalidRange
+                        ? 'Khoảng thời gian chưa hợp lệ'
+                        : 'Không tìm thấy bài đăng phù hợp'
+                    }
+                    description={
+                      invalidRange
+                        ? 'Vui lòng kiểm tra lại ngày bắt đầu và ngày kết thúc.'
+                        : 'Thử thay đổi bộ lọc hoặc chọn khoảng thời gian khác.'
+                    }
+                  />
+                  <Button onClick={resetFilters}>Xóa bộ lọc</Button>
+                </>
+              )}
             </div>
           )
         }
@@ -410,7 +562,7 @@ export default function PostsWorkspace({ posts, setPosts, matchPairs }) {
                 {[
                   ['eye', post.views, 'Lượt xem'],
                   ['comment', post.comments, 'Bình luận'],
-                  ['link', getMatchesForPost(post.id, matchPairs, posts).length, 'Ghép nối'],
+                  ['link', post.matches, 'Ghép nối'],
                 ].map(([icon, count, label]) => (
                   <span
                     key={icon}
@@ -463,6 +615,26 @@ export default function PostsWorkspace({ posts, setPosts, matchPairs }) {
         noun="bài"
       />
 
+      {modal?.kind === 'detail' && !selected && (
+        <Dialog
+          key={modal.id}
+          title="Chi tiết bài đăng"
+          onClose={() => setModal(null)}
+          footer={<Button onClick={() => setModal(null)}>Đóng</Button>}
+        >
+          {detailLoading && (
+            <p className="py-8 text-center text-small text-ink-muted">
+              Đang tải chi tiết bài đăng…
+            </p>
+          )}
+          {detailError && (
+            <p role="alert" className="text-small text-danger-ink">
+              {detailError}
+            </p>
+          )}
+        </Dialog>
+      )}
+
       {selected && modal.kind === 'detail' && (
         <Dialog
           key={selected.id}
@@ -482,13 +654,24 @@ export default function PostsWorkspace({ posts, setPosts, matchPairs }) {
             )
           }
         >
+          {detailLoading && (
+            <p className="mb-3 text-small text-ink-muted">Đang tải đầy đủ chi tiết bài đăng…</p>
+          )}
+          {detailError && (
+            <p
+              role="alert"
+              className="mb-3 rounded-lg bg-danger-soft/50 p-3 text-small text-danger-ink"
+            >
+              {detailError}
+            </p>
+          )}
           <h3 className="mb-1 text-lead font-bold leading-snug text-primary [overflow-wrap:anywhere]">
             {selected.title}
           </h3>
           <DetailList
             rows={[
               ['Mã bài đăng', selected.postCode],
-              ['Người đăng', `@${selected.author}`],
+              ['Người đăng', selected.author],
               ['Loại bài', selected.type === 'lost' ? 'Mất đồ' : 'Nhặt được'],
               ['Danh mục', selected.category],
               ['Ngày đăng', selected.dateTime],
