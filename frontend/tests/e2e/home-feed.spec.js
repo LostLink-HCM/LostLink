@@ -13,16 +13,22 @@ const listFromApi = async (api, params = {}) => {
 
 const PAGE_SIZE = 12
 
-// Cuộn xuống cuối trang tới khi danh sách báo đã tải hết. Thời gian chờ theo số trang cần tải,
-// vì số bài mẫu thay đổi theo dữ liệu seed
-const scrollToEnd = async (page, total) => {
-  const pages = Math.ceil(total / PAGE_SIZE)
+const END_OF_FEED = /Đã hiển thị hết (\d+) bài đăng/
+
+// Cuộn tới khi trang báo đã tải hết, trả về số bài trang báo. Thời gian chờ theo số trang
+// vì dữ liệu seed thay đổi. Test song song có thể đăng thêm bài nên chỉ đòi tối thiểu atLeast
+const scrollToEnd = async (page, atLeast) => {
+  const pages = Math.ceil(atLeast / PAGE_SIZE)
+  const wait = Math.max(20_000, pages * 3_000)
+  test.info().setTimeout(test.info().timeout + wait)
+  const end = page.getByText(END_OF_FEED)
   await expect(async () => {
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
-    await expect(page.getByText(`Đã hiển thị hết ${total} bài đăng`)).toBeVisible({
-      timeout: 1_000,
-    })
-  }).toPass({ timeout: Math.max(20_000, pages * 3_000) })
+    await expect(end).toBeVisible({ timeout: 1_000 })
+  }).toPass({ timeout: wait })
+  const shown = Number((await end.textContent()).match(END_OF_FEED)[1])
+  expect(shown).toBeGreaterThanOrEqual(atLeast)
+  return shown
 }
 
 test.beforeEach(async ({ page }) => {
@@ -45,8 +51,8 @@ test.describe('UC01 - Xem danh sách tin mới', () => {
     await expect(cards(page)).toHaveCount(PAGE_SIZE)
     await expect(page.getByRole('button', { name: /Xóa lọc/ })).toHaveCount(0)
 
-    await scrollToEnd(page, total)
-    await expect(cards(page)).toHaveCount(total)
+    const shown = await scrollToEnd(page, total)
+    await expect(cards(page)).toHaveCount(shown)
   })
 })
 
