@@ -2,8 +2,9 @@ export const STATUS_LABELS = {
   pending: 'Chờ xét duyệt',
   searching: 'Đang tìm',
   contacted: 'Đã liên hệ',
-  completed: 'Đã trao trả',
   rejected: 'Đã từ chối',
+  returned: 'Đã trao trả',
+  closed: 'Đã đóng',
 }
 export const EMPTY_FILTERS = {
   status: '',

@@ -2,7 +2,6 @@ import { useState } from 'react'
 import BackofficeLayout from '../../components/backoffice/BackofficeLayout'
 import { createAdminMessages } from '../../data/adminMessages'
 import { createAdminNotifications } from '../../data/adminNotifications'
-import { createWorkspacePosts, workspacePostMatches } from '../../data/workspacePosts'
 import { readQuickReplies } from '../../lib/backoffice/quickReplies'
 
 const navigation = [
@@ -17,7 +16,6 @@ const navigation = [
 ]
 
 export default function AdminLayout() {
-  const [posts, setPosts] = useState(createWorkspacePosts)
   const [messageState, setMessageState] = useState(createAdminMessages)
   const [quickReplies, setQuickReplies] = useState(() => readQuickReplies(window.localStorage))
   const [notificationState, setNotificationState] = useState(createAdminNotifications)
@@ -41,9 +39,6 @@ export default function AdminLayout() {
       outletContext={{
         messageState,
         setMessageState,
-        posts,
-        setPosts,
-        matchPairs: workspacePostMatches,
         quickReplies,
         setQuickReplies,
         notificationState,

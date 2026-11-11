@@ -1,12 +1,12 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { RequireRole } from '../../auth/guards.jsx'
-import ComingSoon from './ComingSoon.jsx'
-import Messages from './Messages.jsx'
+import ComingSoon from './ComingSoonPage.jsx'
+import Messages from './MessagesPage.jsx'
 import ModeratorLayout from './ModeratorLayout.jsx'
-import Notifications from './Notifications.jsx'
-import Posts from './Posts.jsx'
-import Reports from './Reports.jsx'
-import Review from './Review.jsx'
+import Notifications from './NotificationsPage.jsx'
+import Posts from './PostsPage.jsx'
+import Reports from './ReportsPage.jsx'
+import Review from './ReviewPage.jsx'
 
 // Cả khu moderator nằm trong một file tải riêng, App chỉ tải khi có người vào /moderator
 export default function ModeratorRoutes() {

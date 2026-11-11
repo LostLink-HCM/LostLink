@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import BackofficeLayout from '../../components/backoffice/BackofficeLayout'
-import { createWorkspacePosts, workspacePostMatches } from '../../data/workspacePosts'
+import { createWorkspacePosts } from '../../data/workspacePosts'
 import { moderatorReports } from '../../data/moderatorReports'
 import { createModeratorMessages } from '../../data/moderatorMessages'
 import { createModeratorNotifications } from '../../data/moderatorNotifications'
@@ -77,7 +77,6 @@ export default function ModeratorLayout() {
         reviewLoading,
         reviewError,
         reloadReviewPosts: loadReviewPosts,
-        matchPairs: workspacePostMatches,
         reports,
         setReports,
         messageState,
