@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useAuthSceneReaction } from './scene/SceneContext'
 
 const inputClass =
   'h-9.5 w-full rounded-au-control border border-white/16 bg-white/6 px-3 text-small text-au-ink outline-none transition placeholder:text-au-ink/40 focus:border-au-accent focus:bg-white/10 focus:ring-3 focus:ring-au-accent/16 aria-invalid:border-au-danger aria-invalid:focus:ring-au-danger/20 disabled:opacity-60'
@@ -7,6 +8,7 @@ const labelClass = 'text-au-label font-semibold text-au-ink/60'
 
 export function Field({ id, label, error, hint, trailing, className = '', ...props }) {
   const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined
+  useAuthSceneReaction(error)
 
   return (
     <div className="flex flex-col gap-1">
@@ -49,9 +51,13 @@ export function PasswordField({ className = '', ...props }) {
       // Ẩn nút xem mật khẩu có sẵn của Edge để không bị trùng với nút bên dưới
       className={`[&::-ms-reveal]:hidden ${className}`}
       type={visible ? 'text' : 'password'}
+      // Đánh dấu ô mật khẩu để mèo che mắt khi người dùng gõ (xem AuthScene)
+      data-secret=""
       trailing={
         <button
           type="button"
+          // Giữ focus ở ô nhập khi bấm nút, người dùng gõ tiếp được ngay
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => setVisible((v) => !v)}
           aria-label={visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
           aria-pressed={visible}
@@ -92,7 +98,7 @@ export function OtpBox(props) {
 export function PrimaryButton({ children, className = '', ...props }) {
   return (
     <button
-      className={`h-10 w-full cursor-pointer rounded-au-control border-0 bg-linear-to-b from-au-primary-light to-au-primary-dark text-au-button font-semibold text-white shadow-au-button transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-au-accent active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:brightness-100 ${className}`}
+      className={`h-10 w-full cursor-pointer rounded-au-control border-0 bg-linear-to-b from-au-primary-light to-au-primary-dark text-au-button font-semibold text-au-on-primary shadow-au-button transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-au-accent active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:brightness-100 ${className}`}
       {...props}
     >
       {children}
@@ -105,6 +111,8 @@ export function Alert({ tone = 'error', children }) {
     error: 'border-au-danger/35 bg-au-danger/12 text-au-danger-ink',
     info: 'border-au-accent/35 bg-au-accent/12 text-au-link-hover',
   }
+  // Khung báo lỗi vừa hiện thì mèo và cún tỏ ra buồn
+  useAuthSceneReaction(tone === 'error')
 
   return (
     <div
