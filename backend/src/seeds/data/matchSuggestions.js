@@ -2,17 +2,17 @@
 // Điểm và breakdown là dữ liệu mẫu; liên kết bài được phân giải thành ObjectId khi chạy seed.
 module.exports = [
   {
-    lostTitle: 'Mất chìa khóa nhà có móc hình ngôi nhà ở Quận Gò Vấp',
+    lostTitle: 'Mất chùm chìa khóa có dao xếp Thụy Sĩ đỏ và remote ô tô',
     foundTitle: 'Nhặt được chìa khóa nhà có móc hình ngôi nhà',
-    score: 0.78,
-    breakdown: { location: 0.42, time: 0.52, category: 1, text: 0.96, image: 0.35 },
+    score: 0.55,
+    breakdown: { location: 0.31, time: 0.42, category: 1, text: 0.71, image: 0.35 },
     state: 'pending',
   },
   {
     lostTitle: 'Túi tote vải xanh navy in vòng chữ cổ màu trắng',
-    foundTitle: 'Nhặt được túi tote xanh ở sân bay Tân Sơn Nhất',
-    score: 0.72,
-    breakdown: { location: 0.28, time: 0.84, category: 1, text: 0.86, image: 0.42 },
+    foundTitle: 'Nhặt được balo chống trộm màu xám trên tàu metro số 1',
+    score: 0.57,
+    breakdown: { location: 0.35, time: 0.91, category: 1, text: 0.62, image: 0.42 },
     state: 'pending',
   },
   {

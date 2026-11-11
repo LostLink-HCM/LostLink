@@ -38,14 +38,29 @@ const STATUS_TONES = {
   returned: 'success',
   closed: 'info',
 }
+const TONE_TEXT_CLASSES = {
+  primary: 'text-primary',
+  success: 'text-success',
+  warning: 'text-warning',
+  danger: 'text-danger-ink',
+  info: 'text-info',
+  neutral: 'text-neutral',
+}
 
 const identityFilter = (items) => items
 
-function Status({ value, hidden }) {
+function Status({ value, hidden, uniformTextColor = false }) {
+  const textClass = uniformTextColor ? 'text-primary' : undefined
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
-      <Badge tone={STATUS_TONES[value]}>{STATUS_LABELS[value]}</Badge>
-      {hidden && <Badge>Đã ẩn</Badge>}
+      <Badge tone={STATUS_TONES[value]}>
+        <span className={textClass}>{STATUS_LABELS[value]}</span>
+      </Badge>
+      {hidden && (
+        <Badge>
+          <span className={textClass}>Đã ẩn</span>
+        </Badge>
+      )}
     </span>
   )
 }
@@ -100,7 +115,7 @@ function MatchingPosts({ matches, onView }) {
                 {post.desc}
               </p>
               <div className="flex flex-wrap items-center justify-between gap-2.5">
-                <Status value={post.status} hidden={post.hidden} />
+                <Status value={post.status} hidden={post.hidden} uniformTextColor />
                 <Button size="sm" onClick={() => onView(post.id)}>
                   Xem bài đăng
                   <Icon name="next" size={14} />
@@ -162,7 +177,7 @@ function VisibilityDialog({ post, onSubmit, onClose, submitting, serverError }) 
                 className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
               />
             ) : (
-              <Icon name={post.hidden ? 'eye' : 'eyeOff'} size={16} />
+              post.hidden && <Icon name="eye" size={16} />
             )}
             {submitting ? 'Đang lưu…' : title}
           </Button>
@@ -175,14 +190,15 @@ function VisibilityDialog({ post, onSubmit, onClose, submitting, serverError }) 
             {serverError}
           </p>
         )}
-        <p className="text-lead font-semibold leading-relaxed [overflow-wrap:anywhere]">
-          {post.title}
+        <p className="text-lead font-normal leading-relaxed text-primary [overflow-wrap:anywhere]">
+          <span className="font-[400]">{post.postCode || post.id}:</span>{' '}
+          <span className="font-[400]">{post.title}</span>
         </p>
-        <p className="text-small leading-relaxed text-ink-muted">
-          {post.hidden
-            ? 'Bạn muốn hiện lại bài đăng này?'
-            : 'Bài vẫn được giữ trong danh sách quản lý để có thể kiểm tra và hiện lại.'}
-        </p>
+        {post.hidden && (
+          <p className="text-small leading-relaxed text-ink-muted">
+            Bạn muốn hiện lại bài đăng này?
+          </p>
+        )}
         {!post.hidden && (
           <Field
             label="Lý do ẩn bài đăng"
@@ -218,6 +234,7 @@ export default function PostsWorkspace() {
   const [nextStatus, setNextStatus] = useState('')
   const [statusReason, setStatusReason] = useState('')
   const [statusReasonError, setStatusReasonError] = useState('')
+  const statusReasonRef = useRef(null)
   const [actionError, setActionError] = useState('')
   const [actionPending, setActionPending] = useState(false)
   const [notice, setNotice] = useState('')
@@ -228,6 +245,8 @@ export default function PostsWorkspace() {
   const [categoryOptions, setCategoryOptions] = useState([])
   const [districtOptions, setDistrictOptions] = useState([])
   const [detailState, setDetailState] = useState({ id: null, post: null, error: '' })
+  const [previewImageIndex, setPreviewImageIndex] = useState(null)
+  const [statusHistoryOpen, setStatusHistoryOpen] = useState(false)
   const detailRequest = useRef(0)
   const {
     filters,
@@ -280,10 +299,27 @@ export default function PostsWorkspace() {
   const detailError = detailIsCurrent ? detailState.error : ''
   const matchingPosts = detailPost ? getMatchesForPost(detailPost) : []
 
+  const openDetail = (id, returnId) => {
+    setPreviewImageIndex(null)
+    setStatusHistoryOpen(false)
+    setModal({ kind: 'detail', id, ...(returnId ? { returnId } : {}) })
+  }
+  const closeDetail = () => {
+    setPreviewImageIndex(null)
+    setStatusHistoryOpen(false)
+    setModal(null)
+  }
+
   useEffect(() => {
     const timeout = window.setTimeout(() => setDebouncedQuery(filters.query.trim()), 300)
     return () => window.clearTimeout(timeout)
   }, [filters.query])
+
+  useEffect(() => {
+    if (!notice) return undefined
+    const timeout = window.setTimeout(() => setNotice(''), 3000)
+    return () => window.clearTimeout(timeout)
+  }, [notice])
 
   useEffect(() => {
     if (invalidRange || queryDebouncing) return undefined
@@ -371,6 +407,7 @@ export default function PostsWorkspace() {
     const normalizedReason = statusReason.trim()
     if (nextStatus === 'rejected' && !normalizedReason) {
       setStatusReasonError('Vui lòng nhập lý do từ chối.')
+      statusReasonRef.current?.focus()
       return
     }
 
@@ -448,6 +485,7 @@ export default function PostsWorkspace() {
                     {label}
                   </option>
                 ))}
+                <option value="hidden">Đã ẩn</option>
               </Select>
             )}
           </Field>
@@ -516,13 +554,13 @@ export default function PostsWorkspace() {
         </DateRange>
       </section>
 
-      <p className="mt-4 mb-2.5 text-small text-ink-muted" aria-live="polite">
+      <p className="mt-4 mb-2.5 text-small text-ink-subtle" aria-live="polite">
         {loading ? (
           'Đang tải danh sách bài đăng…'
         ) : (
           <>
-            Số lượng: <strong className="px-1 text-lead text-primary">{filtered.length}</strong> bài
-            đăng
+            Hiển thị {filtered.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0}–
+            {Math.min(currentPage * PAGE_SIZE, filtered.length)} trong số {filtered.length} bài đăng
           </>
         )}
       </p>
@@ -604,18 +642,22 @@ export default function PostsWorkspace() {
               <button
                 type="button"
                 className="mb-1.5 block cursor-pointer text-left text-small font-semibold leading-relaxed text-ink hover:text-primary"
-                onClick={() => setModal({ kind: 'detail', id: post.id })}
+                onClick={() => openDetail(post.id)}
               >
                 {post.title}
               </button>
               <Badge>{post.category}</Badge>
             </td>
             <td className={cell}>
-              <TypeBadge type={post.type} />
+              <span
+                className={`text-caption font-semibold ${post.type === 'lost' ? 'text-danger-ink' : 'text-primary'}`}
+              >
+                {post.type === 'lost' ? 'Mất đồ' : 'Nhặt được'}
+              </span>
             </td>
             <td className={cell}>
               <div className="text-caption font-semibold">{post.dateTime}</div>
-              <Location>{post.location}</Location>
+              <Location>{post.district}</Location>
             </td>
             <td className={cell}>
               <div className="flex gap-2 whitespace-nowrap text-caption text-ink-muted">
@@ -637,20 +679,30 @@ export default function PostsWorkspace() {
               </div>
             </td>
             <td className={cell}>
-              <Status value={post.status} hidden={post.hidden} />
+              <span
+                className={`inline-flex flex-col items-start gap-1 text-caption font-semibold ${TONE_TEXT_CLASSES[STATUS_TONES[post.status]] || 'text-ink-secondary'}`}
+              >
+                <span>{STATUS_LABELS[post.status] || 'Không xác định'}</span>
+                {post.hidden && (
+                  <span className="inline-flex items-center gap-1 text-neutral">
+                    <Icon name="eyeOff" size={13} />
+                    Đã ẩn
+                  </span>
+                )}
+              </span>
             </td>
             <td className={cell}>
               <div className="flex flex-wrap gap-1.5">
                 <IconButton
                   icon="eye"
                   tone="view"
-                  label={`Xem chi tiết bài #${post.id}`}
-                  onClick={() => setModal({ kind: 'detail', id: post.id })}
+                  label="Xem chi tiết bài đăng"
+                  onClick={() => openDetail(post.id)}
                 />
                 <IconButton
                   icon="edit"
                   tone="edit"
-                  label={`Cập nhật trạng thái bài #${post.id}`}
+                  label="Cập nhật trạng thái bài đăng"
                   onClick={() => {
                     setNextStatus(post.status)
                     setStatusReason('')
@@ -660,9 +712,9 @@ export default function PostsWorkspace() {
                   }}
                 />
                 <IconButton
-                  icon={post.hidden ? 'eye' : 'eyeOff'}
+                  icon={post.hidden ? 'eyeCheck' : 'eyeOff'}
                   tone={post.hidden ? 'success' : 'danger'}
-                  label={`${post.hidden ? 'Hiện lại' : 'Ẩn'} bài đăng #${post.id}`}
+                  label={`${post.hidden ? 'Hiện lại' : 'Ẩn'} bài đăng`}
                   onClick={() => {
                     setActionError('')
                     setModal({ kind: 'visibility', id: post.id })
@@ -678,15 +730,17 @@ export default function PostsWorkspace() {
         total={filtered.length}
         pageSize={PAGE_SIZE}
         onChange={setPage}
-        noun="bài"
+        noun="bài đăng"
+        showSummary={false}
       />
 
       {modal?.kind === 'detail' && !selected && (
         <Dialog
           key={modal.id}
           title="Chi tiết bài đăng"
-          onClose={() => setModal(null)}
-          footer={<Button onClick={() => setModal(null)}>Đóng</Button>}
+          onClose={closeDetail}
+          scrollableContent
+          footer={<Button onClick={closeDetail}>Đóng</Button>}
         >
           {detailLoading && (
             <p className="py-8 text-center text-small text-ink-muted">
@@ -705,18 +759,19 @@ export default function PostsWorkspace() {
         <Dialog
           key={selected.id}
           title="Chi tiết bài đăng"
-          onClose={() => setModal(null)}
+          onClose={closeDetail}
+          scrollableContent
           footer={
             modal.returnId ? (
               <>
-                <Button onClick={() => setModal({ kind: 'detail', id: modal.returnId })}>
+                <Button onClick={() => openDetail(modal.returnId)}>
                   <Icon name="back" size={15} />
                   Quay lại bài trước
                 </Button>
-                <Button onClick={() => setModal(null)}>Đóng</Button>
+                <Button onClick={closeDetail}>Đóng</Button>
               </>
             ) : (
-              <Button onClick={() => setModal(null)}>Đóng</Button>
+              <Button onClick={closeDetail}>Đóng</Button>
             )
           }
         >
@@ -744,10 +799,66 @@ export default function PostsWorkspace() {
               ['Vị trí', selected.location],
               [
                 'Trạng thái',
-                <Status key="status" value={selected.status} hidden={selected.hidden} />,
+                <button
+                  key="status"
+                  type="button"
+                  aria-expanded={statusHistoryOpen}
+                  aria-controls={`status-history-${selected.id}`}
+                  aria-label={
+                    statusHistoryOpen ? 'Ẩn lịch sử trạng thái' : 'Xem lịch sử trạng thái'
+                  }
+                  onClick={() => setStatusHistoryOpen((open) => !open)}
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                >
+                  <Status value={selected.status} hidden={selected.hidden} />
+                  <Icon
+                    name="next"
+                    size={14}
+                    className={`transition-transform ${statusHistoryOpen ? 'rotate-90' : ''}`}
+                  />
+                </button>,
               ],
             ]}
           />
+          {statusHistoryOpen && (
+            <section
+              id={`status-history-${selected.id}`}
+              aria-label="Lịch sử trạng thái"
+              className="mb-3 rounded-lg border border-line bg-surface-muted p-3.5"
+            >
+              <h4 className="mb-3 text-small font-semibold">Lịch sử trạng thái</h4>
+              {selected.statusHistory?.length ? (
+                <ol className="grid gap-3">
+                  {[...selected.statusHistory].reverse().map((entry, index) => (
+                    <li
+                      key={`${entry.status}-${entry.dateTime}-${index}`}
+                      className="border-l-2 border-primary-soft pl-3"
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                        <span className="text-small font-semibold text-primary">
+                          {STATUS_LABELS[entry.status] || entry.status}
+                        </span>
+                        {entry.dateTime && (
+                          <time className="text-caption text-ink-muted">{entry.dateTime}</time>
+                        )}
+                      </div>
+                      {entry.status === 'rejected' && (
+                        <p className="mt-1 whitespace-pre-wrap text-small leading-relaxed text-ink-secondary [overflow-wrap:anywhere]">
+                          Lý do: {entry.reason || 'Chưa có lý do được lưu.'}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="text-small text-ink-muted">
+                  {selected.status === 'rejected'
+                    ? 'Bài đăng đang bị từ chối nhưng chưa có lý do được lưu.'
+                    : 'Chưa có lịch sử trạng thái.'}
+                </p>
+              )}
+            </section>
+          )}
           {selected.hidden && selected.hiddenReason && (
             <section
               aria-label="Lý do ẩn bài đăng"
@@ -763,33 +874,79 @@ export default function PostsWorkspace() {
           <p className="rounded-lg border border-primary-soft bg-primary-subtle px-3.5 py-3 text-small leading-relaxed [overflow-wrap:anywhere]">
             {selected.desc}
           </p>
-          {selected.images.length > 0 && (
+          {selected.images?.length > 0 && (
             <>
               <h4 className="mt-3.5 mb-2 text-small font-semibold">Hình ảnh đính kèm</h4>
               <div className="flex flex-wrap gap-3">
                 {selected.images.map((src, index) => (
-                  <img
+                  <button
                     key={src}
-                    src={src}
-                    alt={`Ảnh minh họa ${index + 1} của bài ${selected.title}`}
-                    loading="lazy"
-                    className="size-28 rounded-lg object-cover"
-                  />
+                    type="button"
+                    aria-label={`Phóng to ảnh ${index + 1} của bài ${selected.title}`}
+                    onClick={() => setPreviewImageIndex(index)}
+                    className="cursor-zoom-in rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                  >
+                    <img
+                      src={src}
+                      alt={`Ảnh ${index + 1} của bài ${selected.title}`}
+                      loading="lazy"
+                      className="size-28 rounded-lg object-cover"
+                    />
+                  </button>
                 ))}
               </div>
             </>
           )}
-          <MatchingPosts
-            matches={matchingPosts}
-            onView={(id) => setModal({ kind: 'detail', id, returnId: selected.id })}
-          />
+          <MatchingPosts matches={matchingPosts} onView={(id) => openDetail(id, selected.id)} />
         </Dialog>
       )}
+
+      {selected &&
+        modal?.kind === 'detail' &&
+        previewImageIndex !== null &&
+        selected.images?.[previewImageIndex] && (
+          <Dialog
+            key="image-preview"
+            size="lg"
+            title="Hình ảnh"
+            onClose={() => setPreviewImageIndex(null)}
+          >
+            <div className="flex items-center justify-center gap-3">
+              <IconButton
+                icon="back"
+                label="Xem ảnh trước"
+                bordered
+                size={36}
+                disabled={previewImageIndex === 0}
+                onClick={() => setPreviewImageIndex((index) => index - 1)}
+              />
+              <div className="flex min-w-0 flex-1 justify-center">
+                <img
+                  src={selected.images[previewImageIndex]}
+                  alt={`Ảnh ${previewImageIndex + 1} của bài ${selected.title}`}
+                  className="max-h-[calc(100dvh-180px)] max-w-full rounded-lg object-contain"
+                />
+              </div>
+              <IconButton
+                icon="next"
+                label="Xem ảnh tiếp theo"
+                bordered
+                size={36}
+                disabled={previewImageIndex === selected.images.length - 1}
+                onClick={() => setPreviewImageIndex((index) => index + 1)}
+              />
+            </div>
+            <p className="mt-3 text-center text-caption text-ink-muted">
+              {previewImageIndex + 1}/{selected.images.length}
+            </p>
+          </Dialog>
+        )}
 
       {selected && modal.kind === 'edit' && (
         <Dialog
           size="sm"
           title="Cập nhật trạng thái"
+          scrollableContent
           onClose={() => {
             if (!actionPending) setModal(null)
           }}
@@ -822,8 +979,9 @@ export default function PostsWorkspace() {
               {actionError}
             </p>
           )}
-          <p className="mb-3 text-lead font-semibold leading-relaxed [overflow-wrap:anywhere]">
-            {selected.title}
+          <p className="mb-3 text-lead font-normal leading-relaxed text-primary [overflow-wrap:anywhere]">
+            <span className="font-[400]">{selected.postCode || selected.id}:</span>{' '}
+            <span className="font-[400]">{selected.title}</span>
           </p>
           <fieldset disabled={actionPending}>
             <legend className="mb-2 text-small text-ink-muted">
@@ -848,7 +1006,9 @@ export default function PostsWorkspace() {
                     }}
                     className="accent-primary"
                   />
-                  <Badge tone={STATUS_TONES[value]}>{label}</Badge>
+                  <Badge tone={STATUS_TONES[value]}>
+                    <span className="text-primary">{label}</span>
+                  </Badge>
                 </label>
               ))}
             </div>
@@ -864,6 +1024,7 @@ export default function PostsWorkspace() {
               {(a) => (
                 <Textarea
                   {...a}
+                  ref={statusReasonRef}
                   rows={4}
                   maxLength={1000}
                   value={statusReason}

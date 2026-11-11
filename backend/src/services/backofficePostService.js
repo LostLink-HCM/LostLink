@@ -141,9 +141,10 @@ const matchCountsFor = async (postIds) => {
   return new Map(rows.map((row) => [String(row._id), row.count]))
 }
 
-const listPosts = async ({ status, type, category, area, from, to, q }) => {
+const listPosts = async ({ status, isHidden, type, category, area, from, to, q }) => {
   const filter = {}
   if (status) filter.status = status
+  if (isHidden !== undefined) filter.isHidden = isHidden === 'true'
   if (type) filter.type = type
   if (area) filter.area = area
   if (category) filter.category = await resolveCategory(category)
@@ -205,6 +206,11 @@ const getPost = async (id) => {
     ...toPost(post, matchingPosts.length),
     description: post.description || '',
     images: orderedImageUrls(post.images),
+    statusHistory: (post.statusHistory || []).map(({ status, note, changedAt }) => ({
+      status,
+      note: note || '',
+      changedAt,
+    })),
     matchingPosts,
   }
 }

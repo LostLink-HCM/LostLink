@@ -42,6 +42,13 @@ export function toBackofficePost(post) {
     reputation: author.reputationScore ?? null,
     desc: post.description || '',
     images: Array.isArray(post.images) ? post.images : post.coverImage ? [post.coverImage] : [],
+    statusHistory: Array.isArray(post.statusHistory)
+      ? post.statusHistory.map(({ status, note, changedAt }) => ({
+          status,
+          dateTime: formatDateTime(changedAt),
+          reason: note || '',
+        }))
+      : [],
     views: counts.views ?? 0,
     comments: counts.comments ?? 0,
     matches: counts.matches ?? 0,
@@ -61,7 +68,8 @@ export async function listBackofficePosts(filters = {}) {
   const params = new URLSearchParams()
   const queryFilters = {
     q: filters.query?.trim(),
-    status: filters.status,
+    status: filters.status === 'hidden' ? undefined : filters.status,
+    isHidden: filters.status === 'hidden' ? 'true' : undefined,
     category: filters.category,
     type: filters.type,
     area: filters.district,

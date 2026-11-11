@@ -15,6 +15,9 @@ const listPostsRules = [
   optionalString('status', 'Trạng thái không hợp lệ.')
     .isIn(Post.STATUSES)
     .withMessage('Trạng thái không hợp lệ.'),
+  optionalString('isHidden', 'Trạng thái hiển thị không hợp lệ.')
+    .isIn(['true', 'false'])
+    .withMessage('Trạng thái hiển thị không hợp lệ.'),
   optionalString('type', 'Loại tin không hợp lệ.')
     .isIn(['lost', 'found'])
     .withMessage('Loại tin không hợp lệ.'),
