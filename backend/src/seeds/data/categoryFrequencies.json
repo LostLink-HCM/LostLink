@@ -1,0 +1,563 @@
+{
+  "source": "Bộ khảo sát bài Facebook về mất và nhặt được đồ (không đưa vào repo)",
+  "method": "Laplace (n + 1) / (N + K), sàn 1%. Xem src/scripts/estimateFrequencies.js và docs/design/category-management.md mục 2.4",
+  "posts": 1706,
+  "categories": {
+    "Giấy tờ & thẻ": {
+      "posts": 315,
+      "u": 0.1844
+    },
+    "Ví & tiền": {
+      "posts": 1017,
+      "u": 0.5939
+    },
+    "Túi & balo": {
+      "posts": 131,
+      "u": 0.077
+    },
+    "Thiết bị điện tử": {
+      "posts": 112,
+      "u": 0.0659
+    },
+    "Chìa khóa & xe cộ": {
+      "posts": 65,
+      "u": 0.0385
+    },
+    "Trang sức & phụ kiện": {
+      "posts": 6,
+      "u": 0.01
+    },
+    "Thú cưng": {
+      "posts": 3,
+      "u": 0.01
+    },
+    "Khác": {
+      "posts": 57,
+      "u": 0.0338
+    }
+  },
+  "values": {
+    "Giấy tờ & thẻ": {
+      "Loại giấy tờ": {
+        "CCCD/CMND": {
+          "posts": 185,
+          "u": 0.6788
+        },
+        "Bằng lái xe": {
+          "posts": 28,
+          "u": 0.1058
+        },
+        "Giấy tờ xe": {
+          "posts": 39,
+          "u": 0.146
+        },
+        "Thẻ sinh viên": {
+          "posts": 1,
+          "u": 0.01
+        },
+        "Thẻ ngân hàng": {
+          "posts": 5,
+          "u": 0.0219
+        },
+        "Thẻ BHYT": {
+          "posts": 1,
+          "u": 0.01
+        },
+        "Hộ chiếu": {
+          "posts": 7,
+          "u": 0.0292
+        },
+        "Khác": {
+          "posts": 0,
+          "u": 0.01
+        }
+      }
+    },
+    "Ví & tiền": {
+      "Chất liệu": {
+        "Da": {
+          "posts": 43,
+          "u": 0.88
+        },
+        "Vải": {
+          "posts": 3,
+          "u": 0.08
+        },
+        "Nhựa": {
+          "posts": 0,
+          "u": 0.02
+        },
+        "Khác": {
+          "posts": 0,
+          "u": 0.02
+        }
+      },
+      "Màu chủ đạo": {
+        "Đen": {
+          "posts": 296,
+          "u": 0.6279
+        },
+        "Trắng": {
+          "posts": 21,
+          "u": 0.0465
+        },
+        "Xám": {
+          "posts": 5,
+          "u": 0.0127
+        },
+        "Bạc": {
+          "posts": 0,
+          "u": 0.01
+        },
+        "Nâu": {
+          "posts": 92,
+          "u": 0.1966
+        },
+        "Đỏ": {
+          "posts": 4,
+          "u": 0.0106
+        },
+        "Hồng": {
+          "posts": 21,
+          "u": 0.0465
+        },
+        "Vàng": {
+          "posts": 7,
+          "u": 0.0169
+        },
+        "Xanh lá": {
+          "posts": 5,
+          "u": 0.0127
+        },
+        "Xanh dương": {
+          "posts": 11,
+          "u": 0.0254
+        },
+        "Nhiều màu": {
+          "posts": 0,
+          "u": 0.01
+        }
+      }
+    },
+    "Túi & balo": {
+      "Loại túi": {
+        "Balo": {
+          "posts": 20,
+          "u": 0.3182
+        },
+        "Túi xách": {
+          "posts": 17,
+          "u": 0.2727
+        },
+        "Túi tote": {
+          "posts": 6,
+          "u": 0.1061
+        },
+        "Túi đeo chéo": {
+          "posts": 15,
+          "u": 0.2424
+        },
+        "Vali": {
+          "posts": 2,
+          "u": 0.0455
+        },
+        "Khác": {
+          "posts": 0,
+          "u": 0.0152
+        }
+      },
+      "Màu chủ đạo": {
+        "Đen": {
+          "posts": 29,
+          "u": 0.3846
+        },
+        "Trắng": {
+          "posts": 8,
+          "u": 0.1154
+        },
+        "Xám": {
+          "posts": 1,
+          "u": 0.0256
+        },
+        "Bạc": {
+          "posts": 1,
+          "u": 0.0256
+        },
+        "Nâu": {
+          "posts": 14,
+          "u": 0.1923
+        },
+        "Đỏ": {
+          "posts": 4,
+          "u": 0.0641
+        },
+        "Hồng": {
+          "posts": 7,
+          "u": 0.1026
+        },
+        "Vàng": {
+          "posts": 0,
+          "u": 0.0128
+        },
+        "Xanh lá": {
+          "posts": 3,
+          "u": 0.0513
+        },
+        "Xanh dương": {
+          "posts": 0,
+          "u": 0.0128
+        },
+        "Nhiều màu": {
+          "posts": 0,
+          "u": 0.0128
+        }
+      }
+    },
+    "Thiết bị điện tử": {
+      "Loại thiết bị": {
+        "Điện thoại": {
+          "posts": 94,
+          "u": 0.8333
+        },
+        "Máy tính bảng": {
+          "posts": 1,
+          "u": 0.0175
+        },
+        "Laptop": {
+          "posts": 1,
+          "u": 0.0175
+        },
+        "Tai nghe": {
+          "posts": 7,
+          "u": 0.0702
+        },
+        "Đồng hồ thông minh": {
+          "posts": 0,
+          "u": 0.01
+        },
+        "Máy ảnh": {
+          "posts": 2,
+          "u": 0.0263
+        },
+        "Khác": {
+          "posts": 2,
+          "u": 0.0263
+        }
+      },
+      "Hãng": {
+        "Apple": {
+          "posts": 45,
+          "u": 0.7302
+        },
+        "Samsung": {
+          "posts": 7,
+          "u": 0.127
+        },
+        "Xiaomi": {
+          "posts": 5,
+          "u": 0.0952
+        },
+        "OPPO": {
+          "posts": 0,
+          "u": 0.0159
+        },
+        "Sony": {
+          "posts": 0,
+          "u": 0.0159
+        },
+        "Khác": {
+          "posts": 0,
+          "u": 0.0159
+        }
+      },
+      "Màu chủ đạo": {
+        "Đen": {
+          "posts": 15,
+          "u": 0.3077
+        },
+        "Trắng": {
+          "posts": 11,
+          "u": 0.2308
+        },
+        "Xám": {
+          "posts": 2,
+          "u": 0.0577
+        },
+        "Bạc": {
+          "posts": 1,
+          "u": 0.0385
+        },
+        "Nâu": {
+          "posts": 0,
+          "u": 0.0192
+        },
+        "Đỏ": {
+          "posts": 1,
+          "u": 0.0385
+        },
+        "Hồng": {
+          "posts": 4,
+          "u": 0.0962
+        },
+        "Vàng": {
+          "posts": 5,
+          "u": 0.1154
+        },
+        "Xanh lá": {
+          "posts": 2,
+          "u": 0.0577
+        },
+        "Xanh dương": {
+          "posts": 0,
+          "u": 0.0192
+        },
+        "Nhiều màu": {
+          "posts": 0,
+          "u": 0.0192
+        }
+      }
+    },
+    "Chìa khóa & xe cộ": {
+      "Loại": {
+        "Chìa khóa nhà": {
+          "posts": 1,
+          "u": 0.0364
+        },
+        "Chìa khóa xe máy": {
+          "posts": 16,
+          "u": 0.3091
+        },
+        "Chìa khóa ô tô": {
+          "posts": 15,
+          "u": 0.2909
+        },
+        "Điều khiển xe": {
+          "posts": 1,
+          "u": 0.0364
+        },
+        "Biển số xe": {
+          "posts": 14,
+          "u": 0.2727
+        },
+        "Xe máy": {
+          "posts": 1,
+          "u": 0.0364
+        },
+        "Xe đạp": {
+          "posts": 0,
+          "u": 0.0182
+        }
+      }
+    },
+    "Trang sức & phụ kiện": {
+      "Loại": {
+        "Nhẫn": {
+          "posts": 0,
+          "u": 0.0769
+        },
+        "Dây chuyền": {
+          "posts": 1,
+          "u": 0.1538
+        },
+        "Bông tai": {
+          "posts": 1,
+          "u": 0.1538
+        },
+        "Lắc tay": {
+          "posts": 0,
+          "u": 0.0769
+        },
+        "Đồng hồ": {
+          "posts": 3,
+          "u": 0.3077
+        },
+        "Kính": {
+          "posts": 1,
+          "u": 0.1538
+        },
+        "Khác": {
+          "posts": 0,
+          "u": 0.0769
+        }
+      },
+      "Màu chủ đạo": {
+        "Đen": {
+          "posts": 1,
+          "u": 0.1667
+        },
+        "Trắng": {
+          "posts": 0,
+          "u": 0.0833
+        },
+        "Xám": {
+          "posts": 0,
+          "u": 0.0833
+        },
+        "Bạc": {
+          "posts": 0,
+          "u": 0.0833
+        },
+        "Nâu": {
+          "posts": 0,
+          "u": 0.0833
+        },
+        "Đỏ": {
+          "posts": 0,
+          "u": 0.0833
+        },
+        "Hồng": {
+          "posts": 0,
+          "u": 0.0833
+        },
+        "Vàng": {
+          "posts": 0,
+          "u": 0.0833
+        },
+        "Xanh lá": {
+          "posts": 0,
+          "u": 0.0833
+        },
+        "Xanh dương": {
+          "posts": 0,
+          "u": 0.0833
+        },
+        "Nhiều màu": {
+          "posts": 0,
+          "u": 0.0833
+        }
+      }
+    },
+    "Thú cưng": {
+      "Loài": {
+        "Chó": {
+          "posts": 3,
+          "u": 0.5714
+        },
+        "Mèo": {
+          "posts": 0,
+          "u": 0.1429
+        },
+        "Chim": {
+          "posts": 0,
+          "u": 0.1429
+        },
+        "Khác": {
+          "posts": 0,
+          "u": 0.1429
+        }
+      },
+      "Giống": {
+        "Chó ta": {
+          "posts": 0,
+          "u": 0.1
+        },
+        "Poodle": {
+          "posts": 1,
+          "u": 0.2
+        },
+        "Phốc sóc": {
+          "posts": 0,
+          "u": 0.1
+        },
+        "Corgi": {
+          "posts": 0,
+          "u": 0.1
+        },
+        "Husky": {
+          "posts": 0,
+          "u": 0.1
+        },
+        "Mèo ta": {
+          "posts": 0,
+          "u": 0.1
+        },
+        "Mèo Anh lông ngắn": {
+          "posts": 0,
+          "u": 0.1
+        },
+        "Mèo Ba Tư": {
+          "posts": 0,
+          "u": 0.1
+        },
+        "Khác": {
+          "posts": 0,
+          "u": 0.1
+        }
+      },
+      "Màu lông": {
+        "Nâu": {
+          "posts": 0,
+          "u": 0.1429
+        },
+        "Vàng": {
+          "posts": 0,
+          "u": 0.1429
+        },
+        "Trắng": {
+          "posts": 1,
+          "u": 0.2857
+        },
+        "Đen": {
+          "posts": 0,
+          "u": 0.1429
+        },
+        "Xám": {
+          "posts": 0,
+          "u": 0.1429
+        },
+        "Nhiều màu": {
+          "posts": 0,
+          "u": 0.1429
+        }
+      }
+    },
+    "Khác": {
+      "Màu chủ đạo": {
+        "Đen": {
+          "posts": 3,
+          "u": 0.2667
+        },
+        "Trắng": {
+          "posts": 0,
+          "u": 0.0667
+        },
+        "Xám": {
+          "posts": 0,
+          "u": 0.0667
+        },
+        "Bạc": {
+          "posts": 0,
+          "u": 0.0667
+        },
+        "Nâu": {
+          "posts": 0,
+          "u": 0.0667
+        },
+        "Đỏ": {
+          "posts": 0,
+          "u": 0.0667
+        },
+        "Hồng": {
+          "posts": 0,
+          "u": 0.0667
+        },
+        "Vàng": {
+          "posts": 0,
+          "u": 0.0667
+        },
+        "Xanh lá": {
+          "posts": 0,
+          "u": 0.0667
+        },
+        "Xanh dương": {
+          "posts": 1,
+          "u": 0.1333
+        },
+        "Nhiều màu": {
+          "posts": 0,
+          "u": 0.0667
+        }
+      }
+    }
+  }
+}

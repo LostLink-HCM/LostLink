@@ -1,4 +1,5 @@
-module.exports = [
+// Bài mẫu biên soạn kỹ (có bình luận, trạng thái, câu hỏi xác minh đa dạng)
+const CURATED = [
   // Ví & tiền
   {
     image: 'lv-mono',
@@ -772,13 +773,13 @@ module.exports = [
     likes: 21,
   },
   {
-    image: null,
+    image: 'bia-da-nau-mo',
     author: 'thuylinh.hn',
     type: 'lost',
     category: 'Giấy tờ & thẻ',
     title: 'Mất bằng lái xe máy và thẻ BHYT khi đổ xăng',
     description:
-      'Bằng lái xe hạng A1 và thẻ bảo hiểm y tế kẹp chung trong bao nhựa trong. Có thể rơi khi mở cốp đổ xăng ở cây xăng đường Quang Trung.',
+      'Bằng lái xe hạng A1 và thẻ bảo hiểm y tế kẹp chung trong bìa da nâu dạng sổ. Có thể rơi khi mở cốp đổ xăng ở cây xăng đường Quang Trung.',
     area: 'Quận Gò Vấp',
     placeName: 'Cây xăng đường Quang Trung, Phường 10, Quận Gò Vấp',
     lat: 10.8355,
@@ -790,13 +791,13 @@ module.exports = [
     likes: 5,
   },
   {
-    image: null,
+    image: 'bia-da-den-quai-cai',
     author: 'baotran.sg',
     type: 'found',
     category: 'Giấy tờ & thẻ',
     title: 'Nhặt được giấy đăng ký xe máy ở bãi xe trung tâm thương mại',
     description:
-      'Giấy đăng ký xe máy (cà vẹt) rơi ở bãi giữ xe tầng hầm một trung tâm thương mại trên đường Võ Văn Ngân. Chủ xe nhắn biển số để nhận lại.',
+      'Giấy đăng ký xe máy (cà vẹt) kẹp trong bìa da đen có quai cài, rơi ở bãi giữ xe tầng hầm một trung tâm thương mại trên đường Võ Văn Ngân. Chủ xe nhắn biển số để nhận lại.',
     area: 'Thành phố Thủ Đức',
     placeName: 'Bãi giữ xe trung tâm thương mại, Phường Bình Thọ, Thành phố Thủ Đức',
     lat: 10.8495,
@@ -815,13 +816,13 @@ module.exports = [
 
   // Bài cũ hơn 30 ngày, chỉ hiện khi chọn Từ ngày - Đến ngày
   {
-    image: null,
+    image: 'mi-band-den',
     author: 'hoangnam.q1',
     type: 'lost',
     category: 'Thiết bị điện tử',
     title: 'Mất đồng hồ thông minh Xiaomi màu đen ở sân bóng',
     description:
-      'Đồng hồ thông minh Xiaomi dây silicon đen, mặt vuông. Tháo ra để trên ghế ở sân bóng đá mini đường Cộng Hòa rồi quên mang về.',
+      'Vòng đeo tay thông minh Xiaomi Mi Band, dây silicon đen, mặt dài. Tháo ra để trên ghế ở sân bóng đá mini đường Cộng Hòa rồi quên mang về.',
     area: 'Quận Tân Bình',
     placeName: 'Sân bóng đá mini đường Cộng Hòa, Phường 12, Quận Tân Bình',
     lat: 10.8015,
@@ -833,27 +834,27 @@ module.exports = [
     likes: 2,
   },
   {
-    image: null,
+    image: 'bong-tai-ngoi-sao-vang',
     author: 'ngockhanh.dn',
     type: 'found',
     category: 'Trang sức & phụ kiện',
-    title: 'Nhặt được bông tai bạc hình ngôi sao ở rạp phim',
+    title: 'Nhặt được đôi bông tai ngôi sao vàng ở rạp phim',
     description:
-      'Một chiếc bông tai bạc hình ngôi sao nhỏ có đính đá trắng. Nhặt ở hàng ghế G rạp phim trung tâm thương mại Quận 10.',
+      'Một đôi bông tai hình ngôi sao màu vàng kim lấp lánh, còn gắn trên miếng bìa đỏ, chắc ai vừa mua. Nhặt ở hàng ghế G rạp phim trung tâm thương mại Quận 10.',
     area: 'Quận 10',
     placeName: 'Rạp phim trung tâm thương mại, Phường 12, Quận 10',
     lat: 10.7713,
     lng: 106.669,
     postedHoursAgo: 1200,
     dayPart: 'evening',
-    attributes: { Loại: 'Bông tai', 'Màu chủ đạo': 'Bạc' },
+    attributes: { Loại: 'Bông tai', 'Màu chủ đạo': 'Vàng' },
     views: 70,
     likes: 1,
   },
 
   // Các bài KHÔNG được hiện ở danh sách công khai, dùng để kiểm tra điều kiện lọc
   {
-    image: null,
+    image: 'vi-vai-xam-khoa-dan',
     author: 'user01',
     type: 'lost',
     category: 'Ví & tiền',
@@ -872,12 +873,13 @@ module.exports = [
     likes: 0,
   },
   {
-    image: null,
+    image: 'chia-xe-moc-mo-to',
     author: 'baotran.sg',
     type: 'found',
     category: 'Chìa khóa & xe cộ',
     title: 'Nhặt được chìa khóa xe Honda Vision ở bãi xe',
-    description: 'Chìa khóa xe Honda Vision có móc nhựa đỏ. Bài đang chờ LostLink duyệt.',
+    description:
+      'Chìa khóa xe Honda Vision có móc kim loại hình chiếc mô tô nhỏ. Bài đang chờ LostLink duyệt.',
     area: 'Quận 1',
     placeName: 'Bãi xe đường Lê Thánh Tôn, Phường Bến Nghé, Quận 1',
     lat: 10.7768,
@@ -895,7 +897,7 @@ module.exports = [
     likes: 0,
   },
   {
-    image: null,
+    image: 'dien-thoai-cu-thanh-ly',
     author: 'ducanh.bk',
     type: 'found',
     category: 'Thiết bị điện tử',
@@ -914,7 +916,7 @@ module.exports = [
     likes: 0,
   },
   {
-    image: null,
+    image: 'o-den-mo',
     author: 'thuylinh.hn',
     type: 'lost',
     category: 'Khác',
@@ -932,7 +934,7 @@ module.exports = [
     likes: 0,
   },
   {
-    image: null,
+    image: 'vi-den-mo-lua-dao',
     author: 'hoangnam.q1',
     type: 'found',
     category: 'Ví & tiền',
@@ -951,7 +953,7 @@ module.exports = [
     likes: 0,
   },
   {
-    image: null,
+    image: 'chip-the-ngan-hang',
     author: 'minhkhoi.td',
     type: 'lost',
     category: 'Giấy tờ & thẻ',
@@ -972,13 +974,13 @@ module.exports = [
 
   // Đã trao trả trong 7 ngày gần đây: vẫn hiện trên danh sách
   {
-    image: null,
+    image: 'balo-den-di-hoc',
     author: 'ngockhanh.dn',
     type: 'lost',
     category: 'Túi & balo',
     title: 'Đã tìm lại được balo đen đi học, cảm ơn mọi người',
     description:
-      'Balo vải đen có móc khóa hình gấu, bên trong có sách và máy tính cầm tay. Đã được bạn sinh viên nhặt và trao trả, cảm ơn cộng đồng LostLink.',
+      'Balo vải đen loại trơn, bên trong có sách và máy tính cầm tay. Đã được bạn sinh viên nhặt và trao trả, cảm ơn cộng đồng LostLink.',
     area: 'Quận 10',
     placeName: 'Thư viện Đại học Bách Khoa, Phường 14, Quận 10',
     lat: 10.7722,
@@ -1204,13 +1206,13 @@ module.exports = [
     likes: 6,
   },
   {
-    image: null,
+    image: 'chia-xe-kem-chia-nho',
     author: 'ducanh.bk',
     type: 'found',
     category: 'Chìa khóa & xe cộ',
     title: 'Nhặt được chìa khóa xe máy rơi trên đường Nguyễn Văn Linh',
     description:
-      'Chìa khóa xe máy có móc nhựa xanh và một chìa nhỏ. Nhặt được lúc đi xe dọc Nguyễn Văn Linh, khoảng giữa đoạn gần Crescent Mall và cầu Kênh Tẻ.',
+      'Chìa khóa xe máy kèm một chìa nhỏ, không có móc khóa. Nhặt được lúc đi xe dọc Nguyễn Văn Linh, khoảng giữa đoạn gần Crescent Mall và cầu Kênh Tẻ.',
     area: 'Quận 7',
     placeName: '101 Nguyễn Văn Linh, Phường Tân Phú, Quận 7',
     placeNameTo: '1040 Nguyễn Văn Linh, Phường Tân Phong, Quận 7',
@@ -1230,3 +1232,6 @@ module.exports = [
     likes: 9,
   },
 ]
+
+// Cộng thêm bài cộng đồng viết theo cách người dùng thật đăng trên các nhóm tìm đồ
+module.exports = [...CURATED, ...require('./community')]
