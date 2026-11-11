@@ -1,14 +1,14 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { RequireRole } from '../../auth/guards.jsx'
 import AdminLayout from './AdminLayout.jsx'
-import AdminDashboard from './Dashboard.jsx'
-import AdminUsers from './Users.jsx'
-import AdminCategories from './Categories.jsx'
-import AdminSettings from './Settings.jsx'
-import AdminMessages from './Messages.jsx'
-import AdminNotifications from './Notifications.jsx'
-import AdminPosts from './Posts.jsx'
-import AdminAuditLog from './AuditLog.jsx'
+import AdminDashboard from './DashboardPage.jsx'
+import AdminUsers from './UsersPage.jsx'
+import AdminCategories from './CategoriesPage.jsx'
+import AdminSettings from './SettingsPage.jsx'
+import AdminMessages from './MessagesPage.jsx'
+import AdminNotifications from './NotificationsPage.jsx'
+import AdminPosts from './PostsPage.jsx'
+import AdminAuditLog from './AuditLogPage.jsx'
 
 // Chỉ tải khi có người vào /admin
 export default function AdminRoutes() {
