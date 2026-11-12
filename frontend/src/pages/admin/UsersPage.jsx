@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../auth/AuthContext'
 import Icon from '../../components/common/Icon'
 import Button from '../../components/backoffice/Button'
@@ -8,8 +8,6 @@ import Pagination from '../../components/backoffice/Pagination'
 import { cx, focusRing } from '../../components/backoffice/classes'
 import { downloadCsv } from '../../lib/csv'
 import {
-  applyUserAction,
-  filterAdminUsers,
   isCurrentUser,
   USER_ACTIONS,
   USER_FILTERS,
@@ -18,14 +16,18 @@ import {
   usersToRows,
   userActionUnavailable,
 } from '../../lib/admin/users'
-import { createAdminUsers } from '../../data/adminUsers'
+import { getAdminUser, listAdminUsers } from '../../lib/admin/usersApi'
 import usePaginatedFilter from '../../hooks/usePaginatedFilter'
 
 const PAGE_SIZE = 8
+const identityFilter = (items) => items
+const UNAVAILABLE_MESSAGE = 'Chức năng này chưa khả dụng.'
 const number = (value) => new Intl.NumberFormat('vi-VN').format(value)
 const date = (value) => (value ? new Date(value).toLocaleDateString('vi-VN') : 'Chưa có')
 const dateTime = (value) =>
-  new Date(value).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })
+  value
+    ? new Date(value).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })
+    : 'Chưa có'
 
 const avatarTones = {
   blue: 'bg-[#e7effa] text-[#3e70aa]',
@@ -53,13 +55,6 @@ const actionTones = {
   success: 'border-[#b7d9cb] bg-[#f4fbf8] text-[#2b866d] hover:bg-[#e4f5ed]',
 }
 
-const completedActions = {
-  lock: 'Đã khóa tài khoản của',
-  unlock: 'Đã mở khóa tài khoản của',
-  grant: 'Đã cấp quyền Moderator cho',
-  revoke: 'Đã thu hồi quyền Moderator của',
-}
-
 function Avatar({ account, large = false }) {
   return (
     <span
@@ -72,7 +67,11 @@ function Avatar({ account, large = false }) {
       )}
       aria-hidden="true"
     >
-      {account.initials}
+      {account.avatarUrl ? (
+        <img src={account.avatarUrl} alt="" className="size-full rounded-xl object-cover" />
+      ) : (
+        account.initials
+      )}
     </span>
   )
 }
@@ -100,7 +99,8 @@ function Status({ status }) {
 
 function ActionButton({ action, account, actor, expanded = false, onAction }) {
   const settings = USER_ACTIONS[action]
-  const disabledReason = userActionUnavailable(account, actor, action)
+  // Mở các thao tác này khi API ghi dữ liệu đã được kết nối.
+  const disabledReason = userActionUnavailable(account, actor, action) || UNAVAILABLE_MESSAGE
   const shortLabels = { lock: 'Khóa', unlock: 'Mở khóa', grant: 'Cấp Mod', revoke: 'Thu hồi' }
 
   return (
@@ -144,15 +144,12 @@ function UserActions({ account, actor, onAction, expanded = false }) {
   )
 }
 
-function UserProfile({ account, actor, logs, onClose, onAction }) {
+function UserProfileContent({ account, actor, onAction }) {
   const protectedAccount = isCurrentUser(account, actor) || account.role === 'admin'
+  const logs = account.recentActions
 
   return (
-    <Dialog
-      title="Hồ sơ người dùng"
-      onClose={onClose}
-      footer={<Button onClick={onClose}>Đóng hồ sơ</Button>}
-    >
+    <>
       <div className="flex items-center gap-4">
         <Avatar account={account} large />
         <div className="min-w-0">
@@ -243,11 +240,12 @@ function UserProfile({ account, actor, logs, onClose, onAction }) {
         {account.badges.length ? (
           account.badges.map((badge) => (
             <span
-              key={badge}
+              key={badge.id}
+              title={badge.description || badge.name}
               className="inline-flex items-center gap-1 rounded-md border border-[#d1e6d9] bg-[#f1faf5] px-2 py-1 text-caption text-[#4a8c69]"
             >
               <Icon name="star" size={13} />
-              {badge}
+              {badge.name}
             </span>
           ))
         ) : (
@@ -267,9 +265,9 @@ function UserProfile({ account, actor, logs, onClose, onAction }) {
         </p>
       )}
 
-      {logs.length > 0 && (
+      <h4 className="mb-2 mt-5 text-small font-bold">Thao tác gần đây</h4>
+      {logs.length > 0 ? (
         <>
-          <h4 className="mb-2 mt-5 text-small font-bold">Thao tác gần đây</h4>
           <ol className="m-0 list-none p-0">
             {logs.slice(0, 5).map((log) => (
               <li
@@ -278,14 +276,20 @@ function UserProfile({ account, actor, logs, onClose, onAction }) {
               >
                 <div className="flex flex-wrap justify-between gap-2">
                   <strong className="text-caption font-semibold text-[#4a6a8e]">
-                    {USER_ACTIONS[log.action].label}
+                    {USER_ACTIONS[log.action]?.label ||
+                      (log.action === 'restrict' ? 'Hạn chế tài khoản' : 'Cập nhật tài khoản')}
                   </strong>
                   <time className="text-[11px] text-ink-subtle" dateTime={log.createdAt}>
                     {dateTime(log.createdAt)}
                   </time>
                 </div>
                 <small className="mt-1 block text-[11px] text-ink-subtle">
-                  Thực hiện bởi @{log.actor}
+                  Thực hiện bởi{' '}
+                  {log.actor?.username
+                    ? `@${log.actor.username}`
+                    : log.actorRole && log.actorRole !== 'system'
+                      ? 'tài khoản không còn tồn tại'
+                      : 'hệ thống'}
                 </small>
                 {log.reason && (
                   <p className="mt-2 text-caption leading-relaxed text-ink-muted">{log.reason}</p>
@@ -294,7 +298,33 @@ function UserProfile({ account, actor, logs, onClose, onAction }) {
             ))}
           </ol>
         </>
+      ) : (
+        <p className="text-small text-ink-muted">Chưa có thao tác quản lý.</p>
       )}
+    </>
+  )
+}
+
+function UserProfile({ account, actor, loading, error, onRetry, onClose, onAction }) {
+  return (
+    <Dialog
+      title="Hồ sơ người dùng"
+      onClose={onClose}
+      scrollableContent
+      footer={<Button onClick={onClose}>Đóng hồ sơ</Button>}
+    >
+      {loading ? (
+        <p role="status" className="py-8 text-center text-small text-ink-muted">
+          Đang tải hồ sơ người dùng…
+        </p>
+      ) : error ? (
+        <div role="alert" className="flex flex-col items-center gap-4 py-8 text-center">
+          <p className="text-small text-danger-ink">{error}</p>
+          <Button onClick={onRetry}>Thử lại</Button>
+        </div>
+      ) : account ? (
+        <UserProfileContent account={account} actor={actor} onAction={onAction} />
+      ) : null}
     </Dialog>
   )
 }
@@ -414,38 +444,88 @@ function UserActionDialog({ account, actor, action, onConfirm, onClose, error })
 
 export default function Users() {
   const { user } = useAuth()
-  const actor = user || {
-    id: 'guest-admin',
-    username: 'admin',
-    email: 'admin@lostlink.vn',
-    role: 'admin',
-  }
-  const [userState, setUserState] = useState(() => createAdminUsers())
+  const actor = user
+  const [listState, setListState] = useState({ key: null, items: [], summary: null, error: '' })
+  const [retryCount, setRetryCount] = useState(0)
+  const [debouncedQuery, setDebouncedQuery] = useState('')
   const [modal, setModal] = useState(null)
   const [notice, setNotice] = useState('')
   const [actionError, setActionError] = useState('')
-  const { users, logs } = userState
-  const {
-    filters,
-    setFilter,
-    resetFilters,
-    setPage,
-    currentPage,
-    filteredItems: filtered,
-    visibleItems: visible,
-  } = usePaginatedFilter({
-    items: users,
+  const [profileState, setProfileState] = useState({ key: null, account: null, error: '' })
+  const [profileVersion, setProfileVersion] = useState(0)
+  const { filters, setFilter, resetFilters, setPage, currentPage } = usePaginatedFilter({
+    items: listState.items,
     initialFilters: USER_FILTERS,
-    filterFn: filterAdminUsers,
+    filterFn: identityFilter,
     pageSize: PAGE_SIZE,
   })
+  const requestFilters = useMemo(
+    () => ({
+      query: debouncedQuery,
+      role: filters.role,
+      status: filters.status,
+      sort: filters.sort,
+    }),
+    [debouncedQuery, filters.role, filters.status, filters.sort]
+  )
+  const requestKey = JSON.stringify([requestFilters, retryCount])
+  const listIsCurrent = listState.key === requestKey
+  const queryDebouncing = filters.query.trim() !== debouncedQuery
+  const loading = queryDebouncing || !listIsCurrent
+  const listError = !loading ? listState.error : ''
+  const users = loading || listError ? [] : listState.items
+  const filtered = users
+  const visible = users.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
   const selected = modal ? users.find((account) => account.id === modal.id) : null
-  const counts = {
-    all: users.length,
-    active: users.filter((account) => account.status === 'active').length,
-    moderator: users.filter((account) => account.role === 'moderator').length,
-    locked: users.filter((account) => account.status === 'locked').length,
-  }
+  const counts = listState.summary
+  const profileId = modal?.kind === 'profile' ? modal.id : null
+  const profileKey = profileId ? JSON.stringify([profileId, profileVersion]) : null
+  const profileIsCurrent = profileState.key === profileKey
+  const profileAccount = profileIsCurrent ? profileState.account : null
+  const profileLoading = Boolean(profileId && !profileIsCurrent)
+  const profileError = profileIsCurrent ? profileState.error : ''
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedQuery(filters.query.trim()), 300)
+    return () => window.clearTimeout(timeout)
+  }, [filters.query])
+
+  useEffect(() => {
+    if (queryDebouncing) return undefined
+    let active = true
+    listAdminUsers(requestFilters)
+      .then((data) => {
+        if (active) setListState({ key: requestKey, ...data, error: '' })
+      })
+      .catch((error) => {
+        if (active) {
+          setListState((previous) => ({
+            ...previous,
+            key: requestKey,
+            items: [],
+            error: error.message,
+          }))
+        }
+      })
+    return () => {
+      active = false
+    }
+  }, [queryDebouncing, requestFilters, requestKey])
+
+  useEffect(() => {
+    if (!profileId) return undefined
+    let active = true
+    getAdminUser(profileId)
+      .then((account) => {
+        if (active) setProfileState({ key: profileKey, account, error: '' })
+      })
+      .catch((error) => {
+        if (active) setProfileState({ key: profileKey, account: null, error: error.message })
+      })
+    return () => {
+      active = false
+    }
+  }, [profileId, profileKey])
 
   const changeFilter = (key, value) => {
     setFilter(key, value)
@@ -454,6 +534,7 @@ export default function Users() {
 
   const resetFiltersAndNotice = () => {
     resetFilters()
+    setRetryCount((previous) => previous + 1)
     setNotice('')
   }
 
@@ -465,6 +546,7 @@ export default function Users() {
 
   const openProfile = (id) => {
     setActionError('')
+    setProfileVersion((previous) => previous + 1)
     setModal({ kind: 'profile', id })
   }
 
@@ -478,21 +560,7 @@ export default function Users() {
     setModal(modal?.fromProfile ? { kind: 'profile', id: modal.id } : null)
   }
 
-  const confirmAction = (reason) => {
-    const result = applyUserAction(userState, {
-      id: selected.id,
-      action: modal.action,
-      reason,
-      actor,
-    })
-    if (result.error) {
-      setActionError(result.error)
-      return
-    }
-    setUserState(result.state)
-    setNotice(`${completedActions[modal.action]} @${selected.username}.`)
-    closeAction()
-  }
+  const confirmAction = () => setActionError(UNAVAILABLE_MESSAGE)
 
   return (
     <div className="px-6 py-5 text-small text-ink max-xl:px-5 max-sm:px-4 max-sm:py-4">
@@ -541,7 +609,7 @@ export default function Users() {
                 {label}
               </span>
               <strong className="mt-1.5 block text-[30px] font-bold leading-tight text-[#233d59] max-sm:text-[25px]">
-                {number(counts[key])}
+                {counts ? number(counts[key]) : listError ? '—' : '…'}
               </strong>
             </div>
           </article>
@@ -562,6 +630,7 @@ export default function Users() {
             />
             <input
               type="search"
+              maxLength={100}
               value={filters.query}
               onChange={(event) => changeFilter('query', event.target.value)}
               placeholder="Tên, email hoặc mã tài khoản…"
@@ -625,7 +694,7 @@ export default function Users() {
           >
             <Icon name="reset" />
           </button>
-          <Button variant="primary" onClick={exportUsers} disabled={!filtered.length}>
+          <Button variant="primary" onClick={exportUsers} disabled={loading || !filtered.length}>
             <Icon name="download" size={16} />
             Xuất CSV
           </Button>
@@ -661,7 +730,9 @@ export default function Users() {
           </span>
         </h2>
         <span className="text-caption text-[#73869d]" aria-live="polite">
-          {number(filtered.length)} / {number(users.length)} tài khoản
+          {loading
+            ? 'Đang tải danh sách…'
+            : `${number(filtered.length)} / ${number(counts?.all ?? 0)} tài khoản`}
         </span>
       </div>
 
@@ -678,14 +749,35 @@ export default function Users() {
           ['Thao tác', 'w-[22%]'],
         ]}
         empty={
-          !filtered.length && (
-            <div className="flex flex-col items-center px-5 py-14 text-center text-ink-subtle">
+          (loading || listError || !filtered.length) && (
+            <div
+              className="flex flex-col items-center px-5 py-14 text-center text-ink-subtle"
+              role={loading ? 'status' : listError ? 'alert' : undefined}
+            >
               <Icon name="users" size={36} />
               <h3 className="mb-2 mt-4 text-lead font-semibold text-ink">
-                Không tìm thấy tài khoản phù hợp
+                {loading
+                  ? 'Đang tải danh sách người dùng…'
+                  : listError
+                    ? 'Không tải được danh sách người dùng'
+                    : 'Không tìm thấy tài khoản phù hợp'}
               </h3>
-              <p className="mb-4 text-caption">Thử tìm theo tên, email hoặc thay đổi bộ lọc.</p>
-              <Button onClick={resetFiltersAndNotice}>Xóa bộ lọc</Button>
+              {!loading && (
+                <>
+                  <p className="mb-4 text-caption">
+                    {listError || 'Thử tìm theo tên, email hoặc thay đổi bộ lọc.'}
+                  </p>
+                  <Button
+                    onClick={
+                      listError
+                        ? () => setRetryCount((previous) => previous + 1)
+                        : resetFiltersAndNotice
+                    }
+                  >
+                    {listError ? 'Thử lại' : 'Xóa bộ lọc'}
+                  </Button>
+                </>
+              )}
             </div>
           )
         }
@@ -701,8 +793,9 @@ export default function Users() {
                 <div className="min-w-0">
                   <button
                     type="button"
+                    title="Xem hồ sơ người dùng"
                     className={cx(
-                      'inline text-left text-small font-semibold leading-relaxed text-[#233e5e] hover:text-primary hover:underline',
+                      'inline text-left text-small font-semibold leading-relaxed text-[#233e5e] enabled:hover:text-primary enabled:hover:underline disabled:cursor-default',
                       focusRing
                     )}
                     onClick={() => openProfile(account.id)}
@@ -734,8 +827,9 @@ export default function Users() {
               <div className="flex flex-wrap gap-1.5">
                 <button
                   type="button"
+                  title="Xem hồ sơ người dùng"
                   className={cx(
-                    'inline-flex min-h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-[#c8d8eb] bg-[#f8fbff] px-2 py-1.5 text-caption font-medium text-[#376490] hover:border-[#86a9d2] hover:bg-[#e7f0fc]',
+                    'inline-flex min-h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-[#c8d8eb] bg-[#f8fbff] px-2 py-1.5 text-caption font-medium text-[#376490] enabled:hover:border-[#86a9d2] enabled:hover:bg-[#e7f0fc] disabled:cursor-not-allowed disabled:opacity-40',
                     focusRing
                   )}
                   onClick={() => openProfile(account.id)}
@@ -754,21 +848,25 @@ export default function Users() {
         ))}
       </DataTable>
 
-      <Pagination
-        page={currentPage}
-        total={filtered.length}
-        pageSize={PAGE_SIZE}
-        onChange={setPage}
-        noun="tài khoản"
-      />
+      {!loading && !listError && (
+        <Pagination
+          page={currentPage}
+          total={filtered.length}
+          pageSize={PAGE_SIZE}
+          onChange={setPage}
+          noun="tài khoản"
+        />
+      )}
 
-      {selected && modal?.kind === 'profile' && (
+      {modal?.kind === 'profile' && (
         <UserProfile
-          account={selected}
+          account={profileAccount}
           actor={actor}
-          logs={logs.filter((log) => log.userId === selected.id)}
+          loading={profileLoading}
+          error={profileError}
+          onRetry={() => setProfileVersion((previous) => previous + 1)}
           onClose={() => setModal(null)}
-          onAction={(action) => openAction(selected.id, action, true)}
+          onAction={(action) => openAction(modal.id, action, true)}
         />
       )}
       {selected && modal?.kind === 'action' && (
