@@ -33,4 +33,17 @@ export default defineConfig({
     },
     chunkSizeWarningLimit: 800,
   },
+
+  test: {
+    include: ['tests/unit/**/*.test.js'],
+    environment: 'node',
+    coverage: {
+      include: [
+        'src/lib/user/composePost.js',
+        'src/lib/user/homeFeed.js',
+        'src/lib/passwordRules.js',
+      ],
+      reporter: ['text'],
+    },
+  },
 })
