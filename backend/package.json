@@ -10,7 +10,7 @@
     "seed": "node src/seeds/index.js",
     "seed:demo": "node src/seeds/index.js --demo",
     "db:sync-indexes": "node src/scripts/syncIndexes.js",
-    "lint": "oxlint",
+    "lint": "oxlint --deny-warnings",
     "test": "node --test --test-global-setup=tests/setup/globalSetup.js --require ./tests/setup/env.js --test-timeout=60000 \"tests/**/*.test.js\"",
     "test:coverage": "node --test --test-global-setup=tests/setup/globalSetup.js --require ./tests/setup/env.js --test-timeout=60000 --experimental-test-coverage --test-coverage-include=\"src/**\" --test-coverage-exclude=\"src/seeds/**\" --test-coverage-exclude=\"src/scripts/**\" \"tests/**/*.test.js\""
   },
