@@ -304,11 +304,20 @@ function PostDetail({ post, onChanged }) {
               </time>
             </div>
 
-            {/* Mobile không có thẻ người đăng nên hiện tên ngay trên tiêu đề */}
-            <p className="m-0 mb-1.5 flex items-center gap-2 text-caption text-ink-muted lg:hidden">
+            {/* Mobile không có thẻ người đăng nên hiện tên ngay trên tiêu đề, bấm để xem trang cá nhân */}
+            <button
+              type="button"
+              onClick={openProfile}
+              aria-label={`Xem trang cá nhân của ${post.author}`}
+              className={cx(
+                'm-0 mb-1.5 inline-flex cursor-pointer items-center gap-2 rounded-lg border-0 bg-transparent p-0 text-caption font-semibold text-ink hover:text-primary lg:hidden',
+                focusRing
+              )}
+            >
               <Avatar name={post.author} size="xs" />
-              <span className="font-semibold text-ink">{post.author}</span>
-            </p>
+              {post.author}
+              <Icon name="next" size={14} className="text-ink-subtle" />
+            </button>
             <h1 className="m-0 mb-2 text-title font-bold tracking-tight text-ink lg:text-heading">
               {post.title}
             </h1>

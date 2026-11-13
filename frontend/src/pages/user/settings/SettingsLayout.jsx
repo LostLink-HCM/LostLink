@@ -34,7 +34,7 @@ export default function SettingsLayout() {
         )}
       </h1>
       <p className={cx('m-0 mb-5 text-small text-ink-muted', current && 'max-lg:hidden')}>
-        Quản lý tài khoản, thông báo và những khu vực bạn muốn để ý.
+        Quản lý tài khoản, thông báo, khu vực để ý và những người bạn đã chặn.
       </p>
 
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">

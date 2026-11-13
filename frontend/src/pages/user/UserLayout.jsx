@@ -53,8 +53,7 @@ export default function UserLayout() {
   const [liked, setLiked] = useState(() => new Set())
   const [saved, setSaved] = useState(() => new Set())
   const [followed, setFollowed] = useState(() => new Set())
-  // Theo dõi và chặn theo tên người dùng
-  const [followedUsers, setFollowedUsers] = useState(() => new Set())
+  // Người đã chặn theo tên, để khóa hội thoại mẫu ở trang Tin nhắn (chặn thật đi qua API)
   const [blockedUsers, setBlockedUsers] = useState(() => new Set())
   const [lastCommentAt, setLastCommentAt] = useState(0)
   const [chat, setChat] = useState(createUserMessages)
@@ -185,21 +184,7 @@ export default function UserLayout() {
     return true
   }
 
-  // Đang chặn nhau thì không theo dõi được
-  const toggleFollowUser = (name) => {
-    if (!requireMember() || blockedUsers.has(name)) return
-    setFollowedUsers((prev) => toggleIn(prev, name))
-  }
-
-  // Chặn thì ẩn tin của người đó ở Trang chủ, khóa hội thoại và bỏ theo dõi
-  const blockUser = (name) => {
-    setBlockedUsers((prev) => new Set(prev).add(name))
-    setFollowedUsers((prev) => {
-      const next = new Set(prev)
-      next.delete(name)
-      return next
-    })
-  }
+  const blockUser = (name) => setBlockedUsers((prev) => new Set(prev).add(name))
 
   const unblockUser = (name) =>
     setBlockedUsers((prev) => {
@@ -267,8 +252,6 @@ export default function UserLayout() {
           toggleSaved: memberToggle(setSaved),
           followed,
           toggleFollowed: memberToggle(setFollowed),
-          followedUsers,
-          toggleFollowUser,
           blockedUsers,
           blockUser,
           unblockUser,

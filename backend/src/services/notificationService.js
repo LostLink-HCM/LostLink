@@ -22,9 +22,10 @@ const GROUPS = {
     'post_deleted',
     'returned',
     'area_post',
+    'following_post',
     'stale',
   ],
-  system: ['report_result', 'warning', 'badge', 'tip'],
+  system: ['report_result', 'report_flagged', 'warning', 'badge', 'tip'],
 }
 const PREVIEW_MAX = 120
 

@@ -3,11 +3,13 @@ const { Router } = require('express')
 const ctrl = require('../controllers/postController')
 const commentCtrl = require('../controllers/commentController')
 const interactionCtrl = require('../controllers/interactionController')
+const reportCtrl = require('../controllers/reportController')
 const validate = require('../middleware/validate')
 const { commentBodyRules } = require('../middleware/validation/commentValidation')
 const { notRestricted, optionalAuth, protect } = require('../middleware/authMiddleware')
-const { parsePostForm } = require('../middleware/postForm')
-const { postCreateLimiter, postEditLimiter } = require('../middleware/rateLimiter')
+const { parsePostForm, parseReportForm } = require('../middleware/postForm')
+const { postCreateLimiter, postEditLimiter, reportLimiter } = require('../middleware/rateLimiter')
+const { postReportRules } = require('../middleware/validation/reportValidation')
 const {
   createPostRules,
   draftRules,
@@ -28,8 +30,10 @@ router.delete('/draft', protect, ctrl.deleteDraft)
 
 // Guest xem được; có đăng nhập thì ẩn thêm bài của người mình đã chặn
 router.get('/', optionalAuth, listPostsRules, validate, ctrl.listPosts)
-// Đặt trước /:type/:slug để /<id>/edit không bị hiểu là loại tin và slug
+// Đặt trước /:type/:slug để /<id>/edit, /<id>/report không bị hiểu là loại tin và slug
 router.get('/:id/edit', protect, postIdRules, rejectInvalidPostPath, ctrl.getPostForEdit)
+// Đối tượng bị báo cáo kèm báo cáo mình đã gửi
+router.get('/:id/report', protect, postIdRules, rejectInvalidPostPath, reportCtrl.getPostReport)
 // Chi tiết bài: Guest xem được; có đăng nhập thì biết đã thích/lưu/theo dõi và có phải chủ bài
 router.get('/:type/:slug', optionalAuth, postPathRules, rejectInvalidPostPath, ctrl.getPost)
 
@@ -79,5 +83,18 @@ router.put('/:id/follow', ...byId, interactionCtrl.follow)
 router.delete('/:id/follow', ...byId, interactionCtrl.unfollow)
 
 router.post('/:id/comments', ...byId, commentBodyRules, validate, commentCtrl.addComment)
+
+// Gửi báo cáo bài đăng, kiểm tra hạn mức trước khi nhận ảnh
+router.post(
+  '/:id/report',
+  protect,
+  reportLimiter,
+  postIdRules,
+  rejectInvalidPostPath,
+  parseReportForm,
+  postReportRules,
+  validate,
+  reportCtrl.reportPost
+)
 
 module.exports = router

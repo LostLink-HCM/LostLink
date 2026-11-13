@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const { beforeEach, describe, test } = require('node:test')
 
-const { Conversation, Review, UserBlock } = require('../../src/models')
+const { Conversation, Review, UserBlock, UserFollow } = require('../../src/models')
 const { createUser, loginAs, newClient } = require('../helpers/auth')
 const { useTestDb } = require('../helpers/db')
 const { authed, createWalletCategory, makePost } = require('../helpers/posts')
@@ -128,9 +128,20 @@ describe('UC20 - Xem hồ sơ người dùng khác', () => {
     notFound(await profileOf('Hoang.Nam'))
   })
 
-  test('mình chặn người đó thì vẫn xem được hồ sơ để bỏ chặn', async () => {
+  test('mình chặn người đó thì vẫn xem được hồ sơ để bỏ chặn, không liệt kê bài', async () => {
+    await makePost(owner, wallet.category)
     await UserBlock.create({ blocker: viewer._id, blocked: owner._id })
-    assert.equal((await profileOf('Hoang.Nam')).status, 200)
+
+    const res = await profileOf('Hoang.Nam')
+    assert.equal(res.status, 200)
+    assert.deepEqual(res.body.data.viewer, { following: false, blocked: true })
+    assert.deepEqual(res.body.data.posts, [])
+  })
+
+  test('trả trạng thái theo dõi, chặn của người xem', async () => {
+    await UserFollow.create({ follower: viewer._id, following: owner._id })
+    const { viewer: state } = (await profileOf('Hoang.Nam')).body.data
+    assert.deepEqual(state, { following: true, blocked: false })
   })
 
   test('chưa đăng nhập thì không xem được', async () => {

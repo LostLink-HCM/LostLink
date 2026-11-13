@@ -50,3 +50,11 @@ export const unfollowPost = (id) => api.delete(`/posts/${id}/follow`)
 export const addComment = (postId, body) => api.post(`/posts/${postId}/comments`, { body })
 export const editComment = (id, body) => api.patch(`/comments/${id}`, { body })
 export const deleteComment = (id) => api.delete(`/comments/${id}`)
+
+// ----- Báo cáo bài đăng
+
+// Bài bị báo cáo kèm báo cáo mình đã gửi (null nếu chưa gửi)
+export const getPostReport = (id) => api.get(`/posts/${id}/report`)
+
+// form: FormData gồm data (JSON lý do, mô tả) và screenshots
+export const reportPost = (id, form) => api.post(`/posts/${id}/report`, form)

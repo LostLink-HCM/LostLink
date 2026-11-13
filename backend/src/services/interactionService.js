@@ -1,6 +1,7 @@
 const { Notification, Post, PostFollow, PostLike, SavedPost } = require('../models')
 const { notify } = require('./notificationService')
 const { isPublic, postNotFound, toPostCard, withViewerState } = require('./postService')
+const createOnce = require('../utils/createOnce')
 
 const SAVED_MAX = 100
 
@@ -14,17 +15,6 @@ const findPublicPost = async (id) => {
 // Bỏ thích, bỏ lưu, bỏ theo dõi vẫn được khi bài đã bị ẩn
 const ensurePostExists = async (id) => {
   if (!(await Post.exists({ _id: id }))) throw postNotFound()
-}
-
-// Tạo bản ghi nếu chưa có, trả true khi vừa tạo
-const createOnce = async (Model, fields) => {
-  try {
-    await Model.create(fields)
-    return true
-  } catch (error) {
-    if (error.code === 11000) return false
-    throw error
-  }
 }
 
 const likeCountOf = async (postId) =>

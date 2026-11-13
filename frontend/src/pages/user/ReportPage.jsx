@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, useLocation, useOutletContext, useParams } from 'react-router-dom'
-import { useAuth } from '../../auth/AuthContext'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useOutletContext, useParams } from 'react-router-dom'
+import { getPostReport, reportPost } from '../../api/posts'
+import { getUserReport, reportUser } from '../../api/users'
 import Avatar from '../../components/user/Avatar'
 import BackLink from '../../components/user/BackLink'
 import Button from '../../components/user/Button'
@@ -11,9 +12,9 @@ import ImagePicker from '../../components/user/ImagePicker'
 import Note from '../../components/user/Note'
 import { cx, textareaClass } from '../../components/user/classes'
 import AttachedPost from '../../components/user/messages/AttachedPost'
+import { useBack, useProfileData } from '../../hooks/useProfileData'
 import { postPath } from '../../lib/user/homeFeed'
-import { peerOf, postSnapshot } from '../../lib/user/messages'
-import { findProfile, profilePath } from '../../lib/user/profiles'
+import { profilePath } from '../../lib/user/profiles'
 import {
   DESCRIPTION_MAX,
   MAX_SCREENSHOTS,
@@ -26,67 +27,36 @@ import {
 
 const pageClass = 'mx-auto max-w-160 px-4 pt-5 pb-10 sm:px-6 lg:px-10 lg:pt-7'
 const sectionTitle = 'm-0 mb-2.5 p-0 text-body font-bold text-ink'
+const FAILED = 'Đã có lỗi xảy ra, vui lòng thử lại.'
 
 let nextScreenshotId = 0
 
-// Bài, người dùng thật do trang trước gửi kèm (UserLayout chỉ có dữ liệu mẫu), phải khớp URL
-const sentPost = (state, id) => (state?.post && String(state.post.id) === id ? state.post : null)
-const sentUser = (state, username) =>
-  state?.reportUser?.username === username
-    ? { username, initials: username.slice(0, 2).toUpperCase() }
-    : null
+const peerOf = (name) => ({ name, initials: name.slice(0, 2).toUpperCase() })
 
-// Đối tượng bị báo cáo: bài đăng (từ trang chi tiết) hoặc người dùng (từ hội thoại, trang cá nhân)
-function useReportTarget() {
-  const { id, threadId, username } = useParams()
-  const { state } = useLocation()
-  const { posts, chat } = useOutletContext()
-
-  if (username) {
-    const profile = findProfile(username, { posts }) ?? sentUser(state, username)
-    if (!profile) return null
-    return {
-      type: 'user',
-      id: profile.username,
-      peer: { name: profile.username, initials: profile.initials },
-      post: null,
-      linkable: false,
-      back: { to: profilePath(profile.username), label: 'Quay lại trang cá nhân' },
-    }
-  }
-
-  if (threadId) {
-    const thread = chat.threads.find((item) => item.id === threadId)
-    if (!thread) return null
-    const back = { to: '/messages', label: 'Quay lại tin nhắn' }
-    return {
-      type: 'user',
-      id: thread.peer.name,
-      peer: thread.peer,
-      post: thread.post,
-      linkable: thread.post.id != null,
-      back,
-    }
-  }
-
-  const post = posts.find((item) => String(item.id) === id) ?? sentPost(state, id)
-  if (!post) return null
-  return {
-    type: 'post',
-    id: post.id,
-    peer: peerOf(post),
-    post: postSnapshot(post),
-    linkable: true,
-    back: { to: postPath(post), label: 'Quay lại bài đăng' },
-  }
+// Lỗi khi tải đối tượng: không có, báo cáo chính mình hoặc lỗi mạng
+const LOAD_ERRORS = {
+  CANNOT_REPORT_SELF: { title: 'Bạn không thể báo cáo chính mình' },
+  CANNOT_REPORT_OWN_POST: {
+    title: 'Bạn không thể báo cáo bài đăng của mình',
+    description: 'Nếu bài có sai sót, hãy sửa hoặc gỡ bài ở trang quản lý bài đăng.',
+  },
+}
+const NOT_FOUND = {
+  title: 'Không tìm thấy nội dung cần báo cáo',
+  description: 'Bài đăng hoặc người dùng không tồn tại hoặc đã bị ẩn.',
 }
 
-function Unavailable({ back, title, description }) {
+function Unavailable({ back, title, description, onRetry }) {
   return (
     <div className={pageClass}>
-      <BackLink to={back.to}>{back.label}</BackLink>
+      <BackLink {...back}>{back.label}</BackLink>
       <Card>
         <EmptyState icon="flag" title={title} description={description} />
+        {onRetry && (
+          <div className="flex justify-center pb-6">
+            <Button onClick={onRetry}>Thử lại</Button>
+          </div>
+        )}
       </Card>
     </div>
   )
@@ -100,17 +70,110 @@ function FieldError({ id, children }) {
   )
 }
 
-// Báo cáo vi phạm: người bị báo cáo không biết ai đã báo
+// Báo cáo vi phạm: người bị báo cáo không biết ai đã báo.
+// Bài đăng, người dùng đi qua API; báo cáo từ hội thoại còn dùng dữ liệu mẫu
 export default function ReportPage() {
-  const { user } = useAuth()
-  const { reports, submitReport, notify } = useOutletContext()
-  const target = useReportTarget()
+  const { threadId } = useParams()
+  return threadId ? <ThreadReport threadId={threadId} /> : <ApiReport />
+}
 
+function ApiReport() {
+  const { id, username } = useParams()
+  const { blockUser: lockChat, notify } = useOutletContext()
+  const back = useBack()
+  const load = useCallback(
+    () => (username ? getUserReport(username) : getPostReport(id)),
+    [id, username]
+  )
+  const { data, error, loading, reload } = useProfileData(load)
+  const [sent, setSent] = useState(null)
+
+  if (loading) {
+    return (
+      <div className={pageClass}>
+        <Card className="h-80 animate-pulse" aria-busy="true" />
+      </div>
+    )
+  }
+  if (error) {
+    const known = error.status === 404 ? NOT_FOUND : LOAD_ERRORS[error.code]
+    return (
+      <Unavailable
+        back={{ onClick: back, label: 'Quay lại' }}
+        {...(known ?? { title: 'Không thể tải trang báo cáo, vui lòng thử lại', onRetry: reload })}
+      />
+    )
+  }
+
+  const { target: info } = data
+  const target = username
+    ? {
+        type: 'user',
+        peer: peerOf(info.username),
+        post: null,
+        canBlock: !data.blocked,
+        back: { to: profilePath(info.username), label: 'Quay lại trang cá nhân' },
+      }
+    : {
+        type: 'post',
+        peer: peerOf(info.owner.username),
+        post: { ...info, image: info.coverImage },
+        postLink: postPath(info),
+        back: { to: postPath(info), label: 'Quay lại bài đăng' },
+      }
+  const saved = data.report && { ...data.report, block: data.blocked }
+
+  const submit = async ({ reason, description, screenshots, block }) => {
+    const form = new FormData()
+    form.append('data', JSON.stringify({ reason, description, ...(username && { block }) }))
+    screenshots.forEach((file) => form.append('screenshots', file))
+    try {
+      const res = await (username ? reportUser(username, form) : reportPost(id, form))
+      if (res.data.blocked) lockChat(target.peer.name)
+      setSent({ ...res.data.report, block: res.data.blocked })
+      notify('Đã gửi báo cáo cho LostLink.')
+    } catch (err) {
+      // Đã gửi ở tab khác: tải lại để hiện báo cáo cũ
+      if (err.code === 'ALREADY_REPORTED') reload()
+      else throw err
+    }
+  }
+
+  return <ReportView target={target} sent={sent ?? saved} onSubmit={submit} />
+}
+
+function ThreadReport({ threadId }) {
+  const { chat, reports, submitReport, notify } = useOutletContext()
+  const thread = chat.threads.find((item) => item.id === threadId)
+  if (!thread) {
+    return <Unavailable back={{ to: '/messages', label: 'Quay lại tin nhắn' }} {...NOT_FOUND} />
+  }
+
+  const target = {
+    type: 'user',
+    id: thread.peer.name,
+    peer: thread.peer,
+    post: thread.post,
+    canBlock: true,
+    back: { to: '/messages', label: 'Quay lại tin nhắn' },
+  }
+
+  const submit = async ({ screenshots, ...report }) => {
+    submitReport(target, { ...report, screenshots: screenshots.map((file) => file.name) })
+    notify('Đã gửi báo cáo cho LostLink.')
+  }
+
+  return <ReportView target={target} sent={reports[reportKey(target)]} onSubmit={submit} />
+}
+
+function ReportView({ target, sent, onSubmit }) {
   const [reason, setReason] = useState('')
   const [description, setDescription] = useState('')
   const [screenshots, setScreenshots] = useState([])
   const [block, setBlock] = useState(true)
   const [errors, setErrors] = useState({})
+  const [formError, setFormError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const descriptionRef = useRef(null)
 
   // Thu hồi URL xem trước của ảnh khi rời trang
@@ -123,32 +186,9 @@ export default function ReportPage() {
     []
   )
 
-  if (!target) {
-    return (
-      <Unavailable
-        back={{ to: '/', label: 'Về trang chủ' }}
-        title="Không tìm thấy nội dung cần báo cáo"
-        description="Bài đăng hoặc cuộc trò chuyện không tồn tại hoặc đã bị ẩn."
-      />
-    )
-  }
-
-  if (target.peer.name === user.username) {
-    return target.type === 'user' ? (
-      <Unavailable back={target.back} title="Bạn không thể báo cáo chính mình" />
-    ) : (
-      <Unavailable
-        back={target.back}
-        title="Bạn không thể báo cáo bài đăng của mình"
-        description="Nếu bài có sai sót, hãy sửa hoặc gỡ bài ở trang quản lý bài đăng."
-      />
-    )
-  }
-
   const { type, peer, post, back } = target
   const isUser = type === 'user'
   const required = needsDescription(reason)
-  const sent = reports[reportKey(target)]
 
   const addScreenshots = (files) =>
     setScreenshots((prev) => [
@@ -167,22 +207,31 @@ export default function ReportPage() {
     setScreenshots((prev) => prev.filter((item) => item.id !== id))
   }
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault()
     const problems = validateReport({ reason, description })
     setErrors(problems)
+    setFormError('')
     if (problems.reason) return
     if (problems.description) {
       descriptionRef.current.focus()
       return
     }
-    submitReport(target, {
-      reason,
-      description: description.trim(),
-      screenshots: screenshots.map((image) => image.name),
-      block: isUser && block,
-    })
-    notify('Đã gửi báo cáo cho LostLink.')
+    setSubmitting(true)
+    try {
+      await onSubmit({
+        reason,
+        description: description.trim(),
+        screenshots: screenshots.map((image) => image.file),
+        block: isUser && target.canBlock && block,
+      })
+    } catch (err) {
+      // Lỗi theo trường hiện dưới trường đó; quá tần suất và lỗi khác hiện cuối form
+      if (err.status === 422 && err.details.length) setErrors(err.fieldErrors)
+      else setFormError(err.status && err.status < 500 ? err.message : FAILED)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -214,7 +263,13 @@ export default function ReportPage() {
               </span>
             </div>
           </div>
-          {post && <AttachedPost post={post} linkable={target.linkable} />}
+          {post && (
+            <AttachedPost
+              post={post}
+              linkable={Boolean(target.postLink) || post.id != null}
+              to={target.postLink}
+            />
+          )}
         </div>
 
         {sent ? (
@@ -225,7 +280,7 @@ export default function ReportPage() {
               </strong>
               {reasonLabel(sent.reason)}
               {sent.description && <span className="mt-1 block italic">“{sent.description}”</span>}
-              {sent.block && <span className="mt-1 block">Bạn đã chặn {peer.name}.</span>}
+              {isUser && sent.block && <span className="mt-1 block">Bạn đã chặn {peer.name}.</span>}
             </Note>
             <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row">
               <Link to={back.to} className={buttonClass({ size: 'xl' })}>
@@ -315,16 +370,21 @@ export default function ReportPage() {
               )}
             </div>
 
-            <ImagePicker
-              title="Ảnh chụp màn hình"
-              max={MAX_SCREENSHOTS}
-              cover={false}
-              images={screenshots}
-              onAdd={addScreenshots}
-              onRemove={removeScreenshot}
-            />
+            <div>
+              <ImagePicker
+                title="Ảnh chụp màn hình"
+                max={MAX_SCREENSHOTS}
+                cover={false}
+                images={screenshots}
+                onAdd={addScreenshots}
+                onRemove={removeScreenshot}
+              />
+              {errors.screenshots && (
+                <FieldError id="report-screenshots-error">{errors.screenshots}</FieldError>
+              )}
+            </div>
 
-            {isUser && (
+            {isUser && target.canBlock && (
               <label className="flex cursor-pointer items-center gap-2.5 text-small text-ink-secondary">
                 <input
                   type="checkbox"
@@ -336,12 +396,26 @@ export default function ReportPage() {
               </label>
             )}
 
+            {formError && (
+              <div role="alert">
+                <Note icon="warning" tone="danger">
+                  {formError}
+                </Note>
+              </div>
+            )}
+
             <div className="flex flex-col-reverse gap-3 sm:flex-row">
               <Link to={back.to} className={buttonClass({ size: 'xl' })}>
                 {back.label}
               </Link>
-              <Button type="submit" variant="danger" size="xl" className="sm:ml-auto">
-                Gửi cho LostLink
+              <Button
+                type="submit"
+                variant="danger"
+                size="xl"
+                className="sm:ml-auto"
+                disabled={submitting}
+              >
+                {submitting ? 'Đang gửi…' : 'Gửi cho LostLink'}
               </Button>
             </div>
           </form>

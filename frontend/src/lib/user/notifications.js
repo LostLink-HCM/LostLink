@@ -54,6 +54,11 @@ const DESCRIBE = {
     body: item.text,
   }),
   area_post: (item) => ({ kind: 'area', title: 'Có bài mới ở khu vực bạn để ý', body: item.text }),
+  following_post: (item) => ({
+    kind: 'post',
+    title: `${item.actor?.username ?? 'Người bạn theo dõi'} vừa đăng bài mới`,
+    body: item.post?.title ?? item.text,
+  }),
   match: (item) => ({ kind: 'match', title: 'Có gợi ý ghép cặp mới', body: item.text }),
 }
 
@@ -68,6 +73,7 @@ const GROUP_OF = {
   review: 'trade',
   contact_12h: 'trade',
   report_result: 'system',
+  report_flagged: 'system',
   warning: 'system',
   badge: 'system',
   tip: 'system',
@@ -91,7 +97,7 @@ const GROUP_VISUALS = {
   system: { icon: 'shield', tone: 'from-[#c3cbd8] to-[#8e9bb0] shadow-[#8e9bb0]/30' },
 }
 // Hành động của một người cụ thể thì hiện ảnh đại diện người đó kèm huy hiệu icon
-const PERSONAL_TYPES = ['comment', 'like']
+const PERSONAL_TYPES = ['comment', 'like', 'following_post']
 
 // Thông báo từ API → dữ liệu NotificationItem
 export function describeNotification(item) {

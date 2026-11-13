@@ -22,7 +22,7 @@ export default function SearchBox({ id, value, onChange, onSearch, onClear, clas
         type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Tìm theo tên đồ vật, khu vực…"
+        placeholder="Tìm đồ vật, khu vực, người đăng…"
         className="h-10 w-full rounded-full border border-line bg-surface-muted pr-10 pl-10 text-small text-ink outline-none transition placeholder:text-ink-subtle focus:border-primary focus:bg-surface focus:ring-3 focus:ring-primary/12 [&::-webkit-search-cancel-button]:hidden"
       />
       {value && (
