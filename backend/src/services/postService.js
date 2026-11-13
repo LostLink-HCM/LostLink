@@ -10,6 +10,7 @@ const {
   PostDraft,
   PostLike,
   SavedPost,
+  User,
   UserBlock,
   VerificationChallenge,
 } = require('../models')
@@ -89,6 +90,27 @@ const keywordCondition = (q) => {
   })
 }
 
+const PARTIAL_USERNAME = /^[a-zA-Z0-9._]{1,30}$/
+const USERNAME_MIN = 3
+const OWNER_MATCH_MAX = 50
+
+const searchCondition = async (q) => {
+  const trimmed = q.trim()
+  const byName = trimmed.startsWith('@')
+  const name = byName ? trimmed.slice(1) : trimmed
+  const byText = { $and: keywordCondition(q) }
+
+  const isName = PARTIAL_USERNAME.test(name) && (byName || name.length >= USERNAME_MIN)
+  if (!isName) return byName ? { _id: null } : byText
+
+  const owners = await User.find({ username: { $regex: `^${escapeRegex(name)}`, $options: 'i' } })
+    .select('_id')
+    .limit(OWNER_MATCH_MAX)
+    .lean()
+  const byOwner = { owner: { $in: owners.map((user) => user._id) } }
+  return byName ? byOwner : { $or: [byText, byOwner] }
+}
+
 const findCategoryId = async (slug) => {
   const category = await Category.findOne({ slug }).select('_id')
   // Đúng định dạng nhưng không có trong CSDL, thường do Admin vừa xoá danh mục khi người dùng
@@ -163,7 +185,7 @@ const listPublicPosts = async (params, viewer = null) => {
   if (type) conditions.push({ type })
   if (area) conditions.push({ area })
   if (category) conditions.push({ category: await findCategoryId(category) })
-  if (q) conditions.push(...keywordCondition(q))
+  if (q) conditions.push(await searchCondition(q))
 
   // Người dùng đã đăng nhập không thấy bài của người mình đã chặn
   if (viewer) {

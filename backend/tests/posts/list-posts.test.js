@@ -222,6 +222,21 @@ describe('UC02 - Lọc và tìm kiếm bài đăng', () => {
     assert.deepEqual(titles(await list('?q=ben%20thanh')), ['Nhặt được chìa khóa'])
   })
 
+  test('tìm theo tên người đăng: khớp đầu tên, không phân biệt hoa thường, "@" chỉ tìm người đăng', async () => {
+    const other = await User.create({ username: 'BaoTran.sg', email: 'bao@example.com' })
+    await makePost({ title: 'Nhặt được chìa khóa' })
+    await makePost({ title: 'Mất ví', owner: other._id })
+    await makePost({ title: 'Gặp baotran ở chợ' })
+
+    assert.deepEqual(titles(await list('?q=baotran')).sort(), ['Gặp baotran ở chợ', 'Mất ví'])
+    assert.deepEqual(titles(await list('?q=' + encodeURIComponent('@BAOTRAN.S'))), ['Mất ví'])
+    assert.deepEqual(titles(await list('?q=' + encodeURIComponent('@b'))), ['Mất ví'])
+    // Không có "@" thì từ khóa ngắn hơn 3 ký tự chỉ tìm trong nội dung, "tran" không khớp đầu tên
+    assert.deepEqual(titles(await list('?q=ba')), ['Gặp baotran ở chợ'])
+    assert.equal((await list('?q=' + encodeURIComponent('@tran'))).body.data.total, 0)
+    assert.equal((await list('?q=' + encodeURIComponent('@'))).body.data.total, 0)
+  })
+
   test('từ khóa có ký tự đặc biệt không làm lỗi truy vấn', async () => {
     await makePost({ title: 'Mất ví (màu đen)' })
 

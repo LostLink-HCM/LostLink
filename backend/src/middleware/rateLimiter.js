@@ -33,4 +33,22 @@ const postCreateLimiter = limiter(10, { keyGenerator: (req) => `user:${req.user.
 // Sửa bài 20 lần/15 phút/tài khoản (có tải ảnh, gọi VietMap). Dùng sau protect
 const postEditLimiter = limiter(20, { keyGenerator: (req) => `user:${req.user.id}` })
 
-module.exports = { authLimiter, apiLimiter, geoLimiter, postCreateLimiter, postEditLimiter }
+// Gửi báo cáo 5 lần/15 phút/tài khoản. Lần gửi bị từ chối (thiếu lý do...) không bị tính
+const reportLimiter = limiter(5, {
+  keyGenerator: (req) => `user:${req.user.id}`,
+  skipFailedRequests: true,
+  message: {
+    success: false,
+    message: 'Bạn đã gửi quá nhiều báo cáo, vui lòng thử lại sau.',
+    code: 'REPORT_RATE_LIMITED',
+  },
+})
+
+module.exports = {
+  authLimiter,
+  apiLimiter,
+  geoLimiter,
+  postCreateLimiter,
+  postEditLimiter,
+  reportLimiter,
+}

@@ -1,4 +1,4 @@
-const { Category, Post, User } = require('../models')
+const { Category, Post, User, UserFollow } = require('../models')
 const ApiError = require('../utils/ApiError')
 const { notify } = require('./notificationService')
 const { escapeRegex, lowercaseText, normalizeText } = require('../utils/text')
@@ -157,6 +157,17 @@ const changePendingPostStatus = async ({ id, moderatorId, status, note = '' }) =
     refId: post._id,
     text: status === 'searching' ? post.title : note,
   })
+
+  if (status === 'searching') {
+    const followers = await UserFollow.find({ following: post.owner }).distinct('follower')
+    await notify(followers, {
+      type: 'following_post',
+      actor: post.owner,
+      refType: 'Post',
+      refId: post._id,
+      text: post.title,
+    })
+  }
 
   return { id: String(post._id), code: post.code, status: post.status }
 }
