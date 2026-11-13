@@ -106,6 +106,10 @@ docker compose exec backend node src/seeds/index.js   # first run only
 - To enable Google sign-in, set `VITE_GOOGLE_CLIENT_ID` in a root `.env` before building.
 - Stop with `docker compose down` (add `-v` to wipe the database).
 
+## Contributing
+
+Read the [coding convention](docs/coding-convention.md) and the [contributing guide](.github/CONTRIBUTING.md) before opening a pull request. Run `npm run ci` at the repo root to get the same checks as CI.
+
 ## Staging
 
 Deployed on Render from `main` (config in [`render.yaml`](render.yaml)): https://lostlink-web.onrender.com

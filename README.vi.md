@@ -106,6 +106,10 @@ docker compose exec backend node src/seeds/index.js   # chỉ cần lần đầu
 - Muốn bật đăng nhập Google thì đặt `VITE_GOOGLE_CLIENT_ID` trong file `.env` ở thư mục gốc trước khi build.
 - Dừng bằng `docker compose down` (thêm `-v` để xóa luôn dữ liệu).
 
+## Đóng góp
+
+Đọc [quy ước viết mã](docs/coding-convention.md) và [hướng dẫn đóng góp](.github/CONTRIBUTING.md) trước khi mở Pull Request. Chạy `npm run ci` ở thư mục gốc để kiểm tra giống như CI.
+
 ## Staging
 
 Deploy trên Render từ nhánh `main` (cấu hình trong [`render.yaml`](render.yaml)): https://lostlink-web.onrender.com
