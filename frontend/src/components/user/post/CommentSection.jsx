@@ -53,13 +53,19 @@ function CommentItem({ comment, mine, now, onEdit, onDelete }) {
 
   return (
     <li className="flex gap-3">
-      <Avatar name={comment.author} size="md" tone={mine ? 'primary' : 'neutral'} />
+      <Link
+        to={profilePath(comment.author)}
+        aria-label={`Xem trang cá nhân của ${comment.author}`}
+        className={cx('shrink-0 self-start rounded-full', focusRing)}
+      >
+        <Avatar name={comment.author} size="md" tone={mine ? 'primary' : 'neutral'} />
+      </Link>
       <div className="min-w-0 flex-1">
         <div className="mb-1 flex flex-wrap items-center gap-x-2">
           <Link
             to={profilePath(comment.author)}
             className={cx(
-              'rounded text-caption font-semibold text-ink no-underline hover:text-primary',
+              'rounded text-caption font-semibold text-ink underline-offset-2 hover:text-primary hover:underline',
               focusRing
             )}
           >

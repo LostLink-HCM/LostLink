@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router-dom'
-import { getUserProfile } from '../../api/users'
+import { blockUser, followUser, getUserProfile, unblockUser, unfollowUser } from '../../api/users'
 import { useAuth } from '../../auth/AuthContext'
 import Icon from '../../components/common/Icon'
 import BackLink from '../../components/user/BackLink'
@@ -40,19 +40,24 @@ const CONFIRMS = {
   },
 }
 
-// Trang cá nhân của người khác. Theo dõi, chặn và thao tác với bài chưa có API nên vẫn
-// xử lý ở giao diện như trang chi tiết bài
+const FAILED = 'Đã có lỗi xảy ra, vui lòng thử lại.'
+
+// Trang cá nhân của người khác: theo dõi, chặn qua API; thao tác với bài như trang chi tiết bài
 export default function UserProfilePage({ username }) {
   const navigate = useNavigate()
   const back = useBack()
   const { user } = useAuth()
   const ctx = useOutletContext()
   const { now, interactions, notify } = ctx
-  const { followedUsers, toggleFollowUser, blockedUsers, blockUser, unblockUser } = ctx
+  // Hội thoại còn là dữ liệu mẫu ở UserLayout, đồng bộ để khóa/mở khóa ở trang Tin nhắn
+  const { blockUser: lockChat, unblockUser: unlockChat } = ctx
   const load = useCallback(() => getUserProfile(username), [username])
   const { data, error, loading, reload } = useProfileData(load)
   const [tab, setTab] = useState('')
   const [confirming, setConfirming] = useState(null) // null | 'block' | 'unblock'
+  // Trạng thái sau thao tác gần nhất, trước đó dùng trạng thái server trả kèm hồ sơ
+  const [relation, setRelation] = useState(null)
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -65,21 +70,44 @@ export default function UserProfilePage({ username }) {
   // Tên đúng như tài khoản (URL có thể khác hoa thường)
   const name = profile.username
   const posts = data.posts.map((card) => toFeedPost(card, now))
-  const blocked = blockedUsers.has(name)
-  const following = followedUsers.has(name)
+  const { following, blocked } = relation ?? data.viewer
 
-  // Bỏ theo dõi chỉ đổi nút, không cần thông báo
-  const toggleFollow = () => {
-    toggleFollowUser(name)
-    if (!following) notify('Đã theo dõi người dùng.')
+  // Lỗi thì giữ nguyên trạng thái nút
+  const run = async (action) => {
+    setBusy(true)
+    try {
+      await action()
+    } catch (err) {
+      notify(err.status && err.status < 500 ? err.message : FAILED)
+    } finally {
+      setBusy(false)
+    }
   }
 
+  // Bỏ theo dõi chỉ đổi nút, không cần thông báo
+  const toggleFollow = () =>
+    run(async () => {
+      const res = await (following ? unfollowUser(name) : followUser(name))
+      setRelation({ following: res.data.following, blocked })
+      if (res.data.following) notify('Đã theo dõi người dùng.')
+    })
+
+  // Chặn thì server bỏ theo dõi hai chiều; tải lại để ẩn/hiện bài của người đó
   const confirmAction = () => {
-    if (confirming === 'block') {
-      blockUser(name)
-      notify('Đã chặn người dùng.')
-    } else unblockUser(name)
+    const blocking = confirming === 'block'
     setConfirming(null)
+    run(async () => {
+      if (blocking) {
+        await blockUser(name)
+        lockChat(name)
+        notify('Đã chặn người dùng.')
+      } else {
+        await unblockUser(name)
+        unlockChat(name)
+      }
+      setRelation({ following: false, blocked: blocking })
+      reload()
+    })
   }
 
   // Thao tác với bài như trang chi tiết, đã chặn thì không liên hệ
@@ -130,6 +158,7 @@ export default function UserProfilePage({ username }) {
         <Button
           variant={following ? 'secondary' : 'primary'}
           pressed={following}
+          disabled={busy}
           onClick={toggleFollow}
         >
           <Icon name="bell" size={15} />
@@ -137,9 +166,11 @@ export default function UserProfilePage({ username }) {
         </Button>
       )}
       {blocked ? (
-        <Button onClick={() => setConfirming('unblock')}>Bỏ chặn</Button>
+        <Button disabled={busy} onClick={() => setConfirming('unblock')}>
+          Bỏ chặn
+        </Button>
       ) : (
-        <Button variant="dangerSoft" onClick={() => setConfirming('block')}>
+        <Button variant="dangerSoft" disabled={busy} onClick={() => setConfirming('block')}>
           Chặn
         </Button>
       )}
@@ -162,8 +193,7 @@ export default function UserProfilePage({ username }) {
       <ProfileHeader profile={profile} actions={actions}>
         {blocked && (
           <Note icon="lock" tone="warning" className="mt-5">
-            Bạn đã chặn {name}. Tin của họ không hiện ở Trang chủ của bạn và hội thoại giữa hai
-            người đã bị khóa.
+            Bạn đã chặn {name}.
           </Note>
         )}
       </ProfileHeader>
