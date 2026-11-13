@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import { cx } from '../../components/user/classes'
+import MobileTabBar from '../../components/user/home/MobileTabBar'
 import SiteHeader from '../../components/user/home/SiteHeader'
 import { createFeedComments, createFeedPosts, createMyPosts } from '../../data/homeFeed'
 import { createMatchSuggestions } from '../../data/matchSuggestions'
@@ -22,12 +23,14 @@ import {
   startRequest,
 } from '../../lib/user/messages'
 import { usePostInteractions } from '../../hooks/usePostInteractions'
+import useTimeOfDay from '../../hooks/useTimeOfDay'
 import { useUnreadNotifications } from '../../hooks/useUnreadNotifications'
 
 // Khu người dùng dùng xanh thương hiệu thay cho xanh đậm của khu quản trị
 const userTheme = [
   '[--color-primary:#2e6db4] [--color-primary-hover:#1e4e86] [--color-primary-soft:#e7f0fb] [--color-primary-subtle:#f1f6fc]',
-  '[--text-caption:11px] [--text-small:11.7px] [--text-body:12.6px] [--text-lead:13.5px] [--text-title:16.2px] [--text-heading:21.6px]',
+  // Khoảng 80% cỡ chữ cũ cho thoáng; cỡ nhỏ nhất giữ từ 8.5px trở lên để chữ có dấu còn đọc được
+  '[--text-caption:9.5px] [--text-small:9.8px] [--text-body:10.2px] [--text-lead:10.8px] [--text-title:13px] [--text-heading:17.3px] [--text-display:22.4px] [--text-tiny:9px] [--text-micro:8.5px]',
 ].join(' ')
 
 // Chống spam bình luận
@@ -215,6 +218,8 @@ export default function UserLayout() {
   }
 
   const unreadMessages = inboxUnread(chat.threads)
+  // Header và thanh tab đổi màu trời theo giờ, dùng chung token với khu auth
+  const time = useTimeOfDay()
 
   const search = {
     value: searchInput,
@@ -231,8 +236,20 @@ export default function UserLayout() {
   }
 
   return (
-    <div className={cx('min-h-dvh bg-canvas font-sans text-ink', userTheme)}>
+    <div
+      data-auth-time={time}
+      className={cx(
+        'relative isolate min-h-dvh bg-canvas font-sans text-ink max-lg:pb-[calc(4.5rem+env(safe-area-inset-bottom))]',
+        userTheme
+      )}
+    >
+      {/* Lớp màu trời mờ phía trên nền trang, nhạt dần xuống dưới */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 bg-linear-to-b from-au-sky-3/15 to-transparent"
+      />
       <SiteHeader
+        time={time}
         search={search}
         unreadMessages={unreadMessages}
         unreadNotifications={unreadNotifications}
@@ -286,10 +303,12 @@ export default function UserLayout() {
         }}
       />
 
+      <MobileTabBar unreadMessages={unreadMessages} unreadNotifications={unreadNotifications} />
+
       {toast && (
         <div
           role="status"
-          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-ink px-4 py-2.5 text-caption font-medium text-white shadow-dialog motion-safe:animate-ll-fade"
+          className="fixed bottom-6 left-1/2 z-50 max-lg:bottom-[calc(5.5rem+env(safe-area-inset-bottom))] -translate-x-1/2 rounded-full bg-ink px-4 py-2.5 text-caption font-medium text-white shadow-dialog motion-safe:animate-ll-fade"
         >
           {toast}
         </div>

@@ -46,7 +46,7 @@ export default function UserMenu() {
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         className={cx(
-          'grid size-10 cursor-pointer place-items-center rounded-full border border-primary/25 bg-primary-soft text-caption font-bold text-primary transition-shadow hover:shadow-[0_2px_10px_rgb(46_109_180/0.22)]',
+          'grid size-9 cursor-pointer place-items-center rounded-full border border-primary/25 bg-primary-soft text-caption font-bold text-primary transition-shadow hover:shadow-[0_2px_10px_rgb(46_109_180/0.22)]',
           focusRing
         )}
       >

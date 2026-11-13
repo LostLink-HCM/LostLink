@@ -278,7 +278,7 @@ export default function MessagesPage() {
     <div className="mx-auto max-w-360 px-4 pt-5 pb-6 sm:px-6 lg:px-10">
       <div
         className={cx(
-          'grid h-[calc(100dvh-7rem)] min-h-130 grid-cols-1 gap-4 lg:h-[calc(100dvh-7.5rem)]',
+          'grid h-[calc(100dvh-11.5rem-env(safe-area-inset-bottom))] min-h-130 grid-cols-1 gap-4 lg:h-[calc(100dvh-7.5rem)]',
           'md:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)_300px]'
         )}
       >

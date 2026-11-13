@@ -1,9 +1,8 @@
 import { TYPE_LABELS } from '../../../lib/user/homeFeed'
 import { cx, tagClass } from '../classes'
-
 const tones = {
-  lost: 'bg-danger-soft text-danger-ink',
-  found: 'bg-primary-soft text-primary',
+  lost: 'bg-[#ffe4e9] text-[#e11d48]',
+  found: 'bg-[#d1fae5] text-[#059669]',
 }
 
 // Nhãn Mất đồ / Nhặt được dùng chung cho thẻ bài đăng và trang chi tiết

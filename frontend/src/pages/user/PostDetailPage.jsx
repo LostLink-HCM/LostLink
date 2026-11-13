@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { addComment, deleteComment, editComment, getPost } from '../../api/posts'
 import { useAuth } from '../../auth/AuthContext'
 import Icon from '../../components/common/Icon'
@@ -82,6 +82,21 @@ function usePostDetail(type, slug) {
 }
 
 // Chi tiết bài đăng, mở ở /mat-do/<slug> hoặc /nhat-duoc/<slug>
+// Thẻ bài gửi kèm trang đang xem (state.from): quay lại đúng trang đó, giữ nguyên bộ lọc và vị trí cuộn.
+// Mở thẳng bằng link thì không có trang trước trong app, về Trang chủ
+function BackToList() {
+  const { state } = useLocation()
+  const navigate = useNavigate()
+  const from = state?.from
+  const label = from?.startsWith('/trending') ? 'Quay lại Tin hot' : 'Quay lại danh sách'
+
+  return from ? (
+    <BackLink onClick={() => navigate(-1)}>{label}</BackLink>
+  ) : (
+    <BackLink to="/">{label}</BackLink>
+  )
+}
+
 export default function PostDetailPage({ type }) {
   const { slug } = useParams()
   const { post, error, loading, reload } = usePostDetail(type, slug)
@@ -97,7 +112,7 @@ export default function PostDetailPage({ type }) {
     const missing = error.status === 404
     return (
       <div className={pageClass}>
-        <BackLink to="/">Quay lại danh sách</BackLink>
+        <BackToList />
         <Card>
           <EmptyState
             icon={missing ? 'search' : 'warning'}
@@ -263,7 +278,7 @@ function PostDetail({ post, onChanged }) {
 
   return (
     <div className={pageClass}>
-      <BackLink to="/">Quay lại danh sách</BackLink>
+      <BackToList />
 
       {/* Mobile: ảnh, thông tin rồi bình luận, hành động nằm trong nút ⋯; desktop: cột phải dính bên cạnh */}
       <main className="grid grid-cols-1 items-start gap-x-6 gap-y-4 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -562,7 +577,7 @@ function DetailSkeleton() {
       <div className="mb-4 h-5 w-40 animate-pulse rounded bg-line-subtle" />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex flex-col gap-4">
-          <div className="aspect-4/3 animate-pulse rounded-2xl bg-line-subtle sm:aspect-auto sm:h-80 lg:h-90" />
+          <div className="aspect-4/3 animate-pulse rounded-2xl bg-line-subtle sm:aspect-auto sm:h-80 lg:h-96" />
           <div className="flex flex-col gap-3 rounded-2xl bg-surface p-6">
             <div className="h-3 w-1/3 animate-pulse rounded bg-line-subtle" />
             <div className="h-6 w-3/4 animate-pulse rounded bg-line-subtle" />

@@ -5,6 +5,7 @@ import Icon from '../../common/Icon'
 import Button from '../Button'
 import { cx, focusRing } from '../classes'
 import CategoryIcon from './CategoryIcon'
+import DateField from './DateField'
 
 const typeButtonTones = {
   all: {
@@ -18,14 +19,14 @@ const typeButtonTones = {
     active: 'border-danger/70 ring-3 ring-danger/12',
   },
   found: {
-    base: 'bg-primary-soft text-primary',
-    idle: 'border-primary/18 hover:border-primary/40',
-    active: 'border-primary/70 ring-3 ring-primary/12',
+    base: 'bg-success-soft text-success',
+    idle: 'border-success/18 hover:border-success/40',
+    active: 'border-success/70 ring-3 ring-success/12',
   },
 }
 
 const legendClass =
-  'mb-2 p-0 text-[9.5px] font-semibold tracking-[0.06em] text-ink-subtle uppercase'
+  'mb-1.5 p-0 text-[9px] font-semibold tracking-[0.06em] text-ink-subtle uppercase'
 
 const chipClass = (active) =>
   cx(
@@ -37,7 +38,7 @@ const chipClass = (active) =>
   )
 
 const dateClass =
-  'h-9 w-full rounded-xl border border-line bg-surface px-2.5 text-caption text-ink outline-none focus:border-primary focus:ring-3 focus:ring-primary/12 aria-invalid:border-danger'
+  'h-8 rounded-lg border border-line bg-surface px-2 text-caption outline-none focus-visible:border-primary aria-invalid:border-danger'
 
 // Chỉnh trên bản nháp, bấm "Áp dụng bộ lọc" mới lọc danh sách
 export default function FeedFilters({
@@ -48,6 +49,7 @@ export default function FeedFilters({
   onReset,
   error,
   idPrefix,
+  scrollBody = false,
 }) {
   const setDate = (key) => (e) => onChange({ [key]: e.target.value, range: 'custom' })
 
@@ -58,7 +60,7 @@ export default function FeedFilters({
         e.preventDefault()
         onApply()
       }}
-      className="flex flex-col gap-5 [--text-body:11.5px] [--text-caption:10px] [--text-small:10.5px]"
+      className="flex min-h-0 flex-col gap-3 [--text-body:10.5px] [--text-caption:9.5px] [--text-small:9.5px]"
     >
       {/* Giữ chiều cao cố định để nút xuất hiện không đẩy các mục bên dưới */}
       <div className="flex min-h-7 items-center justify-between">
@@ -83,106 +85,114 @@ export default function FeedFilters({
         )}
       </div>
 
-      <fieldset className="m-0 border-0 p-0">
-        <legend className={legendClass}>Loại tin</legend>
-        <div className="grid grid-cols-3 gap-1.5">
-          {[['', 'Tất cả'], ...Object.entries(TYPE_LABELS)].map(([value, label]) => {
-            const active = draft.type === value
-            const tone = typeButtonTones[value || 'all']
-            return (
-              <button
-                key={value || 'all'}
-                type="button"
-                aria-pressed={active}
-                onClick={() => onChange({ type: value })}
-                className={cx(
-                  'h-9.5 cursor-pointer rounded-xl border-[1.5px] px-1 text-caption whitespace-nowrap transition',
-                  tone.base,
-                  active ? cx('font-semibold', tone.active) : cx('font-medium', tone.idle),
-                  focusRing
-                )}
-              >
-                {label}
-              </button>
-            )
-          })}
-        </div>
-      </fieldset>
-
-      <PickList
-        legend="Danh mục"
-        value={draft.category}
-        options={CATEGORIES}
-        allLabel="Tất cả danh mục"
-        unit="danh mục"
-        renderIcon={(name) => <CategoryIcon name={name || 'Tất cả'} />}
-        onPick={(category) => onChange({ category })}
-      />
-
-      <PickList
-        legend="Khu vực"
-        value={draft.area}
-        options={AREAS}
-        allLabel="Tất cả khu vực"
-        unit="khu vực"
-        renderIcon={(area) => <Icon name={area ? 'pin' : 'locate'} size={16} />}
-        onPick={(area) => onChange({ area })}
-      />
-
-      <fieldset className="m-0 border-0 p-0">
-        <legend className={legendClass}>Khoảng thời gian</legend>
-        <div className="mb-3 grid grid-cols-3 gap-1.5">
-          {TIME_RANGES.map((range) => (
-            <button
-              key={range.value}
-              type="button"
-              aria-pressed={draft.range === range.value}
-              onClick={() => onChange({ range: range.value, from: '', to: '' })}
-              className={cx('h-9 whitespace-nowrap', chipClass(draft.range === range.value))}
-            >
-              {range.label}
-            </button>
-          ))}
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          {[
-            ['from', 'Từ ngày', { max: draft.to || undefined }],
-            ['to', 'Đến ngày', { min: draft.from || undefined }],
-          ].map(([key, label, limits]) => (
-            <div key={key}>
-              <label
-                htmlFor={`${idPrefix}-${key}`}
-                className="mb-1 block text-[9.5px] font-medium text-ink-secondary"
-              >
-                {label}
-              </label>
-              <input
-                id={`${idPrefix}-${key}`}
-                type="date"
-                value={draft[key]}
-                onChange={setDate(key)}
-                aria-invalid={error ? true : undefined}
-                aria-describedby={error ? `${idPrefix}-error` : undefined}
-                className={dateClass}
-                {...limits}
-              />
-            </div>
-          ))}
-        </div>
-        {error && (
-          <p
-            id={`${idPrefix}-error`}
-            role="alert"
-            className="mt-2 mb-0 text-caption text-danger-ink"
-          >
-            {error}
-          </p>
+      {/* scrollBody: tiêu đề đứng yên, chỉ phần dưới cuộn khi khung bị giới hạn chiều cao */}
+      <div
+        className={cx(
+          'flex flex-col gap-3.5',
+          scrollBody &&
+            '-mr-3 min-h-0 overflow-y-auto overscroll-contain pr-3 pb-1 [scrollbar-width:thin]'
         )}
-      </fieldset>
+      >
+        <fieldset className="m-0 border-0 p-0">
+          <legend className={legendClass}>Loại tin</legend>
+          <div className="grid grid-cols-3 gap-1.5">
+            {[['', 'Tất cả'], ...Object.entries(TYPE_LABELS)].map(([value, label]) => {
+              const active = draft.type === value
+              const tone = typeButtonTones[value || 'all']
+              return (
+                <button
+                  key={value || 'all'}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => onChange({ type: value })}
+                  className={cx(
+                    'h-8 cursor-pointer rounded-lg border-[1.5px] px-1 text-caption whitespace-nowrap transition',
+                    tone.base,
+                    active ? cx('font-semibold', tone.active) : cx('font-medium', tone.idle),
+                    focusRing
+                  )}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        </fieldset>
 
-      <Button type="submit" variant="primary" size="xl" block>
-        Áp dụng bộ lọc
-      </Button>
+        <PickList
+          legend="Danh mục"
+          value={draft.category}
+          options={CATEGORIES}
+          allLabel="Tất cả danh mục"
+          unit="danh mục"
+          renderIcon={(name) => <CategoryIcon name={name || 'Tất cả'} size={14} />}
+          onPick={(category) => onChange({ category })}
+        />
+
+        <PickList
+          legend="Khu vực"
+          value={draft.area}
+          options={AREAS}
+          allLabel="Tất cả khu vực"
+          unit="khu vực"
+          renderIcon={(area) => <Icon name={area ? 'pin' : 'locate'} size={14} />}
+          onPick={(area) => onChange({ area })}
+        />
+
+        <fieldset className="m-0 border-0 p-0">
+          <legend className={legendClass}>Khoảng thời gian</legend>
+          <div className="mb-2 grid grid-cols-3 gap-1.5">
+            {TIME_RANGES.map((range) => (
+              <button
+                key={range.value}
+                type="button"
+                aria-pressed={draft.range === range.value}
+                onClick={() => onChange({ range: range.value, from: '', to: '' })}
+                className={cx('h-7.5 whitespace-nowrap', chipClass(draft.range === range.value))}
+              >
+                {range.label}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              ['from', 'Từ ngày', { max: draft.to || undefined }],
+              ['to', 'Đến ngày', { min: draft.from || undefined }],
+            ].map(([key, label, limits]) => (
+              <div key={key}>
+                <label
+                  htmlFor={`${idPrefix}-${key}`}
+                  className="mb-0.5 block text-[9px] font-medium text-ink-secondary"
+                >
+                  {label}
+                </label>
+                <DateField
+                  id={`${idPrefix}-${key}`}
+                  value={draft[key]}
+                  onChange={setDate(key)}
+                  invalid={Boolean(error)}
+                  describedBy={error ? `${idPrefix}-error` : undefined}
+                  className={dateClass}
+                  {...limits}
+                />
+              </div>
+            ))}
+          </div>
+          {error && (
+            <p
+              id={`${idPrefix}-error`}
+              role="alert"
+              className="mt-2 mb-0 text-caption text-danger-ink"
+            >
+              {error}
+            </p>
+          )}
+        </fieldset>
+
+        <Button type="submit" variant="primary" size="lg" block>
+          Áp dụng bộ lọc
+        </Button>
+      </div>
     </form>
   )
 }
@@ -209,7 +219,7 @@ function PickList({ legend, value, options, allLabel, unit, renderIcon, onPick }
                 setExpanded(false)
               }}
               className={cx(
-                'flex cursor-pointer items-center gap-2.5 rounded-xl border-0 px-2 py-1.5 text-left text-caption transition-colors',
+                'flex cursor-pointer items-center gap-2 rounded-lg border-0 px-1.5 py-1 text-left text-caption transition-colors',
                 active
                   ? 'bg-primary-soft font-semibold text-primary'
                   : 'bg-transparent font-medium text-ink hover:bg-surface-muted',
@@ -218,7 +228,7 @@ function PickList({ legend, value, options, allLabel, unit, renderIcon, onPick }
             >
               <span
                 className={cx(
-                  'grid size-8 shrink-0 place-items-center rounded-lg',
+                  'grid size-6.5 shrink-0 place-items-center rounded-md',
                   active ? 'bg-surface text-primary' : 'bg-line-subtle text-ink-muted'
                 )}
               >
@@ -233,7 +243,7 @@ function PickList({ legend, value, options, allLabel, unit, renderIcon, onPick }
           aria-expanded={expanded}
           onClick={() => setExpanded((v) => !v)}
           className={cx(
-            'mt-1 flex cursor-pointer items-center gap-1 self-start rounded-lg border-0 bg-transparent px-2 py-1 text-caption font-medium text-primary hover:bg-primary-subtle',
+            'mt-0.5 flex cursor-pointer items-center gap-1 self-start rounded-lg border-0 bg-transparent px-1.5 py-0.5 text-caption font-medium text-primary hover:bg-primary-subtle',
             focusRing
           )}
         >
