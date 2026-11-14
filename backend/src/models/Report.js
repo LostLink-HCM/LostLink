@@ -20,6 +20,7 @@ const reportSchema = new Schema(
     // Báo cáo bài đăng (từ trang chi tiết) hoặc người dùng (từ hội thoại, hồ sơ)
     targetType: { type: String, enum: ['post', 'user'], required: true },
     targetPost: { type: Schema.Types.ObjectId, ref: 'Post', default: null, index: true },
+    // Báo cáo bài đăng cũng lưu chủ bài để đếm số người báo cáo một tài khoản
     targetUser: { type: Schema.Types.ObjectId, ref: 'User', default: null, index: true },
 
     // Lý do theo: spam, tin giả, nhận vơ, đòi tiền, quấy rối, khác
@@ -79,4 +80,9 @@ reportSchema.index(
   { unique: true, partialFilterExpression: { targetType: 'user' } }
 )
 
-module.exports = mongoose.model('Report', reportSchema)
+const Report = mongoose.model('Report', reportSchema)
+Report.REASONS_BY_TARGET = REASONS_BY_TARGET
+Report.DESCRIPTION_MAX = DESCRIPTION_MAX
+Report.MAX_SCREENSHOTS = MAX_SCREENSHOTS
+
+module.exports = Report

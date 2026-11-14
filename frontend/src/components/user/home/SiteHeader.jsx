@@ -1,158 +1,193 @@
+import { useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '../../../auth/AuthContext'
+import Logo from '../../auth/scene/Logo'
 import Icon from '../../common/Icon'
-import Logo from '../../common/Logo'
-import { buttonClass } from '../buttonClass'
-import CountBadge from '../CountBadge'
 import { cx, focusRing } from '../classes'
+import HeaderPets from './HeaderPets'
 import SearchBox from './SearchBox'
+import SlidingTabs from './SlidingTabs'
 import UserMenu from './UserMenu'
 
-const headerShadow = 'shadow-[0_2px_10px_rgb(46_109_180/0.28)]'
+// Sao chỉ hiện chiều và đêm, độ đậm lấy từ --au-star-opacity theo data-auth-time
+const STARS = [
+  [8, 28],
+  [21, 66],
+  [34, 18],
+  [47, 52],
+  [58, 24],
+  [69, 70],
+  [81, 30],
+  [92, 58],
+]
+  .map(([x, y]) => `radial-gradient(1.2px 1.2px at ${x}% ${y}%, #fff 50%, transparent 51%)`)
+  .join(', ')
 
-// Guest vẫn thấy Tin nhắn => bấm vào thì RequireAuth đưa sang đăng nhập rồi quay lại
-function NavItem({ to, end, label, badge = 0, unit, className }) {
+// Nút chính trên header dùng cùng màu nút của khu auth, đổi theo giờ
+const ctaClass =
+  'inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-full border-0 bg-linear-to-b from-au-primary-light to-au-primary-dark px-4 text-small font-semibold whitespace-nowrap text-au-on-primary no-underline shadow-au-button transition hover:brightness-110'
+const glassClass =
+  'inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-full border border-white/25 bg-white/10 px-4 text-small font-semibold whitespace-nowrap text-white no-underline transition-colors hover:bg-white/18'
+
+// Mặt trời, mặt trời lặn hoặc trăng khuyết theo giờ
+// Nửa mặt trời hoặc trăng khuyết lặn sau mép dưới header, màu nhạt để không bị nhầm là nút
+function SkyOrb({ time }) {
   return (
-    <NavLink
-      to={to}
-      end={end}
-      aria-label={badge ? `${label}, ${badge} ${unit} chưa đọc` : undefined}
-      className={({ isActive }) =>
-        cx(
-          'relative flex items-center gap-2 rounded-lg px-3.5 py-2 text-small font-medium no-underline transition-colors hover:bg-primary-subtle',
-          isActive ? 'text-primary' : 'text-ink-secondary',
-          focusRing,
-          className
-        )
-      }
-    >
-      {({ isActive }) => (
-        <>
-          {label}
-          {badge > 0 && <CountBadge count={badge} />}
-          {isActive && (
-            <span className="absolute inset-x-3.5 -bottom-3.5 h-0.5 rounded-full bg-primary" />
-          )}
-        </>
-      )}
-    </NavLink>
+    <span aria-hidden="true" className="pointer-events-none h-5 w-10 shrink-0 overflow-hidden">
+      <span
+        className={cx(
+          'block size-10 rounded-full opacity-60 [background:radial-gradient(circle,color-mix(in_srgb,var(--color-au-sun)_70%,white)_0_42%,transparent_70%)]',
+          time === 'night' &&
+            '[mask-image:radial-gradient(circle_at_78%_22%,transparent_13px,#000_14px)]'
+        )}
+      />
+    </span>
   )
 }
 
-function MobileIconLink({ to, icon, label, badge, unit }) {
-  return (
-    <NavLink
-      to={to}
-      aria-label={badge ? `${label}, ${badge} ${unit} chưa đọc` : label}
-      title={label}
-      className={({ isActive }) =>
-        cx(
-          'relative grid size-10 place-items-center rounded-full border transition-colors lg:hidden',
-          isActive
-            ? 'border-primary/40 bg-primary-soft text-primary'
-            : 'border-line bg-surface text-ink-secondary hover:bg-primary-subtle hover:text-primary',
-          focusRing
-        )
-      }
-    >
-      <Icon name={icon} size={18} />
-      {badge > 0 && (
-        <CountBadge
-          count={badge}
-          size="sm"
-          className="absolute -top-1 -right-1 ring-2 ring-surface"
-        />
-      )}
-    </NavLink>
-  )
-}
-
-export default function SiteHeader({ search, unreadMessages = 0, unreadNotifications = 0 }) {
+export default function SiteHeader({ time, search, unreadMessages = 0, unreadNotifications = 0 }) {
   const { user } = useAuth()
   const unread = user ? unreadMessages : 0
   const unreadAlerts = user ? unreadNotifications : 0
+  // Điện thoại: ô tìm thu thành nút kính lúp, bấm mới mở đè lên header
+  const [searchOpen, setSearchOpen] = useState(false)
+
+  const tabs = [
+    { to: '/', end: true, label: 'Trang chủ', icon: 'home' },
+    { to: '/trending', label: 'Tin hot', icon: 'trendUp' },
+    {
+      to: '/messages',
+      label: 'Tin nhắn',
+      icon: 'chat',
+      badge: unread,
+      unit: 'hội thoại',
+    },
+    {
+      to: '/notifications',
+      label: 'Thông báo',
+      icon: 'bell',
+      badge: unreadAlerts,
+      unit: 'thông báo',
+    },
+    // Từ xl bảng vinh danh đã nằm ở cột phải trang chủ
+    {
+      to: '/leaderboard',
+      label: 'Bảng vinh danh',
+      icon: 'trophy',
+      className: 'xl:hidden',
+    },
+  ]
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-surface/90 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-360 items-center gap-4 px-4 sm:px-6 lg:h-18 lg:gap-8 lg:px-10">
+    <header className="sticky top-0 z-40 bg-au-sky-1 max-lg:rounded-b-2xl bg-linear-to-r from-au-sky-1 via-au-sky-2 to-au-sky-3 text-white shadow-[0_6px_24px_-14px_rgb(5_11_22/0.7)]">
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 rounded-[inherit] opacity-(--au-star-opacity)"
+        style={{ backgroundImage: STARS }}
+      />
+      <div className="relative mx-auto flex h-16 max-w-360 items-center gap-3 px-4 sm:gap-4 sm:px-6 lg:gap-4 lg:px-8 xl:gap-5">
         <Link
           to="/"
           aria-label="LostLink - Trang chủ"
-          className={cx('flex items-center gap-2.5 rounded-lg no-underline', focusRing)}
+          className={cx(
+            'flex shrink-0 items-center gap-2.5 rounded-lg text-white no-underline',
+            focusRing
+          )}
         >
-          <Logo size={34} animated />
-          <span className="text-title font-bold tracking-tight text-primary max-[359px]:hidden">
-            LostLink
-          </span>
+          <Logo tone="header" className="block size-7.5" />
+          <span className="text-title font-bold tracking-tight max-sm:hidden">LostLink</span>
         </Link>
 
-        <nav aria-label="Điều hướng chính" className="hidden items-center gap-1 lg:flex">
-          <NavItem to="/" end label="Trang chủ" />
-          <NavItem to="/trending" label="Tin hot" />
-          <NavItem to="/messages" label="Tin nhắn" badge={unread} unit="hội thoại" />
-          <NavItem to="/notifications" label="Thông báo" badge={unreadAlerts} unit="thông báo" />
-          {/* Từ xl bảng vinh danh đã nằm ở cột phải trang chủ */}
-          <NavItem to="/leaderboard" label="Bảng vinh danh" className="xl:hidden" />
-        </nav>
+        <SlidingTabs items={tabs} label="Điều hướng chính" className="hidden shrink-0 lg:flex" />
+
+        {/* Khoảng trống còn lại của header, nửa mặt trời hoặc trăng nằm trên mép dưới */}
+        <div className="flex min-w-0 flex-1 items-end self-stretch lg:justify-end">
+          <SkyOrb time={time} />
+        </div>
+
+        <HeaderPets className="h-7 shrink-0 self-end max-[359px]:hidden lg:hidden xl:flex" />
 
         <SearchBox
           id="header-search"
+          tone="sky"
           {...search}
-          className="ml-auto hidden w-full max-w-90 lg:block"
+          className="hidden shrink-0 lg:block lg:w-44 xl:w-64 2xl:w-72"
         />
 
-        <div className="ml-auto flex items-center gap-2 lg:ml-0">
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            aria-label="Tìm bài đăng"
+            onClick={() => setSearchOpen(true)}
+            className={cx(
+              'grid size-9 cursor-pointer place-items-center rounded-full border border-white/25 bg-white/10 text-white transition-colors hover:bg-white/18 lg:hidden',
+              focusRing
+            )}
+          >
+            <Icon name="search" size={17} />
+          </button>
           {user ? (
             <>
               <Link
                 to="/posts/new"
                 aria-label="Đăng bài"
-                className={buttonClass({
-                  variant: 'primary',
-                  size: 'lg',
-                  className: cx(headerShadow, 'max-sm:px-3'),
-                })}
+                className={cx(ctaClass, 'max-sm:px-2.5', focusRing)}
               >
                 <Icon name="compose" size={16} />
                 <span className="hidden sm:inline">Đăng bài</span>
               </Link>
-              <MobileIconLink
-                to="/messages"
-                icon="chat"
-                label="Tin nhắn"
-                badge={unread}
-                unit="hội thoại"
-              />
-              <MobileIconLink
-                to="/notifications"
-                icon="bell"
-                label="Thông báo"
-                badge={unreadAlerts}
-                unit="thông báo"
-              />
               <UserMenu />
             </>
           ) : (
             <>
-              {/* User mở Bảng vinh danh từ menu tài khoản, header mobile hết chỗ */}
-              <MobileIconLink to="/leaderboard" icon="trophy" label="Bảng vinh danh" />
-              <Link to="/login" className={buttonClass({ variant: 'soft', size: 'lg' })}>
+              {/* Header mobile hết chỗ cho tab Bảng vinh danh nên để nút riêng */}
+              <NavLink
+                to="/leaderboard"
+                aria-label="Bảng vinh danh"
+                title="Bảng vinh danh"
+                className={cx(
+                  'grid size-10 place-items-center rounded-full border border-white/25 bg-white/10 text-white transition-colors hover:bg-white/18 lg:hidden',
+                  focusRing
+                )}
+              >
+                <Icon name="trophy" size={18} />
+              </NavLink>
+              <Link to="/login" className={cx(glassClass, focusRing)}>
                 Đăng nhập
               </Link>
-              <Link
-                to="/register"
-                className={buttonClass({
-                  variant: 'primary',
-                  size: 'lg',
-                  className: cx(headerShadow, 'max-sm:hidden'),
-                })}
-              >
+              <Link to="/register" className={cx(ctaClass, 'max-sm:hidden', focusRing)}>
                 Đăng ký
               </Link>
             </>
           )}
         </div>
       </div>
+
+      {searchOpen && (
+        <div className="absolute inset-0 z-20 flex items-center gap-2 rounded-[inherit] bg-au-sky-1 bg-linear-to-r from-au-sky-1 to-au-sky-2 px-3 motion-safe:animate-ll-fade lg:hidden">
+          <SearchBox
+            id="header-search-mobile"
+            tone="sky"
+            autoFocus
+            {...search}
+            onSearch={(value) => {
+              search.onSearch(value)
+              setSearchOpen(false)
+            }}
+            className="min-w-0 flex-1"
+          />
+          <button
+            type="button"
+            onClick={() => setSearchOpen(false)}
+            className={cx(
+              'shrink-0 cursor-pointer rounded-full border-0 bg-transparent px-2 py-2 text-small font-semibold text-white/85 hover:text-white',
+              focusRing
+            )}
+          >
+            Huỷ
+          </button>
+        </div>
+      )}
     </header>
   )
 }

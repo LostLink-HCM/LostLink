@@ -2,12 +2,13 @@ const cloudinary = require('../config/cloudinary')
 const ApiError = require('../utils/ApiError')
 
 const POST_FOLDER = 'lostlink/posts'
+const REPORT_FOLDER = 'lostlink/reports'
 const ALLOWED_FORMATS = ['jpg', 'jpeg', 'png', 'webp']
 
-const uploadOne = (file) =>
+const uploadOne = (file, folder) =>
   new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
-      { folder: POST_FOLDER, resource_type: 'image', allowed_formats: ALLOWED_FORMATS },
+      { folder, resource_type: 'image', allowed_formats: ALLOWED_FORMATS },
       (error, result) =>
         error ? reject(error) : resolve({ url: result.secure_url, publicId: result.public_id })
     )
@@ -24,10 +25,9 @@ const deleteImages = async (publicIds) => {
     .forEach((result) => console.error('Không xoá được ảnh trên Cloudinary', result.reason))
 }
 
-// Tải song song, giữ đúng thứ tự người dùng chọn (ảnh đầu tiên là ảnh bìa).
-// Một ảnh lỗi thì xoá các ảnh đã lên và báo lỗi cho cả lần đăng
-const uploadPostImages = async (files) => {
-  const results = await Promise.allSettled(files.map(uploadOne))
+// Tải song song, giữ đúng thứ tự người dùng chọn (ảnh đầu tiên là ảnh bìa)
+const uploadImages = async (files, folder) => {
+  const results = await Promise.allSettled(files.map((file) => uploadOne(file, folder)))
   const failed = results.find((result) => result.status === 'rejected')
   if (!failed) return results.map((result) => result.value)
 
@@ -44,10 +44,12 @@ const uploadPostImages = async (files) => {
   throw error
 }
 
-// Ảnh ngoài thư mục bài đăng (vd ảnh mẫu trên Wikimedia) trả null để không xoá nhầm
+const uploadPostImages = (files) => uploadImages(files, POST_FOLDER)
+const uploadReportImages = (files) => uploadImages(files, REPORT_FOLDER)
+
 const POST_IMAGE_URL = new RegExp(
   `^https://res\\.cloudinary\\.com/[^/]+/image/upload/(?:v\\d+/)?(${POST_FOLDER}/[^/.]+)\\.[a-z]+$`
 )
 const publicIdFromUrl = (url) => POST_IMAGE_URL.exec(url)?.[1] ?? null
 
-module.exports = { uploadPostImages, deleteImages, publicIdFromUrl }
+module.exports = { uploadPostImages, uploadReportImages, deleteImages, publicIdFromUrl }

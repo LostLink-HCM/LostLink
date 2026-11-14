@@ -93,7 +93,7 @@ export default function AuthLayout({ children }) {
 
           {/* minmax(0,1fr): cột không giãn theo nút Google. items-start: chuyển tab không làm form nhảy */}
           <main className="relative z-10 mx-auto grid w-full max-w-(--au-frame) flex-1 grid-cols-[minmax(0,1fr)] items-start px-(--au-gutter) pb-7 lg:grid-cols-[minmax(0,1fr)_var(--au-form)] lg:items-center lg:gap-10 lg:pt-5 lg:pb-24">
-            <section className="-mt-4 w-full max-w-(--au-form) min-w-0 justify-self-center rounded-au-card border border-white/16 bg-white/7.5 px-5 py-5 shadow-au-card backdrop-blur-[20px] sm:px-6 sm:py-6 lg:col-start-2 lg:mt-0">
+            <section className="-mt-4 w-full max-w-(--au-form) min-w-0 justify-self-center rounded-au-card border border-white/20 bg-au-card px-5 py-5 shadow-au-card backdrop-blur-[20px] sm:px-6 sm:py-6 lg:col-start-2 lg:mt-0">
               <div className="motion-safe:animate-ll-fade">{children}</div>
             </section>
           </main>

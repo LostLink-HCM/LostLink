@@ -6,18 +6,31 @@ import Avatar from '../Avatar'
 import Card from '../Card'
 import { cx, focusRing } from '../classes'
 
+// Huy hiệu vàng, bạc, đồng cho ba người đứng đầu, kèm viền cùng màu quanh ảnh đại diện
+const MEDALS = {
+  1: { badge: 'bg-[#f5c542] text-[#5c4100]', ring: 'ring-[#f5c542]' },
+  2: { badge: 'bg-[#c9d1dc] text-[#3a4352]', ring: 'ring-[#c9d1dc]' },
+  3: { badge: 'bg-[#e0a274] text-[#5a2e0e]', ring: 'ring-[#e0a274]' },
+}
+
 function LeaderRow({ leader }) {
+  const medal = MEDALS[leader.rank]
   return (
     <>
       <span
         className={cx(
-          'w-5.5 text-center text-caption font-bold',
-          leader.rank <= 3 ? 'text-primary' : 'text-ink-subtle'
+          'grid size-5.5 shrink-0 place-items-center rounded-full text-micro font-bold',
+          medal ? medal.badge : 'text-ink-subtle'
         )}
       >
         {leader.rank}
       </span>
-      <Avatar name={leader.username} size="sm" tone="neutral" />
+      <Avatar
+        name={leader.username}
+        size="sm"
+        tone="neutral"
+        className={medal && `ring-2 ring-offset-1 ${medal.ring}`}
+      />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-caption font-semibold text-ink">
           {leader.username}

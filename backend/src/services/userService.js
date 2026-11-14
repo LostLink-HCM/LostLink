@@ -1,4 +1,4 @@
-const { Post, Review, User, UserBlock } = require('../models')
+const { Post, Review, User, UserBlock, UserFollow } = require('../models')
 const ApiError = require('../utils/ApiError')
 const {
   activeTalksOf,
@@ -108,20 +108,29 @@ const getMyProfile = async (viewer) => {
   }
 }
 
-// Hồ sơ người khác: thông tin, bài công khai (như Trang chủ) và lời cảm ơn công khai.
-// Không có hoặc người đó đã chặn mình thì báo như nhau để không lộ việc bị chặn
+const relationOf = async (viewerId, targetId) => {
+  const [following, blocked] = await Promise.all([
+    UserFollow.exists({ follower: viewerId, following: targetId }),
+    UserBlock.exists({ blocker: viewerId, blocked: targetId }),
+  ])
+  return { following: Boolean(following), blocked: Boolean(blocked) }
+}
+
+// Hồ sơ người khác: thông tin, bài công khai (như Trang chủ) và lời cảm ơn công khai
 const getUserProfile = async (username, viewer) => {
   const user = await findProfileUser({ username })
   if (!user) throw userNotFound()
   if (await UserBlock.exists({ blocker: user._id, blocked: viewer._id })) throw userNotFound()
 
+  const relation = await relationOf(viewer._id, user._id)
   const [posts, feedback] = await Promise.all([
-    findPosts({ owner: user._id, ...publicCondition(Date.now()) }),
+    relation.blocked ? [] : findPosts({ owner: user._id, ...publicCondition(Date.now()) }),
     reviewsAbout(user._id),
   ])
 
   return {
     profile: toPublicProfile(user),
+    viewer: relation,
     posts: await withViewerState(posts.map(toPostCard), viewer),
     ...feedback,
   }

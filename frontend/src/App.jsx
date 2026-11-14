@@ -34,6 +34,7 @@ const NotificationSettingsPage = lazy(
   () => import('./pages/user/settings/NotificationSettingsPage.jsx')
 )
 const AreaSettingsPage = lazy(() => import('./pages/user/settings/AreaSettingsPage.jsx'))
+const BlockedUsersPage = lazy(() => import('./pages/user/settings/BlockedUsersPage.jsx'))
 function PageLoading() {
   return (
     <div
@@ -152,6 +153,7 @@ function App() {
             <Route path="account" element={<AccountSettingsPage />} />
             <Route path="notifications" element={<NotificationSettingsPage />} />
             <Route path="areas" element={<AreaSettingsPage />} />
+            <Route path="blocked" element={<BlockedUsersPage />} />
           </Route>
           <Route
             path="users/:username"

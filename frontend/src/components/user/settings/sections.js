@@ -18,6 +18,12 @@ export const SETTINGS_SECTIONS = [
     icon: 'pin',
     description: 'Vùng muốn nhận tin bài mới',
   },
+  {
+    to: 'blocked',
+    label: 'Chặn',
+    icon: 'shield',
+    description: 'Người bạn đã chặn, bỏ chặn khi đổi ý',
+  },
 ]
 
 // Màn từ breakpoint lg trở lên có menu bên trái, nhỏ hơn thì dùng danh sách mục

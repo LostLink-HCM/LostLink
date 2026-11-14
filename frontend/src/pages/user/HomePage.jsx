@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import { NavLink, useOutletContext } from 'react-router-dom'
+import { useOutletContext } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import Icon from '../../components/common/Icon'
 import Button from '../../components/user/Button'
 import Card, { cardClass } from '../../components/user/Card'
 import EmptyState from '../../components/user/EmptyState'
+import { PeekCat, PeekDog } from '../../components/user/mascots/PeekPets'
+import SleepingCat from '../../components/user/mascots/SleepingCat'
 import { cx, focusRing } from '../../components/user/classes'
 import FeedFilters from '../../components/user/home/FeedFilters'
 import PostCard from '../../components/user/home/PostCard'
 import RightRail from '../../components/user/home/RightRail'
-import SearchBox from '../../components/user/home/SearchBox'
 import StickyPanel from '../../components/user/home/StickyPanel'
 import useInfiniteScroll from '../../hooks/useInfiniteScroll'
 import usePostFeed from '../../hooks/usePostFeed'
@@ -19,12 +20,6 @@ import {
   isDefaultView,
   validateFilters,
 } from '../../lib/user/homeFeed'
-
-// Trên mobile không có thanh điều hướng nên chuyển giữa hai trang bằng tab
-const FEEDS = [
-  { to: '/', label: 'Trang chủ' },
-  { to: '/trending', label: 'Tin hot' },
-]
 
 // Dùng chung cho Trang chủ và Tin hot gần đây (hot), cùng bộ lọc, chỉ khác cách sắp xếp
 export default function HomePage({ hot = false }) {
@@ -92,34 +87,23 @@ export default function HomePage({ hot = false }) {
       <div className="mx-auto max-w-360 px-4 pt-5 pb-10 sm:px-6 lg:px-10 lg:pt-7">
         <h1 className="sr-only">{hot ? 'Tin hot gần đây' : 'Bài đăng mới trên LostLink'}</h1>
 
-        <nav
-          aria-label="Chọn cách xem bài đăng"
-          className="mb-3 flex gap-1 rounded-full bg-line-subtle p-1 lg:hidden"
-        >
-          {FEEDS.map(({ to, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end
-              className={({ isActive }) =>
-                cx(
-                  'flex-1 rounded-full py-1.5 text-center text-caption font-semibold no-underline transition-colors',
-                  isActive
-                    ? 'bg-surface text-primary shadow-card'
-                    : 'text-ink-muted hover:text-ink',
-                  focusRing
-                )
-              }
-            >
-              {label}
-            </NavLink>
-          ))}
-        </nav>
-
-        {/* Trên mobile bộ lọc nằm trong drawer, mở bằng nút cạnh ô tìm kiếm */}
+        {/* Trên mobile ô tìm nằm ở nút kính lúp trên header, bộ lọc nằm trong drawer */}
         <div className="mb-4 flex items-center gap-2 lg:hidden">
-          <SearchBox id="feed-search" {...search} className="min-w-0 flex-1" />
-          <Button size="lg" onClick={() => setDrawerOpen(true)}>
+          {keyword && (
+            <button
+              type="button"
+              onClick={search.onClear}
+              aria-label={`Bỏ tìm "${keyword}"`}
+              className={cx(
+                'inline-flex min-w-0 cursor-pointer items-center gap-1.5 rounded-full border border-primary/25 bg-primary-soft px-3 py-1.5 text-caption font-semibold text-primary',
+                focusRing
+              )}
+            >
+              <span className="truncate">Kết quả cho “{keyword}”</span>
+              <Icon name="close" size={12} className="shrink-0" />
+            </button>
+          )}
+          <Button size="md" className="ml-auto" onClick={() => setDrawerOpen(true)}>
             <Icon name="settings" size={14} />
             Bộ lọc
           </Button>
@@ -128,9 +112,13 @@ export default function HomePage({ hot = false }) {
         <main className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[248px_minmax(0,1fr)] xl:grid-cols-[248px_minmax(0,1fr)_272px]">
           <StickyPanel
             aria-label="Bộ lọc bài đăng"
-            className={cx(cardClass, 'hidden p-4 lg:block')}
+            className={cx(
+              cardClass,
+              // Mở Danh mục hoặc Khu vực thì giới hạn chiều cao theo màn hình, phần dưới tiêu đề tự cuộn
+              'hidden p-4 lg:flex lg:flex-col has-[[aria-expanded=true]]:max-h-[calc(100dvh-100px)]'
+            )}
           >
-            <FeedFilters {...filterProps} idPrefix="filter" />
+            <FeedFilters {...filterProps} idPrefix="filter" scrollBody />
           </StickyPanel>
 
           <section
@@ -139,6 +127,7 @@ export default function HomePage({ hot = false }) {
             className="min-w-0"
           >
             <FeedList
+              hot={hot}
               feed={feed}
               now={now}
               interactions={interactions}
@@ -193,7 +182,7 @@ export default function HomePage({ hot = false }) {
 // Danh mục đang lọc vừa bị xoá: gợi ý bỏ bộ lọc danh mục để xem tiếp
 const CATEGORY_GONE = 'CATEGORY_NOT_FOUND'
 
-function FeedList({ feed, now, interactions, defaultView, onShowAllCategories }) {
+function FeedList({ hot, feed, now, interactions, defaultView, onShowAllCategories }) {
   // Cuộn gần tới cuối danh sách thì tự tải trang sau, không cần bấm nút
   const sentinel = useInfiniteScroll({
     enabled: feed.canLoadMore,
@@ -204,6 +193,17 @@ function FeedList({ feed, now, interactions, defaultView, onShowAllCategories })
   if (feed.status === 'loading') {
     return (
       <div className="flex flex-col gap-4" role="status" aria-label="Đang tải danh sách bài đăng">
+        {/* Mèo và cún ló đầu nhấp nhô trong lúc chờ */}
+        <div className="flex flex-col items-center gap-2 pt-2 text-caption text-ink-subtle">
+          <div
+            aria-hidden="true"
+            className="flex h-10 items-end gap-3 overflow-hidden border-b-2 border-line px-3"
+          >
+            <PeekCat className="h-full w-auto motion-safe:animate-ll-bob" />
+            <PeekDog className="h-full w-auto motion-safe:animate-ll-bob [animation-delay:-0.8s]" />
+          </div>
+          Đang tìm tin cho bạn…
+        </div>
         {[0, 1, 2].map((key) => (
           <FeedSkeleton key={key} />
         ))}
@@ -231,10 +231,10 @@ function FeedList({ feed, now, interactions, defaultView, onShowAllCategories })
     return (
       <Card>
         {defaultView ? (
-          <EmptyState icon="search" title="Chưa có bài đăng phù hợp" />
+          <EmptyState mascot="dog" title="Chưa có bài đăng phù hợp" />
         ) : (
           <EmptyState
-            icon="search"
+            mascot="dog"
             title="Không tìm thấy bài đăng phù hợp"
             description="Thử từ khoá khác, mở rộng khoảng thời gian hoặc bấm “Xóa lọc”."
           />
@@ -245,12 +245,13 @@ function FeedList({ feed, now, interactions, defaultView, onShowAllCategories })
 
   return (
     <div className="flex flex-col gap-4">
-      {feed.items.map((post) => {
+      {feed.items.map((post, index) => {
         const state = interactions.stateOf(post)
         return (
           <PostCard
             key={post.id}
             post={post}
+            rank={hot ? index + 1 : undefined}
             now={now}
             commentCount={post.commentCount}
             liked={state.liked}
@@ -277,7 +278,11 @@ function FeedList({ feed, now, interactions, defaultView, onShowAllCategories })
           </div>
         )}
         {!feed.hasMore && !feed.error && (
-          <p className="m-0 py-2">Đã hiển thị hết {feed.total.toLocaleString('vi-VN')} bài đăng</p>
+          <div className="flex flex-col items-center gap-1 pt-4 pb-2">
+            <SleepingCat className="h-16 w-auto" />
+            <p className="m-0 font-semibold text-ink-secondary">Bạn đã xem hết tin</p>
+            <p className="m-0">Đã hiển thị hết {feed.total.toLocaleString('vi-VN')} bài đăng</p>
+          </div>
         )}
       </div>
     </div>

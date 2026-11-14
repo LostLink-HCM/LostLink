@@ -2,7 +2,12 @@ const { Router } = require('express')
 
 const ctrl = require('../controllers/userController')
 const interactionCtrl = require('../controllers/interactionController')
+const reportCtrl = require('../controllers/reportController')
+const validate = require('../middleware/validate')
 const { protect } = require('../middleware/authMiddleware')
+const { parseReportForm } = require('../middleware/postForm')
+const { reportLimiter } = require('../middleware/rateLimiter')
+const { userReportRules } = require('../middleware/validation/reportValidation')
 const {
   rejectInvalidUsername,
   usernamePathRules,
@@ -14,7 +19,30 @@ const router = Router()
 router.get('/me', protect, ctrl.getMyProfile)
 router.post('/me/activity', protect, ctrl.recordActivity)
 router.get('/me/saved', protect, interactionCtrl.getSavedPosts)
+router.get('/me/blocks', protect, ctrl.listBlocks)
+
 // Hồ sơ người dùng khác, cần đăng nhập
-router.get('/:username', protect, usernamePathRules, rejectInvalidUsername, ctrl.getUserProfile)
+const byUsername = [protect, usernamePathRules, rejectInvalidUsername]
+router.get('/:username', ...byUsername, ctrl.getUserProfile)
+
+// Theo dõi, chặn: PUT bật, DELETE tắt
+router.put('/:username/follow', ...byUsername, ctrl.follow)
+router.delete('/:username/follow', ...byUsername, ctrl.unfollow)
+router.put('/:username/block', ...byUsername, ctrl.block)
+router.delete('/:username/block', ...byUsername, ctrl.unblock)
+
+// Báo cáo người dùng: xem báo cáo đã gửi, gửi báo cáo (kiểm tra hạn mức trước khi nhận ảnh)
+router.get('/:username/report', ...byUsername, reportCtrl.getUserReport)
+router.post(
+  '/:username/report',
+  protect,
+  reportLimiter,
+  usernamePathRules,
+  rejectInvalidUsername,
+  parseReportForm,
+  userReportRules,
+  validate,
+  reportCtrl.reportUser
+)
 
 module.exports = router
