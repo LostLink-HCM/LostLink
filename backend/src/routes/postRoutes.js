@@ -1,14 +1,26 @@
 const { Router } = require('express')
 
 const ctrl = require('../controllers/postController')
+const claimCtrl = require('../controllers/claimController')
 const commentCtrl = require('../controllers/commentController')
 const interactionCtrl = require('../controllers/interactionController')
 const reportCtrl = require('../controllers/reportController')
 const validate = require('../middleware/validate')
 const { commentBodyRules } = require('../middleware/validation/commentValidation')
-const { notRestricted, optionalAuth, protect } = require('../middleware/authMiddleware')
+const {
+  notRestricted,
+  notRestrictedFromClaims,
+  optionalAuth,
+  protect,
+} = require('../middleware/authMiddleware')
 const { parsePostForm, parseReportForm } = require('../middleware/postForm')
-const { postCreateLimiter, postEditLimiter, reportLimiter } = require('../middleware/rateLimiter')
+const {
+  claimLimiter,
+  postCreateLimiter,
+  postEditLimiter,
+  reportLimiter,
+} = require('../middleware/rateLimiter')
+const { answerRules, requestRules } = require('../middleware/validation/claimValidation')
 const { postReportRules } = require('../middleware/validation/reportValidation')
 const {
   createPostRules,
@@ -34,6 +46,18 @@ router.get('/', optionalAuth, listPostsRules, validate, ctrl.listPosts)
 router.get('/:id/edit', protect, postIdRules, rejectInvalidPostPath, ctrl.getPostForEdit)
 // Đối tượng bị báo cáo kèm báo cáo mình đã gửi
 router.get('/:id/report', protect, postIdRules, rejectInvalidPostPath, reportCtrl.getPostReport)
+
+const claimGuard = [
+  protect,
+  notRestrictedFromClaims,
+  claimLimiter,
+  postIdRules,
+  rejectInvalidPostPath,
+]
+router.get('/:id/claim', ...claimGuard, claimCtrl.getClaimState)
+router.post('/:id/claim/answer', ...claimGuard, answerRules, validate, claimCtrl.answerQuestion)
+router.post('/:id/claim/request', ...claimGuard, requestRules, validate, claimCtrl.sendRequest)
+
 // Chi tiết bài: Guest xem được; có đăng nhập thì biết đã thích/lưu/theo dõi và có phải chủ bài
 router.get('/:type/:slug', optionalAuth, postPathRules, rejectInvalidPostPath, ctrl.getPost)
 

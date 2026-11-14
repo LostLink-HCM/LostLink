@@ -86,7 +86,7 @@ const upsertDraft = (userId, step, form) =>
   PostDraft.findOneAndUpdate(
     { user: userId },
     { $set: { step, form } },
-    { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true }
+    { upsert: true, returnDocument: 'after', runValidators: true, setDefaultsOnInsert: true }
   ).lean()
 
 // input là dữ liệu đã qua draftRules (matchedData). Trả về thời điểm lưu để hiển thị
