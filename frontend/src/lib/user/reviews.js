@@ -1,5 +1,3 @@
-import { isReceiver } from './messages'
-
 export const COMMENT_MAX = 500
 
 export const RATING_LABELS = ['', 'Chưa ổn lắm', 'Tạm được', 'Bình thường', 'Tốt', 'Rất dễ chịu']
@@ -20,8 +18,7 @@ const PRAISES_FOR_RECEIVER = [
   'Chọn chỗ gặp an toàn',
 ]
 
-export const praisesFor = (thread) =>
-  isReceiver(thread.post) ? PRAISES_FOR_GIVER : PRAISES_FOR_RECEIVER
+export const praisesFor = (thread) => (thread.receiver ? PRAISES_FOR_GIVER : PRAISES_FOR_RECEIVER)
 
 // Kiểm tra trước khi gửi
 export function validateReview({ rating, comment }) {

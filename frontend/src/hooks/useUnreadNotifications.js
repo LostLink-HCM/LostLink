@@ -1,13 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useLocation } from 'react-router-dom'
 import { getUnreadCount } from '../api/notifications'
+import { onSocket } from '../lib/socket'
 
-const POLL_MS = 60 * 1000
-
-// Số chưa đọc trên chuông: hỏi lại khi chuyển trang, quay lại tab và mỗi 60 giây.
-// Có socket thì thay bằng sự kiện server đẩy xuống
 export function useUnreadNotifications(user) {
-  const { pathname } = useLocation()
   const [unread, setUnread] = useState(0)
   const userId = user?.id
 
@@ -19,18 +14,17 @@ export function useUnreadNotifications(user) {
   }, [userId])
 
   useEffect(() => {
-    refresh()
-  }, [refresh, pathname])
-
-  useEffect(() => {
     if (!userId) return undefined
-    const visible = () => document.visibilityState === 'visible'
-    const timer = setInterval(() => visible() && refresh(), POLL_MS)
-    const onVisible = () => visible() && refresh()
+    refresh()
+    const onVisible = () => document.visibilityState === 'visible' && refresh()
     document.addEventListener('visibilitychange', onVisible)
+    const off = [
+      onSocket('connect', refresh),
+      onSocket('notification:new', (payload) => setUnread(payload.unread)),
+    ]
     return () => {
-      clearInterval(timer)
       document.removeEventListener('visibilitychange', onVisible)
+      off.forEach((unsubscribe) => unsubscribe())
     }
   }, [userId, refresh])
 

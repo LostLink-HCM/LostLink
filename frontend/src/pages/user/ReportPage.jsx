@@ -21,7 +21,6 @@ import {
   needsDescription,
   reasonLabel,
   reasonsFor,
-  reportKey,
   validateReport,
 } from '../../lib/user/reports'
 
@@ -70,11 +69,10 @@ function FieldError({ id, children }) {
   )
 }
 
-// Báo cáo vi phạm: người bị báo cáo không biết ai đã báo.
-// Bài đăng, người dùng đi qua API; báo cáo từ hội thoại còn dùng dữ liệu mẫu
+// Báo cáo vi phạm bài đăng hoặc người dùng: người bị báo cáo không biết ai đã báo.
+// Báo cáo từ trang Tin nhắn đi qua báo cáo người dùng
 export default function ReportPage() {
-  const { threadId } = useParams()
-  return threadId ? <ThreadReport threadId={threadId} /> : <ApiReport />
+  return <ApiReport />
 }
 
 function ApiReport() {
@@ -140,30 +138,6 @@ function ApiReport() {
   }
 
   return <ReportView target={target} sent={sent ?? saved} onSubmit={submit} />
-}
-
-function ThreadReport({ threadId }) {
-  const { chat, reports, submitReport, notify } = useOutletContext()
-  const thread = chat.threads.find((item) => item.id === threadId)
-  if (!thread) {
-    return <Unavailable back={{ to: '/messages', label: 'Quay lại tin nhắn' }} {...NOT_FOUND} />
-  }
-
-  const target = {
-    type: 'user',
-    id: thread.peer.name,
-    peer: thread.peer,
-    post: thread.post,
-    canBlock: true,
-    back: { to: '/messages', label: 'Quay lại tin nhắn' },
-  }
-
-  const submit = async ({ screenshots, ...report }) => {
-    submitReport(target, { ...report, screenshots: screenshots.map((file) => file.name) })
-    notify('Đã gửi báo cáo cho LostLink.')
-  }
-
-  return <ReportView target={target} sent={reports[reportKey(target)]} onSubmit={submit} />
 }
 
 function ReportView({ target, sent, onSubmit }) {

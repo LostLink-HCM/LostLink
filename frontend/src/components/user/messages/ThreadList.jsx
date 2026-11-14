@@ -4,6 +4,7 @@ import { closedBy, lastActivity, previewTime, threadPreview } from '../../../lib
 import Button from '../Button'
 import Avatar from '../Avatar'
 import CountBadge from '../CountBadge'
+import MobileBackButton from '../MobileBackButton'
 
 const STATUS_TAGS = {
   request: ['Chưa gửi', 'bg-warning-soft text-warning'],
@@ -11,6 +12,7 @@ const STATUS_TAGS = {
   pending: ['Chờ đồng ý', 'bg-neutral-soft text-neutral'],
   returned: ['Đã trao trả', 'bg-success-soft text-success'],
   declined: ['Đã từ chối', 'bg-neutral-soft text-neutral'],
+  locked: ['Đã khoá', 'bg-neutral-soft text-neutral'],
 }
 
 // Mình đóng thì nằm ở mục Đã đóng, người kia đóng thì vẫn ở mục Đang mở
@@ -34,12 +36,24 @@ export default function ThreadList({
   onFolderChange,
   closedUnread,
   onOpen,
+  onContactModerator,
+  busy,
   now,
 }) {
   return (
     <>
       <div className="px-4 pt-5 pb-3">
-        <h1 className="m-0 mb-3 text-lead font-bold text-ink">Tin nhắn</h1>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-1">
+            <MobileBackButton />
+            <h1 className="m-0 text-lead font-bold text-ink">Tin nhắn</h1>
+          </div>
+          {/* Hỏi LostLink (Moderator trả lời) khi có khiếu nại, giao dịch bị treo hoặc sự cố */}
+          <Button size="sm" disabled={busy} onClick={onContactModerator}>
+            <Icon name="shield" size={14} />
+            Liên hệ LostLink
+          </Button>
+        </div>
         <label
           className={cx(
             'flex items-center gap-2 rounded-full border border-transparent bg-line-subtle px-3.5 text-ink-subtle transition-colors',
@@ -77,7 +91,8 @@ export default function ThreadList({
 
       <ul
         className={cx(
-          'm-0 min-h-0 flex-1 list-none overflow-y-auto px-2 pb-3',
+          // relative: giữ nhãn ẩn (sr-only) trong khung cuộn, không kéo dài cả trang
+          'relative m-0 min-h-0 flex-1 list-none overflow-y-auto px-2 pb-3',
           !threads.length && 'hidden'
         )}
       >
@@ -85,7 +100,10 @@ export default function ThreadList({
           const active = thread.id === activeId
           const closer = closedBy(thread)
           const tag = closer ? CLOSED_TAGS[closer] : STATUS_TAGS[thread.status]
-          const draft = thread.status === 'open' && closer !== 'me' && drafts[thread.id]
+          const draft =
+            ['open', 'returned', 'request'].includes(thread.status) &&
+            closer !== 'me' &&
+            drafts[thread.id]
           return (
             <li key={thread.id}>
               <button
@@ -107,7 +125,7 @@ export default function ThreadList({
                         thread.unread ? 'font-bold' : 'font-semibold'
                       )}
                     >
-                      {thread.peer.name}
+                      {thread.peer.label ?? thread.peer.name}
                     </strong>
                     <time
                       dateTime={lastActivity(thread)}
@@ -117,7 +135,10 @@ export default function ThreadList({
                     </time>
                   </span>
                   <span className="mt-0.5 block truncate text-tiny text-ink-subtle">
-                    {thread.post.title}
+                    {thread.post?.title ??
+                      (thread.kind === 'support'
+                        ? 'Khiếu nại, giao dịch bị treo, sự cố'
+                        : 'Bài đăng đã bị xoá')}
                   </span>
                   <span className="mt-1 flex items-center gap-1.5">
                     {tag && (

@@ -10,10 +10,12 @@ const {
 } = require('../models')
 const env = require('../config/env')
 const emailService = require('./emailService')
+const { markContacted, reopenTrade } = require('./conversationService')
 const { notify } = require('./notificationService')
 const { invalidField, isPublic, postNotFound, toAuthor } = require('./postService')
 const ApiError = require('../utils/ApiError')
 const { matchesAnswer } = require('../utils/crypto')
+const { emitToUsers } = require('../socket')
 
 // Chỉ nhận đồ, liên hệ được khi bài còn Đang tìm hoặc Đã liên hệ
 const CLAIMABLE_STATUSES = ['searching', 'contacted']
@@ -85,31 +87,6 @@ const openTrade = async (post, claimantId) =>
     participants: [{ user: post.owner._id }, { user: claimantId }],
   })
 
-// Bài Đang tìm chuyển Đã liên hệ, bài đã Đã liên hệ thì giữ nguyên
-const markContacted = (post, changedBy, note) =>
-  Post.updateOne(
-    { _id: post._id, status: 'searching' },
-    {
-      $set: { status: 'contacted' },
-      $push: { statusHistory: { status: 'contacted', changedBy, note } },
-    }
-  )
-
-const closedByMe = (conversation, user) =>
-  conversation.participants.some((item) => item.user.equals(user._id) && item.closedAt)
-
-// Mở lại hội thoại mình đã đóng khi bấm nhận đồ lần nữa
-const reopenTrade = async (conversation, post, user) => {
-  await Conversation.updateOne(
-    { _id: conversation._id, 'participants.user': user._id },
-    {
-      $set: { 'participants.$.closedAt': null },
-      $push: { events: { type: 'reopened', by: user._id } },
-    }
-  )
-  await markContacted(post, user._id, 'Mở lại hội thoại')
-}
-
 const toQuestion = (challenge) => ({
   text: challenge.question,
   options: challenge.options.map((option) => ({ id: option._id, text: option.text })),
@@ -133,8 +110,14 @@ const getClaimState = async (postId, user) => {
   ])
 
   if (conversation) {
-    if (closedByMe(conversation, user)) await reopenTrade(conversation, post, user)
-    return { step: 'chat', post: snapshot, claimId: claim?._id ?? null }
+    // Đã đóng hội thoại này trước đây thì mở lại
+    await reopenTrade(conversation, user)
+    return {
+      step: 'chat',
+      post: snapshot,
+      claimId: claim?._id ?? null,
+      conversationId: conversation._id,
+    }
   }
   if (claim?.introMessage) return { step: 'requested', post: snapshot, claimId: claim._id }
 
@@ -227,7 +210,7 @@ const answerQuestion = async (postId, optionId, user) => {
     { upsert: true, returnDocument: 'after' }
   )
   await Promise.all([
-    markContacted(post, user._id, 'Người nhận đồ trả lời đúng câu hỏi xác minh'),
+    markContacted(post._id, user._id, 'Người nhận đồ trả lời đúng câu hỏi xác minh'),
     notify([post.owner._id], {
       type: 'verification_passed',
       actor: user._id,
@@ -304,6 +287,7 @@ const sendRequest = async (postId, message, user) => {
     throw error
   }
 
+  emitToUsers([post.owner._id], 'claim:updated')
   await notify([post.owner._id], {
     type: 'contact_request',
     actor: user._id,
@@ -390,7 +374,7 @@ const acceptClaim = async (id, user) => {
   }
 
   await Promise.all([
-    markContacted(post, user._id, 'Chủ bài đồng ý yêu cầu liên hệ'),
+    markContacted(post._id, user._id, 'Chủ bài đồng ý yêu cầu liên hệ'),
     notify([claim.claimant], {
       type: 'contact_accepted',
       actor: user._id,
@@ -399,6 +383,7 @@ const acceptClaim = async (id, user) => {
       text: `${user.username} đã đồng ý trò chuyện về bài "${post.title}".`,
     }),
   ])
+  emitToUsers([claim.claimant], 'claim:updated')
   return findClaimItem(claim._id, user)
 }
 
@@ -413,6 +398,7 @@ const declineClaim = async (id, user) => {
     refId: claim.post._id,
     text: `${user.username} đã từ chối yêu cầu trò chuyện về bài "${claim.post.title}".`,
   })
+  emitToUsers([claim.claimant], 'claim:updated')
   return findClaimItem(claim._id, user)
 }
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../../../auth/AuthContext'
 import { cx } from '../classes'
+import { hidesTabBar } from '../../../lib/user/navigation'
 import SlidingTabs from './SlidingTabs'
 
 const SCROLL_STEP = 8
@@ -47,8 +48,7 @@ function useAutoHide(pinned) {
 export default function MobileTabBar({ unreadMessages = 0, unreadNotifications = 0 }) {
   const { user } = useAuth()
   const { pathname } = useLocation()
-  // Trang Tin nhắn hay chuyển qua lại nên luôn giữ thanh
-  const hidden = useAutoHide(pathname.startsWith('/messages'))
+  const hidden = useAutoHide(false)
 
   const tabs = [
     { to: '/', end: true, label: 'Trang chủ', icon: 'home' },
@@ -68,6 +68,8 @@ export default function MobileTabBar({ unreadMessages = 0, unreadNotifications =
       unit: 'thông báo',
     },
   ]
+
+  if (hidesTabBar(pathname)) return null
 
   return (
     <div

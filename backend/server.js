@@ -3,6 +3,7 @@ require('./src/config/sentry')
 const env = require('./src/config/env')
 const app = require('./src/app')
 const { connectDatabase, disconnectDatabase } = require('./src/config/database')
+const { attachSocket, closeSocket } = require('./src/socket')
 
 async function start() {
   await connectDatabase()
@@ -10,9 +11,11 @@ async function start() {
   const server = app.listen(env.port, () => {
     console.log(`Server running on http://localhost:${env.port} (${env.nodeEnv})`)
   })
+  attachSocket(server)
 
-  const shutdown = (signal) => {
+  const shutdown = async (signal) => {
     console.log(`${signal} received, shutting down...`)
+    await closeSocket()
     server.close(async () => {
       await disconnectDatabase()
       process.exit(0)
