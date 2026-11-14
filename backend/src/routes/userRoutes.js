@@ -17,6 +17,7 @@ const router = Router()
 
 // Đặt trước /:username. Tên người dùng tối thiểu 3 ký tự nên không trùng "me"
 router.get('/me', protect, ctrl.getMyProfile)
+router.post('/me/activity', protect, ctrl.recordActivity)
 router.get('/me/saved', protect, interactionCtrl.getSavedPosts)
 router.get('/me/blocks', protect, ctrl.listBlocks)
 

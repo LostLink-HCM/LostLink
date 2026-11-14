@@ -5,7 +5,12 @@ const { User } = require('../models')
 const { seedCategories } = require('./categorySeed')
 const { seedNotifications } = require('./notificationSeed')
 const { seedPosts } = require('./postSeed')
-const { seedMissingMembers, seedUsers } = require('./userSeed')
+const {
+  seedMissingMembers,
+  seedUsers,
+  seedUserUpdateDates,
+  seedUserActivityDates,
+} = require('./userSeed')
 
 // npm run seed: dữ liệu local đầy đủ, tạo luôn tài khoản mẫu với mật khẩu cố định
 // npm run seed:demo: danh mục và bài mẫu, chạy được trên production. Không tạo hay đổi
@@ -13,7 +18,14 @@ const { seedMissingMembers, seedUsers } = require('./userSeed')
 const demo = process.argv.includes('--demo')
 const seeders = demo
   ? [seedMissingMembers, seedCategories, seedPosts, seedNotifications]
-  : [seedUsers, seedCategories, seedPosts, seedNotifications]
+  : [
+      seedUsers,
+      seedCategories,
+      seedPosts,
+      seedNotifications,
+      seedUserActivityDates,
+      seedUserUpdateDates,
+    ]
 
 // Kiểm tra tài khoản không tự tạo được trước khi ghi, thiếu thì dừng khi chưa đổi gì trong DB.
 // Tác giả bài mẫu còn thiếu sẽ do seedMissingMembers tạo, findSeedAccounts kiểm lại trong seedPosts

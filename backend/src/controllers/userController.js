@@ -17,6 +17,11 @@ const getUserProfile = asyncHandler(async (req, res) => {
   res.json({ success: true, data })
 })
 
+const recordActivity = asyncHandler(async (req, res) => {
+  await userService.recordActivity(req.user)
+  res.status(204).end()
+})
+
 const listBlocks = asyncHandler(async (req, res) => {
   const data = await relationService.listBlocks(req.user)
   res.json({ success: true, data })
@@ -38,4 +43,5 @@ module.exports = {
   unfollow: relation('unfollow'),
   block: relation('block'),
   unblock: relation('unblock'),
+  recordActivity,
 }
