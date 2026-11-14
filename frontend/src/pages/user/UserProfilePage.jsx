@@ -117,7 +117,7 @@ export default function UserProfilePage({ username }) {
         CLAIMABLE_STATUSES.includes(post.status) && {
           label: post.type === 'lost' ? 'Tôi đang giữ món này' : 'Đây là đồ của tôi',
           icon: 'check',
-          onClick: () => ctx.contactAbout(post),
+          onClick: () => ctx.claimPost(post),
         },
       {
         label: interactions.stateOf(post).saved ? 'Bỏ lưu bài' : 'Lưu bài',

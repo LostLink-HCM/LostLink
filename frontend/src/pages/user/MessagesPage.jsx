@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
+import { acceptClaim, declineClaim, sendContactRequest } from '../../api/claims'
 import Icon from '../../components/common/Icon'
 import Button from '../../components/user/Button'
 import Dialog from '../../components/user/Dialog'
@@ -12,8 +13,10 @@ import Composer from '../../components/user/messages/Composer'
 import ThreadList from '../../components/user/messages/ThreadList'
 import TradePanel from '../../components/user/messages/TradePanel'
 import { checkImages } from '../../lib/user/composePost'
+import { postPath } from '../../lib/user/homeFeed'
 import {
   acceptRequest,
+  claimThread,
   closedBy,
   confirmReturn,
   dayLabel,
@@ -22,6 +25,7 @@ import {
   isClosedByMe,
   isSameDay,
   openThread,
+  replaceThread,
   sendMessage,
   threadNotes,
   timeLabel,
@@ -153,7 +157,7 @@ export default function MessagesPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const { posts, now, chat, setChat, setPostStatus, notify, reviews } = useOutletContext()
-  const { closeConversation, reopenConversation, blockedUsers } = useOutletContext()
+  const { closeConversation, reopenConversation, blockedUsers, reloadClaims } = useOutletContext()
   const [query, setQuery] = useState('')
   // Vào từ bài đăng thì mobile mở thẳng hội thoại
   const [mobileConversation, setMobileConversation] = useState(
@@ -162,6 +166,7 @@ export default function MessagesPage() {
   const [showInfo, setShowInfo] = useState(false)
   const [error, setError] = useState('')
   const [dialog, setDialog] = useState(null)
+  const [busy, setBusy] = useState(false)
   const scrollRef = useRef(null)
   const inputRef = useRef(null)
 
@@ -183,6 +188,10 @@ export default function MessagesPage() {
   const status = active && statusLine(active)
 
   useEffect(() => {
+    reloadClaims()
+  }, [reloadClaims])
+
+  useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [active?.id, active?.messages.length, active?.status, mobileConversation])
 
@@ -198,11 +207,40 @@ export default function MessagesPage() {
     setChat((prev) => ({ ...prev, drafts: { ...prev.drafts, [active.id]: text } }))
   }
 
-  const send = () => {
+  const callApi = async (request, onDone) => {
+    setBusy(true)
+    try {
+      const { data } = await request()
+      setChat((prev) => replaceThread(prev, active.id, claimThread(data)))
+      onDone()
+    } catch (err) {
+      return err
+    } finally {
+      setBusy(false)
+    }
+    return null
+  }
+
+  const send = async () => {
     const intro = active.status === 'request'
     const problem = validateMessage(draft, { intro })
     if (problem) {
       setError(problem)
+      return
+    }
+    if (intro && active.remote) {
+      const err = await callApi(
+        () => sendContactRequest(active.post.id, draft.trim()),
+        () => notify(`Đã gửi lời giới thiệu, chờ ${active.peer.name} đồng ý.`)
+      )
+
+      if (err) {
+        setError(
+          err.status >= 500
+            ? 'Đã có lỗi xảy ra, vui lòng thử lại.'
+            : err.fieldErrors.message || err.message
+        )
+      }
       return
     }
     setChat((prev) => sendMessage(prev, active.id, { text: draft }))
@@ -224,13 +262,34 @@ export default function MessagesPage() {
     if (active.post.id != null) setPostStatus(active.post.id, nextStatus)
   }
 
-  const accept = () => {
+  const respondFailed = (err) => {
+    notify(err.status >= 500 ? 'Đã có lỗi xảy ra, vui lòng thử lại.' : err.message)
+    if (err.status === 409) reloadClaims(active.id)
+  }
+
+  const accept = async () => {
+    if (active.remote) {
+      const err = await callApi(
+        () => acceptClaim(active.claimId),
+        () => notify(`Đã mở kênh trò chuyện với ${active.peer.name}.`)
+      )
+      if (err) respondFailed(err)
+      return
+    }
     setChat((prev) => acceptRequest(prev, active.id))
     updatePost('contacted')
     notify(`Đã mở kênh trò chuyện với ${active.peer.name}.`)
   }
 
-  const decline = () => {
+  const decline = async () => {
+    if (active.remote) {
+      const err = await callApi(
+        () => declineClaim(active.claimId),
+        () => notify(`Đã từ chối yêu cầu của ${active.peer.name}.`)
+      )
+      if (err) respondFailed(err)
+      return
+    }
     setChat((prev) => declineRequest(prev, active.id))
     notify(`Đã từ chối yêu cầu của ${active.peer.name}.`)
   }
@@ -262,7 +321,9 @@ export default function MessagesPage() {
     )
   }
 
-  const linkable = (post) => post?.id != null && posts.some((item) => item.id === post.id)
+  // Bài thật có slug, bài mẫu chỉ mở được khi còn trong dữ liệu mẫu
+  const linkable = (post) =>
+    Boolean(post?.slug) || (post?.id != null && posts.some((item) => item.id === post.id))
 
   const tradePanel = active && (
     <TradePanel
@@ -368,13 +429,18 @@ export default function MessagesPage() {
               ref={scrollRef}
               className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain bg-surface-muted/60 px-4 py-4 sm:px-6"
             >
-              <AttachedPost post={active.post} linkable={linkable(active.post)} />
+              <AttachedPost
+                post={active.post}
+                linkable={linkable(active.post)}
+                to={active.post?.slug ? postPath(active.post) : undefined}
+              />
               <Conversation thread={active} now={now} />
             </div>
 
             <Composer
               thread={active}
               blocked={blockedUsers.has(active.peer.name)}
+              busy={busy}
               draft={draft}
               error={error}
               inputRef={inputRef}

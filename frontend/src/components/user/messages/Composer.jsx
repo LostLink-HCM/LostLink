@@ -15,6 +15,7 @@ const iconButton = cx(
 export default function Composer({
   thread,
   blocked,
+  busy = false,
   draft,
   error,
   inputRef,
@@ -54,8 +55,10 @@ export default function Composer({
           <strong>{peer.name}</strong> muốn trò chuyện về bài đăng của bạn.
         </p>
         <div className="flex gap-2">
-          <Button onClick={onDecline}>Từ chối</Button>
-          <Button variant="primary" onClick={onAccept}>
+          <Button disabled={busy} onClick={onDecline}>
+            Từ chối
+          </Button>
+          <Button variant="primary" disabled={busy} onClick={onAccept}>
             Đồng ý
           </Button>
         </div>
@@ -98,7 +101,7 @@ export default function Composer({
 
   const submit = (event) => {
     event.preventDefault()
-    if (!pending) onSend()
+    if (!pending && !busy) onSend()
   }
 
   const pickFile = (event) => {
@@ -182,7 +185,7 @@ export default function Composer({
         <button
           type="submit"
           aria-label="Gửi"
-          disabled={pending || !draft.trim()}
+          disabled={pending || busy || !draft.trim()}
           className={cx(
             iconButton,
             'bg-primary text-white hover:bg-primary-hover disabled:bg-line-strong'

@@ -11,6 +11,7 @@ const categoryRoutes = require('./categoryRoutes')
 const userRoutes = require('./userRoutes')
 const commentRoutes = require('./commentRoutes')
 const notificationRoutes = require('./notificationRoutes')
+const claimRoutes = require('./claimRoutes')
 const adminUserRoutes = require('./adminUserRoutes')
 
 const router = Router()
@@ -37,6 +38,7 @@ router.use('/categories', categoryRoutes)
 router.use('/users', userRoutes)
 router.use('/comments', commentRoutes)
 router.use('/notifications', notificationRoutes)
+router.use('/claims', claimRoutes)
 router.use('/admin', adminUserRoutes)
 
 module.exports = router
