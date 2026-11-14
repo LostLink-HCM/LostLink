@@ -75,6 +75,26 @@ const DESCRIBE = {
     title: `${item.actor?.username ?? 'Người đăng'} đã từ chối yêu cầu trò chuyện`,
     body: item.post?.title ?? item.text,
   }),
+  conversation_closed: (item) => ({
+    kind: 'contact',
+    title: `${item.actor?.username ?? 'Người kia'} đã đóng hội thoại`,
+    body: item.text,
+  }),
+  return_reminder: (item) => ({
+    kind: 'contact',
+    title: `${item.actor?.username ?? 'Người kia'} đã xác nhận trao trả, bạn xác nhận giúp nhé`,
+    body: item.post?.title ?? item.text,
+  }),
+  return_completed: (item) => ({
+    kind: 'contact',
+    title: 'Hai bên đã xác nhận trao trả',
+    body: item.post?.title ?? item.text,
+  }),
+  review: (item) => ({
+    kind: 'contact',
+    title: `${item.actor?.username ?? 'Ai đó'} đã gửi lời cảm ơn tới bạn`,
+    body: quote(item.text),
+  }),
   verification_passed: (item) => ({
     kind: 'contact',
     title: `${item.actor?.username ?? 'Ai đó'} đã trả lời đúng câu hỏi xác minh`,
@@ -88,6 +108,9 @@ const MESSAGE_TYPES = [
   'contact_accepted',
   'contact_declined',
   'verification_passed',
+  'conversation_closed',
+  'return_reminder',
+  'return_completed',
 ]
 
 const KIND_BY_GROUP = { trade: 'contact', post: 'post', system: 'report' }
@@ -97,6 +120,8 @@ const GROUP_OF = {
   contact_accepted: 'trade',
   contact_declined: 'trade',
   verification_passed: 'trade',
+  conversation_closed: 'trade',
+  return_completed: 'trade',
   return_reminder: 'trade',
   review: 'trade',
   contact_12h: 'trade',
@@ -106,6 +131,9 @@ const GROUP_OF = {
   badge: 'system',
   tip: 'system',
 }
+
+// Nhóm (tab) của một loại thông báo, trùng nhóm của API
+export const notificationGroup = (type) => GROUP_OF[type] ?? 'post'
 
 // Icon và màu gradient theo loại thông báo. Loại chưa có ở đây dùng màu của nhóm
 const VISUALS = {

@@ -3,6 +3,7 @@ const env = require('../config/env')
 const { connectDatabase, disconnectDatabase } = require('../config/database')
 const { User } = require('../models')
 const { seedCategories } = require('./categorySeed')
+const { seedConversations } = require('./conversationSeed')
 const { seedNotifications } = require('./notificationSeed')
 const { seedPosts } = require('./postSeed')
 const {
@@ -22,6 +23,7 @@ const seeders = demo
       seedUsers,
       seedCategories,
       seedPosts,
+      seedConversations,
       seedNotifications,
       seedUserActivityDates,
       seedUserUpdateDates,

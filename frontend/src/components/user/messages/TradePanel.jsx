@@ -2,8 +2,7 @@ import Icon from '../../common/Icon'
 import Button from '../Button'
 import Card from '../Card'
 import { cx } from '../classes'
-import { SAFE_MEETUPS } from '../../../data/userMessages'
-import { canClose, closedBy, isReceiver } from '../../../lib/user/messages'
+import { SAFE_MEETUPS, canClose } from '../../../lib/user/messages'
 
 function CheckRow({ done, children }) {
   return (
@@ -21,59 +20,75 @@ function CheckRow({ done, children }) {
   )
 }
 
-export default function TradePanel({ thread, reviewed, onConfirm, onReview, onClose }) {
-  const { status, peer, confirmed, post } = thread
+function InfoCard({ title, children }) {
+  return (
+    <Card as="section" padding="md">
+      <h2 className="m-0 mb-1.5 text-body font-bold text-ink">{title}</h2>
+      <div className="text-caption leading-relaxed text-ink-muted">{children}</div>
+    </Card>
+  )
+}
+
+export default function TradePanel({ thread, busy, onConfirm, onReview, onClose }) {
+  const { status, peer, confirmed, closedBy } = thread
+
+  if (thread.kind === 'support') {
+    return (
+      <InfoCard title="Hỗ trợ từ LostLink">
+        <p className="m-0">
+          LostLink sẽ hỗ trợ bạn khi có khiếu nại, giao dịch bị treo hoặc sự cố. Bạn có thể gửi kèm
+          ảnh chụp màn hình.
+        </p>
+      </InfoCard>
+    )
+  }
 
   if (status === 'request' || status === 'pending') {
     return (
-      <Card as="section" padding="md">
-        <h2 className="m-0 mb-1.5 text-body font-bold text-ink">Vì sao chỉ được một tin?</h2>
-        <p className="m-0 text-caption leading-relaxed text-ink-muted">
+      <InfoCard title="Vì sao chỉ được một tin?">
+        <p className="m-0">
           Giới hạn này giúp không ai bị nhắn tin dồn dập. Khi {peer.name} đồng ý, hai bạn nhắn tin
           bình thường. Nếu muốn nhận lại món đồ trên bài Nhặt được có câu hỏi xác minh, trả lời đúng
           câu hỏi sẽ mở kênh trò chuyện ngay.
         </p>
-      </Card>
+      </InfoCard>
     )
   }
 
   if (status === 'incoming') {
     return (
-      <Card as="section" padding="md">
-        <h2 className="m-0 mb-1.5 text-body font-bold text-ink">Trước khi đồng ý</h2>
-        <ul className="m-0 flex list-disc flex-col gap-1.5 pl-4 text-caption leading-relaxed text-ink-muted">
+      <InfoCard title="Trước khi đồng ý">
+        <ul className="m-0 flex list-disc flex-col gap-1.5 pl-4">
           <li>Đọc kỹ lời giới thiệu, xem có khớp với món đồ của bạn không.</li>
           <li>Xem trang cá nhân và điểm uy tín của người gửi.</li>
           <li>Đồng ý thì bài chuyển sang Đã liên hệ, từ chối thì bài vẫn Đang tìm.</li>
         </ul>
-      </Card>
+      </InfoCard>
     )
   }
 
-  const closer = closedBy(thread)
-  if (status === 'declined' || closer) {
+  if (status === 'declined' || status === 'locked' || closedBy) {
     return (
-      <Card as="section" padding="md">
-        <h2 className="m-0 mb-1.5 text-body font-bold text-ink">
-          {closer === 'me' ? 'Bạn đã đóng hội thoại' : 'Hội thoại đã đóng'}
-        </h2>
-        <p className="m-0 text-caption leading-relaxed text-ink-muted">
+      <InfoCard title={closedBy === 'me' ? 'Bạn đã đóng hội thoại' : 'Hội thoại đã đóng'}>
+        <p className="m-0">
           {status === 'declined'
             ? 'Yêu cầu trò chuyện đã bị từ chối, bài đăng vẫn ở trạng thái Đang tìm.'
-            : closer === 'me'
-              ? `Tin ${peer.name} gửi thêm vẫn được lưu nhưng không báo cho bạn, mở lại hội thoại để trao đổi tiếp.`
-              : `${peer.name} đã đóng hội thoại vì món đồ không khớp. Bạn vẫn nhắn tin được nhưng không xác nhận trao trả được cho tới khi ${peer.name} mở lại.`}
+            : status === 'locked'
+              ? 'Hội thoại đã khoá nên không thể trao đổi hay xác nhận trao trả.'
+              : closedBy === 'me'
+                ? `Tin ${peer.name} gửi thêm vẫn được lưu nhưng không báo cho bạn, mở lại hội thoại để trao đổi tiếp.`
+                : `${peer.name} đã đóng hội thoại vì món đồ không khớp. Bạn vẫn nhắn tin được nhưng không xác nhận trao trả được cho tới khi ${peer.name} mở lại.`}
         </p>
-      </Card>
+      </InfoCard>
     )
   }
 
-  const receiver = isReceiver(post)
+  const returned = status === 'returned'
 
   return (
     <>
       {canClose(thread) && (
-        <Button variant="dangerSoft" size="lg" block onClick={onClose}>
+        <Button variant="dangerSoft" size="lg" block disabled={busy} onClick={onClose}>
           <Icon name="close" size={16} />
           Đóng hội thoại
         </Button>
@@ -81,10 +96,10 @@ export default function TradePanel({ thread, reviewed, onConfirm, onReview, onCl
 
       <Card as="section" padding="sm">
         <h2 className="m-0 mb-0.5 text-body font-bold text-ink">
-          {status === 'returned' ? 'Đã trao trả' : 'Đã nhận được đồ chưa?'}
+          {returned ? 'Đã trao trả' : 'Đã nhận được đồ chưa?'}
         </h2>
         <p className="m-0 mb-3 text-caption leading-snug text-ink-muted">
-          {status === 'returned'
+          {returned
             ? 'Cả hai đã xác nhận. Gửi lời cảm ơn để ghi nhận người kia nhé.'
             : 'Cả hai cùng xác nhận thì bài đăng mới chuyển sang Đã trao trả.'}
         </p>
@@ -96,22 +111,27 @@ export default function TradePanel({ thread, reviewed, onConfirm, onReview, onCl
             Bạn {confirmed.me ? 'đã xác nhận' : 'chưa xác nhận'}
           </CheckRow>
         </div>
-        {status === 'returned' ? (
-          <Button variant={reviewed ? 'secondary' : 'primary'} size="lg" block onClick={onReview}>
+        {returned ? (
+          <Button
+            variant={thread.review ? 'secondary' : 'primary'}
+            size="lg"
+            block
+            onClick={onReview}
+          >
             <Icon name="star" size={16} />
-            {reviewed ? 'Xem lại lời cảm ơn đã gửi' : 'Đánh giá và gửi lời cảm ơn'}
+            {thread.review ? 'Xem lại lời cảm ơn đã gửi' : 'Đánh giá và gửi lời cảm ơn'}
           </Button>
         ) : (
           <Button
             variant={confirmed.me ? 'secondary' : 'primary'}
             size="lg"
             block
-            disabled={confirmed.me}
+            disabled={confirmed.me || busy}
             onClick={onConfirm}
           >
             {confirmed.me
               ? 'Bạn đã xác nhận rồi'
-              : receiver
+              : thread.receiver
                 ? 'Tôi đã nhận được đồ'
                 : 'Tôi đã trao trả đồ'}
           </Button>

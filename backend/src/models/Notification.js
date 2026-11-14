@@ -9,6 +9,8 @@ const NOTIFICATION_TYPES = [
   'contact_accepted',
   'contact_declined',
   'verification_passed',
+  'conversation_closed',
+  'return_completed',
   'return_reminder',
   'returned',
   'review',

@@ -56,7 +56,8 @@ async function main() {
   for (const seed of [seedUsers, seedCategories, seedPosts]) await seed()
 
   startMailbox()
-  app.listen(API_PORT, () => console.log(`E2E API on http://localhost:${API_PORT}`))
+  const server = app.listen(API_PORT, () => console.log(`E2E API on http://localhost:${API_PORT}`))
+  require('../../src/socket').attachSocket(server)
 
   const shutdown = async () => {
     await mongod.stop()

@@ -1,4 +1,5 @@
-const { Notification, Post } = require('../models')
+const { Notification, Post, User } = require('../models')
+const socket = require('../socket')
 const ApiError = require('../utils/ApiError')
 
 // Nhóm thông báo theo tab
@@ -9,6 +10,8 @@ const GROUPS = {
     'contact_accepted',
     'contact_declined',
     'verification_passed',
+    'conversation_closed',
+    'return_completed',
     'return_reminder',
     'review',
     'contact_12h',
@@ -32,29 +35,22 @@ const PREVIEW_MAX = 120
 const preview = (text = '') =>
   text.length > PREVIEW_MAX ? `${text.slice(0, PREVIEW_MAX).trimEnd()}…` : text
 
-// Chỗ duy nhất tạo thông báo (sau này thêm socket ở đây). Bỏ người trùng và người gây ra
-const notify = async (userIds, { type, actor = null, refType = null, refId = null, text = '' }) => {
-  const recipients = [...new Set(userIds.map(String))].filter((id) => id !== String(actor))
-  if (!recipients.length) return
-  await Notification.insertMany(
-    recipients.map((user) => ({ user, type, actor, refType, refId, preview: preview(text) }))
-  )
-}
+const POST_REF_FIELDS = 'title type slug status isHidden owner'
 
 // Bài liên quan, kèm việc người nhận còn xem được hay không
+const toPostRef = (post, viewerId) => {
+  const isOwner = String(post.owner) === String(viewerId)
+  const visible = isOwner || (!post.isHidden && !['pending', 'rejected'].includes(post.status))
+  return { title: post.title, type: post.type, slug: post.slug, visible }
+}
+
 const postRefsOf = async (items, viewerId) => {
   const ids = items.filter((item) => item.refType === 'Post').map((item) => item.refId)
   if (!ids.length) return new Map()
   const posts = await Post.find({ _id: { $in: ids } })
-    .select('title type slug status isHidden owner')
+    .select(POST_REF_FIELDS)
     .lean()
-  return new Map(
-    posts.map((post) => {
-      const isOwner = String(post.owner) === String(viewerId)
-      const visible = isOwner || (!post.isHidden && !['pending', 'rejected'].includes(post.status))
-      return [String(post._id), { title: post.title, type: post.type, slug: post.slug, visible }]
-    })
-  )
+  return new Map(posts.map((post) => [String(post._id), toPostRef(post, viewerId)]))
 }
 
 const toNotification = (item, posts) => {
@@ -75,6 +71,43 @@ const toNotification = (item, posts) => {
         : null,
     isRead: item.isRead,
     createdAt: item.createdAt,
+  }
+}
+
+// Đẩy thông báo vừa tạo tới trình duyệt đang mở: cùng dạng với API danh sách, kèm số chưa đọc
+// để chuông và trang Thông báo cập nhật ngay, không cần hỏi lại server
+const pushNew = async (docs) => {
+  const [{ actor, refType, refId }] = docs
+  const [actorUser, post, counts] = await Promise.all([
+    actor ? User.findById(actor).select('username avatarUrl').lean() : null,
+    refType === 'Post' ? Post.findById(refId).select(POST_REF_FIELDS).lean() : null,
+    Notification.aggregate([
+      { $match: { user: { $in: docs.map((doc) => doc.user) }, isRead: false } },
+      { $group: { _id: '$user', unread: { $sum: 1 } } },
+    ]),
+  ])
+  const unreadOf = new Map(counts.map((row) => [String(row._id), row.unread]))
+  for (const doc of docs) {
+    const posts = post ? new Map([[String(post._id), toPostRef(post, doc.user)]]) : new Map()
+    socket.emitToUsers([doc.user], 'notification:new', {
+      notification: toNotification({ ...doc.toObject(), actor: actorUser }, posts),
+      unread: unreadOf.get(String(doc.user)) ?? 0,
+    })
+  }
+}
+
+// Chỗ duy nhất tạo thông báo. Bỏ người trùng và người gây ra
+const notify = async (userIds, { type, actor = null, refType = null, refId = null, text = '' }) => {
+  const recipients = [...new Set(userIds.map(String))].filter((id) => id !== String(actor))
+  if (!recipients.length) return
+  const docs = await Notification.insertMany(
+    recipients.map((user) => ({ user, type, actor, refType, refId, preview: preview(text) }))
+  )
+  // Thông báo đã lưu, lỗi khi đẩy qua socket chỉ ghi log
+  try {
+    await pushNew(docs)
+  } catch (error) {
+    console.error('Không đẩy được thông báo qua socket', error)
   }
 }
 

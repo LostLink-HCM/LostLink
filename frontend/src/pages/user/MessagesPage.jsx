@@ -1,11 +1,21 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import { acceptClaim, declineClaim, sendContactRequest } from '../../api/claims'
+import {
+  closeConversation,
+  confirmReturn,
+  getConversation,
+  markConversationRead,
+  openSupport,
+  reopenConversation,
+  sendMessage,
+} from '../../api/conversations'
+import { useAuth } from '../../auth/AuthContext'
 import Icon from '../../components/common/Icon'
+import Avatar from '../../components/user/Avatar'
 import Button from '../../components/user/Button'
 import Dialog from '../../components/user/Dialog'
 import IconButton from '../../components/user/IconButton'
-import Avatar from '../../components/user/Avatar'
 import { cardClass } from '../../components/user/Card'
 import { cx } from '../../components/user/classes'
 import AttachedPost from '../../components/user/messages/AttachedPost'
@@ -15,38 +25,45 @@ import TradePanel from '../../components/user/messages/TradePanel'
 import { checkImages } from '../../lib/user/composePost'
 import { postPath } from '../../lib/user/homeFeed'
 import {
-  acceptRequest,
-  claimThread,
-  closedBy,
-  confirmReturn,
+  appendMessage,
   dayLabel,
-  declineRequest,
   filterThreads,
   isClosedByMe,
   isSameDay,
-  openThread,
-  replaceThread,
-  sendMessage,
   threadNotes,
   timeLabel,
+  toMessage,
   validateMessage,
 } from '../../lib/user/messages'
+import { onSocket } from '../../lib/socket'
 import { profilePath } from '../../lib/user/profiles'
 
 const STATUS_LINES = {
   open: ['Kênh trò chuyện đã mở', 'text-primary', 'bg-primary'],
   request: ['Chưa kết nối · yêu cầu trò chuyện', 'text-warning', 'bg-warning'],
-  pending: ['Đang chờ duyệt', 'text-warning', 'bg-warning'],
-  incoming: ['Đang chờ duyệt', 'text-warning', 'bg-warning'],
+  pending: ['Đang chờ đồng ý trò chuyện', 'text-warning', 'bg-warning'],
+  incoming: ['Đang chờ bạn duyệt', 'text-warning', 'bg-warning'],
   returned: ['Đã trao trả', 'text-success', 'bg-success'],
-  declined: ['Hội thoại đã đóng', 'text-ink-muted', 'bg-ink-subtle'],
+  declined: ['Yêu cầu đã bị từ chối', 'text-ink-muted', 'bg-ink-subtle'],
+  locked: ['Hội thoại đã khoá', 'text-ink-muted', 'bg-ink-subtle'],
 }
 
+const FAILED = 'Đã có lỗi xảy ra, vui lòng thử lại.'
+const SEND_FAILED = 'Gửi tin nhắn thất bại, vui lòng thử lại.'
+
+// Lỗi server (5xx, mất kết nối) dùng câu chung, lỗi nghiệp vụ hiện đúng thông báo của server
+const errorText = (error, fallback = FAILED) =>
+  error.status && error.status < 500
+    ? (error.fieldErrors?.body ?? error.fieldErrors?.image ?? error.message)
+    : fallback
+
 const statusLine = (thread) => {
-  const closer = closedBy(thread)
-  if (!closer) return STATUS_LINES[thread.status]
-  const who = closer === 'me' ? 'Bạn' : thread.peer.name
-  return [`${who} đã đóng hội thoại`, 'text-ink-muted', 'bg-ink-subtle']
+  if (thread.kind === 'support') return ['Hỗ trợ từ LostLink', 'text-primary', 'bg-primary']
+  if (thread.closedBy) {
+    const who = thread.closedBy === 'me' ? 'Bạn' : thread.peer.name
+    return [`${who} đã đóng hội thoại`, 'text-ink-muted', 'bg-ink-subtle']
+  }
+  return STATUS_LINES[thread.status]
 }
 
 function SystemNote({ children, tone = 'primary' }) {
@@ -73,11 +90,13 @@ function Bubble({ message, label }) {
     >
       {label && <span className="mb-1 px-1 text-tiny font-semibold text-warning">{label}</span>}
       {message.image ? (
-        <img
-          src={message.image}
-          alt="Ảnh đã gửi"
-          className="max-h-64 max-w-full rounded-2xl border border-line object-cover"
-        />
+        <a href={message.image} target="_blank" rel="noopener noreferrer">
+          <img
+            src={message.image}
+            alt="Ảnh đã gửi"
+            className="max-h-64 max-w-full rounded-2xl border border-line object-cover"
+          />
+        </a>
       ) : (
         <p
           className={cx(
@@ -96,14 +115,15 @@ function Bubble({ message, label }) {
 }
 
 // Tin nhắn và ghi chú hệ thống xếp chung theo thời gian, cùng thời điểm thì tin nhắn đứng trước
-const timeline = (thread) =>
+const timeline = (thread, messages) =>
   [
-    ...thread.messages.map((message) => ({ at: message.createdAt, message })),
+    ...messages.map((message) => ({ at: message.createdAt, message })),
     ...threadNotes(thread).map((note) => ({ at: note.at, note })),
   ].sort((left, right) => Date.parse(left.at) - Date.parse(right.at))
 
-function Conversation({ thread, now }) {
-  const items = timeline(thread)
+function Conversation({ thread, messages, now }) {
+  const items = timeline(thread, messages)
+  const isIntro = (message) => thread.type === 'claim' && message === messages[0]
 
   return (
     <>
@@ -111,10 +131,13 @@ function Conversation({ thread, now }) {
         <div className="max-w-115 self-center rounded-xl border border-warning/30 bg-warning-soft px-5 py-4 text-center">
           <p className="m-0 mb-1 text-small font-bold text-warning">Yêu cầu trò chuyện</p>
           <p className="m-0 text-caption leading-relaxed text-ink-secondary">
-            Bạn được gửi <strong>một tin nhắn giới thiệu</strong> duy nhất. Khi {thread.peer.name}{' '}
-            đồng ý, kênh trò chuyện mới mở hẳn.
+            Bạn chỉ được gửi <strong>1 tin nhắn giới thiệu</strong>. Khi {thread.peer.name} đồng ý,
+            kênh trò chuyện mới mở hẳn.
           </p>
         </div>
+      )}
+      {thread.kind === 'support' && messages.length === 0 && (
+        <SystemNote>Hãy mô tả vấn đề bạn gặp, LostLink sẽ phản hồi sớm nhất có thể.</SystemNote>
       )}
 
       {items.map(({ at, message, note }, index) => {
@@ -129,14 +152,7 @@ function Conversation({ thread, now }) {
             {note ? (
               <SystemNote tone={note.tone}>{note.text}</SystemNote>
             ) : (
-              <Bubble
-                message={message}
-                label={
-                  message === thread.messages[0] && ['incoming', 'pending'].includes(thread.status)
-                    ? 'Tin nhắn giới thiệu'
-                    : ''
-                }
-              />
+              <Bubble message={message} label={isIntro(message) ? 'Tin nhắn giới thiệu' : ''} />
             )}
           </Fragment>
         )
@@ -153,11 +169,68 @@ function Conversation({ thread, now }) {
   )
 }
 
+// Tin nhắn của hội thoại đang mở: tải khi chọn, nhận tin mới qua socket
+function useConversationDetail(thread, me, putConversation) {
+  const conversationId = thread?.type === 'conversation' ? thread.id : null
+  const [detail, setDetail] = useState({ id: null, messages: [], hasMore: false, error: null })
+
+  useEffect(() => {
+    if (!conversationId) return undefined
+    let active = true
+    const load = () =>
+      getConversation(conversationId)
+        .then(({ data }) => {
+          if (!active) return
+          putConversation(data)
+          setDetail({
+            id: data.id,
+            messages: data.messages.map((message) => toMessage(message, me)),
+            hasMore: data.hasMore,
+            error: null,
+          })
+        })
+        .catch(
+          (error) =>
+            active && setDetail({ id: conversationId, messages: [], hasMore: false, error })
+        )
+    load()
+    const off = [
+      onSocket('message:new', (message) => {
+        if (message.conversationId !== conversationId) return
+        setDetail((prev) => ({
+          ...prev,
+          messages: appendMessage(prev.messages, toMessage(message, me)),
+        }))
+        if (message.sender !== me) markConversationRead(conversationId).catch(() => {})
+      }),
+      onSocket('conversation:updated', ({ conversationId: id }) => id === conversationId && load()),
+    ]
+    return () => {
+      active = false
+      off.forEach((unsubscribe) => unsubscribe())
+    }
+  }, [conversationId, me, putConversation])
+
+  const loading = Boolean(conversationId) && detail.id !== conversationId
+  const append = (message) =>
+    setDetail((prev) => ({ ...prev, messages: appendMessage(prev.messages, message) }))
+  const loadOlder = async () => {
+    const { data } = await getConversation(conversationId, detail.messages[0]?.createdAt)
+    setDetail((prev) => ({
+      ...prev,
+      messages: [...data.messages.map((message) => toMessage(message, me)), ...prev.messages],
+      hasMore: data.hasMore,
+    }))
+  }
+  return { ...detail, loading, append, loadOlder }
+}
+
 export default function MessagesPage() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { posts, now, chat, setChat, setPostStatus, notify, reviews } = useOutletContext()
-  const { closeConversation, reopenConversation, blockedUsers, reloadClaims } = useOutletContext()
+  const { user } = useAuth()
+  const { now, notify, inbox } = useOutletContext()
+  const { threads, activeId, drafts } = inbox
   const [query, setQuery] = useState('')
   // Vào từ bài đăng thì mobile mở thẳng hội thoại
   const [mobileConversation, setMobileConversation] = useState(
@@ -170,33 +243,37 @@ export default function MessagesPage() {
   const scrollRef = useRef(null)
   const inputRef = useRef(null)
 
-  const active = chat.threads.find((thread) => thread.id === chat.activeId)
+  const active = threads.find((thread) => thread.id === activeId)
+  const detail = useConversationDetail(active, user.username, inbox.putConversation)
+  const messages =
+    active?.type === 'conversation'
+      ? detail.messages
+      : active?.type === 'claim'
+        ? [active.intro]
+        : []
+
   // Hội thoại mình đã đóng tách sang mục Đã đóng
   const [folder, setFolder] = useState(active && isClosedByMe(active) ? 'closed' : 'open')
-  const threads = useMemo(
+  const visible = useMemo(
     () =>
-      filterThreads(chat.threads, query).filter(
+      filterThreads(threads, query).filter(
         (thread) => isClosedByMe(thread) === (folder === 'closed')
       ),
-    [chat.threads, query, folder]
+    [threads, query, folder]
   )
-  const closedUnread = chat.threads.reduce(
+  const closedUnread = threads.reduce(
     (count, thread) => count + (isClosedByMe(thread) ? thread.unread : 0),
     0
   )
-  const draft = chat.drafts[active?.id] || ''
+  const draft = drafts[active?.id] || ''
   const status = active && statusLine(active)
 
   useEffect(() => {
-    reloadClaims()
-  }, [reloadClaims])
-
-  useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-  }, [active?.id, active?.messages.length, active?.status, mobileConversation])
+  }, [active?.id, messages.length, active?.status, mobileConversation])
 
   const select = (id) => {
-    setChat((prev) => openThread(prev, id))
+    inbox.open(id)
     setMobileConversation(true)
     setShowInfo(false)
     setError('')
@@ -204,132 +281,128 @@ export default function MessagesPage() {
 
   const updateDraft = (text) => {
     setError('')
-    setChat((prev) => ({ ...prev, drafts: { ...prev.drafts, [active.id]: text } }))
+    inbox.setDraft(active.id, text)
   }
 
-  const callApi = async (request, onDone) => {
+  // Chạy một thao tác gọi API, chặn bấm lặp trong lúc chờ. Lỗi trả về để nơi gọi tự hiển thị
+  const run = async (action) => {
     setBusy(true)
     try {
-      const { data } = await request()
-      setChat((prev) => replaceThread(prev, active.id, claimThread(data)))
-      onDone()
+      await action()
+      return null
     } catch (err) {
       return err
     } finally {
       setBusy(false)
     }
-    return null
   }
 
   const send = async () => {
-    const intro = active.status === 'request'
+    const intro = active.type === 'request'
     const problem = validateMessage(draft, { intro })
     if (problem) {
       setError(problem)
       return
     }
-    if (intro && active.remote) {
-      const err = await callApi(
-        () => sendContactRequest(active.post.id, draft.trim()),
-        () => notify(`Đã gửi lời giới thiệu, chờ ${active.peer.name} đồng ý.`)
-      )
-
-      if (err) {
-        setError(
-          err.status >= 500
-            ? 'Đã có lỗi xảy ra, vui lòng thử lại.'
-            : err.fieldErrors.message || err.message
-        )
+    const err = await run(async () => {
+      if (intro) {
+        const { data } = await sendContactRequest(active.post.id, draft.trim())
+        inbox.putClaim(data, active.id)
+        notify(`Đã gửi lời giới thiệu, chờ ${active.peer.name} đồng ý.`)
+        return
       }
-      return
-    }
-    setChat((prev) => sendMessage(prev, active.id, { text: draft }))
-    if (intro) notify(`Đã gửi lời giới thiệu, chờ ${active.peer.name} đồng ý.`)
-    inputRef.current?.focus()
+      const { data } = await sendMessage(active.id, { body: draft.trim() })
+      detail.append(toMessage(data, user.username))
+      inbox.setDraft(active.id, '')
+    })
+    // Lỗi thì giữ nội dung đang nhập để gửi lại
+    if (err) setError(errorText(err, intro ? FAILED : SEND_FAILED))
+    else inputRef.current?.focus()
   }
 
-  const sendImage = (file) => {
+  const sendImage = async (file) => {
     const { accepted, errors } = checkImages([file], 0)
     if (!accepted.length) {
       setError(errors[0])
       return
     }
     setError('')
-    setChat((prev) => sendMessage(prev, active.id, { image: URL.createObjectURL(file) }))
+    const err = await run(async () => {
+      const { data } = await sendMessage(active.id, { image: file })
+      detail.append(toMessage(data, user.username))
+    })
+    if (err) setError(errorText(err, SEND_FAILED))
   }
 
-  const updatePost = (nextStatus) => {
-    if (active.post.id != null) setPostStatus(active.post.id, nextStatus)
-  }
-
-  const respondFailed = (err) => {
-    notify(err.status >= 500 ? 'Đã có lỗi xảy ra, vui lòng thử lại.' : err.message)
-    if (err.status === 409) reloadClaims(active.id)
-  }
-
-  const accept = async () => {
-    if (active.remote) {
-      const err = await callApi(
-        () => acceptClaim(active.claimId),
-        () => notify(`Đã mở kênh trò chuyện với ${active.peer.name}.`)
-      )
-      if (err) respondFailed(err)
-      return
+  // Yêu cầu đã hết hiệu lực hoặc được xử lý ở nơi khác (409) thì tải lại danh sách
+  const respond = async (accept) => {
+    const err = await run(async () => {
+      const { data } = await (accept ? acceptClaim : declineClaim)(active.claimId)
+      if (accept) {
+        await inbox.reload()
+        inbox.open(data.conversationId)
+        notify(`Đã mở kênh trò chuyện với ${active.peer.name}.`)
+      } else {
+        inbox.putClaim(data)
+        notify(`Đã từ chối yêu cầu của ${active.peer.name}.`)
+      }
+    })
+    if (err) {
+      notify(errorText(err))
+      if (err.status === 409) inbox.reload().catch(() => {})
     }
-    setChat((prev) => acceptRequest(prev, active.id))
-    updatePost('contacted')
-    notify(`Đã mở kênh trò chuyện với ${active.peer.name}.`)
   }
 
-  const decline = async () => {
-    if (active.remote) {
-      const err = await callApi(
-        () => declineClaim(active.claimId),
-        () => notify(`Đã từ chối yêu cầu của ${active.peer.name}.`)
-      )
-      if (err) respondFailed(err)
-      return
-    }
-    setChat((prev) => declineRequest(prev, active.id))
-    notify(`Đã từ chối yêu cầu của ${active.peer.name}.`)
-  }
-
-  const confirm = () => {
-    setChat((prev) => confirmReturn(prev, active.id))
+  // Thao tác trên hội thoại (xác nhận, đóng, mở lại): server trả hội thoại mới
+  const act = async (request, onDone) => {
     setDialog(null)
-    if (active.confirmed.peer) {
-      updatePost('returned')
+    const err = await run(async () => {
+      const { data } = await request(active.id)
+      inbox.putConversation(data)
+      onDone(data)
+    })
+    if (err) {
+      notify(errorText(err))
+      if (err.status === 409) inbox.reload().catch(() => {})
+    }
+  }
+
+  const confirm = () =>
+    act(confirmReturn, (data) => {
       // Cả hai đã xác nhận thì chuyển sang đánh giá và gửi lời cảm ơn
-      navigate(`/messages/${active.id}/review`)
-    } else {
-      notify(`Đã ghi nhận, LostLink sẽ nhắc ${active.peer.name} xác nhận.`)
-    }
+      if (data.returned) navigate(`/messages/${data.id}/review`)
+      else notify(`Đã ghi nhận, LostLink sẽ nhắc ${active.peer.name} xác nhận.`)
+    })
+
+  const close = () =>
+    act(closeConversation, () => {
+      setFolder('closed')
+      notify('Đã đóng hội thoại.')
+    })
+
+  const reopen = () =>
+    act(reopenConversation, () => {
+      setFolder('open')
+      notify('Đã mở lại hội thoại.')
+    })
+
+  const contactModerator = async () => {
+    const err = await run(async () => {
+      const { data } = await openSupport()
+      inbox.putConversation(data)
+      inbox.open(data.id)
+      setFolder('open')
+      setMobileConversation(true)
+    })
+    if (err) notify(errorText(err))
   }
 
-  const close = () => {
-    closeConversation(active)
-    setDialog(null)
-    setFolder('closed')
-    notify('Đã đóng hội thoại.')
-  }
-
-  const reopen = () => {
-    const available = reopenConversation(active)
-    setFolder('open')
-    notify(
-      available ? 'Đã mở lại hội thoại, bài đăng chuyển lại Đã liên hệ.' : 'Đã mở lại hội thoại.'
-    )
-  }
-
-  // Bài thật có slug, bài mẫu chỉ mở được khi còn trong dữ liệu mẫu
-  const linkable = (post) =>
-    Boolean(post?.slug) || (post?.id != null && posts.some((item) => item.id === post.id))
-
+  const trade = active?.kind === 'trade'
   const tradePanel = active && (
     <TradePanel
       thread={active}
+      busy={busy}
       onConfirm={() => setDialog('confirm')}
-      reviewed={Boolean(reviews[active.id])}
       onReview={() => navigate(`/messages/${active.id}/review`)}
       onClose={() => setDialog('close')}
     />
@@ -339,7 +412,7 @@ export default function MessagesPage() {
     <div className="mx-auto max-w-360 px-4 pt-5 pb-6 sm:px-6 lg:px-10">
       <div
         className={cx(
-          'grid h-[calc(100dvh-11.5rem-env(safe-area-inset-bottom))] min-h-130 grid-cols-1 gap-4 lg:h-[calc(100dvh-7.5rem)]',
+          'grid h-[calc(100dvh-7.5rem-env(safe-area-inset-bottom))] min-h-130 grid-cols-1 gap-4 lg:h-[calc(100dvh-7.5rem)]',
           'md:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)_300px]'
         )}
       >
@@ -347,30 +420,32 @@ export default function MessagesPage() {
           aria-label="Danh sách hội thoại"
           className={cx(
             cardClass,
-            'flex min-h-0 flex-col overflow-hidden',
+            'relative flex min-h-0 flex-col overflow-hidden',
             mobileConversation && 'max-md:hidden'
           )}
         >
           <ThreadList
-            threads={threads}
-            activeId={chat.activeId}
-            drafts={chat.drafts}
+            threads={visible}
+            activeId={activeId}
+            drafts={drafts}
             query={query}
             onQueryChange={setQuery}
             folder={folder}
             onFolderChange={setFolder}
             closedUnread={closedUnread}
             onOpen={select}
+            onContactModerator={contactModerator}
+            busy={busy}
             now={now}
           />
         </section>
 
         {active ? (
           <section
-            aria-label={`Trò chuyện với ${active.peer.name}`}
+            aria-label={`Trò chuyện với ${active.peer.label ?? active.peer.name}`}
             className={cx(
               cardClass,
-              'flex min-h-0 flex-col overflow-hidden',
+              'relative flex min-h-0 flex-col overflow-hidden',
               !mobileConversation && 'max-md:hidden'
             )}
           >
@@ -386,7 +461,7 @@ export default function MessagesPage() {
               </span>
               <div className="min-w-0 flex-1">
                 <h2 className="m-0 truncate text-small font-semibold text-ink">
-                  {active.peer.name}
+                  {active.peer.label ?? active.peer.name}
                 </h2>
                 <p className={cx('m-0 flex items-center gap-1.5 text-tiny', status[1])}>
                   <span className={cx('size-1.5 shrink-0 rounded-full', status[2])} />
@@ -394,17 +469,21 @@ export default function MessagesPage() {
                 </p>
               </div>
               <div className="flex shrink-0 gap-1">
-                <IconButton
-                  icon="user"
-                  label="Xem trang cá nhân"
-                  onClick={() => navigate(profilePath(active.peer.name))}
-                />
-                <IconButton
-                  icon="flag"
-                  label={`Báo cáo ${active.peer.name}`}
-                  tone="danger"
-                  onClick={() => navigate(`/messages/${active.id}/report`)}
-                />
+                {trade && (
+                  <>
+                    <IconButton
+                      icon="user"
+                      label="Xem trang cá nhân"
+                      onClick={() => navigate(profilePath(active.peer.name))}
+                    />
+                    <IconButton
+                      icon="flag"
+                      label={`Báo cáo ${active.peer.name}`}
+                      tone="danger"
+                      onClick={() => navigate(`/users/${active.peer.name}/report`)}
+                    />
+                  </>
+                )}
                 <IconButton
                   icon="info"
                   label="Trao trả và chỗ hẹn"
@@ -427,19 +506,37 @@ export default function MessagesPage() {
 
             <div
               ref={scrollRef}
-              className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain bg-surface-muted/60 px-4 py-4 sm:px-6"
+              className="relative flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain bg-surface-muted/60 px-4 py-4 sm:px-6"
             >
-              <AttachedPost
-                post={active.post}
-                linkable={linkable(active.post)}
-                to={active.post?.slug ? postPath(active.post) : undefined}
-              />
-              <Conversation thread={active} now={now} />
+              {trade && (
+                <AttachedPost
+                  post={active.post}
+                  linkable={Boolean(active.post?.slug)}
+                  to={active.post?.slug ? postPath(active.post) : undefined}
+                />
+              )}
+              {detail.hasMore && !detail.loading && (
+                <Button
+                  size="sm"
+                  className="self-center"
+                  onClick={() => detail.loadOlder().catch(() => notify(FAILED))}
+                >
+                  Xem tin nhắn cũ hơn
+                </Button>
+              )}
+              {detail.loading ? (
+                <p role="status" className="m-0 self-center text-caption text-ink-subtle">
+                  Đang tải tin nhắn…
+                </p>
+              ) : detail.error && active.type === 'conversation' ? (
+                <SystemNote tone="muted">Không tải được tin nhắn, vui lòng thử lại.</SystemNote>
+              ) : (
+                <Conversation thread={active} messages={messages} now={now} />
+              )}
             </div>
 
             <Composer
               thread={active}
-              blocked={blockedUsers.has(active.peer.name)}
               busy={busy}
               draft={draft}
               error={error}
@@ -447,8 +544,8 @@ export default function MessagesPage() {
               onDraftChange={updateDraft}
               onSend={send}
               onPickImage={sendImage}
-              onAccept={accept}
-              onDecline={decline}
+              onAccept={() => respond(true)}
+              onDecline={() => respond(false)}
               onReopen={reopen}
             />
           </section>
@@ -468,7 +565,7 @@ export default function MessagesPage() {
 
         <aside
           aria-label="Trao trả và chỗ hẹn"
-          className="hidden min-h-0 flex-col gap-3 overflow-y-auto xl:flex"
+          className="relative hidden min-h-0 flex-col gap-3 overflow-y-auto xl:flex"
         >
           {tradePanel}
         </aside>
@@ -476,7 +573,7 @@ export default function MessagesPage() {
 
       {dialog === 'confirm' && (
         <Dialog
-          title="Xác nhận đã trao trả?"
+          title="Xác nhận món đồ đã được trao trả?"
           size="sm"
           onClose={() => setDialog(null)}
           footer={
@@ -509,10 +606,10 @@ export default function MessagesPage() {
             </>
           }
         >
-          <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-small leading-relaxed text-ink-secondary">
-            <li>{active.peer.name} vẫn nhắn được, bạn không nhận thông báo.</li>
-            <li>Mở lại bất cứ lúc nào ở mục Đã đóng.</li>
-          </ul>
+          <p className="m-0 text-small leading-relaxed text-ink-secondary">
+            Bên kia vẫn nhắn được nhưng bạn sẽ không nhận thông báo. Bạn có thể mở lại bất cứ lúc
+            nào ở mục Đã đóng.
+          </p>
         </Dialog>
       )}
     </div>

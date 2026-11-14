@@ -8,9 +8,16 @@ import {
 import Icon from '../../components/common/Icon'
 import Button from '../../components/user/Button'
 import Card from '../../components/user/Card'
+import MobileBackButton from '../../components/user/MobileBackButton'
 import { cx, focusRing } from '../../components/user/classes'
 import NotificationItem from '../../components/user/notifications/NotificationItem'
-import { NOTIFICATION_GROUPS, describeNotification, groupByDay } from '../../lib/user/notifications'
+import { onSocket } from '../../lib/socket'
+import {
+  NOTIFICATION_GROUPS,
+  describeNotification,
+  groupByDay,
+  notificationGroup,
+} from '../../lib/user/notifications'
 
 const SAVE_ERROR = 'Đã có lỗi xảy ra, vui lòng thử lại.'
 
@@ -40,12 +47,37 @@ function useNotificationList(group, retry) {
     }
   }, [group, key])
 
+  useEffect(
+    () =>
+      onSocket('notification:new', ({ notification, unread }) =>
+        setState((prev) => {
+          if (prev.key !== key) return prev
+          const matches = !group || notificationGroup(notification.type) === group
+          if (!matches || prev.items.some((item) => item.id === notification.id)) {
+            return { ...prev, unread }
+          }
+          return {
+            ...prev,
+            unread,
+            total: (prev.total ?? 0) + 1,
+            items: [notification, ...prev.items],
+          }
+        })
+      ),
+    [group, key]
+  )
+
   const loadMore = async () => {
     setLoadingMore(true)
     try {
       const page = state.page + 1
       const { data } = await listNotifications({ group, page })
-      setState((prev) => ({ ...prev, ...data, page, items: [...prev.items, ...data.items] }))
+      // Thông báo mới chèn lên đầu làm lệch trang, bỏ những cái đã có
+      setState((prev) => {
+        const seen = new Set(prev.items.map((item) => item.id))
+        const fresh = data.items.filter((item) => !seen.has(item.id))
+        return { ...prev, ...data, page, items: [...prev.items, ...fresh] }
+      })
     } catch {
       // Lỗi thì giữ danh sách, bấm Xem thêm lần nữa
     } finally {
@@ -105,7 +137,10 @@ export default function NotificationsPage() {
 
   return (
     <div className="mx-auto max-w-200 px-4 pt-5 pb-10 sm:px-6 lg:px-10 lg:pt-7">
-      <h1 className="m-0 mb-1 text-heading font-bold tracking-tight text-ink">Thông báo</h1>
+      <div className="mb-1 flex items-center gap-1">
+        <MobileBackButton />
+        <h1 className="m-0 text-heading font-bold tracking-tight text-ink">Thông báo</h1>
+      </div>
       <p className="m-0 mb-5 text-small text-ink-muted">
         {list.loading ? 'Đang tải…' : `${list.total ?? 0} thông báo · ${unread} chưa đọc`}
       </p>
