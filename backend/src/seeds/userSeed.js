@@ -135,7 +135,7 @@ const seedUserManagementHistory = async () => {
     const events = MANAGEMENT_HISTORY[user.username]
     const end = Math.min(Date.now(), user.updatedAt.getTime())
     const start = Math.max(user.createdAt.getTime(), end - 4 * 60 * 60 * 1000)
-    let state = { role: 'user', status: 'active' }
+    const state = { role: 'user', status: 'active' }
     for (const [index, [action, reason]] of events.entries()) {
       const before = { ...state }
       if (action === 'grant') state.role = 'moderator'
