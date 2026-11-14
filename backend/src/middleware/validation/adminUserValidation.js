@@ -1,4 +1,4 @@
-const { param, query } = require('express-validator')
+const { body, param, query } = require('express-validator')
 
 const User = require('../../models/User')
 
@@ -22,4 +22,21 @@ const listUsersRules = [
     .withMessage('Cách sắp xếp không hợp lệ.'),
 ]
 
-module.exports = { listUsersRules, userPathRules }
+const actionReasonRules = (required) => [
+  body('reason')
+    .custom((reason) => {
+      if (reason == null) {
+        if (required) throw new Error('Vui lòng nhập lý do có ít nhất 5 ký tự.')
+        return true
+      }
+      if (typeof reason !== 'string') throw new Error('Lý do phải là chuỗi.')
+      if (required && reason.trim().length < 5) {
+        throw new Error('Vui lòng nhập lý do có ít nhất 5 ký tự.')
+      }
+      if (reason.trim().length > 500) throw new Error('Lý do tối đa 500 ký tự.')
+      return true
+    })
+    .customSanitizer((reason) => (typeof reason === 'string' ? reason.trim() : reason)),
+]
+
+module.exports = { listUsersRules, userPathRules, actionReasonRules }

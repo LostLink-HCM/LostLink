@@ -34,8 +34,6 @@ export const USER_ACTIONS = {
     label: 'Cấp quyền Moderator',
     icon: 'shield',
     tone: 'primary',
-    description:
-      'Moderator có thể kiểm duyệt bài đăng, xử lý báo cáo và hỗ trợ các hồ sơ escalation.',
   },
   revoke: {
     label: 'Thu hồi quyền Moderator',
@@ -98,6 +96,9 @@ export function userActionUnavailable(target, actor, action) {
   if (target.role === 'admin') return 'Tài khoản Admin được bảo vệ khỏi thao tác này.'
   if (action === 'lock' && target.status === 'locked') return 'Tài khoản đã bị khóa.'
   if (action === 'unlock' && target.status !== 'locked') return 'Tài khoản chưa bị khóa.'
+  if (action === 'unlock' && target.unlockStatus === null) {
+    return 'Không tìm được trạng thái trước khi khóa. Cần kiểm tra lịch sử tài khoản.'
+  }
   if (action === 'grant' && target.role !== 'user') return 'Tài khoản đã có quyền Moderator.'
   if (action === 'grant' && target.status !== 'active') {
     return 'Chỉ cấp quyền Moderator cho tài khoản đang hoạt động.'

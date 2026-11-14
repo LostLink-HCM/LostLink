@@ -12,6 +12,7 @@ const {
 const LISTED_STATUSES = ['searching', 'contacted']
 const REVIEWING_STATUSES = ['pending', 'rejected']
 const REVIEWS_MAX = 20
+const ACTIVITY_UPDATE_INTERVAL_MS = 60 * 1000
 const PROFILE_FIELDS =
   'username avatarUrl bio favoriteArea reputationScore returnCount badges createdAt'
 
@@ -126,4 +127,21 @@ const getUserProfile = async (username, viewer) => {
   }
 }
 
-module.exports = { getMyProfile, getUserProfile, userNotFound }
+const recordActivity = async (user) => {
+  const now = new Date()
+  await User.updateOne(
+    {
+      _id: user._id,
+      status: { $ne: 'locked' },
+      $or: [
+        { lastActiveAt: null },
+        { lastActiveAt: { $lte: new Date(now.getTime() - ACTIVITY_UPDATE_INTERVAL_MS) } },
+      ],
+    },
+    { $set: { lastActiveAt: now } },
+    // Ghi nhận truy cập độc lập với thời điểm cập nhật thông tin tài khoản.
+    { timestamps: false }
+  )
+}
+
+module.exports = { getMyProfile, getUserProfile, userNotFound, recordActivity }

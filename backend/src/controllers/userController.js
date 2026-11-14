@@ -16,4 +16,9 @@ const getUserProfile = asyncHandler(async (req, res) => {
   res.json({ success: true, data })
 })
 
-module.exports = { getMyProfile, getUserProfile }
+const recordActivity = asyncHandler(async (req, res) => {
+  await userService.recordActivity(req.user)
+  res.status(204).end()
+})
+
+module.exports = { getMyProfile, getUserProfile, recordActivity }

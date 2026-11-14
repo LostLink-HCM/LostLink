@@ -15,4 +15,19 @@ const getUser = asyncHandler(async (req, res) => {
   res.json({ success: true, data })
 })
 
-module.exports = { listUsers, getUser }
+const userAction = (action) =>
+  asyncHandler(async (req, res) => {
+    const { id } = matchedData(req, { locations: ['params'] })
+    const { reason } = matchedData(req, { locations: ['body'] })
+    const data = await adminUserService.manageUser(id, req.user, action, reason)
+    res.json({ success: true, data })
+  })
+
+module.exports = {
+  listUsers,
+  getUser,
+  lockUser: userAction('lock'),
+  unlockUser: userAction('unlock'),
+  grantModerator: userAction('grant'),
+  revokeModerator: userAction('revoke'),
+}

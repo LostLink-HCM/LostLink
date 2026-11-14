@@ -1,6 +1,12 @@
 import { api } from '../api'
 
 const AVATAR_TONES = ['blue', 'purple', 'teal', 'amber']
+const ACTION_PATHS = {
+  lock: 'lock',
+  unlock: 'unlock',
+  grant: 'grant-moderator',
+  revoke: 'revoke-moderator',
+}
 
 const toAdminUser = (user) => {
   const colorIndex = [...user.id].reduce((sum, letter) => sum + letter.charCodeAt(0), 0)
@@ -28,5 +34,14 @@ export async function listAdminUsers({ query = '', role = '', status = '', sort 
 
 export async function getAdminUser(id) {
   const { data } = await api.get(`/admin/users/${encodeURIComponent(id)}`)
+  return toAdminUser(data)
+}
+
+export async function applyAdminUserAction(id, action, reason = '') {
+  const path = ACTION_PATHS[action]
+  if (!path) throw new Error('Thao tác không hợp lệ.')
+  const { data } = await api.patch(`/admin/users/${encodeURIComponent(id)}/${path}`, {
+    reason: reason.trim(),
+  })
   return toAdminUser(data)
 }

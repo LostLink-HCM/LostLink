@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../auth/AuthContext'
 import Icon from '../../components/common/Icon'
 import Button from '../../components/backoffice/Button'
@@ -16,12 +16,17 @@ import {
   usersToRows,
   userActionUnavailable,
 } from '../../lib/admin/users'
-import { getAdminUser, listAdminUsers } from '../../lib/admin/usersApi'
+import { applyAdminUserAction, getAdminUser, listAdminUsers } from '../../lib/admin/usersApi'
 import usePaginatedFilter from '../../hooks/usePaginatedFilter'
 
 const PAGE_SIZE = 8
 const identityFilter = (items) => items
-const UNAVAILABLE_MESSAGE = 'Chức năng này chưa khả dụng.'
+const completedActions = {
+  lock: 'Đã khóa tài khoản',
+  unlock: 'Đã mở khóa tài khoản',
+  grant: 'Đã cấp quyền Moderator cho',
+  revoke: 'Đã thu hồi quyền Moderator của',
+}
 const number = (value) => new Intl.NumberFormat('vi-VN').format(value)
 const date = (value) => (value ? new Date(value).toLocaleDateString('vi-VN') : 'Chưa có')
 const dateTime = (value) =>
@@ -40,6 +45,12 @@ const statusTones = {
   active: 'bg-[#eff9f4] text-[#438b76]',
   locked: 'bg-[#fff3f6] text-[#c27687]',
   restricted: 'bg-[#fff8e8] text-[#b28b4c]',
+}
+
+const statusTextTones = {
+  active: 'text-[#438b76]',
+  locked: 'text-[#c27687]',
+  restricted: 'text-[#b28b4c]',
 }
 
 const roleTones = {
@@ -84,12 +95,13 @@ function Role({ role }) {
   )
 }
 
-function Status({ status }) {
+function Status({ status, plain = false }) {
   return (
     <span
       className={cx(
-        'inline-flex whitespace-nowrap rounded-md px-2.5 py-1.5 text-small font-semibold leading-tight',
-        statusTones[status]
+        'whitespace-nowrap text-small font-semibold leading-tight',
+        !plain && 'inline-flex rounded-md px-2.5 py-1.5',
+        plain ? statusTextTones[status] : statusTones[status]
       )}
     >
       {USER_STATUSES[status]}
@@ -97,10 +109,17 @@ function Status({ status }) {
   )
 }
 
-function ActionButton({ action, account, actor, expanded = false, onAction }) {
+function ActionButton({
+  action,
+  account,
+  actor,
+  expanded = false,
+  showIcon = true,
+  label,
+  onAction,
+}) {
   const settings = USER_ACTIONS[action]
-  // Mở các thao tác này khi API ghi dữ liệu đã được kết nối.
-  const disabledReason = userActionUnavailable(account, actor, action) || UNAVAILABLE_MESSAGE
+  const disabledReason = userActionUnavailable(account, actor, action)
   const shortLabels = { lock: 'Khóa', unlock: 'Mở khóa', grant: 'Cấp Mod', revoke: 'Thu hồi' }
 
   return (
@@ -116,17 +135,24 @@ function ActionButton({ action, account, actor, expanded = false, onAction }) {
       aria-label={`${settings.label} · ${account.username}`}
       onClick={() => onAction(action)}
     >
-      <Icon name={settings.icon} size={15} />
-      {expanded ? settings.label : shortLabels[action]}
+      {showIcon && <Icon name={settings.icon} size={15} />}
+      {label || (expanded ? settings.label : shortLabels[action])}
     </button>
   )
 }
 
-function UserActions({ account, actor, onAction, expanded = false }) {
-  const actions = [
-    account.status === 'locked' ? 'unlock' : 'lock',
-    account.role === 'moderator' ? 'revoke' : 'grant',
-  ]
+function UserActions({
+  account,
+  actor,
+  onAction,
+  expanded = false,
+  showIcons = true,
+  labels,
+  roleFirst = false,
+}) {
+  const statusAction = account.status === 'locked' ? 'unlock' : 'lock'
+  const roleAction = account.role === 'moderator' ? 'revoke' : 'grant'
+  const actions = roleFirst ? [roleAction, statusAction] : [statusAction, roleAction]
 
   return (
     <>
@@ -137,6 +163,8 @@ function UserActions({ account, actor, onAction, expanded = false }) {
           account={account}
           actor={actor}
           expanded={expanded}
+          showIcon={showIcons}
+          label={labels?.[action]}
           onAction={onAction}
         />
       ))}
@@ -144,96 +172,81 @@ function UserActions({ account, actor, onAction, expanded = false }) {
   )
 }
 
-function UserProfileContent({ account, actor, onAction }) {
-  const protectedAccount = isCurrentUser(account, actor) || account.role === 'admin'
+function UserProfileContent({ account, actor, onPreviewAvatar }) {
   const logs = account.recentActions
 
   return (
     <>
-      <div className="flex items-center gap-4">
-        <Avatar account={account} large />
-        <div className="min-w-0">
-          <h3 className="text-title font-bold text-[#284663]">
-            {account.name}
-            {isCurrentUser(account, actor) && (
-              <span className="ml-2 inline-flex rounded bg-[#e4eefc] px-1.5 py-0.5 align-middle text-[10px] font-medium text-[#396dad]">
-                Bạn
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 max-sm:gap-3">
+        <div className="flex min-w-0 items-center gap-4 max-sm:gap-3">
+          {account.avatarUrl ? (
+            <button
+              type="button"
+              className={cx('shrink-0 cursor-zoom-in rounded-xl', focusRing)}
+              aria-label={`Xem ảnh đại diện của ${account.username}`}
+              title="Xem ảnh đại diện"
+              onClick={onPreviewAvatar}
+            >
+              <Avatar account={account} large />
+            </button>
+          ) : (
+            <Avatar account={account} large />
+          )}
+          <div className="min-w-0">
+            <h3 className="text-title font-bold text-[#284663] [overflow-wrap:anywhere]">
+              {account.name}
+              {isCurrentUser(account, actor) && (
+                <span className="ml-2 inline-flex rounded bg-[#e4eefc] px-1.5 py-0.5 align-middle text-[10px] font-medium text-[#396dad]">
+                  Bạn
+                </span>
+              )}
+            </h3>
+            <p className="mt-2 text-small">
+              <Role role={account.role} />
+              <span className="whitespace-nowrap">
+                {' '}
+                - <Status status={account.status} plain />
               </span>
-            )}
-          </h3>
-          <p className="mt-1 text-small text-ink-muted">@{account.username}</p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            <Role role={account.role} />
-            <Status status={account.status} />
+            </p>
           </div>
         </div>
+        <section
+          aria-label="Điểm uy tín"
+          className="flex shrink-0 flex-col items-center rounded-xl border border-[#ecd8a8] bg-[#fffbf0] px-4 py-3 max-sm:px-3"
+        >
+          <div className="flex items-center gap-2 text-[#b08b32]">
+            <Icon name="star" size={20} />
+            <strong className="text-[28px] leading-tight text-[#88661d]">
+              {number(account.reputationScore)}
+            </strong>
+          </div>
+          <span className="mt-1 text-caption text-[#9a8862]">điểm uy tín</span>
+        </section>
       </div>
-
-      <section className="my-5 rounded-xl border border-[#ecd8a8] bg-[#fffbf0] px-5 py-4">
-        <div className="flex items-center gap-2.5 text-[#b08b32]">
-          <Icon name="star" size={23} />
-          <strong className="text-[28px] leading-tight text-[#88661d]">
-            {number(account.reputationScore)}
-          </strong>
-          <span className="text-small">điểm uy tín</span>
-        </div>
-        <p className="mt-1.5 text-caption leading-relaxed text-[#9a8862]">
-          Uy tín cộng đồng từ hoạt động trao trả và đánh giá.
-        </p>
-      </section>
 
       <h4 className="mb-2 mt-5 text-small font-bold">Thông tin tài khoản</h4>
       <dl className="mb-3">
         {[
-          ['Mã tài khoản', account.id],
           ['Email', account.email],
           ['Ngày tham gia', date(account.createdAt)],
           ['Cập nhật gần nhất', dateTime(account.updatedAt)],
           [
-            'Xác thực email',
-            account.emailVerifiedAt
-              ? `Đã xác thực · ${date(account.emailVerifiedAt)}`
-              : 'Chưa xác thực',
+            'Truy cập gần nhất',
+            account.lastActiveAt ? dateTime(account.lastActiveAt) : 'Chưa ghi nhận',
           ],
         ].map(([label, value], index) => (
           <div
             key={label}
             className={cx(
               'grid grid-cols-[145px_minmax(0,1fr)] gap-3 py-2.5 text-small max-sm:grid-cols-[110px_minmax(0,1fr)] max-sm:text-caption',
-              index < 4 && 'border-b border-line-subtle'
+              index < 3 && 'border-b border-line-subtle'
             )}
           >
             <dt className="text-ink-subtle">{label}</dt>
-            <dd
-              className={cx(
-                'm-0 [overflow-wrap:anywhere]',
-                label === 'Xác thực email' && account.emailVerifiedAt && 'text-success'
-              )}
-            >
-              {value}
-            </dd>
+            <dd className="m-0 [overflow-wrap:anywhere]">{value}</dd>
           </div>
         ))}
       </dl>
-
-      {account.statusReason && (
-        <div
-          className={cx(
-            'mt-4 flex items-start gap-2.5 rounded-lg px-3 py-3 text-caption leading-relaxed',
-            account.status === 'locked'
-              ? 'bg-[#fcf0f3] text-[#a85568]'
-              : 'bg-[#fcf3de] text-[#947328]'
-          )}
-        >
-          <Icon name="info" size={17} className="mt-0.5 shrink-0" />
-          <div>
-            <strong>
-              {account.status === 'locked' ? 'Lý do khóa tài khoản' : 'Lý do hạn chế'}
-            </strong>
-            <p className="mt-1.5">{account.statusReason}</p>
-          </div>
-        </div>
-      )}
 
       <h4 className="mb-2 mt-5 text-small font-bold">Huy hiệu</h4>
       <div className="flex flex-wrap gap-1.5">
@@ -253,93 +266,174 @@ function UserProfileContent({ account, actor, onAction }) {
         )}
       </div>
 
-      <h4 className="mb-2 mt-5 text-small font-bold">Quản lý tài khoản</h4>
-      <div className="flex flex-wrap gap-2.5">
-        <UserActions account={account} actor={actor} onAction={onAction} expanded />
-      </div>
-
-      {protectedAccount && (
-        <p className="mt-3.5 flex items-start gap-1.5 text-caption leading-relaxed text-ink-subtle">
-          <Icon name="shield" size={14} className="mt-0.5 shrink-0" />
-          Tài khoản quản trị được bảo vệ khỏi thao tác khóa và thay đổi quyền tại đây.
-        </p>
-      )}
-
-      <h4 className="mb-2 mt-5 text-small font-bold">Thao tác gần đây</h4>
+      <h4 className="mb-2 mt-5 text-small font-bold">Lịch sử</h4>
       {logs.length > 0 ? (
-        <>
-          <ol className="m-0 list-none p-0">
-            {logs.slice(0, 5).map((log) => (
-              <li
-                key={log.id}
-                className="mt-2 rounded-r-md border-l-3 border-[#afc5e2] bg-[#f5f8fc] px-3.5 py-3"
-              >
-                <div className="flex flex-wrap justify-between gap-2">
-                  <strong className="text-caption font-semibold text-[#4a6a8e]">
-                    {USER_ACTIONS[log.action]?.label ||
-                      (log.action === 'restrict' ? 'Hạn chế tài khoản' : 'Cập nhật tài khoản')}
-                  </strong>
-                  <time className="text-[11px] text-ink-subtle" dateTime={log.createdAt}>
-                    {dateTime(log.createdAt)}
-                  </time>
-                </div>
-                <small className="mt-1 block text-[11px] text-ink-subtle">
-                  Thực hiện bởi{' '}
-                  {log.actor?.username
+        <ol
+          aria-label="Lịch sử tài khoản"
+          tabIndex={0}
+          className={cx(
+            'm-0 max-h-72 list-none divide-y divide-line overflow-y-auto overscroll-contain rounded-lg border border-line p-0',
+            focusRing
+          )}
+        >
+          {logs.map((log) => (
+            <li key={log.id} className="bg-[#f5f8fc] px-3.5 py-3">
+              <div className="flex flex-wrap justify-between gap-x-3 gap-y-1">
+                <strong className="text-caption font-semibold text-[#4a6a8e]">
+                  {USER_ACTIONS[log.action]?.label ||
+                    (log.action === 'restrict' ? 'Hạn chế tài khoản' : 'Cập nhật tài khoản')}
+                </strong>
+                <time
+                  className="whitespace-nowrap text-[11px] text-ink-subtle"
+                  dateTime={log.createdAt}
+                >
+                  {dateTime(log.createdAt)}
+                </time>
+              </div>
+              <small className="mt-1 block text-[11px] text-ink-subtle">
+                Thực hiện bởi{' '}
+                {log.actorRole === 'admin'
+                  ? 'Admin'
+                  : log.actor?.username
                     ? `@${log.actor.username}`
                     : log.actorRole && log.actorRole !== 'system'
                       ? 'tài khoản không còn tồn tại'
                       : 'hệ thống'}
-                </small>
-                {log.reason && (
-                  <p className="mt-2 text-caption leading-relaxed text-ink-muted">{log.reason}</p>
+              </small>
+              {['lock', 'grant', 'revoke', 'restrict'].includes(log.action) &&
+                log.reason?.trim() && (
+                  <p className="mt-2 text-caption leading-relaxed text-ink-muted [overflow-wrap:anywhere]">
+                    Lý do: {log.reason}
+                  </p>
                 )}
-              </li>
-            ))}
-          </ol>
-        </>
+            </li>
+          ))}
+        </ol>
       ) : (
-        <p className="text-small text-ink-muted">Chưa có thao tác quản lý.</p>
+        <p className="text-small text-ink-muted">Chưa có lịch sử quản lý tài khoản.</p>
       )}
     </>
   )
 }
 
 function UserProfile({ account, actor, loading, error, onRetry, onClose, onAction }) {
+  const [avatarPreviewOpen, setAvatarPreviewOpen] = useState(false)
+  const profileReady = Boolean(account && !loading && !error)
+  const protectedAccount =
+    profileReady && (isCurrentUser(account, actor) || account.role === 'admin')
+
   return (
-    <Dialog
-      title="Hồ sơ người dùng"
-      onClose={onClose}
-      scrollableContent
-      footer={<Button onClick={onClose}>Đóng hồ sơ</Button>}
-    >
-      {loading ? (
-        <p role="status" className="py-8 text-center text-small text-ink-muted">
-          Đang tải hồ sơ người dùng…
-        </p>
-      ) : error ? (
-        <div role="alert" className="flex flex-col items-center gap-4 py-8 text-center">
-          <p className="text-small text-danger-ink">{error}</p>
-          <Button onClick={onRetry}>Thử lại</Button>
-        </div>
-      ) : account ? (
-        <UserProfileContent account={account} actor={actor} onAction={onAction} />
-      ) : null}
-    </Dialog>
+    <>
+      <Dialog
+        title="Hồ sơ người dùng"
+        onClose={onClose}
+        scrollableContent
+        footer={
+          <div className="w-full">
+            {protectedAccount && (
+              <p className="mb-3 flex items-start gap-1.5 text-caption leading-relaxed text-ink-subtle">
+                <Icon name="shield" size={14} className="mt-0.5 shrink-0" />
+                Tài khoản quản trị được bảo vệ khỏi thao tác khóa và thay đổi quyền tại đây.
+              </p>
+            )}
+            <div className="flex flex-wrap items-center justify-end gap-2.5">
+              {profileReady && (
+                <UserActions
+                  account={account}
+                  actor={actor}
+                  onAction={onAction}
+                  expanded
+                  roleFirst
+                  showIcons={false}
+                  labels={{ lock: 'Khóa', unlock: 'Mở khóa' }}
+                />
+              )}
+              <Button onClick={onClose}>Đóng</Button>
+            </div>
+          </div>
+        }
+      >
+        {loading ? (
+          <p role="status" className="py-8 text-center text-small text-ink-muted">
+            Đang tải hồ sơ người dùng…
+          </p>
+        ) : error ? (
+          <div role="alert" className="flex flex-col items-center gap-4 py-8 text-center">
+            <p className="text-small text-danger-ink">{error}</p>
+            <Button onClick={onRetry}>Thử lại</Button>
+          </div>
+        ) : account ? (
+          <UserProfileContent
+            account={account}
+            actor={actor}
+            onPreviewAvatar={() => setAvatarPreviewOpen(true)}
+          />
+        ) : null}
+      </Dialog>
+      {profileReady && avatarPreviewOpen && account.avatarUrl && (
+        <Dialog
+          title="Ảnh đại diện"
+          size="lg"
+          scrollableContent
+          onClose={() => setAvatarPreviewOpen(false)}
+        >
+          <img
+            src={account.avatarUrl}
+            alt={`Ảnh đại diện của ${account.username}`}
+            className="mx-auto max-h-[calc(100dvh-180px)] max-w-full rounded-lg object-contain"
+          />
+        </Dialog>
+      )}
+    </>
   )
 }
 
-function UserActionDialog({ account, actor, action, onConfirm, onClose, error }) {
+function UserActionDialog({
+  account,
+  actor,
+  action,
+  onConfirm,
+  onClose,
+  error,
+  loading,
+  onRetry,
+  pending,
+}) {
   const [reason, setReason] = useState('')
   const [attempted, setAttempted] = useState(false)
   const settings = USER_ACTIONS[action]
   const unavailable = userActionUnavailable(account, actor, action)
-  const invalidReason = attempted && action === 'lock' && reason.trim().length < 5
+  const isStatusAction = ['lock', 'unlock'].includes(action)
+  const submitLabel = action === 'lock' ? 'Khóa' : action === 'unlock' ? 'Mở khóa' : settings.label
+  const reasonRequired = ['lock', 'grant', 'revoke'].includes(action)
+  const invalidReason = attempted && reasonRequired && reason.trim().length < 5
+
+  if (loading || !account) {
+    return (
+      <Dialog
+        title={settings.label}
+        onClose={onClose}
+        footer={<Button onClick={onClose}>Hủy</Button>}
+      >
+        {loading ? (
+          <p role="status" className="py-8 text-center text-ink-muted">
+            Đang tải thông tin tài khoản…
+          </p>
+        ) : (
+          <div role="alert" className="flex flex-col items-center gap-4 py-8 text-center">
+            <p className="text-danger-ink">{error}</p>
+            <Button onClick={onRetry}>Thử lại</Button>
+          </div>
+        )}
+      </Dialog>
+    )
+  }
 
   const submit = (event) => {
     event.preventDefault()
+    if (pending || unavailable) return
     setAttempted(true)
-    if (action === 'lock' && reason.trim().length < 5) return
+    if (reasonRequired && reason.trim().length < 5) return
     onConfirm(reason)
   }
 
@@ -347,9 +441,12 @@ function UserActionDialog({ account, actor, action, onConfirm, onClose, error })
     <Dialog
       title={settings.label}
       onClose={onClose}
+      scrollableContent
       footer={
         <>
-          <Button onClick={onClose}>Hủy</Button>
+          <Button onClick={onClose} disabled={pending}>
+            Hủy
+          </Button>
           <button
             type="submit"
             form="admin-user-action-form"
@@ -358,10 +455,10 @@ function UserActionDialog({ account, actor, action, onConfirm, onClose, error })
               actionTones[settings.tone],
               focusRing
             )}
-            disabled={Boolean(unavailable)}
+            disabled={pending || Boolean(unavailable)}
           >
-            <Icon name={settings.icon} size={16} />
-            {settings.label}
+            {!isStatusAction && <Icon name={settings.icon} size={16} />}
+            {pending ? 'Đang xử lý…' : submitLabel}
           </button>
         </>
       }
@@ -377,20 +474,24 @@ function UserActionDialog({ account, actor, action, onConfirm, onClose, error })
           <div className="min-w-0">
             <strong className="block text-lead text-[#365676]">{account.name}</strong>
             <span className="mt-1 block break-words text-caption text-[#768ba5]">
-              @{account.username} · {account.email}
+              {isStatusAction ? account.email : `@${account.username} · ${account.email}`}
             </span>
           </div>
         </div>
-        <p className="my-2 text-small leading-relaxed text-ink-muted">{settings.description}</p>
+        {settings.description && (
+          <p className="my-2 text-small leading-relaxed text-ink-muted">{settings.description}</p>
+        )}
         <div className="flex flex-wrap items-center gap-2.5 rounded-lg bg-[#f5f8fc] p-3 text-small">
           <span className="mr-auto text-caption text-ink-subtle">Hiện tại</span>
-          {['lock', 'unlock'].includes(action) ? (
+          {isStatusAction ? (
             <>
               <Status status={account.status} />
               <Icon name="next" size={15} className="text-ink-subtle" />
-              <Status
-                status={action === 'lock' ? 'locked' : account.beforeLock?.status || 'active'}
-              />
+              {action === 'lock' || account.unlockStatus ? (
+                <Status status={action === 'lock' ? 'locked' : account.unlockStatus} />
+              ) : (
+                <span className="text-ink-muted">Chưa xác định</span>
+              )}
             </>
           ) : (
             <>
@@ -401,12 +502,7 @@ function UserActionDialog({ account, actor, action, onConfirm, onClose, error })
           )}
         </div>
         <label htmlFor="admin-user-reason" className="text-small font-semibold text-ink-secondary">
-          Lý do{' '}
-          {action === 'lock' ? (
-            <span className="text-danger-ink">*</span>
-          ) : (
-            <small className="font-normal text-ink-subtle">(không bắt buộc)</small>
-          )}
+          Lý do {reasonRequired && <span className="text-danger-ink">*</span>}
         </label>
         <textarea
           id="admin-user-reason"
@@ -414,22 +510,21 @@ function UserActionDialog({ account, actor, action, onConfirm, onClose, error })
           maxLength={500}
           value={reason}
           onChange={(event) => setReason(event.target.value)}
-          aria-required={action === 'lock'}
+          aria-required={reasonRequired}
           aria-invalid={invalidReason}
+          disabled={pending}
           className={cx(
             'w-full resize-y rounded-lg border bg-surface px-3 py-2 text-small leading-relaxed text-ink outline-none placeholder:text-ink-subtle focus:border-focus focus:ring-2 focus:ring-focus/20',
             invalidReason ? 'border-danger' : 'border-line-strong'
           )}
           placeholder={
-            action === 'lock'
-              ? 'Nhập căn cứ hoặc lý do khóa tài khoản…'
-              : 'Ghi chú cho thao tác này…'
+            action === 'lock' ? 'Nhập lý do khóa tài khoản' : 'Ghi chú cho thao tác này…'
           }
         />
         <span className="text-right text-[11px] text-ink-subtle">{reason.length}/500</span>
         {invalidReason && (
           <p className="text-caption text-danger-ink" role="alert">
-            Vui lòng nhập lý do khóa có ít nhất 5 ký tự.
+            Vui lòng nhập lý do có ít nhất 5 ký tự.
           </p>
         )}
         {(error || unavailable) && (
@@ -445,12 +540,14 @@ function UserActionDialog({ account, actor, action, onConfirm, onClose, error })
 export default function Users() {
   const { user } = useAuth()
   const actor = user
-  const [listState, setListState] = useState({ key: null, items: [], summary: null, error: '' })
+  const [listState, setListState] = useState({ key: null, items: [], error: '' })
   const [retryCount, setRetryCount] = useState(0)
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [modal, setModal] = useState(null)
   const [notice, setNotice] = useState('')
   const [actionError, setActionError] = useState('')
+  const [actionPending, setActionPending] = useState(false)
+  const actionInFlight = useRef(false)
   const [profileState, setProfileState] = useState({ key: null, account: null, error: '' })
   const [profileVersion, setProfileVersion] = useState(0)
   const { filters, setFilter, resetFilters, setPage, currentPage } = usePaginatedFilter({
@@ -476,9 +573,7 @@ export default function Users() {
   const users = loading || listError ? [] : listState.items
   const filtered = users
   const visible = users.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
-  const selected = modal ? users.find((account) => account.id === modal.id) : null
-  const counts = listState.summary
-  const profileId = modal?.kind === 'profile' ? modal.id : null
+  const profileId = modal?.id || null
   const profileKey = profileId ? JSON.stringify([profileId, profileVersion]) : null
   const profileIsCurrent = profileState.key === profileKey
   const profileAccount = profileIsCurrent ? profileState.account : null
@@ -527,6 +622,12 @@ export default function Users() {
     }
   }, [profileId, profileKey])
 
+  useEffect(() => {
+    if (!notice) return undefined
+    const timeout = window.setTimeout(() => setNotice(''), 3000)
+    return () => window.clearTimeout(timeout)
+  }, [notice])
+
   const changeFilter = (key, value) => {
     setFilter(key, value)
     setNotice('')
@@ -552,76 +653,44 @@ export default function Users() {
 
   const openAction = (id, action, fromProfile = false) => {
     setActionError('')
+    setProfileVersion((previous) => previous + 1)
     setModal({ kind: 'action', id, action, fromProfile })
   }
 
   const closeAction = () => {
+    if (actionInFlight.current) return
     setActionError('')
     setModal(modal?.fromProfile ? { kind: 'profile', id: modal.id } : null)
   }
 
-  const confirmAction = () => setActionError(UNAVAILABLE_MESSAGE)
+  const confirmAction = async (reason) => {
+    if (actionInFlight.current || !profileAccount || modal?.kind !== 'action') return
+    actionInFlight.current = true
+    setActionPending(true)
+    setActionError('')
+    const { id, action, fromProfile } = modal
+    try {
+      const account = await applyAdminUserAction(id, action, reason)
+      setProfileState({ key: profileKey, account, error: '' })
+      setRetryCount((previous) => previous + 1)
+      setNotice(`${completedActions[action]} ${account.username}.`)
+      setModal(fromProfile ? { kind: 'profile', id } : null)
+    } catch (error) {
+      setActionError(error.fieldErrors?.reason || error.message)
+    } finally {
+      actionInFlight.current = false
+      setActionPending(false)
+    }
+  }
 
   return (
     <div className="px-6 py-5 text-small text-ink max-xl:px-5 max-sm:px-4 max-sm:py-4">
-      <section
-        className="mb-6 grid grid-cols-4 gap-[18px] max-xl:grid-cols-2 max-xl:gap-3.5 max-sm:gap-2.5"
-        aria-label="Tổng quan người dùng"
-      >
-        {[
-          [
-            'all',
-            'Tổng tài khoản',
-            'users',
-            'border-[#2e6db4] from-white to-[#e8f0fb] text-[#2e6db4]',
-          ],
-          [
-            'active',
-            'Đang hoạt động',
-            'check',
-            'border-[#238d78] from-white to-[#e9f6f1] text-[#238d78]',
-          ],
-          [
-            'moderator',
-            'Moderator',
-            'shield',
-            'border-[#7b60b1] from-white to-[#f0ebfa] text-[#7b60b1]',
-          ],
-          [
-            'locked',
-            'Đang bị khóa',
-            'lock',
-            'border-[#bc5870] from-white to-[#fbeef2] text-[#bc5870]',
-          ],
-        ].map(([key, label, icon, tone]) => (
-          <article
-            key={key}
-            className={cx(
-              'flex items-center gap-[17px] rounded-[10px] border border-t-3 bg-linear-to-br via-white px-[22px] py-[22px] shadow-[0_3px_10px_#16233a08] max-sm:gap-2.5 max-sm:px-3 max-sm:py-3.5',
-              tone
-            )}
-          >
-            <span className="inline-flex rounded-[10px] bg-white/70 p-3 max-sm:p-2">
-              <Icon name={icon} size={23} className="max-sm:size-[19px]" />
-            </span>
-            <div>
-              <span className="block text-small font-medium text-[#62758d] max-sm:text-caption">
-                {label}
-              </span>
-              <strong className="mt-1.5 block text-[30px] font-bold leading-tight text-[#233d59] max-sm:text-[25px]">
-                {counts ? number(counts[key]) : listError ? '—' : '…'}
-              </strong>
-            </div>
-          </article>
-        ))}
-      </section>
-
       <section
         className="grid grid-cols-[minmax(240px,1.7fr)_minmax(140px,1fr)_minmax(150px,1fr)_minmax(165px,1fr)_auto] items-end gap-4 rounded-xl border border-[#b4c6db] bg-surface p-4 shadow-card max-xl:grid-cols-3 max-sm:grid-cols-2 max-sm:gap-x-2.5 max-sm:gap-y-3.5"
         aria-label="Bộ lọc người dùng"
       >
         <label className="flex min-w-0 flex-col gap-2 text-small font-semibold text-ink-secondary max-xl:col-span-2 max-sm:col-span-2">
-          Tìm tài khoản
+          Tìm kiếm
           <span className="relative">
             <Icon
               name="search"
@@ -633,7 +702,7 @@ export default function Users() {
               maxLength={100}
               value={filters.query}
               onChange={(event) => changeFilter('query', event.target.value)}
-              placeholder="Tên, email hoặc mã tài khoản…"
+              placeholder="Username hoặc email"
               className="h-9 w-full rounded-lg border border-line-strong bg-surface pl-[38px] pr-3 text-small font-normal text-ink outline-none placeholder:text-ink-subtle focus:border-focus focus:ring-2 focus:ring-focus/20"
             />
           </span>
@@ -722,31 +791,29 @@ export default function Users() {
         </div>
       )}
 
-      <div className="my-6 flex items-center justify-between gap-4 max-sm:flex-wrap max-sm:gap-2">
-        <h2 className="flex items-center gap-2.5 text-lead font-semibold text-[#253e59]">
-          Danh sách người dùng
-          <span className="rounded-md bg-[#e1ecfa] px-2 py-1 text-caption text-[#34689b]">
-            {number(filtered.length)}
-          </span>
-        </h2>
-        <span className="text-caption text-[#73869d]" aria-live="polite">
-          {loading
-            ? 'Đang tải danh sách…'
-            : `${number(filtered.length)} / ${number(counts?.all ?? 0)} tài khoản`}
-        </span>
-      </div>
+      <p className="mt-4 mb-2.5 text-small text-ink-subtle" aria-live="polite">
+        {loading ? (
+          'Đang tải danh sách người dùng…'
+        ) : (
+          <>
+            Hiển thị {filtered.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0}–
+            {Math.min(currentPage * PAGE_SIZE, filtered.length)} trong số {filtered.length} tài
+            khoản
+          </>
+        )}
+      </p>
 
       <DataTable
         variant="admin"
         caption="Người dùng, vai trò, trạng thái, ngày tham gia và thao tác"
         ariaLabel="Bảng người dùng, cuộn ngang để xem thêm"
-        minWidth="min-w-[1030px]"
+        minWidth="min-w-[1100px] table-fixed"
         columns={[
-          ['Tài khoản', 'w-[34%]'],
-          ['Vai trò', 'w-[15%]'],
-          ['Trạng thái', 'w-[14%]'],
-          ['Ngày tham gia', 'w-[15%]'],
-          ['Thao tác', 'w-[22%]'],
+          ['Tài khoản', 'w-[26%]'],
+          ['Vai trò', 'w-[12%]'],
+          ['Trạng thái', 'w-[15%]'],
+          ['Ngày tham gia', 'w-[20%]'],
+          ['Thao tác', 'w-[27%]'],
         ]}
         empty={
           (loading || listError || !filtered.length) && (
@@ -789,7 +856,6 @@ export default function Users() {
           >
             <td className="border-b border-[#e2eaf3] px-4 py-[18px]">
               <div className="flex items-center gap-3">
-                <Avatar account={account} />
                 <div className="min-w-0">
                   <button
                     type="button"
@@ -821,7 +887,6 @@ export default function Users() {
             </td>
             <td className="border-b border-[#e2eaf3] px-4 py-[18px] text-small text-ink-secondary">
               <time dateTime={account.createdAt}>{date(account.createdAt)}</time>
-              <span className="mt-1.5 block text-[11px] text-[#8797ab]">{account.id}</span>
             </td>
             <td className="border-b border-[#e2eaf3] px-4 py-[18px]">
               <div className="flex flex-wrap gap-1.5">
@@ -855,6 +920,7 @@ export default function Users() {
           pageSize={PAGE_SIZE}
           onChange={setPage}
           noun="tài khoản"
+          showSummary={false}
         />
       )}
 
@@ -869,15 +935,18 @@ export default function Users() {
           onAction={(action) => openAction(modal.id, action, true)}
         />
       )}
-      {selected && modal?.kind === 'action' && (
+      {modal?.kind === 'action' && (
         <UserActionDialog
-          key={`${selected.id}-${modal.action}`}
-          account={selected}
+          key={`${modal.id}-${modal.action}-${profileVersion}`}
+          account={profileAccount}
           actor={actor}
           action={modal.action}
           onConfirm={confirmAction}
           onClose={closeAction}
-          error={actionError}
+          error={profileError || actionError}
+          loading={profileLoading}
+          onRetry={() => setProfileVersion((previous) => previous + 1)}
+          pending={actionPending}
         />
       )}
     </div>

@@ -58,6 +58,21 @@ const SEED_MEMBERS = [
 const MEMBER_PASSWORD = 'User@1234'
 const BCRYPT_ROUNDS = 10
 
+const MANAGEMENT_HISTORY = {
+  'minhkhoi.td': [
+    ['grant', 'Phân công hỗ trợ kiểm duyệt trong đợt thử nghiệm.'],
+    ['revoke', 'Đã hoàn thành đợt hỗ trợ, tài khoản trở lại vai trò người dùng.'],
+    ['lock', 'Tạm khóa để xác minh thông tin liên hệ theo báo cáo.'],
+    ['unlock', 'Đã xác minh thông tin liên hệ, mở lại tài khoản.'],
+  ],
+  'hoangnam.q1': [
+    ['lock', 'Tạm khóa để rà soát nội dung bị báo cáo.'],
+    ['unlock', 'Đã rà soát và xác nhận tài khoản đủ điều kiện hoạt động trở lại.'],
+    ['grant', 'Phân công hỗ trợ kiểm duyệt bài đăng trong chiến dịch cộng đồng.'],
+    ['revoke', 'Kết thúc chiến dịch cộng đồng, thu hồi quyền kiểm duyệt tạm thời.'],
+  ],
+}
+
 const upsertUser = (email, fields) =>
   User.findOneAndUpdate(
     { email },
@@ -72,7 +87,16 @@ const upsertUser = (email, fields) =>
     { upsert: true, setDefaultsOnInsert: true, returnDocument: 'after' }
   )
 
-const createSeedLog = async ({ user, actor, action, reason, previousStatus }) => {
+const createSeedLog = async ({
+  user,
+  actor,
+  action,
+  reason,
+  previousStatus,
+  before,
+  after,
+  createdAt,
+}) => {
   await AuditLog.create({
     actor: actor._id,
     actorRole: 'admin',
@@ -83,8 +107,108 @@ const createSeedLog = async ({ user, actor, action, reason, previousStatus }) =>
       seedSource: 'user-seed',
       reason,
       ...(previousStatus && { previousStatus }),
+      ...(before && { before }),
+      ...(after && { after }),
     },
+    ...(createdAt && { createdAt }),
   })
+}
+
+// Gọi riêng hàm này để bổ sung lịch sử cho hai tài khoản mẫu mà không seed lại tài khoản/bài đăng.
+const seedUserManagementHistory = async () => {
+  const actor = await User.findOne({ username: 'admin', role: 'admin' }).select('_id')
+  const users = await User.find({ username: { $in: Object.keys(MANAGEMENT_HISTORY) } })
+  if (!actor || users.length !== 2) throw new Error('Thiếu tài khoản mẫu để seed lịch sử quản lý')
+  if (users.some((user) => user.role !== 'user' || user.status !== 'active')) {
+    throw new Error(
+      'Hai tài khoản mẫu cần ở vai trò Người dùng và trạng thái Hoạt động để khớp lịch sử'
+    )
+  }
+
+  for (const user of users) {
+    // Chỉ thay các bản ghi do seed tạo, giữ các thao tác quản lý thực tế.
+    await AuditLog.deleteMany({
+      entityType: 'User',
+      entityId: user._id,
+      'detail.seedSource': 'user-seed',
+    })
+    const events = MANAGEMENT_HISTORY[user.username]
+    const end = Math.min(Date.now(), user.updatedAt.getTime())
+    const start = Math.max(user.createdAt.getTime(), end - 4 * 60 * 60 * 1000)
+    let state = { role: 'user', status: 'active' }
+    for (const [index, [action, reason]] of events.entries()) {
+      const before = { ...state }
+      if (action === 'grant') state.role = 'moderator'
+      if (action === 'revoke') state.role = 'user'
+      if (action === 'lock') state.status = 'locked'
+      if (action === 'unlock') state.status = 'active'
+      await createSeedLog({
+        user,
+        actor,
+        action,
+        reason,
+        before,
+        after: { ...state },
+        ...(action === 'lock' && { previousStatus: before.status }),
+        createdAt: new Date(start + ((end - start) * (index + 1)) / events.length),
+      })
+    }
+    console.log(`  ✓ ${user.username}: ${events.length} thao tác quản lý mẫu`)
+  }
+}
+
+// Chạy cuối lượt seed đầy đủ để các thao tác tạo dữ liệu mẫu không làm lệch mốc cập nhật ban đầu.
+const seedUserUpdateDates = async () => {
+  const usernames = [...SEED_USERS, ...SEED_MEMBERS].map((user) => user.username)
+  const users = await User.find({ username: { $in: usernames }, createdAt: { $type: 'date' } })
+    .select('createdAt updatedAt')
+    .lean()
+  const usersWithHistory = new Set(
+    (
+      await AuditLog.distinct('entityId', {
+        entityType: 'User',
+        entityId: { $in: users.map((user) => user._id) },
+      })
+    ).map(String)
+  )
+  let updated = 0
+  for (const user of users) {
+    if (usersWithHistory.has(String(user._id))) continue
+    if (user.updatedAt?.getTime() === user.createdAt.getTime()) continue
+    const result = await User.updateOne(
+      { _id: user._id, updatedAt: user.updatedAt },
+      { $set: { updatedAt: user.createdAt } },
+      { timestamps: false }
+    )
+    updated += result.modifiedCount
+  }
+  console.log(`  ✓ ${updated} tài khoản mẫu chưa có lịch sử: updatedAt bằng createdAt`)
+}
+
+const seedUserActivityDates = async () => {
+  const usernames = [...SEED_USERS, ...SEED_MEMBERS].map((user) => user.username)
+  const users = await User.find({
+    username: { $in: usernames },
+    lastActiveAt: null,
+    createdAt: { $type: 'date' },
+  })
+    .select('username createdAt updatedAt status')
+    .lean()
+  const now = Date.now()
+  let updated = 0
+  for (const user of users) {
+    // Các lần truy cập mẫu cách nhau 30 phút, sau ngày tạo và trước thời điểm khóa nếu có.
+    const sampleTime = now - (usernames.indexOf(user.username) + 1) * 30 * 60 * 1000
+    const latest = user.status === 'locked' ? Math.min(now, user.updatedAt.getTime()) : now
+    const lastActiveAt = new Date(Math.max(user.createdAt.getTime(), Math.min(sampleTime, latest)))
+    const result = await User.updateOne(
+      { _id: user._id, lastActiveAt: null },
+      { $set: { lastActiveAt } },
+      { timestamps: false }
+    )
+    updated += result.modifiedCount
+  }
+  console.log(`  ✓ ${updated} tài khoản mẫu được bổ sung thời điểm truy cập gần nhất`)
 }
 
 const seedUsers = async () => {
@@ -135,6 +259,7 @@ const seedUsers = async () => {
     { username: 'minhkhoi.td', 'badges.badge': { $ne: badge._id } },
     { $push: { badges: { badge: badge._id } } }
   )
+  await seedUserManagementHistory()
 }
 
 // seed:demo trên production: chỉ tạo thành viên mẫu còn thiếu, mỗi tài khoản một mật khẩu ngẫu nhiên
@@ -158,4 +283,13 @@ const seedMissingMembers = async () => {
   console.log(`  ✓ tạo ${created} thành viên mẫu còn thiếu (mật khẩu ngẫu nhiên, không in ra)`)
 }
 
-module.exports = { seedUsers, seedMissingMembers, SEED_USERS, SEED_MEMBERS, MEMBER_PASSWORD }
+module.exports = {
+  seedUsers,
+  seedMissingMembers,
+  seedUserManagementHistory,
+  seedUserUpdateDates,
+  seedUserActivityDates,
+  SEED_USERS,
+  SEED_MEMBERS,
+  MEMBER_PASSWORD,
+}
