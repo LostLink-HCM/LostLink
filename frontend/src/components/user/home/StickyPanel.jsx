@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-const TOP_GAP = 100
+const TOP_GAP = 84
 const BOTTOM_GAP = 16
 
 export default function StickyPanel({ className, children, ...props }) {

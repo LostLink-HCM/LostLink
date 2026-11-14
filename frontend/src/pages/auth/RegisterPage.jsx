@@ -133,7 +133,7 @@ export default function RegisterPage() {
       />
 
       <p className="mb-0 mt-3.5 text-center text-caption">
-        <Link to="/" className="text-au-ink/55 no-underline hover:text-au-link">
+        <Link to="/" className="text-au-ink/70 no-underline hover:text-au-link">
           Xem tin công khai mà không cần đăng nhập →
         </Link>
       </p>

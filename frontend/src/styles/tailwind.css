@@ -4,18 +4,21 @@
   --font-sans: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
   --color-au-ink: #eaf1fb;
-  /* Màu nhấn của khu auth là cam sáng, nút chính dùng chữ tối để đủ tương phản */
-  --color-au-accent: #fdba74;
-  --color-au-link: #fdba74;
-  --color-au-link-hover: #ffedd5;
+  /* Màu nhấn của khu auth đổi theo giờ: ban ngày xanh biển, chiều tím nhạt, đêm xanh đậm.
+     Giá trị ở đây là ban ngày, chiều và đêm ghi đè ở cuối file */
+  --color-au-accent: #7dd3fc;
+  --color-au-link: #7dd3fc;
+  --color-au-link-hover: #e0f2fe;
   --color-au-star: #a9ccff;
   --color-au-danger: #e96060;
   --color-au-success: #4cbe8b;
   --color-au-danger-ink: #ffb4b4;
-  --color-au-primary: #fb923c;
-  --color-au-primary-light: #fdba74;
-  --color-au-primary-dark: #fb923c;
-  --color-au-on-primary: #431407;
+  --color-au-primary: #38bdf8;
+  --color-au-primary-light: #7dd3fc;
+  --color-au-primary-dark: #38bdf8;
+  --color-au-on-primary: #082f49;
+  /* Nền form là kính sẫm pha màu trời, để form đồng màu dù phía sau là trời hay đồi */
+  --color-au-card: rgb(12 38 82 / 0.55);
 
   /* Bầu trời ban ngày, chiều và đêm ghi đè ở cuối file */
   --color-au-sky-1: #0f2f63;
@@ -51,7 +54,7 @@
   --radius-au-control: 9px;
   --radius-au-card: 18px;
 
-  --shadow-au-button: 0 10px 24px -10px rgb(251 146 60 / 0.85);
+  --shadow-au-button: 0 10px 24px -10px rgb(56 189 248 / 0.7);
   --shadow-au-card: 0 30px 80px -24px rgb(4 12 24 / 0.7), inset 0 1px 0 rgb(255 255 255 / 0.14);
 
   /* Token theo ngữ nghĩa, giá trị mặc định là khu quản trị (moderator/admin).
@@ -132,6 +135,9 @@
   --animate-ll-twinkle: ll-twinkle 4s ease-in-out infinite;
   --animate-ll-pulse: ll-pulse 3s ease-out infinite;
   --animate-ll-fade: ll-fade 0.35s ease both;
+  /* backwards: hết hiệu ứng thì trả về vị trí thường (chỉ ló tai) để rê chuột vẫn ngoi lên được */
+  --animate-ll-peek: ll-peek 4.2s ease-in-out backwards;
+  --animate-ll-bob: ll-bob 1.6s ease-in-out infinite;
   --animate-logo-glow: logo-glow 5s ease-in-out infinite;
   --animate-logo-mag: logo-mag 3s cubic-bezier(0.16, 0.84, 0.28, 1) infinite;
   --animate-logo-pin: logo-pin 3s cubic-bezier(0.16, 0.84, 0.28, 1) infinite;
@@ -207,6 +213,26 @@
     to {
       opacity: 1;
       transform: none;
+    }
+  }
+  /* Thú cưng trên header ngoi lên nhìn rồi thụt xuống chỉ còn tai */
+  @keyframes ll-peek {
+    0%,
+    100% {
+      translate: 0 64%;
+    }
+    18%,
+    72% {
+      translate: 0 0;
+    }
+  }
+  @keyframes ll-bob {
+    0%,
+    100% {
+      translate: 0 18%;
+    }
+    50% {
+      translate: 0 0;
     }
   }
   @keyframes logo-glow {
@@ -290,6 +316,15 @@
   --color-au-tree-shade: #3b3762;
   --color-au-trunk: #3a2e45;
   --color-au-bird: #2a1f3d;
+  --color-au-accent: #d8b4fe;
+  --color-au-link: #d8b4fe;
+  --color-au-link-hover: #f3e8ff;
+  --color-au-primary: #c084fc;
+  --color-au-primary-light: #d8b4fe;
+  --color-au-primary-dark: #c084fc;
+  --color-au-on-primary: #3b0764;
+  --color-au-card: rgb(32 20 64 / 0.58);
+  --shadow-au-button: 0 10px 24px -10px rgb(192 132 252 / 0.7);
   --au-star-opacity: 0.4;
   --au-cloud-opacity: 0.75;
   --au-flower-opacity: 0.85;
@@ -313,6 +348,16 @@
   --color-au-tree-shade: #102d22;
   --color-au-trunk: #1f1a1d;
   --color-au-bird: #8fa6c8;
+  --color-au-accent: #93c5fd;
+  --color-au-link: #93c5fd;
+  --color-au-link-hover: #dbeafe;
+  --color-au-primary: #2563eb;
+  /* Nút đêm dùng chữ trắng nên chọn xanh đủ đậm để chữ còn đọc rõ */
+  --color-au-primary-light: #3b82f6;
+  --color-au-primary-dark: #1d4ed8;
+  --color-au-on-primary: #ffffff;
+  --color-au-card: rgb(6 14 28 / 0.62);
+  --shadow-au-button: 0 10px 24px -10px rgb(59 130 246 / 0.75);
   --au-star-opacity: 1;
   --au-cloud-opacity: 0.6;
   --au-flower-opacity: 0.55;

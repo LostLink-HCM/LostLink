@@ -1,31 +1,31 @@
 import { useId } from 'react'
 import { LOGO_VIEWBOX } from './theme'
 
-// Vẽ riêng với common/Logo để tách được ghim và kính lúp khi diễn hoạt cảnh
 const TONES = {
-  dark: { ring: '#22304a', glass: '#dff1ff' },
-  // Thêm viền sáng để vành đậm không chìm vào nền trời
-  header: { ring: '#22304a', glass: '#dff1ff', edge: '#eaf1fb' },
+  dark: { ring: '#1b3358', arc: '#8fb3dc', glass: '#e8f4ff' },
+  // Mặt kính trong suốt để thấy nền trời; viền sáng bên ngoài để vành đậm không chìm vào nền
+  header: { ring: '#1b3358', arc: '#8fb3dc', glass: 'none', edge: '#eaf1fb' },
 }
 
 export function LogoPinGradient({ id }) {
   return (
     <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stopColor="#fb923c" />
-      <stop offset="1" stopColor="#c2410c" />
+      <stop offset="0" stopColor="#4fa8f5" />
+      <stop offset="1" stopColor="#2563c9" />
     </linearGradient>
   )
 }
 
 // children nằm giữa mặt kính và vành kính
 export function LogoLens({ tone = 'dark', children }) {
-  const { ring, glass, edge } = TONES[tone]
+  const { ring, arc, glass, edge } = TONES[tone]
 
   return (
     <g>
       {edge && (
         <g stroke={edge} fill="none">
           <path d="M283 149 L298 164" strokeWidth="13" strokeLinecap="round" />
+          {/* Viền sáng cả mép ngoài lẫn mép trong của vành kính */}
           <circle cx="262" cy="128" r="26" strokeWidth="10" />
         </g>
       )}
@@ -33,6 +33,8 @@ export function LogoLens({ tone = 'dark', children }) {
       <circle cx="262" cy="128" r="26" fill={glass} />
       {children}
       <circle cx="262" cy="128" r="26" fill="none" stroke={ring} strokeWidth="6" />
+      {/* Cung từ -71° tới 25° như logo gốc */}
+      <path d="M270.5 103.4 A26 26 0 0 1 285.5 139.2" fill="none" stroke={arc} strokeWidth="6" />
     </g>
   )
 }
