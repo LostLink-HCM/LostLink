@@ -53,11 +53,6 @@ function ownerNotice(post) {
   }
 }
 
-// Tải chi tiết bài theo loại tin và slug. Mỗi lần gọi API server tính một lượt xem, nên giữ
-// lời gọi trong ref: StrictMode chạy effect hai lần vẫn chỉ gọi một lần cho mỗi lần mở bài.
-// Đợi khôi phục phiên đăng nhập xong mới gọi, nếu không request đi không kèm token: chủ bài bị
-// coi là Guest (vẫn thấy nút nhận đồ, Báo cáo) và lượt xem của chính họ bị tính.
-// Đăng xuất hoặc đổi tài khoản ngay trên trang thì tải lại để các nút đúng với người đang xem
 function usePostDetail(type, slug) {
   const { user, ready } = useAuth()
   const [retry, setRetry] = useState(0)
@@ -167,7 +162,7 @@ function PostDetail({ post, onChanged }) {
     // Gửi kèm bài vì trang Báo cáo chưa tự tải được bài
     if (requireMember()) navigate(`/posts/${post.id}/report`, { state: { post } })
   }
-  const claim = () => ctx.contactAbout(post)
+  const claim = () => ctx.claimPost(post)
 
   // Bài của chính mình: không nhận đồ hay báo cáo, thay bằng lối vào gợi ý ghép cặp
   const showMatches = isMine && isMatchable(post)

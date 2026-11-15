@@ -44,8 +44,18 @@ const reportLimiter = limiter(5, {
   },
 })
 
+const claimLimiter = limiter(20, {
+  keyGenerator: (req) => `user:${req.user.id}`,
+  message: {
+    success: false,
+    message: 'Bạn thao tác quá nhanh, vui lòng thử lại sau.',
+    code: 'CLAIM_RATE_LIMITED',
+  },
+})
+
 module.exports = {
   authLimiter,
+  claimLimiter,
   apiLimiter,
   geoLimiter,
   postCreateLimiter,

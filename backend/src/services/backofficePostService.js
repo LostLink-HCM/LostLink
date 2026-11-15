@@ -262,7 +262,7 @@ const updateStatus = async (id, actor, status, reason = '') => {
         },
       },
     },
-    { new: true, runValidators: true }
+    { returnDocument: 'after', runValidators: true }
   )
   if (!updated) throw statusChanged()
 
@@ -311,7 +311,7 @@ const updateVisibility = async (id, isHidden, reason = '') => {
   const update = { $set: { isHidden } }
   if (isHidden) update.$set.hiddenReason = reason
   const post = await Post.findOneAndUpdate({ _id: id, isHidden: current.isHidden }, update, {
-    new: true,
+    returnDocument: 'after',
     runValidators: true,
   }).select('code isHidden hiddenReason')
   if (!post) throw statusChanged()

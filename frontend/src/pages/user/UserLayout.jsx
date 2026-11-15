@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { getClaimState, listClaims } from '../../api/claims'
 import { useAuth } from '../../auth/AuthContext'
 import { cx } from '../../components/user/classes'
 import MobileTabBar from '../../components/user/home/MobileTabBar'
@@ -16,7 +17,8 @@ import {
   hasOtherOpenThread,
   inboxUnread,
   isClosedByMe,
-  openVerifiedThread,
+  mergeClaimThreads,
+  openThread,
   peerOf,
   postSnapshot,
   reopenThread,
@@ -65,8 +67,6 @@ export default function UserLayout() {
   const [watchAreas, setWatchAreas] = useState(createWatchAreas)
   // Thay đổi ở mục Tài khoản (chưa có API): email mới đã xác thực, lần đổi mật khẩu gần nhất
   const [account, setAccount] = useState({ email: '', passwordChangedAt: null })
-  // Kết quả xác minh theo bài: 'passed' | 'failed', mỗi bài chỉ được trả lời một lần
-  const [verifications, setVerifications] = useState({})
   // Đánh giá đã gửi theo hội thoại, mỗi giao dịch chỉ đánh giá một lần
   const [reviews, setReviews] = useState({})
   // Báo cáo đã gửi theo đối tượng ('post:id' | 'user:tên'), mỗi đối tượng chỉ báo cáo một lần
@@ -205,16 +205,48 @@ export default function UserLayout() {
     return true
   }
 
-  // Ghi nhận câu trả lời xác minh, đúng thì mở hội thoại và chuyển bài sang Đã liên hệ
-  const answerQuestion = (post, choice) => {
-    if (verifications[post.id]) return verifications[post.id]
-    const result = choice === post.question.correct ? 'passed' : 'failed'
-    setVerifications((prev) => ({ ...prev, [post.id]: result }))
-    if (result === 'passed') {
-      setChat((prev) => openVerifiedThread(prev, post))
-      setPostStatus(post.id, 'contacted')
+  const reloadClaims = useCallback(async (activeId) => {
+    try {
+      const { data } = await listClaims()
+      setChat((prev) => {
+        const next = mergeClaimThreads(prev, data.items)
+        return activeId ? openThread(next, activeId) : next
+      })
+    } catch {
+      // bỏ qua, lần mở trang Tin nhắn sau sẽ tải lại
     }
-    return result
+  }, [])
+
+  useEffect(() => {
+    if (!user) return undefined
+    let active = true
+    listClaims()
+      .then(({ data }) => active && setChat((prev) => mergeClaimThreads(prev, data.items)))
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [user])
+
+  const claimPost = async (post) => {
+    if (!requireMember()) return
+    try {
+      const { data } = await getClaimState(post.id)
+      if (data.step === 'verify') {
+        navigate(`/posts/${post.id}/verify`, { state: { claim: data } })
+        return
+      }
+      if (data.step === 'request') {
+        setChat((prev) =>
+          startRequest(prev, { post: data.post, peer: peerOf(data.post), remote: true })
+        )
+      } else {
+        await reloadClaims(data.claimId && `claim-${data.claimId}`)
+      }
+      navigate('/messages', { state: { openConversation: true } })
+    } catch (error) {
+      setToast(error.message)
+    }
   }
 
   const unreadMessages = inboxUnread(chat.threads)
@@ -283,10 +315,10 @@ export default function UserLayout() {
           closeConversation,
           reopenConversation,
           contactAbout,
+          claimPost,
+          reloadClaims,
           matches,
           respondToMatch,
-          verifications,
-          answerQuestion,
           reviews,
           submitReview,
           reports,

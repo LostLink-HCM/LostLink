@@ -77,10 +77,72 @@ export const postSnapshot = (post) => ({
   image: post.images[0],
 })
 
-export const peerOf = (post) => ({
-  name: post.author,
-  initials: post.author.slice(0, 2).toUpperCase(),
-})
+const peerNamed = (name) => ({ name, initials: name.slice(0, 2).toUpperCase() })
+
+export const peerOf = (post) => peerNamed(post.author)
+
+const CLAIM_STATUSES = { linked: 'open', rejected: 'declined' }
+
+export function claimThread(claim) {
+  const outgoing = claim.direction === 'outgoing'
+  const status = CLAIM_STATUSES[claim.status] ?? (outgoing ? 'pending' : 'incoming')
+  return {
+    id: `claim-${claim.id}`,
+    claimId: claim.id,
+    remote: true,
+    peer: peerNamed(claim.peer?.username ?? 'Người dùng'),
+    post: { ...claim.post, mine: !outgoing },
+    status,
+    ...(status === 'open' && {
+      openedBy: claim.verified ? 'verified' : 'accepted',
+      openedAt: claim.respondedAt,
+    }),
+    createdAt: claim.createdAt,
+    unread: status === 'incoming' ? 1 : 0,
+    confirmed: { me: false, peer: false },
+    messages: claim.introMessage
+      ? [
+          {
+            id: `claim-${claim.id}-intro`,
+            sender: outgoing ? 'me' : 'peer',
+            text: claim.introMessage,
+            createdAt: claim.createdAt,
+          },
+        ]
+      : [],
+  }
+}
+
+export function mergeClaimThreads(state, claims) {
+  const fresh = claims.map(claimThread)
+  const claimed = new Set(fresh.map((thread) => thread.post.id))
+  const previous = new Map(state.threads.map((thread) => [thread.id, thread]))
+  const kept = state.threads.filter(
+    (thread) => !thread.remote || (thread.status === 'request' && !claimed.has(thread.post.id))
+  )
+  const merged = fresh.map((thread) => {
+    const prev = previous.get(thread.id)
+    if (!prev || prev.status !== thread.status) return thread
+    const messages = prev.messages.length > thread.messages.length ? prev.messages : thread.messages
+    return { ...thread, unread: prev.unread, messages, events: prev.events }
+  })
+  return { ...state, threads: [...merged, ...kept] }
+}
+
+// Đổi một hội thoại thành bản mới (vd yêu cầu vừa gửi, vừa được đồng ý) và mở nó
+export const replaceThread = (state, threadId, thread) => {
+  const drafts = { ...state.drafts }
+  delete drafts[threadId]
+  return {
+    ...state,
+    activeId: thread.id,
+    drafts,
+    threads: [
+      thread,
+      ...state.threads.filter((item) => item.id !== threadId && item.id !== thread.id),
+    ],
+  }
+}
 
 // Trả lời đúng câu hỏi xác minh thì mở kênh trò chuyện ngay, không cần chờ đồng ý
 export function openVerifiedThread(state, post, now = Date.now()) {
@@ -111,12 +173,13 @@ export function openVerifiedThread(state, post, now = Date.now()) {
 }
 
 // Mở chế độ yêu cầu trò chuyện từ bài đăng, nếu đã có hội thoại về bài này thì mở lại hội thoại cũ
-export function startRequest(state, { post, peer }, now = Date.now()) {
+export function startRequest(state, { post, peer, remote = false }, now = Date.now()) {
   const existing = state.threads.find((thread) => thread.post.id === post.id)
   if (existing) return openThread(state, existing.id)
 
   const thread = {
     id: `thread-post-${post.id}`,
+    ...(remote && { remote: true }),
     peer,
     post,
     status: 'request',

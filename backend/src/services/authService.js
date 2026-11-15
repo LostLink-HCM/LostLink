@@ -322,6 +322,15 @@ const hasSessionClaims = (payload) =>
   mongoose.isValidObjectId(payload?.sub) && mongoose.isValidObjectId(payload?.sid)
 
 // Dùng cho middleware protect: access token phải thuộc một phiên còn hiệu lực
+const ACTIVITY_INTERVAL_MS = 5 * 60 * 1000
+
+const touchActivity = async (user) => {
+  const now = new Date()
+  if (user.lastActiveAt && now - user.lastActiveAt < ACTIVITY_INTERVAL_MS) return
+  user.lastActiveAt = now
+  await User.updateOne({ _id: user._id }, { $set: { lastActiveAt: now } })
+}
+
 const findSessionUser = async (payload) => {
   if (!hasSessionClaims(payload)) throw ApiError.unauthorized(SESSION_EXPIRED)
 
@@ -331,6 +340,7 @@ const findSessionUser = async (payload) => {
   ])
   if (!user || !active) throw ApiError.unauthorized(SESSION_EXPIRED)
   if (user.status === 'locked') throw accountLocked()
+  await touchActivity(user)
   return user
 }
 

@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
-import { useAuth } from '../../auth/AuthContext'
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import { answerQuestion, getClaimState } from '../../api/claims'
 import Icon from '../../components/common/Icon'
 import Button from '../../components/user/Button'
 import { buttonClass } from '../../components/user/buttonClass'
@@ -10,92 +10,139 @@ import EmptyState from '../../components/user/EmptyState'
 import Note from '../../components/user/Note'
 import { cx } from '../../components/user/classes'
 import AttachedPost from '../../components/user/messages/AttachedPost'
-import { isClosedByMe, openThread, postSnapshot } from '../../lib/user/messages'
+import { postPath } from '../../lib/user/homeFeed'
 
 const pageClass = 'mx-auto max-w-180 px-4 pt-5 pb-10 sm:px-6 lg:pt-7'
 
-// Không trả lời được: bài không tồn tại, không có câu hỏi, bài của mình hoặc không còn Đang tìm
-function Unavailable({ postId, title, description }) {
+// Không trả lời được: bài không tồn tại, không có câu hỏi, bài của mình hoặc không còn nhận đồ
+function Unavailable({ post, title, description, children }) {
   return (
     <div className={pageClass}>
-      <BackLink to={postId ? `/posts/${postId}` : '/'}>
-        {postId ? 'Quay lại bài đăng' : 'Về trang chủ'}
+      <BackLink to={post ? postPath(post) : '/'}>
+        {post ? 'Quay lại bài đăng' : 'Về trang chủ'}
       </BackLink>
       <Card>
         <EmptyState icon="lock" title={title} description={description} />
+        {children && <div className="flex justify-center gap-3 pb-10">{children}</div>}
       </Card>
     </div>
   )
 }
 
+// Từ trang chi tiết đã có sẵn câu hỏi (state.claim), mở thẳng link thì tải lại
+function useClaimState(id) {
+  const { state } = useLocation()
+  const initial = state?.claim?.post?.id === id ? state.claim : null
+  const [result, setResult] = useState({ claim: initial, error: null })
+
+  useEffect(() => {
+    if (initial) return undefined
+    let active = true
+    getClaimState(id)
+      .then((res) => active && setResult({ claim: res.data, error: null }))
+      .catch((error) => active && setResult({ claim: null, error }))
+    return () => {
+      active = false
+    }
+  }, [id, initial])
+
+  return { ...result, loading: !result.claim && !result.error }
+}
+
 // Trả lời câu hỏi xác minh của người nhặt
 export default function VerifyPage() {
   const { id } = useParams()
-  const { user } = useAuth()
   const navigate = useNavigate()
-  const { posts, chat, setChat, verifications, answerQuestion, reopenConversation } =
-    useOutletContext()
+  const { reloadClaims } = useOutletContext()
+  const { claim, error, loading } = useClaimState(id)
   const [choice, setChoice] = useState(null)
+  // passed | failed sau khi gửi, kèm hội thoại vừa mở
+  const [answer, setAnswer] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
-  const post = posts.find((item) => String(item.id) === id)
-  const result = post && verifications[post.id]
-
-  if (!post) {
+  if (loading) {
     return (
-      <Unavailable
-        title="Không tìm thấy bài đăng"
-        description="Bài đăng không tồn tại hoặc đã bị ẩn."
-      />
-    )
-  }
-  if (post.type !== 'found' || !post.question) {
-    return (
-      <Unavailable
-        postId={post.id}
-        title="Bài này không có câu hỏi xác minh"
-        description="Bạn có thể gửi yêu cầu liên hệ cho người đăng từ trang bài đăng."
-      />
-    )
-  }
-  if (post.author === user.username) {
-    return (
-      <Unavailable
-        postId={post.id}
-        title="Đây là bài đăng của bạn"
-        description="Bạn không thể tự trả lời câu hỏi xác minh của mình."
-      />
-    )
-  }
-  if (!result && post.status !== 'searching') {
-    return (
-      <Unavailable
-        postId={post.id}
-        title="Không thể nhận đồ từ bài này"
-        description="Bài đăng không còn ở trạng thái Đang tìm."
-      />
+      <div className={pageClass} role="status" aria-label="Đang tải câu hỏi xác minh">
+        <div className="h-80 animate-pulse rounded-2xl bg-line-subtle" />
+      </div>
     )
   }
 
-  const { question } = post
+  if (error) {
+    const failed = error.code === 'VERIFICATION_FAILED'
+    return (
+      <Unavailable
+        title={
+          failed
+            ? 'Xác minh không thành công'
+            : error.status === 404
+              ? 'Không tìm thấy bài đăng'
+              : 'Không thể nhận đồ từ bài này'
+        }
+        description={error.message}
+      >
+        {failed && (
+          <Link to="/posts/new" className={buttonClass({ variant: 'primary' })}>
+            Đăng tin mất đồ
+          </Link>
+        )}
+      </Unavailable>
+    )
+  }
 
-  const submit = (event) => {
+  const { post } = claim
+  if (claim.step !== 'verify') {
+    const chatting = ['chat', 'requested'].includes(claim.step)
+    return (
+      <Unavailable
+        post={post}
+        title={chatting ? 'Bạn đã liên hệ về bài này' : 'Bài này không có câu hỏi xác minh'}
+        description={
+          chatting
+            ? 'Mở trang Tin nhắn để tiếp tục trao đổi với người đăng.'
+            : 'Bạn có thể gửi yêu cầu liên hệ cho người đăng từ trang bài đăng.'
+        }
+      >
+        {chatting && (
+          <Link to="/messages" className={buttonClass({ variant: 'primary' })}>
+            Mở tin nhắn
+          </Link>
+        )}
+      </Unavailable>
+    )
+  }
+
+  const { question } = claim
+  const result = answer?.correct === true ? 'passed' : answer ? 'failed' : null
+
+  const submit = async (event) => {
     event.preventDefault()
-    if (choice === null || result) return
-    answerQuestion(post, choice)
+    if (choice === null || result || submitting) return
+    setSubmitting(true)
+    setSubmitError('')
+    try {
+      const { data } = await answerQuestion(id, choice)
+      setAnswer(data)
+    } catch (err) {
+      if (err.code === 'ALREADY_ANSWERED') setAnswer({ correct: false })
+      else setSubmitError(err.message)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  const openChat = () => {
-    const thread = chat.threads.find((item) => item.post.id === post.id)
-    if (thread) {
-      if (isClosedByMe(thread)) reopenConversation(thread)
-      setChat((prev) => openThread(prev, thread.id))
-    }
+  const openChat = async () => {
+    await reloadClaims(answer.claimId && `claim-${answer.claimId}`)
     navigate('/messages', { state: { openConversation: true } })
   }
 
+  // Để sau: chưa gửi thì lượt trả lời vẫn còn
+  const later = () => navigate(postPath(post))
+
   return (
     <div className={pageClass}>
-      <BackLink to={`/posts/${post.id}`}>Quay lại bài đăng</BackLink>
+      <BackLink to={postPath(post)}>Quay lại bài đăng</BackLink>
 
       <Card className="p-5 sm:p-7">
         <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -113,21 +160,21 @@ export default function VerifyPage() {
         </p>
 
         <div className="mb-5">
-          <AttachedPost post={postSnapshot(post)} linkable />
+          <AttachedPost post={post} linkable to={postPath(post)} />
         </div>
 
         <form noValidate onSubmit={submit}>
           <fieldset
-            disabled={Boolean(result)}
+            disabled={Boolean(result) || submitting}
             className="m-0 rounded-2xl border border-line bg-surface-muted p-4 sm:p-5"
           >
             <legend className="float-left mb-4 w-full p-0 text-lead font-semibold text-ink">
               {question.text}
             </legend>
             <div className="clear-both flex flex-col gap-2.5">
-              {question.options.map((text, index) => (
+              {question.options.map((option) => (
                 <label
-                  key={text}
+                  key={option.id}
                   className={cx(
                     'flex items-center gap-3 rounded-xl border-[1.5px] border-line bg-surface px-4 py-3.5 text-body text-ink transition-colors',
                     'has-checked:border-primary has-checked:bg-primary-soft',
@@ -138,16 +185,21 @@ export default function VerifyPage() {
                   <input
                     type="radio"
                     name="answer"
-                    checked={choice === index}
-                    onChange={() => setChoice(index)}
+                    checked={choice === option.id}
+                    onChange={() => setChoice(option.id)}
                     className="size-4.5 shrink-0 accent-primary"
                   />
-                  {text}
+                  {option.text}
                 </label>
               ))}
             </div>
           </fieldset>
 
+          {submitError && (
+            <Note icon="warning" tone="danger" className="mt-4">
+              {submitError}
+            </Note>
+          )}
           {result === 'passed' && (
             <Note icon="check" tone="success" className="mt-4">
               <strong className="block text-small text-success">Chính xác rồi</strong>
@@ -172,7 +224,7 @@ export default function VerifyPage() {
               </Button>
             ) : result === 'failed' ? (
               <>
-                <Link to={`/posts/${post.id}`} className={buttonClass({ size: 'xl' })}>
+                <Link to={postPath(post)} className={buttonClass({ size: 'xl' })}>
                   Về bài đăng
                 </Link>
                 <Link
@@ -188,17 +240,17 @@ export default function VerifyPage() {
               </>
             ) : (
               <>
-                <Button size="xl" onClick={() => navigate(`/posts/${post.id}`)}>
+                <Button size="xl" onClick={later}>
                   Để sau
                 </Button>
                 <Button
                   type="submit"
                   variant="primary"
                   size="xl"
-                  disabled={choice === null}
+                  disabled={choice === null || submitting}
                   className="sm:flex-1"
                 >
-                  Gửi câu trả lời
+                  {submitting ? 'Đang gửi…' : 'Gửi câu trả lời'}
                 </Button>
               </>
             )}
