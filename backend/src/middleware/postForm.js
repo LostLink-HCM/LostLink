@@ -83,4 +83,18 @@ const parseReportForm = createImageForm({
   },
 })
 
-module.exports = { parsePostForm, parseReportForm, MAX_IMAGES, MAX_IMAGE_MB }
+// Tin nhắn: field "data" (JSON nội dung) và tối đa một ảnh ở field "image"
+const MESSAGE_IMAGE_ERROR = `Ảnh phải là JPG, PNG hoặc WEBP và không quá ${MAX_IMAGE_MB} MB.`
+const parseMessageForm = createImageForm({
+  field: 'image',
+  maxImages: 1,
+  messages: {
+    type: () => MESSAGE_IMAGE_ERROR,
+    LIMIT_FILE_SIZE: MESSAGE_IMAGE_ERROR,
+    LIMIT_FILE_COUNT: 'Mỗi lần chỉ gửi được một ảnh.',
+    LIMIT_UNEXPECTED_FILE: 'Mỗi lần chỉ gửi được một ảnh.',
+    json: 'Dữ liệu tin nhắn không đúng định dạng JSON.',
+  },
+})
+
+module.exports = { parsePostForm, parseReportForm, parseMessageForm, MAX_IMAGES, MAX_IMAGE_MB }

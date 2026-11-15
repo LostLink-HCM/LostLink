@@ -325,26 +325,28 @@ const changePostStatus = async (id, user, status) => {
     throw statusChanged()
   }
 
+  await afterPostEnded(post, status, user._id, changedAt)
+  return { id: post._id, status: post.status, changedAt }
+}
+
+const afterPostEnded = async (post, status, actorId, changedAt = new Date()) => {
   const followers = await PostFollow.find({ post: post._id }).distinct('user')
   const notice = STATUS_NOTICES[status]
   await Promise.all([
     staleMatchesOf(post._id),
-    // Huỷ các yêu cầu liên hệ chưa được trả lời
     Claim.updateMany(
       { post: post._id, status: { $in: ['pending', 'verifying'] } },
       { $set: { status: 'rejected', respondedAt: changedAt } }
     ),
     notify(followers, {
       type: notice.type,
-      actor: user._id,
+      actor: actorId,
       refType: 'Post',
       refId: post._id,
       text: `Bài "${post.title}" ${notice.text}.`,
     }),
     status === 'returned' ? returnService.refreshReturnersOf(post) : null,
   ])
-
-  return { id: post._id, status: post.status, changedAt }
 }
 
-module.exports = { getPostForEdit, updatePost, deletePost, changePostStatus }
+module.exports = { getPostForEdit, updatePost, deletePost, changePostStatus, afterPostEnded }

@@ -2,9 +2,6 @@ import { normalize } from './homeFeed'
 
 export const MESSAGE_LIMIT = 2000
 
-// Người mất là người nhận lại đồ
-export const isReceiver = (post) => (post.type === 'found') !== Boolean(post.mine)
-
 const PHONE = /(?:\+84|\b0)(?:[\s.-]?\d){9}\b/
 const EMAIL = /\S+@\S+\.\S+/
 const ADDRESS = /\d+\/\d+|\b(?:so nha|hem|ngo|ngach|kiet|duong so)\s*\d+/
@@ -12,9 +9,7 @@ const ADDRESS = /\d+\/\d+|\b(?:so nha|hem|ngo|ngach|kiet|duong so)\s*\d+/
 export function validateMessage(text, { intro = false } = {}) {
   const value = text.trim()
   if (!value) return 'Vui lòng nhập nội dung tin nhắn.'
-  if (value.length > MESSAGE_LIMIT) {
-    return `Tin nhắn dài quá ${MESSAGE_LIMIT} ký tự, vui lòng rút gọn.`
-  }
+  if (value.length > MESSAGE_LIMIT) return 'Tin nhắn tối đa 2.000 ký tự.'
   if (intro) {
     if (PHONE.test(value) || EMAIL.test(value)) {
       return 'Tin nhắn giới thiệu không được chứa số điện thoại hoặc email.'
@@ -26,260 +21,172 @@ export function validateMessage(text, { intro = false } = {}) {
   return ''
 }
 
-export const lastActivity = (thread) => thread.messages.at(-1)?.createdAt || thread.createdAt
+const peerNamed = (name, role = 'user') => ({
+  name,
+  initials: name.slice(0, 2).toUpperCase(),
+  role,
+})
 
-const previewText = (message) => (message.image ? 'Đã gửi một ảnh' : message.text)
+export const peerOf = (post) => peerNamed(post.author)
+
+// ----- Ba loại mục trong danh sách Tin nhắn:
+// conversation: kênh trò chuyện đã mở (trao trả hoặc hỗ trợ), dữ liệu từ /conversations
+// claim: yêu cầu liên hệ đang chờ hoặc bị từ chối, dữ liệu từ /claims
+// request: lời giới thiệu đang soạn, chỉ có trên máy cho tới khi gửi
+
+// Chủ bài: bài Nhặt được thì chủ bài là người nhặt (không phải người nhận lại đồ) và ngược lại
+const ownsPost = (post, receiver) => (post.type === 'found') !== Boolean(receiver)
+
+export function conversationThread(item) {
+  const support = item.kind === 'support'
+  return {
+    id: item.id,
+    type: 'conversation',
+    conversationId: item.id,
+    kind: item.kind,
+    peer: support
+      ? { ...peerNamed(item.peer?.username ?? 'Moderator', 'moderator'), label: 'Hỗ trợ LostLink' }
+      : peerNamed(item.peer?.username ?? 'Người dùng'),
+    post: item.post ? { ...item.post, mine: ownsPost(item.post, item.receiver) } : null,
+    status: item.status === 'locked' ? 'locked' : item.returned ? 'returned' : 'open',
+    receiver: item.receiver,
+    closedBy: item.closedBy,
+    confirmed: item.confirmed,
+    opened: item.opened ?? null,
+    events: item.events ?? [],
+    lastMessage: item.lastMessage ?? null,
+    unread: item.unread ?? 0,
+    activity: item.lastMessageAt ?? item.createdAt,
+    review: item.review ?? null,
+  }
+}
+
+export function claimThread(claim) {
+  const outgoing = claim.direction === 'outgoing'
+  const status = claim.status === 'rejected' ? 'declined' : outgoing ? 'pending' : 'incoming'
+  return {
+    id: `claim-${claim.id}`,
+    type: 'claim',
+    claimId: claim.id,
+    kind: 'trade',
+    peer: peerNamed(claim.peer?.username ?? 'Người dùng'),
+    post: { ...claim.post, mine: !outgoing },
+    status,
+    closedBy: null,
+    unread: status === 'incoming' ? 1 : 0,
+    activity: claim.respondedAt ?? claim.createdAt,
+    intro: {
+      id: `claim-${claim.id}-intro`,
+      sender: outgoing ? 'me' : 'peer',
+      text: claim.introMessage,
+      createdAt: claim.createdAt,
+    },
+  }
+}
+
+export function requestThread(post, now = Date.now()) {
+  return {
+    id: `request-${post.id}`,
+    type: 'request',
+    kind: 'trade',
+    peer: peerOf(post),
+    post: { ...post, mine: false },
+    status: 'request',
+    closedBy: null,
+    unread: 0,
+    activity: new Date(now).toISOString(),
+  }
+}
+
+// Gộp ba nguồn thành danh sách hội thoại. Yêu cầu đã được đồng ý có hội thoại riêng nên bỏ qua;
+// lời giới thiệu đang soạn chỉ giữ khi bài đó chưa có yêu cầu hay hội thoại nào
+export function buildThreads({ conversations, claims, requests }) {
+  const fromConversations = conversations.map(conversationThread)
+  const fromClaims = claims.filter((claim) => claim.status !== 'linked').map(claimThread)
+  const taken = new Set(
+    [...fromConversations, ...fromClaims].map((thread) => thread.post?.id).filter(Boolean)
+  )
+  const drafts = requests.filter((post) => !taken.has(post.id)).map((post) => requestThread(post))
+  return [...drafts, ...fromConversations, ...fromClaims]
+}
+
+export const lastActivity = (thread) => thread.activity
 
 export function threadPreview(thread) {
-  const last = thread.messages.at(-1)
-  if (thread.status === 'request') return 'Đang soạn tin nhắn giới thiệu'
-  if (thread.status === 'incoming') return `Yêu cầu trò chuyện: ${last?.text || ''}`
+  if (thread.type === 'request') return 'Đang soạn tin nhắn giới thiệu'
+  if (thread.type === 'claim') {
+    return thread.status === 'incoming'
+      ? `Yêu cầu trò chuyện: ${thread.intro.text}`
+      : `Bạn: ${thread.intro.text}`
+  }
+  const last = thread.lastMessage
   if (!last) return 'Bắt đầu cuộc trò chuyện'
-  return `${last.sender === 'me' ? 'Bạn: ' : ''}${previewText(last)}`
+  return `${last.mine ? 'Bạn: ' : ''}${last.image ? 'Đã gửi một ảnh' : last.body}`
 }
 
 // Tìm theo tên người kia hoặc tiêu đề bài đăng, mới nhất lên đầu
 export function filterThreads(threads, query) {
   const needle = normalize(query)
+  const text = (thread) =>
+    `${thread.peer.name} ${thread.peer.label ?? ''} ${thread.post?.title ?? ''}`
   return threads
-    .filter(
-      (thread) => !needle || normalize(`${thread.peer.name} ${thread.post.title}`).includes(needle)
-    )
+    .filter((thread) => !needle || normalize(text(thread)).includes(needle))
     .sort((left, right) => Date.parse(lastActivity(right)) - Date.parse(lastActivity(left)))
 }
 
-const updateThread = (state, threadId, update) => ({
-  ...state,
-  threads: state.threads.map((thread) => (thread.id === threadId ? update(thread) : thread)),
-})
+export const closedBy = (thread) => thread.closedBy ?? null
+export const isClosedByMe = (thread) => thread.closedBy === 'me'
+export const canClose = (thread) =>
+  thread.type === 'conversation' &&
+  thread.kind === 'trade' &&
+  thread.status === 'open' &&
+  !thread.closedBy
 
-const dropUnsentRequests = (threads, keepId) =>
-  threads.filter((thread) => thread.status !== 'request' || thread.id === keepId)
-
-export function openThread(state, threadId) {
-  if (!state.threads.some((thread) => thread.id === threadId)) return state
-  return {
-    ...state,
-    activeId: threadId,
-    threads: dropUnsentRequests(state.threads, threadId).map((thread) =>
-      thread.id === threadId ? { ...thread, unread: 0 } : thread
-    ),
-  }
-}
-
-// Thông tin bài đăng và người đăng gắn vào hội thoại
-export const postSnapshot = (post) => ({
-  id: post.id,
-  type: post.type,
-  title: post.title,
-  category: post.category,
-  area: post.area,
-  image: post.images[0],
-})
-
-const peerNamed = (name) => ({ name, initials: name.slice(0, 2).toUpperCase() })
-
-export const peerOf = (post) => peerNamed(post.author)
-
-const CLAIM_STATUSES = { linked: 'open', rejected: 'declined' }
-
-export function claimThread(claim) {
-  const outgoing = claim.direction === 'outgoing'
-  const status = CLAIM_STATUSES[claim.status] ?? (outgoing ? 'pending' : 'incoming')
-  return {
-    id: `claim-${claim.id}`,
-    claimId: claim.id,
-    remote: true,
-    peer: peerNamed(claim.peer?.username ?? 'Người dùng'),
-    post: { ...claim.post, mine: !outgoing },
-    status,
-    ...(status === 'open' && {
-      openedBy: claim.verified ? 'verified' : 'accepted',
-      openedAt: claim.respondedAt,
-    }),
-    createdAt: claim.createdAt,
-    unread: status === 'incoming' ? 1 : 0,
-    confirmed: { me: false, peer: false },
-    messages: claim.introMessage
-      ? [
-          {
-            id: `claim-${claim.id}-intro`,
-            sender: outgoing ? 'me' : 'peer',
-            text: claim.introMessage,
-            createdAt: claim.createdAt,
-          },
-        ]
-      : [],
-  }
-}
-
-export function mergeClaimThreads(state, claims) {
-  const fresh = claims.map(claimThread)
-  const claimed = new Set(fresh.map((thread) => thread.post.id))
-  const previous = new Map(state.threads.map((thread) => [thread.id, thread]))
-  const kept = state.threads.filter(
-    (thread) => !thread.remote || (thread.status === 'request' && !claimed.has(thread.post.id))
-  )
-  const merged = fresh.map((thread) => {
-    const prev = previous.get(thread.id)
-    if (!prev || prev.status !== thread.status) return thread
-    const messages = prev.messages.length > thread.messages.length ? prev.messages : thread.messages
-    return { ...thread, unread: prev.unread, messages, events: prev.events }
-  })
-  return { ...state, threads: [...merged, ...kept] }
-}
-
-// Đổi một hội thoại thành bản mới (vd yêu cầu vừa gửi, vừa được đồng ý) và mở nó
-export const replaceThread = (state, threadId, thread) => {
-  const drafts = { ...state.drafts }
-  delete drafts[threadId]
-  return {
-    ...state,
-    activeId: thread.id,
-    drafts,
-    threads: [
-      thread,
-      ...state.threads.filter((item) => item.id !== threadId && item.id !== thread.id),
-    ],
-  }
-}
-
-// Trả lời đúng câu hỏi xác minh thì mở kênh trò chuyện ngay, không cần chờ đồng ý
-export function openVerifiedThread(state, post, now = Date.now()) {
-  const openedAt = new Date(now).toISOString()
-  const existing = state.threads.find((thread) => thread.post.id === post.id)
-  if (existing) {
-    const opened = { ...existing, status: 'open', openedBy: 'verified', openedAt }
-    return {
-      ...state,
-      activeId: existing.id,
-      threads: state.threads.map((thread) => (thread.id === existing.id ? opened : thread)),
-    }
-  }
-
-  const thread = {
-    id: `thread-post-${post.id}`,
-    peer: peerOf(post),
-    post: postSnapshot(post),
-    status: 'open',
-    openedBy: 'verified',
-    openedAt,
-    createdAt: openedAt,
-    unread: 0,
-    confirmed: { me: false, peer: false },
-    messages: [],
-  }
-  return { ...state, activeId: thread.id, threads: [thread, ...state.threads] }
-}
-
-// Mở chế độ yêu cầu trò chuyện từ bài đăng, nếu đã có hội thoại về bài này thì mở lại hội thoại cũ
-export function startRequest(state, { post, peer, remote = false }, now = Date.now()) {
-  const existing = state.threads.find((thread) => thread.post.id === post.id)
-  if (existing) return openThread(state, existing.id)
-
-  const thread = {
-    id: `thread-post-${post.id}`,
-    ...(remote && { remote: true }),
-    peer,
-    post,
-    status: 'request',
-    createdAt: new Date(now).toISOString(),
-    unread: 0,
-    confirmed: { me: false, peer: false },
-    messages: [],
-  }
-  return {
-    ...state,
-    activeId: thread.id,
-    threads: [thread, ...dropUnsentRequests(state.threads)],
-  }
-}
-
-// Gửi tin trong hội thoại đã mở, hoặc gửi tin giới thiệu duy nhất ở chế độ yêu cầu
-export function sendMessage(state, threadId, { text = '', image = null }, now = Date.now()) {
-  const thread = state.threads.find((entry) => entry.id === threadId)
-  if (!thread || !['open', 'returned', 'request'].includes(thread.status)) return state
-  if (!image && validateMessage(text, { intro: thread.status === 'request' })) return state
-  if (image && thread.status === 'request') return state
-
-  const message = {
-    id: `${threadId}-${now}-${thread.messages.length}`,
-    sender: 'me',
-    text: image ? '' : text.trim(),
-    image,
-    createdAt: new Date(now).toISOString(),
-  }
-  const next = updateThread(state, threadId, (entry) => ({
-    ...entry,
-    status: entry.status === 'request' ? 'pending' : entry.status,
-    messages: [...entry.messages, message],
-  }))
-  return image ? next : { ...next, drafts: { ...next.drafts, [threadId]: '' } }
-}
-
-export const acceptRequest = (state, threadId, now = Date.now()) =>
-  updateThread(state, threadId, (thread) =>
-    thread.status === 'incoming'
-      ? { ...thread, status: 'open', openedBy: 'accepted', openedAt: new Date(now).toISOString() }
-      : thread
-  )
-
-export const declineRequest = (state, threadId) =>
-  updateThread(state, threadId, (thread) =>
-    thread.status === 'incoming' ? { ...thread, status: 'declined' } : thread
-  )
-
-// Cả hai cùng xác nhận thì bài chuyển Đã trao trả
-export const confirmReturn = (state, threadId) =>
-  updateThread(state, threadId, (thread) => {
-    if (thread.status !== 'open') return thread
-    const confirmed = { ...thread.confirmed, me: true }
-    return { ...thread, confirmed, status: confirmed.peer ? 'returned' : 'open' }
-  })
-
-export const closedBy = (thread) => {
-  const last = thread.events?.at(-1)
-  return last?.type === 'closed' ? last.by : null
-}
-
-export const isClosedByMe = (thread) => closedBy(thread) === 'me'
-export const canClose = (thread) => thread.status === 'open' && !closedBy(thread)
-
-// Còn hội thoại khác về cùng bài đang mở
-export const hasOtherOpenThread = (threads, thread) =>
-  thread.post.id != null &&
-  threads.some(
-    (other) =>
-      other.id !== thread.id &&
-      other.post.id === thread.post.id &&
-      other.status === 'open' &&
-      !closedBy(other)
-  )
-
-const addEvent = (thread, type, now) => ({
-  ...thread,
-  events: [...(thread.events ?? []), { type, by: 'me', at: new Date(now).toISOString() }],
-})
-
-export const closeThread = (state, threadId, now = Date.now()) =>
-  updateThread(state, threadId, (thread) =>
-    canClose(thread) ? addEvent(thread, 'closed', now) : thread
-  )
-
-export const reopenThread = (state, threadId, now = Date.now()) =>
-  updateThread(state, threadId, (thread) =>
-    isClosedByMe(thread) ? addEvent(thread, 'reopened', now) : thread
-  )
+// Số tin chưa đọc trên thanh điều hướng: không tính hội thoại mình đã đóng
 export const inboxUnread = (threads) =>
   threads.reduce((count, thread) => count + (isClosedByMe(thread) ? 0 : thread.unread), 0)
+
+// Tin nhắn từ API → dữ liệu hiển thị, me: tên người đang đăng nhập
+export const toMessage = (message, me) => ({
+  id: message.id,
+  sender: message.sender === me ? 'me' : 'peer',
+  text: message.body,
+  image: message.image,
+  createdAt: message.sentAt,
+})
+
+// Thêm tin vào cuối, bỏ tin trùng (tin mình gửi về cả qua API và qua socket)
+export const appendMessage = (messages, message) =>
+  messages.some((item) => item.id === message.id) ? messages : [...messages, message]
+
+// Cập nhật dòng hội thoại khi có tin mới qua socket. active: mình đang xem hội thoại đó
+export function applyIncoming(conversations, message, me, active) {
+  return conversations.map((item) =>
+    item.id === message.conversationId
+      ? {
+          ...item,
+          lastMessageAt: message.sentAt,
+          lastMessage: {
+            body: message.body,
+            image: Boolean(message.image),
+            mine: message.sender === me,
+            sentAt: message.sentAt,
+          },
+          unread: message.sender === me || active ? 0 : (item.unread ?? 0) + 1,
+        }
+      : item
+  )
+}
+
+// Ghi chú hệ thống xen giữa tin nhắn: mở kênh, đóng, mở lại
 export function threadNotes(thread) {
-  const { peer, post } = thread
+  const { peer } = thread
   const notes = []
-  if (thread.openedAt) {
-    const how = thread.openedBy === 'verified' ? 'Đã xác minh' : 'Đã đồng ý trò chuyện'
+  if (thread.opened?.at) {
+    const how = thread.opened.by === 'verified' ? 'Đã xác minh' : 'Đã đồng ý trò chuyện'
     notes.push({
-      at: thread.openedAt,
-      text: `${how} lúc ${timeLabel(thread.openedAt)} · Kênh trò chuyện đã mở`,
+      at: thread.opened.at,
+      text: `${how} lúc ${timeLabel(thread.opened.at)} · Kênh trò chuyện đã mở`,
     })
   }
   for (const event of thread.events ?? []) {
@@ -290,7 +197,7 @@ export function threadNotes(thread) {
     } else if (event.by === 'me') {
       text = `Bạn đã đóng hội thoại lúc ${time}`
     } else {
-      text = isReceiver(post)
+      text = thread.receiver
         ? `${peer.name} cho rằng thông tin của bạn không khớp với món đồ họ đang giữ`
         : `${peer.name} xác nhận món đồ không khớp với đồ họ đang tìm`
     }
@@ -313,3 +220,11 @@ export const previewTime = (value, now = Date.now()) =>
   dateKey(value) === dateKey(now)
     ? timeLabel(value)
     : new Date(value).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
+
+// Gợi ý chỗ hẹn trao trả an toàn
+export const SAFE_MEETUPS = [
+  { name: 'Quán cà phê đông khách', hint: 'Không gian mở, luôn có người qua lại' },
+  { name: 'Quầy bảo vệ chung cư / toà nhà', hint: 'Có người trực và camera an ninh' },
+  { name: 'Siêu thị, cửa hàng tiện lợi', hint: 'Sáng đèn, đông người gần như cả ngày' },
+  { name: 'Trụ sở công an phường', hint: 'An tâm nhất khi cần người làm chứng' },
+]

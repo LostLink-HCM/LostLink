@@ -3,6 +3,7 @@ const ApiError = require('../utils/ApiError')
 
 const POST_FOLDER = 'lostlink/posts'
 const REPORT_FOLDER = 'lostlink/reports'
+const MESSAGE_FOLDER = 'lostlink/messages'
 const ALLOWED_FORMATS = ['jpg', 'jpeg', 'png', 'webp']
 
 const uploadOne = (file, folder) =>
@@ -46,10 +47,17 @@ const uploadImages = async (files, folder) => {
 
 const uploadPostImages = (files) => uploadImages(files, POST_FOLDER)
 const uploadReportImages = (files) => uploadImages(files, REPORT_FOLDER)
+const uploadMessageImage = async (file) => (await uploadImages([file], MESSAGE_FOLDER))[0]
 
 const POST_IMAGE_URL = new RegExp(
   `^https://res\\.cloudinary\\.com/[^/]+/image/upload/(?:v\\d+/)?(${POST_FOLDER}/[^/.]+)\\.[a-z]+$`
 )
 const publicIdFromUrl = (url) => POST_IMAGE_URL.exec(url)?.[1] ?? null
 
-module.exports = { uploadPostImages, uploadReportImages, deleteImages, publicIdFromUrl }
+module.exports = {
+  uploadPostImages,
+  uploadReportImages,
+  uploadMessageImage,
+  deleteImages,
+  publicIdFromUrl,
+}

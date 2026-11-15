@@ -53,7 +53,7 @@ function useClaimState(id) {
 export default function VerifyPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { reloadClaims } = useOutletContext()
+  const { inbox } = useOutletContext()
   const { claim, error, loading } = useClaimState(id)
   const [choice, setChoice] = useState(null)
   // passed | failed sau khi gửi, kèm hội thoại vừa mở
@@ -133,7 +133,8 @@ export default function VerifyPage() {
   }
 
   const openChat = async () => {
-    await reloadClaims(answer.claimId && `claim-${answer.claimId}`)
+    await inbox.reload().catch(() => {})
+    inbox.open(answer.conversationId)
     navigate('/messages', { state: { openConversation: true } })
   }
 

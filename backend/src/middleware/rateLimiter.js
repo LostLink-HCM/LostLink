@@ -53,7 +53,21 @@ const claimLimiter = limiter(20, {
   },
 })
 
+const messageLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 60,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  keyGenerator: (req) => `user:${req.user.id}`,
+  message: {
+    success: false,
+    message: 'Bạn gửi tin nhắn quá nhanh, vui lòng thử lại sau.',
+    code: 'MESSAGE_RATE_LIMITED',
+  },
+})
+
 module.exports = {
+  messageLimiter,
   authLimiter,
   claimLimiter,
   apiLimiter,
