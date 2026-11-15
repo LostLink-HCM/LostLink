@@ -14,7 +14,7 @@ const iconButton = cx(
 
 export default function Composer({
   thread,
-  blocked,
+  busy = false,
   draft,
   error,
   inputRef,
@@ -28,21 +28,27 @@ export default function Composer({
   const galleryRef = useRef(null)
   const { status, peer } = thread
 
-  // Đã chặn người này thì khóa ô nhập, bỏ chặn ở trang cá nhân của họ
-  if (blocked) {
+  // Hội thoại bị khoá: hai bên chặn nhau, hoặc bài đăng đã bị xoá
+  if (status === 'locked') {
     return (
       <p className="m-0 flex flex-wrap items-center gap-2 border-t border-line bg-surface-muted px-5 py-4 text-caption text-ink-muted">
         <Icon name="lock" size={15} className="shrink-0" />
-        <span className="min-w-0 flex-1">Không thể nhắn tin vì hai bên đã chặn nhau.</span>
-        <Link
-          to={profilePath(peer.name)}
-          className={cx(
-            'rounded font-semibold text-primary no-underline hover:underline',
-            focusRing
-          )}
-        >
-          Bỏ chặn
-        </Link>
+        <span className="min-w-0 flex-1">
+          {thread.post
+            ? 'Không thể nhắn tin vì hai bên đã chặn nhau.'
+            : 'Bài đăng đã bị xoá nên hội thoại đã đóng.'}
+        </span>
+        {thread.post && (
+          <Link
+            to={profilePath(peer.name)}
+            className={cx(
+              'rounded font-semibold text-primary no-underline hover:underline',
+              focusRing
+            )}
+          >
+            Xem trang cá nhân
+          </Link>
+        )}
       </p>
     )
   }
@@ -54,8 +60,10 @@ export default function Composer({
           <strong>{peer.name}</strong> muốn trò chuyện về bài đăng của bạn.
         </p>
         <div className="flex gap-2">
-          <Button onClick={onDecline}>Từ chối</Button>
-          <Button variant="primary" onClick={onAccept}>
+          <Button disabled={busy} onClick={onDecline}>
+            Từ chối
+          </Button>
+          <Button variant="primary" disabled={busy} onClick={onAccept}>
             Đồng ý
           </Button>
         </div>
@@ -98,7 +106,7 @@ export default function Composer({
 
   const submit = (event) => {
     event.preventDefault()
-    if (!pending) onSend()
+    if (!pending && !busy) onSend()
   }
 
   const pickFile = (event) => {
@@ -182,7 +190,7 @@ export default function Composer({
         <button
           type="submit"
           aria-label="Gửi"
-          disabled={pending || !draft.trim()}
+          disabled={pending || busy || !draft.trim()}
           className={cx(
             iconButton,
             'bg-primary text-white hover:bg-primary-hover disabled:bg-line-strong'

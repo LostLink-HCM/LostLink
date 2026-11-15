@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import { getConversation, reviewConversation } from '../../api/conversations'
 import Icon from '../../components/common/Icon'
 import Button from '../../components/user/Button'
 import { buttonClass } from '../../components/user/buttonClass'
@@ -9,7 +10,8 @@ import EmptyState from '../../components/user/EmptyState'
 import Note from '../../components/user/Note'
 import { cx, focusRing, textareaClass } from '../../components/user/classes'
 import AttachedPost from '../../components/user/messages/AttachedPost'
-import { isReceiver } from '../../lib/user/messages'
+import { postPath } from '../../lib/user/homeFeed'
+import { conversationThread } from '../../lib/user/messages'
 import { COMMENT_MAX, RATING_LABELS, praisesFor, validateReview } from '../../lib/user/reviews'
 
 const pageClass = 'mx-auto max-w-260 px-4 pt-5 pb-10 sm:px-6 lg:px-10 lg:pt-7'
@@ -65,14 +67,35 @@ function StarRating({ value, onChange, describedBy }) {
 export default function ReviewPage() {
   const { threadId } = useParams()
   const navigate = useNavigate()
-  const { chat, reviews, submitReview, notify } = useOutletContext()
+  const { notify, inbox } = useOutletContext()
+  const [loaded, setLoaded] = useState({ id: null, data: null })
+  const [sent, setSent] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
   const [rating, setRating] = useState(0)
   const [praises, setPraises] = useState([])
   const [comment, setComment] = useState('')
   const [isPublic, setIsPublic] = useState(true)
   const [error, setError] = useState('')
 
-  const thread = chat.threads.find((item) => item.id === threadId)
+  useEffect(() => {
+    let active = true
+    getConversation(threadId)
+      .then(({ data }) => active && setLoaded({ id: threadId, data }))
+      .catch(() => active && setLoaded({ id: threadId, data: null }))
+    return () => {
+      active = false
+    }
+  }, [threadId])
+
+  if (loaded.id !== threadId) {
+    return (
+      <div className={pageClass}>
+        <Card className="h-80 animate-pulse" aria-busy="true" />
+      </div>
+    )
+  }
+
+  const thread = loaded.data && conversationThread(loaded.data)
 
   if (!thread || thread.status !== 'returned') {
     return (
@@ -90,21 +113,37 @@ export default function ReviewPage() {
   }
 
   const { peer, post } = thread
-  const receiver = isReceiver(post)
-  const review = reviews[thread.id]
+  const receiver = thread.receiver
+  const review = sent ?? thread.review
 
   const togglePraise = (praise) =>
     setPraises((prev) =>
       prev.includes(praise) ? prev.filter((item) => item !== praise) : [...prev, praise]
     )
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault()
     const problem = validateReview({ rating, comment })
     setError(problem)
-    if (problem) return
-    submitReview(thread.id, { rating, praises, comment: comment.trim(), isPublic })
-    notify(`Đã gửi lời cảm ơn tới ${peer.name}.`)
+    if (problem || submitting) return
+    setSubmitting(true)
+    try {
+      const { data } = await reviewConversation(thread.id, {
+        rating,
+        praises,
+        comment: comment.trim(),
+        isPublic,
+      })
+      setSent(data)
+      inbox.putConversation({ ...loaded.data, review: data })
+      notify('Đã gửi lời cảm ơn.')
+    } catch (err) {
+      // Giữ nội dung đã nhập để gửi lại
+      if (err.code === 'ALREADY_REVIEWED') notify(err.message)
+      setError(err.status && err.status < 500 ? err.message : 'Đã có lỗi xảy ra, vui lòng thử lại.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -128,7 +167,11 @@ export default function ReviewPage() {
               : `Đánh giá ${peer.name} để người khác yên tâm hơn khi giao dịch với họ.`}
           </p>
 
-          <AttachedPost post={post} linkable={post.id != null} />
+          <AttachedPost
+            post={post}
+            linkable={Boolean(post?.slug)}
+            to={post?.slug ? postPath(post) : undefined}
+          />
           <p className="m-0 mt-2.5 mb-6 flex flex-wrap gap-x-4 gap-y-1 text-caption text-ink-muted">
             <span className="inline-flex items-center gap-1.5">
               <Icon name="user" size={14} />
@@ -238,7 +281,13 @@ export default function ReviewPage() {
                 <Button size="xl" onClick={() => navigate('/')}>
                   Để sau
                 </Button>
-                <Button type="submit" variant="primary" size="xl" className="sm:ml-auto">
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="xl"
+                  disabled={submitting}
+                  className="sm:ml-auto"
+                >
                   Gửi lời cảm ơn
                 </Button>
               </div>
@@ -272,7 +321,7 @@ export default function ReviewPage() {
               Nếu buổi gặp làm bạn không thoải mái, hãy báo riêng cho LostLink. Người kia sẽ không
               biết ai báo cáo.
             </p>
-            <Link to={`/messages/${thread.id}/report`} className={buttonClass({ block: true })}>
+            <Link to={`/users/${peer.name}/report`} className={buttonClass({ block: true })}>
               Báo cáo cho LostLink
             </Link>
           </section>

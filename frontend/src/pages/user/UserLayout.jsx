@@ -1,27 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { getClaimState } from '../../api/claims'
 import { useAuth } from '../../auth/AuthContext'
 import { cx } from '../../components/user/classes'
 import MobileTabBar from '../../components/user/home/MobileTabBar'
 import SiteHeader from '../../components/user/home/SiteHeader'
 import { createFeedComments, createFeedPosts, createMyPosts } from '../../data/homeFeed'
 import { createMatchSuggestions } from '../../data/matchSuggestions'
-import { createUserMessages } from '../../data/userMessages'
 import { createUserNotifications } from '../../data/userNotifications'
 import { createWatchAreas } from '../../data/userSettings'
 import { DEFAULT_FILTERS } from '../../lib/user/homeFeed'
-import { reportKey } from '../../lib/user/reports'
-import {
-  closeThread,
-  hasOtherOpenThread,
-  inboxUnread,
-  isClosedByMe,
-  openVerifiedThread,
-  peerOf,
-  postSnapshot,
-  reopenThread,
-  startRequest,
-} from '../../lib/user/messages'
+import { inboxUnread } from '../../lib/user/messages'
+import { hidesTabBar } from '../../lib/user/navigation'
+import { useInbox } from '../../hooks/useInbox'
 import { usePostInteractions } from '../../hooks/usePostInteractions'
 import useTimeOfDay from '../../hooks/useTimeOfDay'
 import { useUnreadNotifications } from '../../hooks/useUnreadNotifications'
@@ -56,21 +47,12 @@ export default function UserLayout() {
   const [liked, setLiked] = useState(() => new Set())
   const [saved, setSaved] = useState(() => new Set())
   const [followed, setFollowed] = useState(() => new Set())
-  // Người đã chặn theo tên, để khóa hội thoại mẫu ở trang Tin nhắn (chặn thật đi qua API)
-  const [blockedUsers, setBlockedUsers] = useState(() => new Set())
   const [lastCommentAt, setLastCommentAt] = useState(0)
-  const [chat, setChat] = useState(createUserMessages)
   const [notifications, setNotifications] = useState(createUserNotifications)
   // Khu vực để ý, chỉnh ở Cài đặt
   const [watchAreas, setWatchAreas] = useState(createWatchAreas)
   // Thay đổi ở mục Tài khoản (chưa có API): email mới đã xác thực, lần đổi mật khẩu gần nhất
   const [account, setAccount] = useState({ email: '', passwordChangedAt: null })
-  // Kết quả xác minh theo bài: 'passed' | 'failed', mỗi bài chỉ được trả lời một lần
-  const [verifications, setVerifications] = useState({})
-  // Đánh giá đã gửi theo hội thoại, mỗi giao dịch chỉ đánh giá một lần
-  const [reviews, setReviews] = useState({})
-  // Báo cáo đã gửi theo đối tượng ('post:id' | 'user:tên'), mỗi đối tượng chỉ báo cáo một lần
-  const [reports, setReports] = useState({})
 
   const [searchInput, setSearchInput] = useState('')
   const [keyword, setKeyword] = useState('')
@@ -94,6 +76,7 @@ export default function UserLayout() {
   const interactions = usePostInteractions({ requireMember, notify: setToast })
   const { unread: unreadNotifications, setUnread: setUnreadNotifications } =
     useUnreadNotifications(user)
+  const inbox = useInbox(user)
 
   const memberToggle = (setter) => (id) => {
     if (requireMember()) setter((prev) => toggleIn(prev, id))
@@ -140,84 +123,31 @@ export default function UserLayout() {
   const respondToMatch = (id, state) =>
     setMatches((prev) => prev.map((match) => (match.id === id ? { ...match, state } : match)))
 
-  // Lưu lúc chuyển Đã trao trả để bài tự ẩn khỏi danh sách công khai sau 7 ngày
-  const setPostStatus = (id, status) =>
-    setPosts((prev) =>
-      prev.map((post) =>
-        post.id === id
-          ? {
-              ...post,
-              status,
-              ...(status === 'returned' && { returnedAt: new Date().toISOString() }),
-            }
-          : post
-      )
-    )
-
-  // Đóng hội thoại khi món đồ không khớp; bài chỉ trở lại Đang tìm khi không còn hội thoại nào khác về bài đó đang mở
-  const closeConversation = (thread) => {
-    setChat((prev) => closeThread(prev, thread.id))
-    if (!hasOtherOpenThread(chat.threads, thread)) setPostStatus(thread.post.id, 'searching')
+  const refreshInbox = () => {
+    inbox.reload().catch(() => {})
   }
 
-  // Mở lại hội thoại đã đóng, trả về false nếu bài không còn Đang tìm nên giữ nguyên trạng thái
-  const reopenConversation = (thread) => {
-    setChat((prev) => reopenThread(prev, thread.id))
-    const post = posts.find((item) => item.id === thread.post.id)
-    if (post && post.status !== 'searching') return false
-    setPostStatus(thread.post.id, 'contacted')
-    return true
-  }
-
-  // Gửi yêu cầu liên hệ từ bài đăng, đã đóng hội thoại về bài này thì tự mở lại
-  const contactAbout = (post) => {
+  const claimPost = async (post) => {
     if (!requireMember()) return
-    const existing = chat.threads.find((thread) => thread.post.id === post.id)
-    if (existing && isClosedByMe(existing)) reopenConversation(existing)
-    setChat((prev) => startRequest(prev, { post: postSnapshot(post), peer: peerOf(post) }))
-    navigate('/messages', { state: { openConversation: true } })
-  }
-
-  const submitReview = (threadId, review) => {
-    if (reviews[threadId]) return false
-    setReviews((prev) => ({
-      ...prev,
-      [threadId]: { ...review, createdAt: new Date().toISOString() },
-    }))
-    return true
-  }
-
-  const blockUser = (name) => setBlockedUsers((prev) => new Set(prev).add(name))
-
-  const unblockUser = (name) =>
-    setBlockedUsers((prev) => {
-      const next = new Set(prev)
-      next.delete(name)
-      return next
-    })
-
-  const submitReport = (target, report) => {
-    const key = reportKey(target)
-    if (reports[key]) return false
-    setReports((prev) => ({ ...prev, [key]: { ...report, createdAt: new Date().toISOString() } }))
-    // Chọn "Chặn và ẩn tin của họ" ở màn Báo cáo
-    if (report.block) blockUser(target.peer.name)
-    return true
-  }
-
-  // Ghi nhận câu trả lời xác minh, đúng thì mở hội thoại và chuyển bài sang Đã liên hệ
-  const answerQuestion = (post, choice) => {
-    if (verifications[post.id]) return verifications[post.id]
-    const result = choice === post.question.correct ? 'passed' : 'failed'
-    setVerifications((prev) => ({ ...prev, [post.id]: result }))
-    if (result === 'passed') {
-      setChat((prev) => openVerifiedThread(prev, post))
-      setPostStatus(post.id, 'contacted')
+    try {
+      const { data } = await getClaimState(post.id)
+      if (data.step === 'verify') {
+        navigate(`/posts/${post.id}/verify`, { state: { claim: data } })
+        return
+      }
+      if (data.step === 'request') {
+        inbox.startRequest(data.post)
+      } else {
+        await inbox.reload()
+        inbox.open(data.conversationId ?? `claim-${data.claimId}`)
+      }
+      navigate('/messages', { state: { openConversation: true } })
+    } catch (error) {
+      setToast(error.message)
     }
-    return result
   }
 
-  const unreadMessages = inboxUnread(chat.threads)
+  const unreadMessages = inboxUnread(inbox.threads)
   // Header và thanh tab đổi màu trời theo giờ, dùng chung token với khu auth
   const time = useTimeOfDay()
 
@@ -239,7 +169,9 @@ export default function UserLayout() {
     <div
       data-auth-time={time}
       className={cx(
-        'relative isolate min-h-dvh bg-canvas font-sans text-ink max-lg:pb-[calc(4.5rem+env(safe-area-inset-bottom))]',
+        'relative isolate min-h-dvh bg-canvas font-sans text-ink',
+        // Chừa chỗ cho thanh tab dưới đáy, trang không có thanh thì thôi
+        !hidesTabBar(location.pathname) && 'max-lg:pb-[calc(4.5rem+env(safe-area-inset-bottom))]',
         userTheme
       )}
     >
@@ -269,28 +201,18 @@ export default function UserLayout() {
           toggleSaved: memberToggle(setSaved),
           followed,
           toggleFollowed: memberToggle(setFollowed),
-          blockedUsers,
-          blockUser,
-          unblockUser,
+          blockUser: refreshInbox,
+          unblockUser: refreshInbox,
           requireMember,
           addView,
           addComment,
           editComment,
           deleteComment,
-          chat,
-          setChat,
-          setPostStatus,
-          closeConversation,
-          reopenConversation,
-          contactAbout,
+          inbox,
+          contactAbout: claimPost,
+          claimPost,
           matches,
           respondToMatch,
-          verifications,
-          answerQuestion,
-          reviews,
-          submitReview,
-          reports,
-          submitReport,
           notifications,
           setNotifications,
           setUnreadNotifications,

@@ -60,7 +60,58 @@ const DESCRIBE = {
     body: item.post?.title ?? item.text,
   }),
   match: (item) => ({ kind: 'match', title: 'Có gợi ý ghép cặp mới', body: item.text }),
+  contact_request: (item) => ({
+    kind: 'contact',
+    title: `${item.actor?.username ?? 'Ai đó'} muốn trò chuyện về bài ${quote(item.post?.title)}`,
+    body: quote(item.text),
+  }),
+  contact_accepted: (item) => ({
+    kind: 'contact',
+    title: `${item.actor?.username ?? 'Người đăng'} đã đồng ý trò chuyện`,
+    body: item.post?.title ?? item.text,
+  }),
+  contact_declined: (item) => ({
+    kind: 'contact',
+    title: `${item.actor?.username ?? 'Người đăng'} đã từ chối yêu cầu trò chuyện`,
+    body: item.post?.title ?? item.text,
+  }),
+  conversation_closed: (item) => ({
+    kind: 'contact',
+    title: `${item.actor?.username ?? 'Người kia'} đã đóng hội thoại`,
+    body: item.text,
+  }),
+  return_reminder: (item) => ({
+    kind: 'contact',
+    title: `${item.actor?.username ?? 'Người kia'} đã xác nhận trao trả, bạn xác nhận giúp nhé`,
+    body: item.post?.title ?? item.text,
+  }),
+  return_completed: (item) => ({
+    kind: 'contact',
+    title: 'Hai bên đã xác nhận trao trả',
+    body: item.post?.title ?? item.text,
+  }),
+  review: (item) => ({
+    kind: 'contact',
+    title: `${item.actor?.username ?? 'Ai đó'} đã gửi lời cảm ơn tới bạn`,
+    body: quote(item.text),
+  }),
+  verification_passed: (item) => ({
+    kind: 'contact',
+    title: `${item.actor?.username ?? 'Ai đó'} đã trả lời đúng câu hỏi xác minh`,
+    body: item.post?.title ?? item.text,
+  }),
 }
+
+// Thông báo về yêu cầu liên hệ, xác minh: bấm vào mở trang Tin nhắn thay vì bài đăng
+const MESSAGE_TYPES = [
+  'contact_request',
+  'contact_accepted',
+  'contact_declined',
+  'verification_passed',
+  'conversation_closed',
+  'return_reminder',
+  'return_completed',
+]
 
 const KIND_BY_GROUP = { trade: 'contact', post: 'post', system: 'report' }
 const GROUP_OF = {
@@ -69,6 +120,8 @@ const GROUP_OF = {
   contact_accepted: 'trade',
   contact_declined: 'trade',
   verification_passed: 'trade',
+  conversation_closed: 'trade',
+  return_completed: 'trade',
   return_reminder: 'trade',
   review: 'trade',
   contact_12h: 'trade',
@@ -78,6 +131,9 @@ const GROUP_OF = {
   badge: 'system',
   tip: 'system',
 }
+
+// Nhóm (tab) của một loại thông báo, trùng nhóm của API
+export const notificationGroup = (type) => GROUP_OF[type] ?? 'post'
 
 // Icon và màu gradient theo loại thông báo. Loại chưa có ở đây dùng màu của nhóm
 const VISUALS = {
@@ -97,7 +153,7 @@ const GROUP_VISUALS = {
   system: { icon: 'shield', tone: 'from-[#c3cbd8] to-[#8e9bb0] shadow-[#8e9bb0]/30' },
 }
 // Hành động của một người cụ thể thì hiện ảnh đại diện người đó kèm huy hiệu icon
-const PERSONAL_TYPES = ['comment', 'like', 'following_post']
+const PERSONAL_TYPES = ['comment', 'like', 'following_post', ...MESSAGE_TYPES]
 
 // Thông báo từ API → dữ liệu NotificationItem
 export function describeNotification(item) {
@@ -107,6 +163,7 @@ export function describeNotification(item) {
     body: '',
   }
   const post = item.post
+  const toMessages = MESSAGE_TYPES.includes(item.type)
   return {
     ...described,
     visual: VISUALS[item.type] ?? GROUP_VISUALS[GROUP_OF[item.type] ?? 'post'],
@@ -114,8 +171,14 @@ export function describeNotification(item) {
     id: item.id,
     unread: !item.isRead,
     createdAt: item.createdAt,
-    action: post ? 'Xem bài' : null,
-    link: post ? (post.available ? { to: postPath(post) } : { unavailable: true }) : null,
+    action: toMessages ? 'Mở tin nhắn' : post ? 'Xem bài' : null,
+    link: toMessages
+      ? { to: '/messages' }
+      : post
+        ? post.available
+          ? { to: postPath(post) }
+          : { unavailable: true }
+        : null,
   }
 }
 

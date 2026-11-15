@@ -123,14 +123,6 @@ function App() {
             }
           />
           <Route
-            path="messages/:threadId/report"
-            element={
-              <RequireAuth>
-                <ReportPage />
-              </RequireAuth>
-            }
-          />
-          <Route
             path="messages/:threadId/review"
             element={
               <RequireAuth>

@@ -46,18 +46,26 @@ const requireRole =
     next()
   }
 
-module.exports = { protect, optionalAuth, can, requireRole }
 // Tài khoản bị hạn chế (HT06) không được đăng bài, gửi yêu cầu liên hệ. Dùng sau protect
-const notRestricted = (req, res, next) => {
+const restrictedFrom = (message) => (req, res, next) => {
   if (req.user?.status === 'restricted') {
-    return next(
-      ApiError.forbidden(
-        'Tài khoản của bạn đang bị hạn chế, vui lòng chờ LostLink xử lý.',
-        'ACCOUNT_RESTRICTED'
-      )
-    )
+    return next(ApiError.forbidden(message, 'ACCOUNT_RESTRICTED'))
   }
   next()
 }
 
-module.exports = { protect, optionalAuth, can, requireRole, notRestricted }
+const notRestricted = restrictedFrom(
+  'Tài khoản của bạn đang bị hạn chế, vui lòng chờ LostLink xử lý.'
+)
+const notRestrictedFromClaims = restrictedFrom(
+  'Tài khoản của bạn tạm thời bị hạn chế gửi yêu cầu liên hệ.'
+)
+
+module.exports = {
+  protect,
+  optionalAuth,
+  can,
+  requireRole,
+  notRestricted,
+  notRestrictedFromClaims,
+}

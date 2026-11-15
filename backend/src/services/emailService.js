@@ -43,6 +43,13 @@ const sendMail = async ({ to, subject, text, html }) => {
   await tx.sendMail({ from: `LostLink <${env.email.from}>`, to, subject, text, html })
 }
 
+// Tiêu đề bài do người dùng nhập nên phải escape trước khi ghép vào HTML
+const escapeHtml = (text) =>
+  String(text).replace(
+    /[&<>"']/g,
+    (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]
+  )
+
 const sendVerificationCode = ({ to, code, minutes }) =>
   sendMail({
     to,
@@ -71,4 +78,19 @@ const sendResetLink = ({ to, resetUrl, minutes }) =>
       </div>`,
   })
 
-module.exports = { sendVerificationCode, sendResetLink }
+// Nhắc người nhặt lâu chưa vào LostLink rằng có người đã xác minh đúng và cần liên hệ
+const sendContactReminder = ({ to, postTitle, messagesUrl }) =>
+  sendMail({
+    to,
+    subject: 'Có người cần liên hệ với bạn trên LostLink',
+    text: `Có người cần liên hệ với bạn về bài "${postTitle}". Mở tin nhắn: ${messagesUrl}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto">
+        <h2>Có người cần liên hệ với bạn</h2>
+        <p>Một người đã trả lời đúng câu hỏi xác minh của bài <strong>${escapeHtml(postTitle)}</strong>.</p>
+        <p><a href="${messagesUrl}" style="display:inline-block;padding:12px 20px;background:#3B76D6;color:#fff;border-radius:8px;text-decoration:none">Mở tin nhắn</a></p>
+        <p style="color:#666">Bạn nhận email này vì đã bật nhận email từ LostLink.</p>
+      </div>`,
+  })
+
+module.exports = { sendVerificationCode, sendResetLink, sendContactReminder }

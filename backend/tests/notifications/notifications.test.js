@@ -1,8 +1,9 @@
 const assert = require('node:assert/strict')
-const { beforeEach, describe, test } = require('node:test')
+const { beforeEach, describe, mock, test } = require('node:test')
 
 const { Notification, Post } = require('../../src/models')
 const { notify } = require('../../src/services/notificationService')
+const socket = require('../../src/socket')
 const { createUser, loginAs, newClient } = require('../helpers/auth')
 const { useTestDb } = require('../helpers/db')
 const { authed, createWalletCategory, makePost } = require('../helpers/posts')
@@ -45,6 +46,58 @@ describe('notificationService.notify', () => {
     )
     // Đoạn trích ngắn gọn
     assert.ok(items[0].preview.length <= 121)
+  })
+})
+
+describe('Đẩy thông báo mới qua socket', () => {
+  const emit = mock.method(socket, 'emitToUsers', () => {})
+  beforeEach(() => emit.mock.resetCalls())
+
+  test('mỗi người nhận được thông báo của mình cùng dạng với API, kèm số chưa đọc', async () => {
+    const post = await makePost(me, wallet.category, { title: 'Ví da nâu' })
+    await make({ type: 'like', isRead: false })
+    await notify([me._id], {
+      type: 'comment',
+      actor: other._id,
+      refType: 'Post',
+      refId: post._id,
+      text: 'Mình thấy ví này ở chợ',
+    })
+
+    assert.equal(emit.mock.callCount(), 1)
+    const [users, event, payload] = emit.mock.calls[0].arguments
+    assert.deepEqual(users.map(String), [String(me._id)])
+    assert.equal(event, 'notification:new')
+    assert.equal(payload.unread, 2)
+    assert.equal(payload.notification.type, 'comment')
+    assert.equal(payload.notification.actor.username, 'nguoikhac')
+    assert.equal(payload.notification.text, 'Mình thấy ví này ở chợ')
+    assert.deepEqual(payload.notification.post, {
+      available: true,
+      title: 'Ví da nâu',
+      type: 'lost',
+      slug: post.slug,
+    })
+    // Không lộ dữ liệu ngoài những gì API danh sách trả về
+    assert.deepEqual(Object.keys(payload.notification).sort(), [
+      'actor',
+      'createdAt',
+      'id',
+      'isRead',
+      'post',
+      'text',
+      'type',
+    ])
+  })
+
+  test('đẩy qua socket lỗi thì thông báo vẫn được lưu', async () => {
+    emit.mock.mockImplementationOnce(() => {
+      throw new Error('socket hỏng')
+    })
+    const error = mock.method(console, 'error', () => {})
+    await notify([me._id], { type: 'tip', text: 'Mẹo' })
+    error.mock.restore()
+    assert.equal(await Notification.countDocuments({ type: 'tip' }), 1)
   })
 })
 

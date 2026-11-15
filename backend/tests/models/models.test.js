@@ -83,7 +83,7 @@ describe('UC23 - Ràng buộc bài đăng', () => {
       type: 'lost',
       category: category._id,
       title: 'Mất ví da màu nâu',
-      // validateSync không chạy hook tạo mã và slug (bất đồng bộ) nên đặt sẵn
+      // Đặt sẵn mã và slug để hook không cần tự cấp
       code: 'L011126001',
       slug: 'mat-vi-da-mau-nau',
       timeFrom: new Date('2026-11-01T08:00:00Z'),
@@ -91,20 +91,27 @@ describe('UC23 - Ràng buộc bài đăng', () => {
     })
   }
 
+  // Lỗi kiểm tra dữ liệu của document, hợp lệ thì undefined
+  const validationError = (doc) =>
+    doc.validate().then(
+      () => undefined,
+      (error) => error
+    )
+
   test('tiêu đề tối đa 120 ký tự, mô tả tối đa 1.000 ký tự (đúng biên thì hợp lệ)', async () => {
     const tooLong = await buildPost({ title: 'a'.repeat(121), description: 'b'.repeat(1001) })
-    const errors = tooLong.validateSync().errors
+    const errors = (await validationError(tooLong)).errors
     assert.equal(errors.title.message, 'Tiêu đề tối đa 120 ký tự.')
     assert.equal(errors.description.message, 'Mô tả tối đa 1.000 ký tự.')
 
     const atLimit = await buildPost({ title: 'a'.repeat(120), description: 'b'.repeat(1000) })
-    assert.equal(atLimit.validateSync(), undefined)
+    assert.equal(await validationError(atLimit), undefined)
   })
 
   test('thời điểm kết thúc không được trước thời điểm bắt đầu', async () => {
     const post = await buildPost({ timeTo: new Date('2026-10-31T08:00:00Z') })
 
-    const err = post.validateSync()
+    const err = await validationError(post)
 
     assert.equal(err.errors.timeTo.message, 'Thời điểm kết thúc phải sau thời điểm bắt đầu.')
   })
