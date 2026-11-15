@@ -102,7 +102,11 @@ test.describe('Người dùng & quyền của admin', () => {
     await expect(dialog.getByRole('alert')).toContainText('ít nhất 5 ký tự')
     await dialog.getByRole('textbox', { name: /Lý do/ }).fill('Vi phạm quy định')
     await dialog.getByRole('button', { name: 'Khóa', exact: true }).click()
-    await expect(page.getByRole('status')).toContainText(`Đã khóa tài khoản ${account.username}.`)
+    await expect(
+      page.getByRole('status').filter({
+        hasText: `Đã khóa tài khoản ${account.username}.`,
+      })
+    ).toBeVisible()
     await expect(userRow(page, account).getByText('Đã khóa', { exact: true })).toBeVisible()
 
     await userRow(page, account)
@@ -110,9 +114,11 @@ test.describe('Người dùng & quyền của admin', () => {
       .click()
     dialog = page.getByRole('dialog', { name: 'Mở tài khoản' })
     await dialog.getByRole('button', { name: 'Mở khóa', exact: true }).click()
-    await expect(page.getByRole('status')).toContainText(
-      `Đã mở khóa tài khoản ${account.username}.`
-    )
+    await expect(
+      page.getByRole('status').filter({
+        hasText: `Đã mở khóa tài khoản ${account.username}.`,
+      })
+    ).toBeVisible()
     await expect(userRow(page, account).getByText('Hoạt động', { exact: true })).toBeVisible()
   })
 
