@@ -2,7 +2,7 @@ import { useState } from 'react'
 import BackofficeLayout from '../../components/backoffice/BackofficeLayout'
 import { createAdminMessages } from '../../data/adminMessages'
 import { createAdminNotifications } from '../../data/adminNotifications'
-import { readQuickReplies } from '../../lib/backoffice/quickReplies'
+import useSystemSettings from '../../hooks/useSystemSettings'
 
 const navigation = [
   { path: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -17,7 +17,7 @@ const navigation = [
 
 export default function AdminLayout() {
   const [messageState, setMessageState] = useState(createAdminMessages)
-  const [quickReplies, setQuickReplies] = useState(() => readQuickReplies(window.localStorage))
+  const settings = useSystemSettings()
   const [notificationState, setNotificationState] = useState(createAdminNotifications)
   const unreadMessages = messageState.threads.reduce((total, thread) => total + thread.unread, 0)
   const unreadNotifications = notificationState.notifications.filter(
@@ -39,8 +39,7 @@ export default function AdminLayout() {
       outletContext={{
         messageState,
         setMessageState,
-        quickReplies,
-        setQuickReplies,
+        ...settings,
         notificationState,
         setNotificationState,
       }}

@@ -191,6 +191,26 @@ export default function BackofficeLayout({
           </div>
         </header>
         <main className="pb-7">
+          {outletContext?.settingsError && (
+            <div
+              role="alert"
+              className="mx-6 mt-5 flex flex-wrap items-center gap-3 rounded-lg border border-danger-soft bg-danger-soft p-4 text-small text-danger-ink max-sm:mx-4"
+            >
+              <p className="min-w-0 flex-1">
+                Không tải được cấu hình hệ thống. {outletContext.settingsError}
+              </p>
+              <button
+                type="button"
+                onClick={outletContext.reloadSystemSettings}
+                className={cx(
+                  'rounded-lg border border-current px-3 py-2 font-semibold',
+                  focusRing
+                )}
+              >
+                Thử lại
+              </button>
+            </div>
+          )}
           <Outlet context={outletContext} />
         </main>
       </div>

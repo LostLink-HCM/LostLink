@@ -1,7 +1,3 @@
-// v2: bỏ 5 trọng số w, thay bằng tham số Fellegi-Sunter của docs/design/matching-algorithm.md
-export const SETTINGS_STORAGE_KEY = 'll_admin_system_settings_v2'
-
-// Độ tin cậy m của các tiêu chí dùng chung (mục 8). Ảnh không được chấm điểm nên không có ô
 export const RELIABILITY_FIELDS = [
   { key: 'mCategory', label: 'Danh mục' },
   { key: 'mTime', label: 'Thời gian' },
@@ -11,6 +7,17 @@ export const RELIABILITY_FIELDS = [
 ]
 
 export const ADVANCED_FIELDS = ['priorOdds', 'timeTolerance', 'sMin']
+
+export const SETTINGS_KEYS_BY_TAB = Object.freeze({
+  matching: [
+    ...RELIABILITY_FIELDS.map(({ key }) => key),
+    'strongThreshold',
+    'weakThreshold',
+    ...ADVANCED_FIELDS,
+  ],
+  timeThresholds: ['reportDays', 'contactHours', 'returnReminderDays'],
+  pagination: ['paginationPageSize'],
+})
 
 export const DEFAULT_SETTINGS = Object.freeze({
   reportDays: 5,
@@ -34,7 +41,6 @@ const numberValue = (value) =>
     ? Number(value)
     : NaN
 
-// Ngưỡng nhập dạng xác suất, đổi sang tổng bit W bằng công thức ngược của mục 6.4
 export const thresholdBits = (percent, priorOdds) =>
   Math.log2((percent / (100 - percent)) * (priorOdds - 1))
 
@@ -45,7 +51,7 @@ export function validateSettings(values) {
   const errors = {}
   const parsed = normalizeSettings(values)
   const integer = (key, min, max, unit) => {
-    if (!Number.isInteger(parsed[key]) || parsed[key] < min || parsed[key] > max) {
+    if (!Number.isSafeInteger(parsed[key]) || parsed[key] < min || parsed[key] > max) {
       errors[key] =
         `Nhập số nguyên từ ${min.toLocaleString('vi-VN')} đến ${max.toLocaleString('vi-VN')}${unit ? ` ${unit}` : ''}.`
     }
@@ -53,7 +59,7 @@ export function validateSettings(values) {
 
   integer('reportDays', 1, 365, 'ngày')
   integer('contactHours', 1, 72, 'giờ')
-  if (!Number.isInteger(parsed.returnReminderDays) || parsed.returnReminderDays < 1) {
+  if (!Number.isSafeInteger(parsed.returnReminderDays) || parsed.returnReminderDays < 1) {
     errors.returnReminderDays = 'Nhập số ngày nguyên dương.'
   }
 
@@ -75,39 +81,4 @@ export function validateSettings(values) {
   integer('paginationPageSize', 1, 100, 'mục')
 
   return errors
-}
-
-export function readSettings(storage) {
-  const fallback = { values: { ...DEFAULT_SETTINGS }, savedAt: null }
-
-  try {
-    const stored = JSON.parse(storage.getItem(SETTINGS_STORAGE_KEY))
-    if (!stored || typeof stored.values !== 'object' || stored.values === null) {
-      return fallback
-    }
-
-    // Giữ cấu hình cũ và thêm giá trị mặc định cho các trường mới.
-    const values = { ...DEFAULT_SETTINGS, ...stored.values }
-    if (Object.keys(validateSettings(values)).length) return fallback
-
-    return {
-      values: normalizeSettings(values),
-      savedAt:
-        typeof stored.savedAt === 'string' && Number.isFinite(Date.parse(stored.savedAt))
-          ? stored.savedAt
-          : null,
-    }
-  } catch {
-    return fallback
-  }
-}
-
-export function saveSettings(storage, values, now = new Date()) {
-  if (Object.keys(validateSettings(values)).length) {
-    throw new Error('Cấu hình chưa hợp lệ.')
-  }
-
-  const saved = { values: normalizeSettings(values), savedAt: now.toISOString() }
-  storage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(saved))
-  return saved
 }

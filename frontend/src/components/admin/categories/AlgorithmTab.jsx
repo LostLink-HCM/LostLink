@@ -1,7 +1,7 @@
 import { useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import Icon from '../../common/Icon'
 import { isSame, validateAlgorithm } from '../../../lib/admin/categories'
-import { readSettings } from '../../../lib/admin/settings'
 import {
   TIME_SHAPES,
   filterRadius,
@@ -83,7 +83,8 @@ function Preview({ form, valid, frequency, sMin }) {
 
 export default function AlgorithmTab({ category, onSave }) {
   const saved = pick(category)
-  const sMin = readSettings(window.localStorage).values.sMin
+  const { systemSettings } = useOutletContext()
+  const sMin = systemSettings?.values.sMin
   const [form, setForm] = useState(saved)
   const [shape, setShape] = useState(() => timeShapeKey(saved.timeShape))
   const [errors, setErrors] = useState({})
@@ -171,7 +172,12 @@ export default function AlgorithmTab({ category, onSave }) {
         </Card>
       </div>
 
-      <Preview form={form} valid={valid} frequency={category.frequency} sMin={sMin} />
+      <Preview
+        form={form}
+        valid={valid && Number.isFinite(sMin)}
+        frequency={category.frequency}
+        sMin={sMin}
+      />
 
       <SaveBar formId="category-algorithm-form" dirty={dirty} onReset={reset} />
     </form>

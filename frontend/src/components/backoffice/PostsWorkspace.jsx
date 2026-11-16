@@ -27,8 +27,7 @@ import {
 } from '../../lib/backoffice/postsApi'
 import { downloadCsv } from '../../lib/csv'
 import usePaginatedFilter from '../../hooks/usePaginatedFilter'
-
-const PAGE_SIZE = 8
+import useBackofficePageSize from '../../hooks/useBackofficePageSize'
 
 const STATUS_TONES = {
   pending: 'warning',
@@ -230,6 +229,7 @@ function VisibilityDialog({ post, onSubmit, onClose, submitting, serverError }) 
 }
 
 export default function PostsWorkspace() {
+  const pageSize = useBackofficePageSize()
   const [modal, setModal] = useState(null)
   const [nextStatus, setNextStatus] = useState('')
   const [statusReason, setStatusReason] = useState('')
@@ -258,7 +258,7 @@ export default function PostsWorkspace() {
     items: listState.items,
     initialFilters: EMPTY_FILTERS,
     filterFn: identityFilter,
-    pageSize: PAGE_SIZE,
+    pageSize,
   })
   const invalidRange = hasInvalidRange(filters)
   const requestFilters = useMemo(
@@ -287,7 +287,7 @@ export default function PostsWorkspace() {
   const loading = !invalidRange && (queryDebouncing || !listIsCurrent)
   const posts = invalidRange || queryDebouncing || !listIsCurrent ? [] : listState.items
   const filtered = posts
-  const visible = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   const listError = !queryDebouncing && listIsCurrent ? listState.error : ''
   const detailId = modal?.kind === 'detail' ? modal.id : null
   const detailIsCurrent = detailState.id === detailId
@@ -559,8 +559,8 @@ export default function PostsWorkspace() {
           'Đang tải danh sách bài đăng…'
         ) : (
           <>
-            Hiển thị {filtered.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0}–
-            {Math.min(currentPage * PAGE_SIZE, filtered.length)} trong số {filtered.length} bài đăng
+            Hiển thị {filtered.length ? (currentPage - 1) * pageSize + 1 : 0}–
+            {Math.min(currentPage * pageSize, filtered.length)} trong số {filtered.length} bài đăng
           </>
         )}
       </p>
@@ -728,7 +728,7 @@ export default function PostsWorkspace() {
       <Pagination
         page={currentPage}
         total={filtered.length}
-        pageSize={PAGE_SIZE}
+        pageSize={pageSize}
         onChange={setPage}
         noun="bài đăng"
         showSummary={false}

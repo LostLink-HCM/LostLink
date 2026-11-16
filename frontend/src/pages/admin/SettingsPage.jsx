@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
+import { saveSystemSettings } from '../../api/systemSettings'
 import Button from '../../components/backoffice/Button'
 import { cx } from '../../components/backoffice/classes'
 import Dialog from '../../components/backoffice/Dialog'
@@ -10,15 +11,13 @@ import {
   ADVANCED_FIELDS,
   DEFAULT_SETTINGS,
   RELIABILITY_FIELDS,
-  readSettings,
-  saveSettings,
+  SETTINGS_KEYS_BY_TAB,
   thresholdBits,
   validateSettings,
 } from '../../lib/admin/settings'
 import {
   cloneQuickReplies,
   QUICK_REPLY_TEXT_LIMIT,
-  saveQuickReplies,
   validateQuickReplies,
 } from '../../lib/backoffice/quickReplies'
 
@@ -35,28 +34,12 @@ const cardTones = {
   },
 }
 
-const MATCHING_SETTING_KEYS = [
-  ...RELIABILITY_FIELDS.map(({ key }) => key),
-  'strongThreshold',
-  'weakThreshold',
-  'priorOdds',
-  'timeTolerance',
-  'sMin',
-]
-const TIME_THRESHOLD_SETTING_KEYS = ['reportDays', 'contactHours', 'returnReminderDays']
-const PAGINATION_SETTING_KEYS = ['paginationPageSize']
 const SETTINGS_TABS = [
   { key: 'matching', label: 'Ghép cặp' },
   { key: 'timeThresholds', label: 'Thời hạn' },
   { key: 'quickReplies', label: 'Mẫu trả lời nhanh' },
   { key: 'pagination', label: 'Phân trang' },
 ]
-const SETTINGS_KEYS_BY_TAB = {
-  matching: MATCHING_SETTING_KEYS,
-  timeThresholds: TIME_THRESHOLD_SETTING_KEYS,
-  pagination: PAGINATION_SETTING_KEYS,
-}
-
 const pickSettings = (values, keys) => Object.fromEntries(keys.map((key) => [key, values[key]]))
 
 function SettingsCard({ id, icon, title, description, children, tone = 'blue', className }) {
@@ -456,25 +439,25 @@ function QuickReplyManager({ value, onChange, error }) {
   )
 }
 
-export default function Settings() {
-  const { quickReplies, setQuickReplies } = useOutletContext()
-  const [saved, setSaved] = useState(() => {
-    try {
-      return readSettings(window.localStorage)
-    } catch {
-      return { values: { ...DEFAULT_SETTINGS }, savedAt: null }
-    }
-  })
+function SettingsEditor({ initialSettings, onSaved }) {
+  const [saved, setSaved] = useState(initialSettings)
   const [draft, setDraft] = useState(() => ({ ...saved.values }))
-  const [savedQuickReplies, setSavedQuickReplies] = useState(() => cloneQuickReplies(quickReplies))
-  const [quickReplyDraft, setQuickReplyDraft] = useState(() => cloneQuickReplies(quickReplies))
+  const [savedQuickReplies, setSavedQuickReplies] = useState(() =>
+    cloneQuickReplies(saved.quickReplies)
+  )
+  const [quickReplyDraft, setQuickReplyDraft] = useState(() =>
+    cloneQuickReplies(saved.quickReplies)
+  )
   const [touched, setTouched] = useState({})
   const [activeTab, setActiveTab] = useState('matching')
   const [submittedTabs, setSubmittedTabs] = useState({})
   const [notice, setNotice] = useState(null)
   const [confirmation, setConfirmation] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [serverErrors, setServerErrors] = useState({})
+  const saveInFlight = useRef(false)
   const formRef = useRef(null)
-  const errors = validateSettings(draft)
+  const errors = { ...validateSettings(draft), ...serverErrors }
   const quickReplyErrors = validateQuickReplies(quickReplyDraft)
   const settingsChanged = Object.keys(DEFAULT_SETTINGS).some(
     (key) => String(draft[key]) !== String(saved.values[key])
@@ -492,10 +475,7 @@ export default function Settings() {
       : Object.fromEntries(
           activeSettingsKeys.filter((key) => errors[key]).map((key) => [key, errors[key]])
         )
-  const saveDisabled =
-    activeTab === 'quickReplies'
-      ? !quickRepliesChanged
-      : !activeSectionDirty && Boolean(saved.savedAt)
+  const saveDisabled = saving || !activeSectionDirty
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const priorOdds = Number(draft.priorOdds)
   const bitsHint = (key) =>
@@ -525,11 +505,13 @@ export default function Settings() {
 
   const change = (key, value) => {
     setDraft((current) => ({ ...current, [key]: value }))
+    setServerErrors({})
     setNotice(null)
   }
 
   const changeQuickReplies = (value) => {
     setQuickReplyDraft(value)
+    setServerErrors({})
     setNotice(null)
   }
 
@@ -549,22 +531,35 @@ export default function Settings() {
     />
   )
 
-  const saveTab = (tab) => {
+  const saveTab = async (tab) => {
+    if (saveInFlight.current) return
+    saveInFlight.current = true
+    setSaving(true)
+    setServerErrors({})
+    setNotice(null)
     try {
       const keys = SETTINGS_KEYS_BY_TAB[tab] || []
+      const next = await saveSystemSettings(tab, tab === 'quickReplies' ? quickReplyDraft : draft)
+      const nextReplies = cloneQuickReplies(next.quickReplies)
+      setSaved(next)
+      setSavedQuickReplies(nextReplies)
+      // Cập nhật bản đã lưu, giữ những ô đang sửa dở ở các tab khác.
+      setDraft((current) =>
+        Object.fromEntries(
+          Object.keys(next.values).map((key) => [
+            key,
+            keys.includes(key) || String(current[key]) === String(saved.values[key])
+              ? next.values[key]
+              : current[key],
+          ])
+        )
+      )
       if (tab === 'quickReplies') {
-        const next = saveQuickReplies(window.localStorage, quickReplyDraft)
-        setSavedQuickReplies(next)
-        setQuickReplyDraft(cloneQuickReplies(next))
-        setQuickReplies(next)
-      } else {
-        const next = saveSettings(window.localStorage, {
-          ...saved.values,
-          ...pickSettings(draft, keys),
-        })
-        setSaved(next)
-        setDraft((current) => ({ ...current, ...pickSettings(next.values, keys) }))
+        setQuickReplyDraft(cloneQuickReplies(nextReplies))
+      } else if (!quickRepliesChanged) {
+        setQuickReplyDraft(cloneQuickReplies(nextReplies))
       }
+      onSaved(next)
       setTouched((current) => {
         const next = { ...current }
         keys.forEach((key) => delete next[key])
@@ -572,15 +567,23 @@ export default function Settings() {
       })
       setSubmittedTabs((current) => ({ ...current, [tab]: false }))
       setNotice({ type: 'success', text: 'Đã lưu cấu hình.' })
-    } catch {
+    } catch (error) {
+      setServerErrors(error.fieldErrors || {})
+      if (tab === 'matching' && ADVANCED_FIELDS.some((key) => error.fieldErrors?.[key])) {
+        setAdvancedOpen(true)
+      }
       setNotice({
         type: 'error',
-        text: 'Không thể lưu thay đổi. Vui lòng kiểm tra quyền lưu trữ của trình duyệt và thử lại.',
+        text: error.message || 'Không thể lưu cấu hình. Vui lòng thử lại.',
       })
+    } finally {
+      saveInFlight.current = false
+      setSaving(false)
     }
   }
 
   const discardTab = (tab) => {
+    setServerErrors({})
     const keys = SETTINGS_KEYS_BY_TAB[tab] || []
     if (tab === 'quickReplies') {
       setQuickReplyDraft(cloneQuickReplies(savedQuickReplies))
@@ -598,6 +601,7 @@ export default function Settings() {
 
   const submit = (event) => {
     event.preventDefault()
+    if (saveInFlight.current) return
     setSubmittedTabs((current) => ({ ...current, [activeTab]: true }))
     setNotice(null)
 
@@ -637,10 +641,11 @@ export default function Settings() {
   }
 
   const confirmAction = () => {
+    if (saveInFlight.current) return
     const { action, tab } = confirmation
     setConfirmation(null)
 
-    if (action === 'save') saveTab(tab)
+    if (action === 'save') void saveTab(tab)
     if (action === 'discard') discardTab(tab)
   }
 
@@ -655,8 +660,8 @@ export default function Settings() {
             <span>
               Cập nhật lần cuối
               <strong className="ml-1.5 inline text-small font-semibold text-[#465f7b]">
-                {saved.savedAt
-                  ? new Date(saved.savedAt).toLocaleString('vi-VN')
+                {saved.updatedAt
+                  ? new Date(saved.updatedAt).toLocaleString('vi-VN')
                   : 'Chưa có lần lưu'}
               </strong>
             </span>
@@ -664,189 +669,196 @@ export default function Settings() {
         </div>
 
         <form id="admin-settings-form" ref={formRef} noValidate onSubmit={submit}>
-          <div
-            className="mb-5 flex gap-1 overflow-x-auto border-b border-line"
-            role="tablist"
-            aria-label="Nhóm cấu hình hệ thống"
-          >
-            {SETTINGS_TABS.map((tab) => {
-              const selected = activeTab === tab.key
-              return (
-                <button
-                  key={tab.key}
-                  id={`settings-tab-${tab.key}`}
-                  type="button"
-                  role="tab"
-                  aria-selected={selected}
-                  aria-controls="settings-tab-panel"
-                  className={cx(
-                    'min-h-[45px] shrink-0 border-b-2 px-4 text-small font-semibold transition-colors',
-                    selected
-                      ? 'border-primary text-primary'
-                      : 'border-transparent text-ink-muted hover:text-primary'
-                  )}
-                  onClick={() => {
-                    setActiveTab(tab.key)
-                    setNotice(null)
-                  }}
-                >
-                  {tab.label}
-                </button>
-              )
-            })}
-          </div>
-          <div
-            id="settings-tab-panel"
-            role="tabpanel"
-            aria-labelledby={`settings-tab-${activeTab}`}
-            tabIndex={0}
-            className="flex flex-col gap-4"
-          >
-            {activeTab === 'matching' && (
-              <SettingsCard
-                id="settings-match-params"
-                icon="settings"
-                title="Ghép cặp"
-                description="Độ tin cậy và ngưỡng gợi ý dùng chung cho mọi danh mục."
-              >
-                <h3 className="mb-3 text-body font-semibold text-ink">Độ tin cậy (m)</h3>
-                <div className="grid gap-x-[18px] min-[601px]:grid-cols-2">
-                  {RELIABILITY_FIELDS.map(({ key, label }) => (
-                    <Fragment key={key}>
-                      {field(key, label, '', '', { min: 0.01, max: 0.99, step: 0.01 })}
-                    </Fragment>
-                  ))}
-                </div>
-
-                <h3 className="mt-5 mb-3 border-t border-primary-muted pt-5 text-body font-semibold text-ink">
-                  Ngưỡng gợi ý
-                </h3>
-                <div className="grid gap-x-[18px] min-[601px]:grid-cols-2">
-                  {field('strongThreshold', 'Gợi ý mạnh', bitsHint('strongThreshold'), '%', {
-                    min: 1,
-                    max: 99,
-                  })}
-                  {field('weakThreshold', 'Gợi ý yếu', bitsHint('weakThreshold'), '%', {
-                    min: 1,
-                    max: 99,
-                  })}
-                </div>
-
-                <details
-                  open={advancedOpen}
-                  onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
-                  className="rounded-lg border border-line bg-surface-muted"
-                >
-                  <summary className="cursor-pointer rounded-lg px-4 py-3 text-small font-semibold text-primary outline-none hover:bg-primary-subtle focus-visible:ring-2 focus-visible:ring-focus/30">
-                    Nâng cao
-                  </summary>
-                  <div className="border-t border-line px-4 pt-4">
-                    {field('priorOdds', 'Xác suất tiên nghiệm p₀ = 1 / N', priorHint(), 'N', {
-                      min: 2,
-                      max: 100000,
-                    })}
-                    <div className="grid gap-x-[18px] min-[601px]:grid-cols-2">
-                      {field('timeTolerance', 'Dung sai thời gian ε', '', 'ngày', {
-                        min: 0,
-                        max: 30,
-                      })}
-                      {field('sMin', 'Điểm tối thiểu Sₘᵢₙ', '', '', {
-                        min: 0.01,
-                        max: 0.5,
-                        step: 0.01,
-                      })}
-                    </div>
-                  </div>
-                </details>
-              </SettingsCard>
-            )}
-
-            {activeTab === 'timeThresholds' && (
-              <SettingsCard
-                id="settings-time-thresholds"
-                icon="flag"
-                title="Thời hạn"
-                description="Thiết lập thời hạn xử lý báo cáo và lịch gửi email nhắc cho các hội thoại đang mở."
-              >
-                {field(
-                  'reportDays',
-                  'Thời hạn xử lý báo cáo',
-                  'Tính từ khi tiếp nhận báo cáo chưa được xử lý.',
-                  'ngày',
-                  { min: 1, max: 365, step: 1 }
-                )}
-                <div className="grid gap-x-[18px] border-t border-primary-muted pt-5 min-[601px]:grid-cols-2">
-                  {field(
-                    'contactHours',
-                    'Thời gian không hoạt động trước khi gửi email nhắc',
-                    'Tính từ lần hoạt động gần nhất.',
-                    'giờ',
-                    { min: 1, max: 72, step: 1 }
-                  )}
-                  {field(
-                    'returnReminderDays',
-                    'Nhắc nếu hội thoại vẫn mở sau',
-                    'Chỉ nhắc khi hội thoại chưa được đánh dấu “Đã trao trả” hoặc “Đã đóng”.',
-                    'ngày',
-                    { min: 1, step: 1 }
-                  )}
-                </div>
-              </SettingsCard>
-            )}
-
-            {activeTab === 'quickReplies' && (
-              <SettingsCard
-                id="settings-quick-replies"
-                icon="reply"
-                title="Mẫu trả lời nhanh"
-                description="Quản lý các nội dung được sử dụng khi trả lời hội thoại."
-              >
-                <QuickReplyManager
-                  value={quickReplyDraft}
-                  onChange={changeQuickReplies}
-                  error={
-                    Object.keys(quickReplyErrors).length ? 'Có mẫu trả lời chưa hợp lệ.' : null
-                  }
-                />
-              </SettingsCard>
-            )}
-
-            {activeTab === 'pagination' && (
-              <SettingsCard
-                id="settings-pagination"
-                icon="list"
-                title="Phân trang"
-                description="Số mục hiển thị trên mỗi trang trong các danh sách admin và moderator."
-              >
-                {field('paginationPageSize', 'Số mục trên mỗi trang', '', 'mục', {
-                  min: 1,
-                  max: 100,
-                  step: 1,
-                })}
-              </SettingsCard>
-            )}
-
-            <div className="flex justify-end gap-2.5 max-sm:[&>button]:flex-1">
-              <Button
-                type="button"
-                className="h-auto min-h-[43px] px-[17px] text-small max-sm:px-2.5"
-                disabled={!activeSectionDirty}
-                icon="reset"
-                onClick={requestDiscard}
-              >
-                Hủy thay đổi
-              </Button>
-              <Button
-                className="h-auto min-h-[43px] px-[17px] text-small max-sm:px-2.5"
-                type="submit"
-                variant="primary"
-                disabled={saveDisabled}
-                icon="check"
-              >
-                Lưu cấu hình
-              </Button>
+          <fieldset disabled={saving} className="m-0 min-w-0 border-0 p-0" aria-busy={saving}>
+            <div
+              className="mb-5 flex gap-1 overflow-x-auto border-b border-line"
+              role="tablist"
+              aria-label="Nhóm cấu hình hệ thống"
+            >
+              {SETTINGS_TABS.map((tab) => {
+                const selected = activeTab === tab.key
+                return (
+                  <button
+                    key={tab.key}
+                    id={`settings-tab-${tab.key}`}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    aria-controls="settings-tab-panel"
+                    className={cx(
+                      'min-h-[45px] shrink-0 border-b-2 px-4 text-small font-semibold transition-colors',
+                      selected
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-ink-muted hover:text-primary'
+                    )}
+                    onClick={() => {
+                      setActiveTab(tab.key)
+                      setNotice(null)
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                )
+              })}
             </div>
-          </div>
+            <div
+              id="settings-tab-panel"
+              role="tabpanel"
+              aria-labelledby={`settings-tab-${activeTab}`}
+              tabIndex={0}
+              className="flex flex-col gap-4"
+            >
+              {activeTab === 'matching' && (
+                <SettingsCard
+                  id="settings-match-params"
+                  icon="settings"
+                  title="Ghép cặp"
+                  description="Độ tin cậy và ngưỡng gợi ý dùng chung cho mọi danh mục."
+                >
+                  <h3 className="mb-3 text-body font-semibold text-ink">Độ tin cậy (m)</h3>
+                  <div className="grid gap-x-[18px] min-[601px]:grid-cols-2">
+                    {RELIABILITY_FIELDS.map(({ key, label }) => (
+                      <Fragment key={key}>
+                        {field(key, label, '', '', { min: 0.01, max: 0.99, step: 0.01 })}
+                      </Fragment>
+                    ))}
+                  </div>
+
+                  <h3 className="mt-5 mb-3 border-t border-primary-muted pt-5 text-body font-semibold text-ink">
+                    Ngưỡng gợi ý
+                  </h3>
+                  <div className="grid gap-x-[18px] min-[601px]:grid-cols-2">
+                    {field('strongThreshold', 'Gợi ý mạnh', bitsHint('strongThreshold'), '%', {
+                      min: 1,
+                      max: 99,
+                    })}
+                    {field('weakThreshold', 'Gợi ý yếu', bitsHint('weakThreshold'), '%', {
+                      min: 1,
+                      max: 99,
+                    })}
+                  </div>
+
+                  <details
+                    open={advancedOpen}
+                    onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
+                    className="rounded-lg border border-line bg-surface-muted"
+                  >
+                    <summary className="cursor-pointer rounded-lg px-4 py-3 text-small font-semibold text-primary outline-none hover:bg-primary-subtle focus-visible:ring-2 focus-visible:ring-focus/30">
+                      Nâng cao
+                    </summary>
+                    <div className="border-t border-line px-4 pt-4">
+                      {field('priorOdds', 'Xác suất tiên nghiệm p₀ = 1 / N', priorHint(), 'N', {
+                        min: 2,
+                        max: 100000,
+                      })}
+                      <div className="grid gap-x-[18px] min-[601px]:grid-cols-2">
+                        {field('timeTolerance', 'Dung sai thời gian ε', '', 'ngày', {
+                          min: 0,
+                          max: 30,
+                        })}
+                        {field('sMin', 'Điểm tối thiểu Sₘᵢₙ', '', '', {
+                          min: 0.01,
+                          max: 0.5,
+                          step: 0.01,
+                        })}
+                      </div>
+                    </div>
+                  </details>
+                </SettingsCard>
+              )}
+
+              {activeTab === 'timeThresholds' && (
+                <SettingsCard
+                  id="settings-time-thresholds"
+                  icon="flag"
+                  title="Thời hạn"
+                  description="Thiết lập thời hạn xử lý báo cáo và lịch gửi email nhắc cho các hội thoại đang mở."
+                >
+                  {field(
+                    'reportDays',
+                    'Thời hạn xử lý báo cáo',
+                    'Tính từ khi tiếp nhận báo cáo chưa được xử lý.',
+                    'ngày',
+                    { min: 1, max: 365, step: 1 }
+                  )}
+                  <div className="grid gap-x-[18px] border-t border-primary-muted pt-5 min-[601px]:grid-cols-2">
+                    {field(
+                      'contactHours',
+                      'Thời gian không hoạt động trước khi gửi email nhắc',
+                      'Tính từ lần hoạt động gần nhất.',
+                      'giờ',
+                      { min: 1, max: 72, step: 1 }
+                    )}
+                    {field(
+                      'returnReminderDays',
+                      'Nhắc nếu hội thoại vẫn mở sau',
+                      'Chỉ nhắc khi hội thoại chưa được đánh dấu “Đã trao trả” hoặc “Đã đóng”.',
+                      'ngày',
+                      { min: 1, step: 1 }
+                    )}
+                  </div>
+                </SettingsCard>
+              )}
+
+              {activeTab === 'quickReplies' && (
+                <SettingsCard
+                  id="settings-quick-replies"
+                  icon="reply"
+                  title="Mẫu trả lời nhanh"
+                  description="Quản lý các nội dung được sử dụng khi trả lời hội thoại."
+                >
+                  <QuickReplyManager
+                    value={quickReplyDraft}
+                    onChange={changeQuickReplies}
+                    error={
+                      Object.keys(quickReplyErrors).length
+                        ? 'Có mẫu trả lời chưa hợp lệ.'
+                        : Object.entries(serverErrors)
+                            .filter(([key]) => key.startsWith('user') || key.startsWith('internal'))
+                            .map(([, message]) => message)
+                            .join(' ') || null
+                    }
+                  />
+                </SettingsCard>
+              )}
+
+              {activeTab === 'pagination' && (
+                <SettingsCard
+                  id="settings-pagination"
+                  icon="list"
+                  title="Phân trang"
+                  description="Số mục hiển thị trên mỗi trang trong các danh sách admin và moderator."
+                >
+                  {field('paginationPageSize', 'Số mục trên mỗi trang', '', 'mục', {
+                    min: 1,
+                    max: 100,
+                    step: 1,
+                  })}
+                </SettingsCard>
+              )}
+
+              <div className="flex justify-end gap-2.5 max-sm:[&>button]:flex-1">
+                <Button
+                  type="button"
+                  className="h-auto min-h-[43px] px-[17px] text-small max-sm:px-2.5"
+                  disabled={!activeSectionDirty}
+                  icon="reset"
+                  onClick={requestDiscard}
+                >
+                  Hủy thay đổi
+                </Button>
+                <Button
+                  className="h-auto min-h-[43px] px-[17px] text-small max-sm:px-2.5"
+                  type="submit"
+                  variant="primary"
+                  disabled={saveDisabled}
+                  icon="check"
+                >
+                  {saving ? 'Đang lưu…' : 'Lưu cấu hình'}
+                </Button>
+              </div>
+            </div>
+          </fieldset>
         </form>
 
         {confirmation && (
@@ -880,4 +892,16 @@ export default function Settings() {
       </div>
     </div>
   )
+}
+
+export default function Settings() {
+  const { systemSettings, settingsLoading, applySystemSettings } = useOutletContext()
+  if (!systemSettings) {
+    return settingsLoading ? (
+      <p role="status" className="px-8 py-7 text-small text-ink-muted max-sm:px-4">
+        Đang tải cấu hình hệ thống…
+      </p>
+    ) : null
+  }
+  return <SettingsEditor initialSettings={systemSettings} onSaved={applySystemSettings} />
 }
