@@ -136,20 +136,33 @@ test.describe('Người dùng & quyền của admin', () => {
     await expect(dialog.getByRole('alert')).toContainText('ít nhất 5 ký tự')
     await dialog.getByRole('textbox', { name: /Lý do/ }).fill('Được phân công')
     await dialog.getByRole('button', { name: 'Cấp quyền Moderator', exact: true }).click()
-    await expect(page.getByRole('status')).toContainText(
-      `Đã cấp quyền Moderator cho ${account.username}.`
-    )
+    await expect(
+      page.getByRole('status').filter({
+        hasText: `Đã cấp quyền Moderator cho ${account.username}.`,
+      })
+    ).toBeVisible()
     await expect(userRow(page, account).getByText('Moderator', { exact: true })).toBeVisible()
+
+    const closeNotice = page.getByRole('button', { name: 'Đóng thông báo' })
+    if (await closeNotice.isVisible()) await closeNotice.click()
 
     await userRow(page, account)
       .getByRole('button', { name: `Thu hồi quyền Moderator · ${account.username}` })
       .click()
     dialog = page.getByRole('dialog', { name: 'Thu hồi quyền Moderator' })
     await dialog.getByRole('textbox', { name: /Lý do/ }).fill('Kết thúc nhiệm vụ')
-    await dialog.getByRole('button', { name: 'Thu hồi quyền Moderator', exact: true }).click()
-    await expect(page.getByRole('status')).toContainText(
-      `Đã thu hồi quyền Moderator của ${account.username}.`
+    const revokeResponsePromise = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'PATCH' && response.url().includes('/revoke-moderator')
     )
+    await dialog.getByRole('button', { name: 'Thu hồi quyền Moderator', exact: true }).click()
+    const revokeResponse = await revokeResponsePromise
+    expect(revokeResponse.ok()).toBeTruthy()
+    await expect(
+      page.getByRole('status').filter({
+        hasText: `Đã thu hồi quyền Moderator của ${account.username}.`,
+      })
+    ).toBeVisible()
     await expect(userRow(page, account).getByText('Người dùng', { exact: true })).toBeVisible()
   })
 
