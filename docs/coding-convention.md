@@ -150,3 +150,21 @@ routes → middleware (auth, rate limit, validation) → controller → service 
   ```
 
 - **Pull requests:** fill in `.github/pull_request_template.md` and get at least one approving review.
+
+## 8. Testing
+
+- Backend tests use `node:test`, `node:assert/strict` and Supertest. Frontend unit tests
+  use Vitest in the Node environment; E2E tests use Playwright.
+- Group related tests with `describe` (`test.describe` in Playwright). Test names state
+  the condition and expected behavior; descriptions may be written in Vietnamese.
+- Changes to business logic include tests for relevant success, invalid input, boundary
+  and permission cases. Business logic bug fixes include a new or updated regression test.
+- Tests run independently and reuse existing fixtures/helpers. Shared seed data may be
+  read, but tests must isolate their changes. Backend `node:test` tests needing a database
+  use `useTestDb()`; E2E uses its own database setup.
+- Mock dependencies outside the behavior being tested. Reset mock calls and changed
+  implementations between tests; restore fake timers after use.
+- E2E tests use the shared fixtures from `tests/helpers/auth.js`. Prefer `getByRole`,
+  `getByLabel` and assertions that wait and retry over fixed delays.
+- Run relevant tests before opening a pull request. Do not skip tests or weaken
+  assertions just to make CI pass.
