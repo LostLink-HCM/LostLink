@@ -11,6 +11,11 @@ const getBackofficeSettings = asyncHandler(async (_req, res) => {
   res.json({ success: true, data })
 })
 
+const getMatchingSettings = asyncHandler(async (_req, res) => {
+  const data = await adminSettingsService.getMatchingSettings()
+  res.json({ success: true, data })
+})
+
 const updateSettings = (group) =>
   asyncHandler(async (req, res) => {
     const data = await adminSettingsService.updateSettings(group, req.body, req.user)
@@ -30,6 +35,7 @@ const initializeSettings = asyncHandler(async (req, res) => {
 module.exports = {
   getSettings,
   getBackofficeSettings,
+  getMatchingSettings,
   updateSettings,
   updateQuickReplies,
   initializeSettings,

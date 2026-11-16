@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { saveSystemSettings } from '../../api/systemSettings'
+import useSystemSettings from '../../hooks/useSystemSettings'
 import Button from '../../components/backoffice/Button'
 import { cx } from '../../components/backoffice/classes'
 import Dialog from '../../components/backoffice/Dialog'
@@ -23,13 +24,11 @@ import {
 
 const cardTones = {
   blue: {
-    accent: 'border-t-[#3976bd]',
-    tint: 'from-[#edf3fc]',
+    tint: 'bg-[#edf3fa]',
     icon: 'border border-[#d5e0ec] bg-white text-[#3976bd]',
   },
   amber: {
-    accent: 'border-t-[#b4852e]',
-    tint: 'from-[#fcf6e9]',
+    tint: 'bg-[#fcf6e9]',
     icon: 'border border-[#e4d5b8] bg-white text-[#a67a2d]',
   },
 }
@@ -41,6 +40,8 @@ const SETTINGS_TABS = [
   { key: 'pagination', label: 'Phân trang' },
 ]
 const pickSettings = (values, keys) => Object.fromEntries(keys.map((key) => [key, values[key]]))
+const EMPTY_REPLY_EDITOR = { activeGroup: 'user', newText: '', editingId: null, editingText: '' }
+const UNSAVED_HIGHLIGHT_MS = 3000
 
 function SettingsCard({ id, icon, title, description, children, tone = 'blue', className }) {
   const colors = cardTones[tone]
@@ -48,15 +49,14 @@ function SettingsCard({ id, icon, title, description, children, tone = 'blue', c
   return (
     <section
       className={cx(
-        'min-w-0 overflow-hidden rounded-[10px] border border-[#b4c6db] border-t-[3px] bg-surface shadow-[0_3px_10px_#16233a08]',
-        colors.accent,
+        'min-w-0 overflow-hidden rounded-[10px] border border-[#8fa7c2] bg-white shadow-[0_4px_14px_#16233a12]',
         className
       )}
       aria-labelledby={id}
     >
       <header
         className={cx(
-          'flex items-center gap-3 border-b border-[#d5e0ec] bg-linear-to-br to-white px-6 py-5 max-sm:gap-2.5 max-sm:px-[17px] max-sm:py-[17px]',
+          'flex items-center gap-3 border-b border-[#c4d2e2] px-6 py-5 max-sm:gap-2.5 max-sm:px-[17px] max-sm:py-[17px]',
           colors.tint
         )}
       >
@@ -66,10 +66,10 @@ function SettingsCard({ id, icon, title, description, children, tone = 'blue', c
           <Icon name={icon} size={21} />
         </span>
         <div className="min-w-0">
-          <h2 id={id} className="mb-1 text-title font-[650] text-ink max-sm:text-lead">
+          <h2 id={id} className="mb-1 text-title font-[650] text-[#24476b] max-sm:text-lead">
             {title}
           </h2>
-          <p className="text-body leading-relaxed text-ink-muted">{description}</p>
+          <p className="text-body leading-relaxed text-[#526a83]">{description}</p>
         </div>
       </header>
       <div className="flex flex-1 flex-col gap-0 px-6 py-[22px] max-sm:px-[17px] max-sm:py-[18px]">
@@ -85,6 +85,7 @@ function SettingField({
   hint,
   unit,
   value,
+  highlighted = false,
   error,
   errorTextClassName = 'text-danger-ink',
   onChange,
@@ -104,9 +105,12 @@ function SettingField({
       </label>
       <div
         className={cx(
-          'flex h-9 items-center overflow-hidden rounded-lg border border-line-strong bg-surface transition focus-within:border-focus focus-within:ring-2 focus-within:ring-focus/20',
-          error &&
-            'border-danger bg-danger-soft focus-within:border-danger focus-within:ring-danger/20'
+          'flex h-9 items-center overflow-hidden rounded-lg border transition focus-within:border-focus focus-within:ring-2 focus-within:ring-focus/20',
+          error
+            ? 'border-danger bg-danger-soft focus-within:border-danger focus-within:ring-danger/20'
+            : highlighted
+              ? 'border-amber-400 bg-amber-50'
+              : 'border-line-strong bg-surface'
         )}
       >
         {options ? (
@@ -208,15 +212,36 @@ function createQuickReplyId(group) {
   return `${group}-${randomId}`
 }
 
-function QuickReplyManager({ value, onChange, error }) {
-  const [activeGroup, setActiveGroup] = useState('user')
-  const [newText, setNewText] = useState('')
-  const [editingId, setEditingId] = useState(null)
-  const [editingText, setEditingText] = useState('')
+function QuickReplyManager({
+  value,
+  savedValue,
+  onChange,
+  error,
+  editor,
+  setEditor,
+  highlightChanges,
+}) {
+  const { activeGroup, newText, editingId, editingText } = editor
+  const changeEditor = (key, next) => setEditor((current) => ({ ...current, [key]: next }))
+  const setActiveGroup = (next) => changeEditor('activeGroup', next)
+  const setNewText = (next) => changeEditor('newText', next)
+  const setEditingId = (next) => changeEditor('editingId', next)
+  const setEditingText = (next) => changeEditor('editingText', next)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [actionError, setActionError] = useState('')
   const replies = value?.[activeGroup] || []
-
+  const savedReplies = savedValue[activeGroup] || []
+  const deletedReplies = savedReplies.filter(
+    (reply) => !replies.some((item) => item.id === reply.id)
+  )
+  const changedReply = (reply) => {
+    const original = savedReplies.find((item) => item.id === reply.id)
+    return (
+      !original ||
+      original.text !== reply.text ||
+      (editingId === reply.id && editingText !== reply.text)
+    )
+  }
   const updateGroup = (nextReplies) => {
     onChange({ ...value, [activeGroup]: nextReplies })
     setActionError('')
@@ -332,7 +357,12 @@ function QuickReplyManager({ value, onChange, error }) {
               setActionError('')
             }}
             placeholder="Nhập nội dung mẫu trả lời..."
-            className="min-h-18 min-w-0 flex-1 resize-y rounded-lg border border-line-strong bg-surface px-3 py-2 text-small leading-relaxed text-ink outline-none transition focus:border-primary focus:ring-3 focus:ring-primary/10 placeholder:text-ink-subtle"
+            className={cx(
+              'min-h-18 min-w-0 flex-1 resize-y rounded-lg border px-3 py-2 text-small leading-relaxed text-ink outline-none transition focus:border-primary focus:ring-3 focus:ring-primary/10 placeholder:text-ink-subtle',
+              highlightChanges && newText
+                ? 'border-amber-400 bg-amber-50'
+                : 'border-line-strong bg-surface'
+            )}
           />
           <Button
             type="button"
@@ -348,11 +378,21 @@ function QuickReplyManager({ value, onChange, error }) {
         </p>
       </div>
 
-      <div className="flex flex-col divide-y divide-line rounded-lg border border-line">
+      <div
+        className={cx(
+          'flex flex-col divide-y divide-line rounded-lg border',
+          highlightChanges && deletedReplies.length ? 'border-amber-400 bg-amber-50' : 'border-line'
+        )}
+      >
         {replies.map((reply) => (
           <div
             key={reply.id}
-            className="flex items-start gap-3 border-l-3 border-[#d7e6f4] bg-[#f8fbff] p-3 transition-colors hover:border-primary hover:bg-primary-soft/50"
+            className={cx(
+              'flex items-start gap-3 border-l-3 p-3 transition-colors',
+              highlightChanges && changedReply(reply)
+                ? 'border-amber-400 bg-amber-50'
+                : 'border-[#d7e6f4] bg-[#f8fbff] hover:border-primary hover:bg-primary-soft/50'
+            )}
           >
             {editingId === reply.id ? (
               <div className="flex min-w-0 flex-1 flex-col gap-2">
@@ -364,7 +404,12 @@ function QuickReplyManager({ value, onChange, error }) {
                     setEditingText(event.target.value)
                     setActionError('')
                   }}
-                  className="min-h-18 w-full resize-y rounded-lg border border-primary bg-surface px-3 py-2 text-small leading-relaxed text-ink outline-none ring-3 ring-primary/10"
+                  className={cx(
+                    'min-h-18 w-full resize-y rounded-lg border px-3 py-2 text-small leading-relaxed text-ink outline-none ring-3 ring-primary/10',
+                    highlightChanges && changedReply(reply)
+                      ? 'border-amber-400 bg-amber-50'
+                      : 'border-primary bg-surface'
+                  )}
                   autoFocus
                 />
                 <div className="flex flex-wrap gap-2">
@@ -439,7 +484,7 @@ function QuickReplyManager({ value, onChange, error }) {
   )
 }
 
-function SettingsEditor({ initialSettings, onSaved }) {
+function SettingsEditor({ initialSettings, onSaved, registerNavigationGuard }) {
   const [saved, setSaved] = useState(initialSettings)
   const [draft, setDraft] = useState(() => ({ ...saved.values }))
   const [savedQuickReplies, setSavedQuickReplies] = useState(() =>
@@ -453,21 +498,31 @@ function SettingsEditor({ initialSettings, onSaved }) {
   const [submittedTabs, setSubmittedTabs] = useState({})
   const [notice, setNotice] = useState(null)
   const [confirmation, setConfirmation] = useState(null)
+  const [pendingNavigation, setPendingNavigation] = useState(null)
+  const [replyEditor, setReplyEditor] = useState(EMPTY_REPLY_EDITOR)
+  const [highlightedChanges, setHighlightedChanges] = useState(null)
   const [saving, setSaving] = useState(false)
   const [serverErrors, setServerErrors] = useState({})
   const saveInFlight = useRef(false)
   const formRef = useRef(null)
   const errors = { ...validateSettings(draft), ...serverErrors }
   const quickReplyErrors = validateQuickReplies(quickReplyDraft)
-  const settingsChanged = Object.keys(DEFAULT_SETTINGS).some(
+  const changedSettings = Object.keys(DEFAULT_SETTINGS).filter(
     (key) => String(draft[key]) !== String(saved.values[key])
   )
+  const settingsChanged = changedSettings.length > 0
   const quickRepliesChanged = JSON.stringify(quickReplyDraft) !== JSON.stringify(savedQuickReplies)
-  const dirty = settingsChanged || quickRepliesChanged
+  const editedReply = quickReplyDraft[replyEditor.activeGroup].find(
+    (reply) => reply.id === replyEditor.editingId
+  )
+  const replyEditorDirty =
+    Boolean(replyEditor.newText) ||
+    Boolean(editedReply && replyEditor.editingText !== editedReply.text)
+  const dirty = settingsChanged || quickRepliesChanged || replyEditorDirty
   const activeSettingsKeys = SETTINGS_KEYS_BY_TAB[activeTab] || []
   const activeSectionDirty =
     activeTab === 'quickReplies'
-      ? quickRepliesChanged
+      ? quickRepliesChanged || replyEditorDirty
       : activeSettingsKeys.some((key) => String(draft[key]) !== String(saved.values[key]))
   const activeSectionErrors =
     activeTab === 'quickReplies'
@@ -475,7 +530,8 @@ function SettingsEditor({ initialSettings, onSaved }) {
       : Object.fromEntries(
           activeSettingsKeys.filter((key) => errors[key]).map((key) => [key, errors[key]])
         )
-  const saveDisabled = saving || !activeSectionDirty
+  const saveDisabled =
+    saving || (activeTab === 'quickReplies' ? !quickRepliesChanged : !activeSectionDirty)
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const priorOdds = Number(draft.priorOdds)
   const bitsHint = (key) =>
@@ -484,6 +540,23 @@ function SettingsEditor({ initialSettings, onSaved }) {
       : `Tương ứng W ≈ ${formatNumber(thresholdBits(Number(draft[key]), priorOdds), 1)} bit`
   const priorHint = () =>
     errors.priorOdds ? '' : `p₀ = 1/${formatNumber(priorOdds)} ≈ ${formatPercent(1 / priorOdds)}`
+
+  useEffect(() => {
+    if (!registerNavigationGuard) return undefined
+    const guard = (proceed) => {
+      if (saveInFlight.current) {
+        setNotice({
+          type: 'info',
+          text: 'Cấu hình đang được lưu. Vui lòng chờ lưu xong trước khi chuyển trang.',
+        })
+        return false
+      }
+      if (!dirty) return true
+      setPendingNavigation({ kind: 'page', proceed })
+      return false
+    }
+    return registerNavigationGuard(guard)
+  }, [dirty, registerNavigationGuard])
 
   useEffect(() => {
     if (!dirty) return undefined
@@ -503,6 +576,12 @@ function SettingsEditor({ initialSettings, onSaved }) {
     return () => window.clearTimeout(timeout)
   }, [notice])
 
+  useEffect(() => {
+    if (!highlightedChanges) return undefined
+    const timeout = window.setTimeout(() => setHighlightedChanges(null), UNSAVED_HIGHLIGHT_MS)
+    return () => window.clearTimeout(timeout)
+  }, [highlightedChanges])
+
   const change = (key, value) => {
     setDraft((current) => ({ ...current, [key]: value }))
     setServerErrors({})
@@ -515,7 +594,17 @@ function SettingsEditor({ initialSettings, onSaved }) {
     setNotice(null)
   }
 
-  const blur = (key) => setTouched((current) => ({ ...current, [key]: true }))
+  const blur = (key) => {
+    setTouched((current) => ({ ...current, [key]: true }))
+    setDraft((current) => {
+      const value = current[key]
+      if (typeof value !== 'string' || value.trim() === '' || !Number.isFinite(Number(value))) {
+        return current
+      }
+      const normalized = String(Number(value))
+      return value === normalized ? current : { ...current, [key]: normalized }
+    })
+  }
 
   const field = (name, label, hint, unit, extra = {}) => (
     <SettingField
@@ -524,6 +613,7 @@ function SettingsEditor({ initialSettings, onSaved }) {
       hint={hint}
       unit={unit}
       value={draft[name] ?? DEFAULT_SETTINGS[name] ?? ''}
+      highlighted={Boolean(highlightedChanges) && changedSettings.includes(name)}
       error={submittedTabs[activeTab] || touched[name] ? errors[name] : null}
       onChange={change}
       onBlur={blur}
@@ -584,9 +674,11 @@ function SettingsEditor({ initialSettings, onSaved }) {
 
   const discardTab = (tab) => {
     setServerErrors({})
+    setHighlightedChanges(null)
     const keys = SETTINGS_KEYS_BY_TAB[tab] || []
     if (tab === 'quickReplies') {
       setQuickReplyDraft(cloneQuickReplies(savedQuickReplies))
+      setReplyEditor((current) => ({ ...EMPTY_REPLY_EDITOR, activeGroup: current.activeGroup }))
     } else {
       setDraft((current) => ({ ...current, ...pickSettings(saved.values, keys) }))
     }
@@ -649,6 +741,36 @@ function SettingsEditor({ initialSettings, onSaved }) {
     if (action === 'discard') discardTab(tab)
   }
 
+  const changeTab = (tab) => {
+    if (tab === activeTab || saveInFlight.current) return
+    if (activeSectionDirty) {
+      setPendingNavigation({ kind: 'tab', tab })
+      return
+    }
+    setActiveTab(tab)
+    setNotice(null)
+  }
+
+  const continueNavigation = () => {
+    if (!pendingNavigation || saveInFlight.current) return
+    const target = pendingNavigation
+    setPendingNavigation(null)
+    if (target.kind === 'page') target.proceed()
+    else {
+      discardTab(activeTab)
+      setActiveTab(target.tab)
+      setNotice(null)
+    }
+  }
+
+  const stayOnPage = () => {
+    setPendingNavigation(null)
+    if (activeTab === 'matching' && ADVANCED_FIELDS.some((key) => changedSettings.includes(key))) {
+      setAdvancedOpen(true)
+    }
+    setHighlightedChanges({})
+  }
+
   return (
     <div className="mx-auto max-w-[1640px] px-8 pb-1 pt-7 max-[1200px]:px-[22px] max-sm:px-4 max-sm:py-5">
       <div className="flex flex-col gap-5">
@@ -691,10 +813,7 @@ function SettingsEditor({ initialSettings, onSaved }) {
                         ? 'border-primary text-primary'
                         : 'border-transparent text-ink-muted hover:text-primary'
                     )}
-                    onClick={() => {
-                      setActiveTab(tab.key)
-                      setNotice(null)
-                    }}
+                    onClick={() => changeTab(tab.key)}
                   >
                     {tab.label}
                   </button>
@@ -809,7 +928,11 @@ function SettingsEditor({ initialSettings, onSaved }) {
                 >
                   <QuickReplyManager
                     value={quickReplyDraft}
+                    savedValue={savedQuickReplies}
+                    highlightChanges={Boolean(highlightedChanges)}
                     onChange={changeQuickReplies}
+                    editor={replyEditor}
+                    setEditor={setReplyEditor}
                     error={
                       Object.keys(quickReplyErrors).length
                         ? 'Có mẫu trả lời chưa hợp lệ.'
@@ -861,6 +984,30 @@ function SettingsEditor({ initialSettings, onSaved }) {
           </fieldset>
         </form>
 
+        {pendingNavigation && (
+          <Dialog
+            size="sm"
+            title="Có thay đổi chưa lưu"
+            onClose={() => setPendingNavigation(null)}
+            footer={
+              <>
+                <Button data-autofocus onClick={stayOnPage}>
+                  Ở lại
+                </Button>
+                <Button variant="primary" onClick={continueNavigation}>
+                  {pendingNavigation.kind === 'page' ? 'Rời trang' : 'Chuyển tab'}
+                </Button>
+              </>
+            }
+          >
+            <p className="text-body leading-relaxed text-ink-secondary">
+              {pendingNavigation.kind === 'page'
+                ? 'Bạn có thay đổi chưa lưu. Rời trang sẽ bỏ các thay đổi này. Bạn có muốn tiếp tục không?'
+                : 'Bạn có thay đổi chưa lưu. Chuyển tab sẽ bỏ các thay đổi trong tab hiện tại. Bạn có muốn tiếp tục không?'}
+            </p>
+          </Dialog>
+        )}
+
         {confirmation && (
           <Dialog
             size="sm"
@@ -895,13 +1042,42 @@ function SettingsEditor({ initialSettings, onSaved }) {
 }
 
 export default function Settings() {
-  const { systemSettings, settingsLoading, applySystemSettings } = useOutletContext()
-  if (!systemSettings) {
-    return settingsLoading ? (
-      <p role="status" className="px-8 py-7 text-small text-ink-muted max-sm:px-4">
-        Đang tải cấu hình hệ thống…
-      </p>
-    ) : null
+  const { applySystemSettings: applySharedSettings, registerSettingsNavigationGuard } =
+    useOutletContext()
+  const {
+    systemSettings,
+    settingsLoading,
+    settingsError,
+    reloadSystemSettings,
+    applySystemSettings,
+  } = useSystemSettings({ scope: 'full', onLoaded: applySharedSettings })
+
+  const saved = (data) => {
+    applySystemSettings(data)
+    applySharedSettings(data)
   }
-  return <SettingsEditor initialSettings={systemSettings} onSaved={applySystemSettings} />
+  return (
+    <>
+      {settingsError && (
+        <div
+          role="alert"
+          className="mx-6 mt-5 flex flex-wrap items-center gap-3 rounded-lg border border-danger-soft bg-danger-soft p-4 text-small text-danger-ink max-sm:mx-4"
+        >
+          <p className="min-w-0 flex-1">Không tải được cấu hình hệ thống. {settingsError}</p>
+          <Button onClick={reloadSystemSettings}>Thử lại</Button>
+        </div>
+      )}
+      {systemSettings ? (
+        <SettingsEditor
+          initialSettings={systemSettings}
+          onSaved={saved}
+          registerNavigationGuard={registerSettingsNavigationGuard}
+        />
+      ) : settingsLoading ? (
+        <p role="status" className="px-8 py-7 text-small text-ink-muted max-sm:px-4">
+          Đang tải cấu hình hệ thống…
+        </p>
+      ) : null}
+    </>
+  )
 }

@@ -18,6 +18,11 @@ export async function getBackofficeSettings() {
   return data
 }
 
+export async function getMatchingSettings() {
+  const { data } = await api.get('/admin/settings/matching')
+  return data
+}
+
 export async function initializeSystemSettings(input) {
   const { data } = await api.post('/admin/settings/initialize', input)
   return data

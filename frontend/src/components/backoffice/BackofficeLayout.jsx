@@ -39,6 +39,31 @@ export default function BackofficeLayout({
   const closeSidebar = () => setSidebarOpen(false)
   const homeHref = `${basePath}${homePath}`
 
+  const navigateFromSidebar = (event, to) => {
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    )
+      return
+    const guard = outletContext?.requestSettingsNavigation
+    if (
+      currentPath !== to &&
+      guard &&
+      !guard(() => {
+        closeSidebar()
+        navigate(to)
+      })
+    ) {
+      event.preventDefault()
+      return
+    }
+    closeSidebar()
+  }
+
   return (
     <div className="flex min-h-dvh w-full bg-canvas font-sans text-small text-ink">
       {sidebarOpen && (
@@ -72,7 +97,7 @@ export default function BackofficeLayout({
               collapsed && 'lg:justify-center',
               focusRing
             )}
-            onClick={closeSidebar}
+            onClick={(event) => navigateFromSidebar(event, homeHref)}
           >
             <span className="grid place-items-center rounded-lg bg-white p-0.75">
               <Logo size={32} animated />
@@ -114,7 +139,7 @@ export default function BackofficeLayout({
                   focusRing
                 )
               }
-              onClick={closeSidebar}
+              onClick={(event) => navigateFromSidebar(event, `${basePath}${item.path}`)}
             >
               <Icon name={item.icon} />
               <span className={cx('min-w-0 truncate', collapsed && 'lg:hidden')}>{item.label}</span>

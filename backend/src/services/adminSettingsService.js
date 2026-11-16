@@ -11,6 +11,7 @@ const ApiError = require('../utils/ApiError')
 const { settingError, thresholdError } = require('../utils/systemSettings')
 
 const MANAGED_KEYS = [...SETTING_KEYS, ...Object.values(QUICK_REPLY_MARKERS)]
+const SHARED_KEYS = ['paginationPageSize', ...Object.values(QUICK_REPLY_MARKERS)]
 let operations = Promise.resolve()
 
 const exclusive = (work) => {
@@ -23,8 +24,8 @@ const invalidFields = (details) => new ApiError(422, 'Dữ liệu không hợp l
 const configChanged = () =>
   ApiError.conflict('Cấu hình đã thay đổi. Vui lòng tải lại và thử lại.', 'SETTINGS_CHANGED')
 
-const readRecords = async (session = null) => {
-  const configQuery = SystemConfig.find({ key: { $in: MANAGED_KEYS } })
+const readRecords = async (session = null, keys = MANAGED_KEYS) => {
+  const configQuery = SystemConfig.find({ key: { $in: keys } })
     .session(session)
     .lean()
   const replyQuery = QuickReply.find({ group: { $in: QUICK_REPLY_GROUPS } })
@@ -64,6 +65,16 @@ const groupInitialized = (records, group) =>
 const replyValues = (replies) =>
   replies.map((reply) => ({ id: String(reply._id), text: reply.text }))
 
+const quickRepliesOf = (records) =>
+  Object.fromEntries(
+    QUICK_REPLY_GROUPS.map((group) => [
+      group,
+      groupInitialized(records, group)
+        ? replyValues(records.replies.filter((reply) => reply.group === group))
+        : DEFAULT_QUICK_REPLIES[group].map((text) => ({ text })),
+    ])
+  )
+
 const stateOf = async (records, session = null) => {
   const latest = [...records.configs, ...records.replies]
     .filter((record) => record.updatedAt)
@@ -73,14 +84,7 @@ const stateOf = async (records, session = null) => {
     : null
   return {
     values: valuesOf(records),
-    quickReplies: Object.fromEntries(
-      QUICK_REPLY_GROUPS.map((group) => [
-        group,
-        groupInitialized(records, group)
-          ? replyValues(records.replies.filter((reply) => reply.group === group))
-          : DEFAULT_QUICK_REPLIES[group].map((text) => ({ text })),
-      ])
-    ),
+    quickReplies: quickRepliesOf(records),
     updatedAt: latest?.updatedAt ?? null,
     updatedBy: actor ? { id: String(actor._id), username: actor.username } : null,
     missing: {
@@ -94,8 +98,21 @@ const getSettings = () => exclusive(async () => stateOf(await readRecords()))
 
 const getBackofficeSettings = () =>
   exclusive(async () => {
-    const data = await stateOf(await readRecords())
-    return { paginationPageSize: data.values.paginationPageSize, quickReplies: data.quickReplies }
+    const records = await readRecords(null, SHARED_KEYS)
+    return {
+      paginationPageSize: valuesOf(records).paginationPageSize,
+      quickReplies: quickRepliesOf(records),
+    }
+  })
+
+const getMatchingSettings = () =>
+  exclusive(async () => {
+    const keys = SETTING_GROUPS.matching
+    const configs = await SystemConfig.find({ key: { $in: keys } })
+      .select('key value')
+      .lean()
+    const values = valuesOf({ configs })
+    return { values: Object.fromEntries(keys.map((key) => [key, values[key]])) }
   })
 
 const nextTimestamp = (records) =>
@@ -364,6 +381,7 @@ const initializeSettings = (input, actor) =>
 module.exports = {
   getSettings,
   getBackofficeSettings,
+  getMatchingSettings,
   updateSettings,
   updateQuickReplies,
   initializeSettings,

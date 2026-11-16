@@ -13,6 +13,7 @@ const router = Router()
 
 router.use(protect, requireRole('admin'))
 router.get('/', ctrl.getSettings)
+router.get('/matching', ctrl.getMatchingSettings)
 router.post('/initialize', initializeSettingsRules, validate, ctrl.initializeSettings)
 router.patch('/matching', groupSettingsRules('matching'), validate, ctrl.updateSettings('matching'))
 router.patch(

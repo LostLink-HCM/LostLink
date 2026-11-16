@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import BackofficeLayout from '../../components/backoffice/BackofficeLayout'
 import { createAdminMessages } from '../../data/adminMessages'
 import { createAdminNotifications } from '../../data/adminNotifications'
@@ -16,6 +16,17 @@ const navigation = [
 ]
 
 export default function AdminLayout() {
+  const settingsNavigationGuard = useRef(null)
+  const registerSettingsNavigationGuard = useCallback((guard) => {
+    settingsNavigationGuard.current = guard
+    return () => {
+      if (settingsNavigationGuard.current === guard) settingsNavigationGuard.current = null
+    }
+  }, [])
+  const requestSettingsNavigation = useCallback(
+    (proceed) => settingsNavigationGuard.current?.(proceed) ?? true,
+    []
+  )
   const [messageState, setMessageState] = useState(createAdminMessages)
   const settings = useSystemSettings()
   const [notificationState, setNotificationState] = useState(createAdminNotifications)
@@ -37,6 +48,8 @@ export default function AdminLayout() {
       pendingCount={unreadMessages}
       pendingCounts={{ '/messages': unreadMessages, '/notifications': unreadNotifications }}
       outletContext={{
+        registerSettingsNavigationGuard,
+        requestSettingsNavigation,
         messageState,
         setMessageState,
         ...settings,
