@@ -1,5 +1,7 @@
 const { Category, Post, User, UserFollow } = require('../models')
 const ApiError = require('../utils/ApiError')
+const { notifyAreaSubscribers } = require('./areaService')
+const { runMatching } = require('./matchingService')
 const { notify } = require('./notificationService')
 const { escapeRegex, lowercaseText, normalizeText } = require('../utils/text')
 const { endOfVnDay, startOfVnDay } = require('../utils/vnTime')
@@ -124,6 +126,14 @@ const getPendingPostDetails = async (id) => {
   }
 }
 
+// Bài đã duyệt dù ghép cặp hay cảnh báo khu vực lỗi, lỗi chỉ ghi log
+const afterApproved = async (postId) => {
+  const results = await Promise.allSettled([runMatching(postId), notifyAreaSubscribers(postId)])
+  for (const result of results) {
+    if (result.status === 'rejected') console.error('Lỗi sau khi duyệt bài', result.reason)
+  }
+}
+
 const changePendingPostStatus = async ({ id, moderatorId, status, note = '' }) => {
   const post = await Post.findOneAndUpdate(
     { _id: id, status: 'pending' },
@@ -167,6 +177,7 @@ const changePendingPostStatus = async ({ id, moderatorId, status, note = '' }) =
       refId: post._id,
       text: post.title,
     })
+    await afterApproved(post._id)
   }
 
   return { id: String(post._id), code: post.code, status: post.status }

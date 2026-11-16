@@ -11,13 +11,13 @@ const {
   User,
   VerificationChallenge,
 } = require('../models')
+const { runMatching } = require('../services/matchingService')
 const { buildChallenge } = require('../services/postService')
 const { refreshReturnCount } = require('../services/returnService')
 const { formatPostCode, postCodePrefix } = require('../utils/postCode')
 const { DAY_PART_HOURS, startOfVnDay, todayVn, vnTimeRange } = require('../utils/vnTime')
 const POSTS = require('./data/posts')
 const POST_IMAGES = require('./data/postImages')
-const MATCH_SUGGESTIONS = require('./data/matchSuggestions')
 
 const HOUR = 60 * 60 * 1000
 const MINUTE = 60 * 1000
@@ -47,6 +47,11 @@ const timeWindowOf = (definition, createdAt) => {
   }
   return { timeFrom: range.from, timeTo: new Date(Math.min(range.to.getTime(), posted)) }
 }
+
+// Ảnh của bài mẫu. imageIndexes chọn vài ảnh trong bộ, để bài mất và bài nhặt của cùng một món
+// dùng các góc chụp khác nhau
+const imagesOf = ({ image, imageIndexes }) =>
+  (POST_IMAGES[image] ?? []).filter((_, index) => !imageIndexes || imageIndexes.includes(index))
 
 // Vị trí của bài mẫu: ghim (lat, lng; công khai lệch 150-250 m) hoặc đoạn đường (road: hai đầu
 // [lat, lng]; công khai nguyên đoạn, giống khi đăng bài thật)
@@ -219,10 +224,7 @@ const seedPosts = async () => {
       commentCount: comments.length,
       contents: definition.contents ?? [],
       attributes: buildAttributes(categoryIndex, definition),
-      images: (POST_IMAGES[definition.image] ?? []).map((image, order) => ({
-        url: image.url,
-        order,
-      })),
+      images: imagesOf(definition).map((image, order) => ({ url: image.url, order })),
       statusHistory,
     })
     seededPostsByTitle.set(definition.title, post)
@@ -259,32 +261,39 @@ const seedPosts = async () => {
     }
   }
 
-  const matchSuggestions = MATCH_SUGGESTIONS.map((suggestion) => {
-    const postLost = seededPostsByTitle.get(suggestion.lostTitle)
-    const postFound = seededPostsByTitle.get(suggestion.foundTitle)
-    if (!postLost || !postFound) {
-      throw new Error(
-        `Không tìm thấy bài để seed ghép nối: "${suggestion.lostTitle}" / "${suggestion.foundTitle}"`
+  const matchable = [...seededPostsByTitle.values()].filter(
+    (post) => ['searching', 'contacted'].includes(post.status) && !post.isHidden
+  )
+  // Thông báo manh mối do seedNotifications tạo theo thời điểm giả lập
+  for (const post of matchable) await runMatching(post._id, { silent: true })
+  const suggestions = await MatchSuggestion.find({
+    postLost: { $in: matchable.map((post) => post._id) },
+  }).lean()
+  // Gợi ý xuất hiện lúc bài sau trong cặp được duyệt
+  const approvedAt = new Map(
+    matchable.map((post) => [
+      String(post._id),
+      post.statusHistory.find((step) => step.status === 'searching').changedAt,
+    ])
+  )
+  for (const suggestion of suggestions) {
+    const at = new Date(
+      Math.max(
+        approvedAt.get(String(suggestion.postLost)),
+        approvedAt.get(String(suggestion.postFound))
       )
-    }
-    if (postLost.type !== 'lost' || postFound.type !== 'found') {
-      throw new Error(`Ghép nối phải gồm bài Mất đồ và Nhặt được: "${suggestion.lostTitle}"`)
-    }
-
-    return {
-      postLost: postLost._id,
-      postFound: postFound._id,
-      score: suggestion.score,
-      breakdown: suggestion.breakdown,
-      state: suggestion.state,
-    }
-  })
-  await MatchSuggestion.insertMany(matchSuggestions)
+    )
+    await MatchSuggestion.collection.updateOne(
+      { _id: suggestion._id },
+      { $set: { createdAt: at, updatedAt: at } }
+    )
+  }
+  const matchCount = suggestions.length
 
   console.log(
     `  ✓ ${POSTS.length} bài đăng (${listed} bài công khai, ${POSTS.length - listed} bài ẩn/chờ duyệt/từ chối/đã đóng)`
   )
-  console.log(`  ✓ ${matchSuggestions.length} gợi ý ghép nối`)
+  console.log(`  ✓ ${matchCount} gợi ý ghép nối`)
 
   // Số lần trao trả của các tác giả đếm lại từ bài đã trao trả vừa tạo
   for (const id of authorIds) await refreshReturnCount(id)

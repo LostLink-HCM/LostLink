@@ -36,7 +36,6 @@ import {
   loadLocalDraft,
   mapApiErrors,
   moveToCover,
-  prefillDescription,
   reconcileClassification,
   restoreDraft,
   serializeDraft,
@@ -309,10 +308,6 @@ export default function ComposePostPage({ mode = 'create', postId = null }) {
   const makeCover = (id) => setForm((prev) => ({ ...prev, images: moveToCover(prev.images, id) }))
 
   const goTo = (index) => {
-    if (steps[index]?.key === 'content') {
-      const prefill = prefillDescription(form, category)
-      if (prefill) setForm((prev) => ({ ...prev, ...prefill }))
-    }
     setStep(index)
     setReached((prev) => Math.max(prev, index))
     setErrors({})
@@ -537,6 +532,7 @@ export default function ComposePostPage({ mode = 'create', postId = null }) {
               {stepKey === 'content' && (
                 <ContentStep
                   form={form}
+                  category={category}
                   errors={errors}
                   onChange={update}
                   onAddImages={addImages}

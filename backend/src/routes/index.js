@@ -14,11 +14,11 @@ const notificationRoutes = require('./notificationRoutes')
 const claimRoutes = require('./claimRoutes')
 const conversationRoutes = require('./conversationRoutes')
 const adminUserRoutes = require('./adminUserRoutes')
+const matchRoutes = require('./matchRoutes')
+const statsRoutes = require('./statsRoutes')
 
 const router = Router()
 
-// Trả 503 khi mất kết nối CSDL để Render và dịch vụ uptime phát hiện sự cố.
-// version cho CI biết Render đã chạy đúng bản vừa deploy chưa
 router.get('/health', (req, res) => {
   const databaseUp = mongoose.connection.readyState === 1
   res.status(databaseUp ? 200 : 503).json({
@@ -42,5 +42,7 @@ router.use('/notifications', notificationRoutes)
 router.use('/claims', claimRoutes)
 router.use('/conversations', conversationRoutes)
 router.use('/admin', adminUserRoutes)
+router.use('/matches', matchRoutes)
+router.use('/stats', statsRoutes)
 
 module.exports = router

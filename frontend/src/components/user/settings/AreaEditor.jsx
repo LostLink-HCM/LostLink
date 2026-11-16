@@ -1,52 +1,62 @@
-import { useId } from 'react'
-import { PLACES } from '../../../data/composePost'
+import { lazy, Suspense, useId } from 'react'
 import {
+  AREA_PRESETS,
   RADIUS_MAX,
   RADIUS_MIN,
   RADIUS_STEP,
   formatRadius,
-  radiusToPercent,
 } from '../../../lib/user/settings'
-import LocationMap from '../compose/LocationMap'
 import { chipClass, labelClass } from '../compose/styles'
 import TextField from './TextField'
 
-const QUICK_PICKS = PLACES.slice(0, 6)
+const VietMapView = lazy(() => import('../compose/VietMapView'))
+
+function MapFallback() {
+  return (
+    <div className="grid h-72 place-items-center rounded-2xl border border-line bg-surface-muted text-caption text-ink-muted sm:h-96">
+      Đang tải bản đồ…
+    </div>
+  )
+}
+
+const samePoint = (a, b) => a && b && a.lat === b.lat && a.lng === b.lng
 
 // Chọn tâm trên bản đồ và chỉnh bán kính cho một khu vực để ý
 export default function AreaEditor({ value, onChange, error }) {
   const radiusId = useId()
+  const pick = (point) => onChange({ point })
 
   return (
     <div className="flex flex-col gap-4 rounded-2xl border border-primary/20 bg-primary-subtle/60 p-4">
       <div>
         <p className={labelClass}>Chọn nhanh</p>
         <div className="flex flex-wrap gap-2">
-          {QUICK_PICKS.map((place) => {
-            const active = value.name === place.label
+          {AREA_PRESETS.map(({ label, lat, lng }) => {
+            const active = samePoint(value.point, { lat, lng })
             return (
               <button
-                key={place.label}
+                key={label}
                 type="button"
-                aria-pressed={active}
-                onClick={() => onChange({ name: place.label, point: { x: place.x, y: place.y } })}
+                aria-pressed={Boolean(active)}
+                onClick={() => onChange({ name: value.name || label, point: { lat, lng } })}
                 className={chipClass(active)}
               >
-                {place.label}
+                {label}
               </button>
             )
           })}
         </div>
       </div>
 
-      <LocationMap
-        point={value.point}
-        label={value.point ? value.name || 'Vị trí đã ghim' : ''}
-        emptyText="Bấm vào bản đồ để chọn tâm khu vực"
-        draggable
-        onMove={(point) => onChange({ point })}
-        ringPercent={radiusToPercent(value.radius)}
-      />
+      <Suspense fallback={<MapFallback />}>
+        <VietMapView
+          mode="point"
+          point={value.point}
+          radius={value.radius}
+          onMapClick={pick}
+          onPointDrag={pick}
+        />
+      </Suspense>
 
       <TextField
         label="Tên gợi nhớ"

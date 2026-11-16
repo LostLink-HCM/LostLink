@@ -4,9 +4,11 @@ const { describe, mock, test } = require('node:test')
 const {
   Category,
   Comment,
+  MatchSuggestion,
   Notification,
   Post,
   PostLike,
+  User,
   VerificationChallenge,
 } = require('../../src/models')
 const { seedNotifications } = require('../../src/seeds/notificationSeed')
@@ -129,9 +131,15 @@ describe('Dữ liệu mẫu: thông báo', () => {
     const types = new Set(items.map((item) => item.type))
     for (const type of types) {
       assert.ok(
-        ['post_approved', 'post_rejected', 'comment', 'like', 'post_closed', 'returned'].includes(
-          type
-        ),
+        [
+          'post_approved',
+          'post_rejected',
+          'comment',
+          'like',
+          'post_closed',
+          'returned',
+          'match',
+        ].includes(type),
         type
       )
     }
@@ -145,6 +153,14 @@ describe('Dữ liệu mẫu: thông báo', () => {
     const comments = await Comment.find().populate('post', 'owner').lean()
     const fromOthers = comments.filter((comment) => !comment.post.owner.equals(comment.user))
     assert.equal(items.filter((item) => item.type === 'comment').length, fromOthers.length)
+    // UC36: mỗi manh mối mạnh báo cho cả hai bên, user01 (user@lostlink.vn) cũng có
+    const strongMatches = await MatchSuggestion.countDocuments({ score: { $gte: 0.9 } })
+    const matchNotes = items.filter((item) => item.type === 'match')
+    assert.ok(strongMatches > 0)
+    assert.equal(matchNotes.length, strongMatches * 2)
+    const user01 = await User.findOne({ username: 'user01' }).lean()
+    assert.ok(matchNotes.some((item) => item.user.equals(user01._id)))
+
     // Chưa ai mở nên tất cả chưa đọc
     assert.ok(items.every((item) => !item.isRead))
 

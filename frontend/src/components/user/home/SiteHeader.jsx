@@ -45,7 +45,13 @@ function SkyOrb({ time }) {
   )
 }
 
-export default function SiteHeader({ time, search, unreadMessages = 0, unreadNotifications = 0 }) {
+export default function SiteHeader({
+  time,
+  search,
+  unreadMessages = 0,
+  unreadNotifications = 0,
+  pendingMatches = 0,
+}) {
   const { user } = useAuth()
   const unread = user ? unreadMessages : 0
   const unreadAlerts = user ? unreadNotifications : 0
@@ -62,6 +68,13 @@ export default function SiteHeader({ time, search, unreadMessages = 0, unreadNot
       badge: unread,
       unit: 'hội thoại',
     },
+    user && {
+      to: '/matches',
+      label: 'Manh mối',
+      icon: 'link',
+      badge: pendingMatches,
+      unit: 'manh mối',
+    },
     {
       to: '/notifications',
       label: 'Thông báo',
@@ -69,14 +82,13 @@ export default function SiteHeader({ time, search, unreadMessages = 0, unreadNot
       badge: unreadAlerts,
       unit: 'thông báo',
     },
-    // Từ xl bảng vinh danh đã nằm ở cột phải trang chủ
     {
       to: '/leaderboard',
       label: 'Bảng vinh danh',
       icon: 'trophy',
-      className: 'xl:hidden',
+      className: user ? 'hidden' : 'xl:hidden',
     },
-  ]
+  ].filter(Boolean)
 
   return (
     <header className="sticky top-0 z-40 bg-au-sky-1 max-lg:rounded-b-2xl bg-linear-to-r from-au-sky-1 via-au-sky-2 to-au-sky-3 text-white shadow-[0_6px_24px_-14px_rgb(5_11_22/0.7)]">

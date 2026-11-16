@@ -3,6 +3,7 @@ const CURATED = [
   // Ví & tiền
   {
     image: 'lv-mono',
+    imageIndexes: [0, 1],
     author: 'ngockhanh.dn',
     type: 'lost',
     category: 'Ví & tiền',
@@ -27,6 +28,32 @@ const CURATED = [
         45,
       ],
     ],
+  },
+  // Cùng chiếc ví với bài trên, ảnh chụp góc khác
+  {
+    image: 'lv-mono',
+    imageIndexes: [2],
+    author: 'user01',
+    type: 'found',
+    category: 'Ví & tiền',
+    title: 'Nhặt được ví Louis Vuitton Monogram nâu ở lối ra Takashimaya',
+    description:
+      'Ví gập Louis Vuitton họa tiết Monogram nâu cỡ nhỏ, nút bấm cài ngang, lót da bò nâu. Nhặt ở lối ra Takashimaya sang phố đi bộ Nguyễn Huệ lúc tối, bên trong có thẻ ngân hàng. Chủ ví mô tả đúng sẽ hẹn trả.',
+    area: 'Quận 1',
+    placeName: 'Lối ra Takashimaya đường Lê Lợi, Phường Bến Nghé, Quận 1',
+    lat: 10.7733,
+    lng: 106.7011,
+    postedHoursAgo: 1,
+    dayPart: 'evening',
+    question: {
+      text: 'Ví có ngăn đựng xu kiểu gì?',
+      options: ['Ngăn kéo khóa', 'Ngăn nút bấm', 'Không có ngăn đựng xu'],
+      correct: 0,
+    },
+    attributes: { 'Chất liệu': 'Da', 'Màu chủ đạo': 'Nâu' },
+    contents: ['Thẻ ngân hàng'],
+    views: 40,
+    likes: 2,
   },
   {
     image: 'lv-epi',
@@ -54,6 +81,7 @@ const CURATED = [
   },
   {
     image: 'wallet-black',
+    imageIndexes: [0],
     author: 'minhkhoi.td',
     type: 'lost',
     category: 'Ví & tiền',
@@ -70,6 +98,27 @@ const CURATED = [
     contents: ['Tiền mặt', 'Bằng lái xe', 'Thẻ ngân hàng'],
     views: 410,
     likes: 15,
+  },
+  // Có thể cùng chiếc ví với bài trên (ảnh góc khác) nhưng cách xa hơn và chỉ còn tiền mặt
+  {
+    image: 'wallet-black',
+    imageIndexes: [1],
+    author: 'hoangnam.q1',
+    type: 'found',
+    category: 'Ví & tiền',
+    title: 'Nhặt được ví da đen vân sần gần bãi giữ xe chợ Bến Thành',
+    description:
+      'Ví gập đôi da đen vân sần, lót trong màu nâu. Nhặt trên vỉa hè cạnh bãi giữ xe chợ Bến Thành, bên trong chỉ còn ít tiền mặt, không thấy bằng lái hay thẻ.',
+    area: 'Quận 1',
+    placeName: 'Vỉa hè đường Phan Bội Châu, Phường Bến Thành, Quận 1',
+    lat: 10.7722,
+    lng: 106.6983,
+    postedHoursAgo: 14,
+    dayPart: '',
+    attributes: { 'Chất liệu': 'Da', 'Màu chủ đạo': 'Đen' },
+    contents: ['Tiền mặt'],
+    views: 70,
+    likes: 1,
   },
   {
     image: 'wallet-croc',
@@ -221,6 +270,30 @@ const CURATED = [
     attributes: { 'Loại thiết bị': 'Laptop', Hãng: 'Apple', 'Màu chủ đạo': 'Bạc' },
     views: 890,
     likes: 34,
+  },
+  // Khớp với bài MacBook của user01 để có manh mối mạnh và thông báo
+  {
+    image: 'macbook',
+    author: 'baotran.sg',
+    type: 'found',
+    category: 'Thiết bị điện tử',
+    title: 'Nhặt được MacBook Air màu xám ở bãi taxi ga quốc nội Tân Sơn Nhất',
+    description:
+      'MacBook Air màu xám nhạt, bàn phím có miếng phủ silicon trong suốt. Tài xế taxi chạy chuyến từ sân bay về Phú Nhuận phát hiện trên ghế sau và gửi lại ở bãi taxi ga quốc nội, mình đang giữ giúp.',
+    area: 'Quận Tân Bình',
+    placeName: 'Bãi taxi ga quốc nội Tân Sơn Nhất, Phường 15, Quận Tân Bình',
+    lat: 10.818,
+    lng: 106.6592,
+    postedHoursAgo: 73,
+    dayPart: 'night',
+    question: {
+      text: 'Bàn phím của máy có gì đặc biệt?',
+      options: ['Miếng phủ silicon trong suốt', 'Dán decal hình mèo', 'Thiếu một phím'],
+      correct: 0,
+    },
+    attributes: { 'Loại thiết bị': 'Laptop', Hãng: 'Apple', 'Màu chủ đạo': 'Xám' },
+    views: 210,
+    likes: 9,
   },
   {
     image: 'canon',
@@ -420,6 +493,30 @@ const CURATED = [
       ['minhkhoi.td', 'Quán đó có camera ở quầy, bạn xin xem lại giờ mình rời đi xem sao.', 90],
     ],
   },
+  // Khớp với bài túi Herschel của user01
+  {
+    image: 'messenger',
+    author: 'ducanh.bk',
+    type: 'found',
+    category: 'Túi & balo',
+    title: 'Nhặt được túi đeo chéo xanh navy nắp đỏ gần công viên Hoàng Văn Thụ',
+    description:
+      'Túi đeo chéo kiểu đưa thư, thân xanh navy, nắp đỏ, khá nặng. Mình thấy trên ghế đá gần cổng công viên Hoàng Văn Thụ sáng nay, chưa mở ra xem bên trong. Chủ túi mô tả đúng sẽ nhận lại.',
+    area: 'Quận Tân Bình',
+    placeName: 'Cổng công viên Hoàng Văn Thụ, Phường 2, Quận Tân Bình',
+    lat: 10.8021,
+    lng: 106.6668,
+    postedHoursAgo: 30,
+    dayPart: 'morning',
+    question: {
+      text: 'Ngoài laptop, trong túi còn có gì?',
+      options: ['Giấy tờ tùy thân', 'Bình nước và ô', 'Máy ảnh'],
+      correct: 0,
+    },
+    attributes: { 'Loại túi': 'Túi đeo chéo', 'Màu chủ đạo': 'Xanh dương' },
+    views: 150,
+    likes: 5,
+  },
   {
     image: 'timbuk2',
     author: 'hoangnam.q1',
@@ -522,6 +619,26 @@ const CURATED = [
     attributes: { Loại: 'Chìa khóa nhà' },
     views: 120,
     likes: 2,
+  },
+  // Khớp với chùm chìa khóa user01 nhặt được
+  {
+    image: 'keys-tag',
+    author: 'thaovy.q11',
+    type: 'lost',
+    category: 'Chìa khóa & xe cộ',
+    title: 'Mất chùm 3 chìa khóa nhà có móc xanh dương chữ "Safe Driving"',
+    description:
+      'Chùm ba chìa khóa nhà màu bạc, móc khóa nhựa xanh dương in chữ "Safe Driving". Rơi chiều hôm trước khi đi bộ từ trạm xe buýt Võ Văn Ngân về phía trường Sư phạm Kỹ thuật.',
+    area: 'Thành phố Thủ Đức',
+    placeName: 'Trạm xe buýt đường Võ Văn Ngân, Phường Linh Chiểu, Thành phố Thủ Đức',
+    lat: 10.8495,
+    lng: 106.7719,
+    postedHoursAgo: 172,
+    daysBefore: 1,
+    dayPart: 'afternoon',
+    attributes: { Loại: 'Chìa khóa nhà' },
+    views: 64,
+    likes: 1,
   },
   {
     image: 'bicycle',
@@ -655,6 +772,7 @@ const CURATED = [
   },
   {
     image: 'umbrella',
+    imageIndexes: [0],
     author: 'ducanh.bk',
     type: 'found',
     category: 'Khác',
@@ -670,6 +788,26 @@ const CURATED = [
     attributes: { 'Màu chủ đạo': 'Nhiều màu' },
     views: 95,
     likes: 3,
+  },
+  // Cùng chiếc ô với bài trên, ảnh chụp góc khác
+  {
+    image: 'umbrella',
+    imageIndexes: [1],
+    author: 'thuylinh.hn',
+    type: 'lost',
+    category: 'Khác',
+    title: 'Để quên ô gấp ba họa tiết giọt mưa trên xe buýt 152',
+    description:
+      'Ô gấp ba nền trắng họa tiết giọt mưa nhiều màu, có túi bọc cùng họa tiết. Mình để quên trên xe buýt 152 khi xuống trạm đường Trường Sơn.',
+    area: 'Quận Tân Bình',
+    placeName: 'Trạm xe buýt đường Trường Sơn, Phường 2, Quận Tân Bình',
+    lat: 10.809,
+    lng: 106.664,
+    postedHoursAgo: 40,
+    dayPart: '',
+    attributes: { 'Màu chủ đạo': 'Nhiều màu' },
+    views: 58,
+    likes: 2,
   },
   {
     image: 'bottle',

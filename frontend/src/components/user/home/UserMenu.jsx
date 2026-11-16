@@ -80,14 +80,14 @@ export default function UserMenu() {
             <Icon name="user" size={16} />
             Trang cá nhân
           </Link>
-          {/* Từ lg đã có mục này trên thanh điều hướng */}
+          {/* Từ xl đã có bảng vinh danh ở cột phải trang chủ */}
           <Link
             to="/leaderboard"
             role="menuitem"
             onClick={() => setOpen(false)}
             className={cx(
               rowClass,
-              'text-ink-secondary hover:bg-primary-subtle lg:hidden',
+              'text-ink-secondary hover:bg-primary-subtle xl:hidden',
               focusRing
             )}
           >

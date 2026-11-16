@@ -607,13 +607,6 @@ export const createMyPosts = () => [
   },
 ]
 
-export const communityStats = [
-  { value: '12.480', label: 'Tin đã đăng' },
-  { value: '4.037', label: 'Đồ đã trao trả', accent: true },
-  { value: '32,3%', label: 'Tỷ lệ ghép cặp thành công' },
-  { value: '2,1 ngày', label: 'Thời gian trao trả trung bình' },
-]
-
 const comment = (id, postId, author, h, text) => ({
   id,
   postId,

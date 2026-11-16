@@ -45,7 +45,11 @@ function useAutoHide(pinned) {
 }
 
 // Điện thoại không đủ chỗ cho tab trên header nên đưa xuống đáy màn hình, trong tầm ngón cái
-export default function MobileTabBar({ unreadMessages = 0, unreadNotifications = 0 }) {
+export default function MobileTabBar({
+  unreadMessages = 0,
+  unreadNotifications = 0,
+  pendingMatches = 0,
+}) {
   const { user } = useAuth()
   const { pathname } = useLocation()
   const hidden = useAutoHide(false)
@@ -60,6 +64,13 @@ export default function MobileTabBar({ unreadMessages = 0, unreadNotifications =
       badge: user ? unreadMessages : 0,
       unit: 'hội thoại',
     },
+    user && {
+      to: '/matches',
+      label: 'Manh mối',
+      icon: 'link',
+      badge: pendingMatches,
+      unit: 'manh mối',
+    },
     {
       to: '/notifications',
       label: 'Thông báo',
@@ -67,7 +78,7 @@ export default function MobileTabBar({ unreadMessages = 0, unreadNotifications =
       badge: user ? unreadNotifications : 0,
       unit: 'thông báo',
     },
-  ]
+  ].filter(Boolean)
 
   if (hidesTabBar(pathname)) return null
 
