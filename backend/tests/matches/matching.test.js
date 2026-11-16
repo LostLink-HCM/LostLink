@@ -86,7 +86,13 @@ describe('UC36 - Chạy thuật toán ghép cặp khi bài được duyệt', ()
       match.evidence.map((item) => item.key),
       ['category', 'time', 'location', 'attribute', 'contents']
     )
-    assert.equal(match.evidence.find((item) => item.key === 'location').detail.distance, 100)
+    // Chỉ lưu nấc khoảng cách và số món trùng, không lưu số mét hay tên món
+    assert.deepEqual(match.evidence.find((item) => item.key === 'location').detail, {
+      within: 200,
+    })
+    assert.deepEqual(match.evidence.find((item) => item.key === 'contents').detail, {
+      sharedCount: 2,
+    })
 
     const notes = await Notification.find({ type: 'match' }).lean()
     assert.deepEqual(notes.map((note) => String(note.user)).sort(), [loser.id, finder.id].sort())
@@ -201,6 +207,25 @@ describe('UC36 - Chạy thuật toán ghép cặp khi bài được duyệt', ()
     assert.equal(match.confirmedLost, false)
   })
 
+  test('gợi ý đang chờ được chấm lại từ yếu lên mạnh thì báo cả hai bên một lần', async () => {
+    const lost = await lostWallet()
+    const found = await foundWallet()
+    await MatchSuggestion.create({
+      postLost: lost._id,
+      postFound: found._id,
+      score: 0.6,
+      state: 'pending',
+    })
+
+    assert.deepEqual(await runMatching(found._id), { created: 0 })
+    assert.ok((await MatchSuggestion.findOne()).score >= 0.9)
+    assert.equal(await Notification.countDocuments({ type: 'match' }), 2)
+
+    // Đã là gợi ý mạnh thì chấm lại không báo nữa
+    await runMatching(found._id)
+    assert.equal(await Notification.countDocuments({ type: 'match' }), 2)
+  })
+
   test('người đã tắt nhóm Ghép cặp & liên hệ không nhận thông báo gợi ý', async () => {
     loser.notificationGroups.trade = false
     await loser.save()
@@ -249,6 +274,30 @@ describe('UC36 - Xem và phản hồi gợi ý ghép cặp', () => {
     assert.equal(item.post.contents, undefined)
   })
 
+  test('lý do gợi ý không lộ tên đồ bên trong và khoảng cách chính xác, kể cả gợi ý lưu kiểu cũ', async () => {
+    const evidenceOf = async () =>
+      (await loserApi.get('/api/matches')).body.data.groups[0].items[0].evidence
+    const detailOf = (evidence, key) => evidence.find((item) => item.key === key).detail
+
+    let evidence = await evidenceOf()
+    assert.deepEqual(detailOf(evidence, 'location'), { within: 200 })
+    assert.deepEqual(detailOf(evidence, 'contents'), { sharedCount: 2 })
+
+    await MatchSuggestion.updateOne(
+      { _id: match._id },
+      {
+        $set: {
+          'evidence.$[loc].detail': { distance: 437 },
+          'evidence.$[con].detail': { shared: ['Tiền mặt', 'CCCD/CMND'] },
+        },
+      },
+      { arrayFilters: [{ 'loc.key': 'location' }, { 'con.key': 'contents' }] }
+    )
+    evidence = await evidenceOf()
+    assert.deepEqual(detailOf(evidence, 'location'), { within: 500 })
+    assert.deepEqual(detailOf(evidence, 'contents'), { sharedCount: 2 })
+  })
+
   test('bài đối ứng bị ẩn hoặc chủ bài bị chặn thì gợi ý không hiện', async () => {
     await Post.updateOne({ _id: found._id }, { isHidden: true })
     assert.equal((await loserApi.get('/api/matches')).body.data.groups[0].items.length, 0)
@@ -273,6 +322,34 @@ describe('UC36 - Xem và phản hồi gợi ý ghép cặp', () => {
     const both = await finderApi.post(`/api/matches/${match.id}/confirm`)
     assert.equal(both.body.data.state, 'confirmed_both')
     assert.equal(both.body.data.post.id, lost.id)
+  })
+
+  test('hai bên xác nhận cùng lúc thì gợi ý thành Cả hai đã xác nhận', async () => {
+    const results = await Promise.all([
+      loserApi.post(`/api/matches/${match.id}/confirm`),
+      finderApi.post(`/api/matches/${match.id}/confirm`),
+    ])
+    assert.deepEqual(
+      results.map((res) => res.status),
+      [200, 200]
+    )
+    const saved = await MatchSuggestion.findById(match.id)
+    assert.equal(saved.confirmedLost, true)
+    assert.equal(saved.confirmedFound, true)
+    assert.equal(saved.state, 'confirmed_both')
+  })
+
+  test('đã chặn nhau thì không xác nhận hay từ chối được; bài của mình đã đóng thì hết hiệu lực', async () => {
+    await UserBlock.create({ blocker: loser._id, blocked: finder._id })
+    assert.equal((await finderApi.post(`/api/matches/${match.id}/confirm`)).status, 404)
+    assert.equal((await finderApi.post(`/api/matches/${match.id}/reject`)).status, 404)
+    assert.equal((await loserApi.post(`/api/matches/${match.id}/confirm`)).status, 404)
+
+    await UserBlock.deleteMany()
+    await Post.updateOne({ _id: lost._id }, { status: 'closed' })
+    const res = await loserApi.post(`/api/matches/${match.id}/confirm`)
+    assert.equal(res.status, 409)
+    assert.equal(res.body.code, 'MATCH_STALE')
   })
 
   test('bài đối ứng không còn Đang tìm hoặc Đã liên hệ thì gợi ý hết hiệu lực', async () => {

@@ -1,4 +1,4 @@
-const { GeofenceSubscription, Post, UserBlock } = require('../models')
+const { GeofenceSubscription, Notification, Post, UserBlock } = require('../models')
 const ApiError = require('../utils/ApiError')
 const { geometryDistance, searchCircle } = require('../utils/matchScore')
 const { notify } = require('./notificationService')
@@ -55,7 +55,7 @@ const deleteArea = async (user, id) => {
   if (!result.deletedCount) throw areaNotFound()
 }
 
-// Báo người có khu vực đang bật chứa vị trí bài vừa được duyệt (trừ chủ bài và người đã chặn chủ bài)
+// Báo người có vùng đang bật chứa vị trí bài, trừ chủ bài và hai bên đã chặn nhau
 const notifyAreaSubscribers = async (postId) => {
   const post = await Post.findById(postId).select('owner title locExact isHidden').lean()
   if (!post?.locExact || post.isHidden) return { notified: 0 }
@@ -79,12 +79,24 @@ const notifyAreaSubscribers = async (postId) => {
   const userIds = [...new Set(inside.map((area) => String(area.user)))]
   if (!userIds.length) return { notified: 0 }
 
-  const blockedOwner = new Set(
-    (
-      await UserBlock.find({ blocker: { $in: userIds }, blocked: post.owner }).distinct('blocker')
-    ).map(String)
-  )
-  const recipients = userIds.filter((id) => !blockedOwner.has(id))
+  const [blocks, notified] = await Promise.all([
+    UserBlock.find({
+      $or: [
+        { blocker: { $in: userIds }, blocked: post.owner },
+        { blocker: post.owner, blocked: { $in: userIds } },
+      ],
+    }).lean(),
+    // Duyệt lại sau khi sửa thì không báo lại
+    Notification.distinct('user', { user: { $in: userIds }, type: 'area_post', refId: post._id }),
+  ])
+  const skipped = new Set([
+    ...blocks.map((block) =>
+      String(String(block.blocker) === String(post.owner) ? block.blocked : block.blocker)
+    ),
+    ...notified.map(String),
+  ])
+  const recipients = userIds.filter((id) => !skipped.has(id))
+  if (!recipients.length) return { notified: 0 }
   await notify(recipients, {
     type: 'area_post',
     refType: 'Post',

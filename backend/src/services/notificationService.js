@@ -76,7 +76,7 @@ const toNotification = (item, posts) => {
 
 // Đẩy thông báo vừa tạo tới trình duyệt đang mở: cùng dạng với API danh sách, kèm số chưa đọc
 // để chuông và trang Thông báo cập nhật ngay, không cần hỏi lại server
-// push: người nhận có bật Thông báo đẩy hay không, trình duyệt dựa vào đó để hiện thông báo hệ thống
+// push: người nhận có bật Thông báo đẩy không
 const pushNew = async (docs, pushOf) => {
   const [{ actor, refType, refId }] = docs
   const [actorUser, post, counts] = await Promise.all([

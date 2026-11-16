@@ -37,6 +37,8 @@ export default function MatchesPage() {
   const [rejecting, setRejecting] = useState(null)
   const [busy, setBusy] = useState(null)
   const [hidden, setHidden] = useState(() => new Set())
+  // Gợi ý vừa xác nhận (id → trạng thái), cập nhật thẻ mà không tải lại
+  const [confirmed, setConfirmed] = useState(() => new Map())
   // Điện thoại: chưa chọn bài thì chỉ hiện danh sách bài, chọn bài mới hiện manh mối
   const isDesktop = useMediaQuery('(min-width: 64rem)')
   const navigate = useNavigate()
@@ -72,7 +74,16 @@ export default function MatchesPage() {
   const groups = sortGroups(
     toGroups(data, now).map((group) => ({
       ...group,
-      items: group.items.filter((item) => !hidden.has(item.match.id)),
+      items: group.items
+        .filter((item) => !hidden.has(item.match.id))
+        .map((item) =>
+          confirmed.has(item.match.id)
+            ? {
+                ...item,
+                match: { ...item.match, confirmed: true, state: confirmed.get(item.match.id) },
+              }
+            : item
+        ),
     }))
   )
   const current = findGroup(groups, params.get('post'))
@@ -113,6 +124,7 @@ export default function MatchesPage() {
     setBusy(match.id)
     try {
       const { data: result } = await confirmMatch(match.id)
+      setConfirmed((prev) => new Map(prev).set(match.id, result.state))
       refreshPendingMatches()
       await claimPost(result.post)
     } catch (err) {

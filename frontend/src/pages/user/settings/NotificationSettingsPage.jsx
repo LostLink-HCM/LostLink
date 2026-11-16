@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { getNotificationSettings, updateNotificationSettings } from '../../../api/notifications'
 import Button from '../../../components/user/Button'
@@ -23,9 +23,12 @@ const diffOf = (prev, next) => {
 export default function NotificationSettingsPage() {
   const { notify } = useOutletContext()
   const { data, loading, reload } = useProfileData(getNotificationSettings)
-  // Hiện ngay giá trị mới, lưu lỗi thì trả về giá trị cũ
+  // Hiện ngay giá trị mới, lưu lỗi thì trả về giá trị server đã lưu
   const [prefs, setPrefs] = useState(null)
   const current = prefs ?? data
+  // Bật/tắt nhanh nhiều lần: chỉ phản hồi của lần đổi mới nhất được ghi lên giao diện
+  const latest = useRef(0)
+  const saved = useRef({ seq: 0, prefs: null })
 
   if (loading) {
     return (
@@ -48,13 +51,15 @@ export default function NotificationSettingsPage() {
   }
 
   const change = async (next) => {
+    const seq = ++latest.current
     const previous = current
     setPrefs(next)
     try {
-      const { data: saved } = await updateNotificationSettings(diffOf(previous, next))
-      setPrefs(saved)
+      const { data: result } = await updateNotificationSettings(diffOf(previous, next))
+      if (seq > saved.current.seq) saved.current = { seq, prefs: result }
+      if (seq === latest.current) setPrefs(result)
     } catch {
-      setPrefs(previous)
+      if (seq === latest.current) setPrefs(saved.current.prefs ?? data)
       notify('Đã có lỗi xảy ra, vui lòng thử lại.')
     }
   }

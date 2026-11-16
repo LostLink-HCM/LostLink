@@ -49,6 +49,10 @@ const POST_FIELDS =
 
 const isMatchable = (post) => !post.isHidden && MATCHABLE_STATUSES.includes(post.status)
 
+// Khoảng cách chỉ lưu theo nấc (m), không lộ vị trí chính xác của bài bên kia
+const DISTANCE_BANDS = [200, 500, 1000, 2000, 5000]
+const distanceBand = (meters) => DISTANCE_BANDS.find((band) => meters <= band) ?? null
+
 const matchNotFound = () =>
   new ApiError(404, 'Gợi ý ghép cặp không tồn tại.', undefined, 'MATCH_NOT_FOUND')
 
@@ -199,12 +203,17 @@ const evaluatePair = (lost, found, ctx) => {
     }),
     feature('time', sTime, config.mTime, U_TIME, { gapDays: Math.round(gapDays * 10) / 10 }),
     feature('location', sLocation, config.mLocation, U_LOCATION, {
-      distance: Math.round(distance),
+      within: distanceBand(distance),
     }),
     ...attributes,
     ...(sText === null ? [] : [feature('text', sText, config.mDescription, U_TEXT)]),
+    // Đồ bên trong là bí mật để xác minh: chỉ lưu số món trùng, không lưu tên món
     ...(contents
-      ? [feature('contents', contents.s, config.mContents, U_CONTENTS, { shared: contents.shared })]
+      ? [
+          feature('contents', contents.s, config.mContents, U_CONTENTS, {
+            sharedCount: contents.shared.length,
+          }),
+        ]
       : []),
   ]
   const weight = evidence.reduce((sum, item) => sum + item.w, 0)
@@ -222,18 +231,19 @@ const evaluatePair = (lost, found, ctx) => {
   }
 }
 
-// Lưu hoặc cập nhật gợi ý; trả về true khi gợi ý vừa (lại) có hiệu lực
+// Lưu hoặc cập nhật gợi ý, null nếu không còn hiệu lực. wasStrong: đã là gợi ý mạnh (đã báo)
 const saveSuggestion = async (lost, found, result, config) => {
   const existing = await MatchSuggestion.findOne({ postLost: lost._id, postFound: found._id })
-  if (existing && SETTLED_STATES.includes(existing.state)) return false
+  if (existing && SETTLED_STATES.includes(existing.state)) return null
   if (result.score < config.weak) {
     if (existing && existing.state !== 'stale') {
       existing.state = 'stale'
       await existing.save()
     }
-    return false
+    return null
   }
   const wasActive = Boolean(existing && ACTIVE_STATES.includes(existing.state))
+  const wasStrong = wasActive && existing.score >= config.strong
   const suggestion = existing ?? new MatchSuggestion({ postLost: lost._id, postFound: found._id })
   Object.assign(suggestion, result)
   // Gợi ý hết hiệu lực vì bài được sửa thì xác nhận cũ không còn giá trị
@@ -243,10 +253,10 @@ const saveSuggestion = async (lost, found, result, config) => {
     await suggestion.save()
   } catch (error) {
     // Hai bài được duyệt cùng lúc cùng tạo một cặp
-    if (error.code === 11000) return false
+    if (error.code === 11000) return null
     throw error
   }
-  return !wasActive
+  return { revived: !wasActive, wasStrong }
 }
 
 const notifyMatch = (lost, found) =>
@@ -262,8 +272,7 @@ const blockedUsersOf = async (userId) => {
   )
 }
 
-// Chạy khi bài được duyệt: tìm bài đối ứng, chấm điểm, lưu gợi ý, báo cả hai bên khi gợi ý mạnh.
-// silent: không gửi thông báo (dùng khi seed dữ liệu mẫu)
+// Chạy khi bài được duyệt. silent: không gửi thông báo (dùng khi seed)
 const runMatching = async (postId, { silent = false } = {}) => {
   const post = await Post.findById(postId).select(POST_FIELDS).lean()
   if (!post || !isMatchable(post) || !post.locExact) {
@@ -320,11 +329,13 @@ const runMatching = async (postId, { silent = false } = {}) => {
     const [lost, found] = isLost ? [post, candidate] : [candidate, post]
     const result = evaluatePair(lost, found, ctx)
     if (!result) continue
-    const revived = await saveSuggestion(lost, found, result, config)
-    if (!revived) continue
-    created += 1
-    // Gợi ý yếu chỉ hiện trong danh sách, không đẩy thông báo
-    if (!silent && result.score >= config.strong) await notifyMatch(lost, found)
+    const saved = await saveSuggestion(lost, found, result, config)
+    if (!saved) continue
+    if (saved.revived) created += 1
+    // Chỉ báo khi gợi ý vừa thành mạnh, gợi ý yếu chỉ hiện trong danh sách
+    if (!silent && result.score >= config.strong && !saved.wasStrong) {
+      await notifyMatch(lost, found)
+    }
   }
   return { created }
 }
@@ -334,7 +345,25 @@ const runMatching = async (postId, { silent = false } = {}) => {
 const populatePost = (query) =>
   query.populate('category', 'slug name icon').populate('owner', 'username avatarUrl')
 
-const toEvidence = (item) => ({ key: item.key, w: item.w, detail: item.detail ?? {} })
+const round = (value, digits) => Math.round(value * 10 ** digits) / 10 ** digits
+
+// Chỉ trả chi tiết được phép (gợi ý cũ còn lưu tên món và số mét)
+const PUBLIC_DETAIL = {
+  location: (detail) => ({
+    within: 'within' in detail ? detail.within : distanceBand(detail.distance ?? Infinity),
+  }),
+  contents: (detail) => ({ sharedCount: detail.sharedCount ?? detail.shared?.length ?? 0 }),
+}
+
+// w làm tròn để không suy ngược được khoảng cách từ điểm số
+const toEvidence = (item) => {
+  const detail = item.detail ?? {}
+  return {
+    key: item.key,
+    w: round(item.w, 1),
+    detail: PUBLIC_DETAIL[item.key]?.(detail) ?? detail,
+  }
+}
 
 // Đặc điểm công khai (thuộc tính) của từng bài để so sánh hai bài; không gồm đồ bên trong
 const traitsOf = async (posts) => {
@@ -400,7 +429,7 @@ const listMyMatches = async (user) => {
         return [
           {
             id: match._id,
-            score: match.score,
+            score: round(match.score, 2),
             strong: match.score >= config.strong,
             state: match.state,
             confirmed: isLost ? match.confirmedLost : match.confirmedFound,
@@ -416,8 +445,7 @@ const listMyMatches = async (user) => {
   return { thresholds: { strong: config.strong, possible: config.weak }, groups }
 }
 
-// Số gợi ý mình chưa phản hồi, cho huy hiệu trên thanh điều hướng. Cùng điều kiện hiển thị
-// với listMyMatches nhưng không nạp nội dung bài
+// Số gợi ý chưa phản hồi cho huy hiệu, cùng điều kiện với listMyMatches
 const countPendingMatches = async (user) => {
   const myPosts = await Post.find({ owner: user._id, status: { $in: MATCHABLE_STATUSES } })
     .select('type')
@@ -453,35 +481,62 @@ const countPendingMatches = async (user) => {
   return { pending: suggestions.filter((match) => visible.has(String(otherIdOf(match)))).length }
 }
 
-// Gợi ý có bài của người dùng ở một phía, của người khác coi như không tồn tại
+// Gợi ý có bài của mình ở một phía; của người khác hoặc đã chặn nhau thì coi như không có
 const findOwnMatch = async (id, user) => {
-  const match = await MatchSuggestion.findById(id)
+  const match = await MatchSuggestion.findById(id).lean()
   if (!match) throw matchNotFound()
   const [lost, found] = await Promise.all([
     Post.findById(match.postLost).select(POST_FIELDS).lean(),
     Post.findById(match.postFound).select(POST_FIELDS).lean(),
   ])
   if (!lost || !found) throw matchNotFound()
-  if (lost.owner.equals(user._id)) return { match, side: 'lost', other: found }
-  if (found.owner.equals(user._id)) return { match, side: 'found', other: lost }
-  throw matchNotFound()
+  const side = lost.owner.equals(user._id) ? 'lost' : found.owner.equals(user._id) ? 'found' : null
+  if (!side) throw matchNotFound()
+  const [mine, other] = side === 'lost' ? [lost, found] : [found, lost]
+  const blocked = await UserBlock.exists({
+    $or: [
+      { blocker: user._id, blocked: other.owner },
+      { blocker: other.owner, blocked: user._id },
+    ],
+  })
+  if (blocked) throw matchNotFound()
+  return { match, side, mine, other }
 }
 
 // Đúng là đồ của tôi / Tôi đang giữ món này. Trả về bài đối ứng để chuyển sang xác minh hoặc liên hệ
 const confirmMatch = async (id, user) => {
-  const { match, side, other } = await findOwnMatch(id, user)
-  if (!VISIBLE_STATES.includes(match.state)) throw matchStale()
+  const { match, side, mine, other } = await findOwnMatch(id, user)
+  if (!VISIBLE_STATES.includes(match.state) || !isMatchable(mine)) throw matchStale()
   if (!isMatchable(other)) {
-    match.state = 'stale'
-    await match.save()
+    await MatchSuggestion.updateOne(
+      { _id: match._id, state: { $in: ACTIVE_STATES } },
+      { $set: { state: 'stale' } }
+    )
     throw matchStale()
   }
-  match[side === 'lost' ? 'confirmedLost' : 'confirmedFound'] = true
-  match.state = match.confirmedLost && match.confirmedFound ? 'confirmed_both' : 'confirmed_one'
-  await match.save()
+  // Một lệnh duy nhất để hai bên xác nhận cùng lúc vẫn đúng
+  const updated = await MatchSuggestion.findOneAndUpdate(
+    { _id: match._id, state: { $in: VISIBLE_STATES } },
+    [
+      { $set: { [side === 'lost' ? 'confirmedLost' : 'confirmedFound']: true } },
+      {
+        $set: {
+          state: {
+            $cond: [
+              { $and: ['$confirmedLost', '$confirmedFound'] },
+              'confirmed_both',
+              'confirmed_one',
+            ],
+          },
+        },
+      },
+    ],
+    { returnDocument: 'after', updatePipeline: true }
+  ).lean()
+  if (!updated) throw matchStale()
   return {
-    id: match._id,
-    state: match.state,
+    id: updated._id,
+    state: updated.state,
     post: { id: other._id, type: other.type, slug: other.slug },
   }
 }
@@ -489,12 +544,15 @@ const confirmMatch = async (id, user) => {
 // Không phải: gợi ý bị từ chối, không gợi ý lại cặp này
 const rejectMatch = async (id, user) => {
   const { match } = await findOwnMatch(id, user)
-  if (match.state === 'confirmed_both') {
+  const updated = await MatchSuggestion.findOneAndUpdate(
+    { _id: match._id, state: { $ne: 'confirmed_both' } },
+    { $set: { state: 'rejected' } },
+    { returnDocument: 'after' }
+  ).lean()
+  if (!updated) {
     throw ApiError.conflict('Cả hai bên đã xác nhận manh mối này.', 'MATCH_CONFIRMED')
   }
-  match.state = 'rejected'
-  await match.save()
-  return { id: match._id, state: match.state }
+  return { id: updated._id, state: updated.state }
 }
 
 module.exports = {

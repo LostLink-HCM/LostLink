@@ -164,7 +164,7 @@ export function describeNotification(item) {
   }
   const post = item.post
   const toMessages = MESSAGE_TYPES.includes(item.type)
-  // Gợi ý ghép cặp mở danh sách gợi ý của chính bài đó
+  // Thông báo manh mối mở trang Manh mối của bài đó
   const toMatches = item.type === 'match' && post?.available
   return {
     ...described,

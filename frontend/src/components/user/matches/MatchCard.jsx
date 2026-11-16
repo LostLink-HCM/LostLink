@@ -91,8 +91,7 @@ const statusText = (match, now) =>
     ? 'Bạn đã xác nhận manh mối này'
     : `LostLink tìm thấy ${timeAgo(match.createdAt, now).toLowerCase()}`
 
-// Một manh mối: bài đối ứng, khả năng khớp, lý do khớp và khác biệt, hai nút phản hồi.
-// lost = bài của tôi là Mất đồ => bài đối ứng là Nhặt được; mine là bài của tôi để so sánh
+// Một manh mối. lost: bài của tôi là Mất đồ; mine: bài của tôi để so sánh
 export default function MatchCard({ item, mine, lost, now, busy, onConfirm, onReject }) {
   const { match, post } = item
   const compareId = useId()

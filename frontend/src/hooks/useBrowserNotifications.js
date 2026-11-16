@@ -8,8 +8,7 @@ const canShow = () =>
   'Notification' in window &&
   window.Notification.permission === 'granted'
 
-// Thông báo đẩy: khi người dùng bật và đã cấp quyền, thông báo mới hiện bằng thông báo của
-// trình duyệt lúc tab LostLink đang ẩn. Tab đang mở thì đã có chuông và trang Thông báo
+// Hiện thông báo của trình duyệt khi đã bật Thông báo đẩy và tab LostLink đang ẩn
 export function useBrowserNotifications(user) {
   const navigate = useNavigate()
   const userId = user?.id

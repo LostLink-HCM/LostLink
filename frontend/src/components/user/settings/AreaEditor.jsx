@@ -20,6 +20,9 @@ function MapFallback() {
 }
 
 const samePoint = (a, b) => a && b && a.lat === b.lat && a.lng === b.lng
+const PRESET_LABELS = new Set(AREA_PRESETS.map((preset) => preset.label))
+// Tên trống hoặc đang là tên chip khác thì đổi theo chip mới, tên tự đặt thì giữ nguyên
+const presetName = (name, label) => (!name || PRESET_LABELS.has(name) ? label : name)
 
 // Chọn tâm trên bản đồ và chỉnh bán kính cho một khu vực để ý
 export default function AreaEditor({ value, onChange, error }) {
@@ -38,7 +41,9 @@ export default function AreaEditor({ value, onChange, error }) {
                 key={label}
                 type="button"
                 aria-pressed={Boolean(active)}
-                onClick={() => onChange({ name: value.name || label, point: { lat, lng } })}
+                onClick={() =>
+                  onChange({ name: presetName(value.name, label), point: { lat, lng } })
+                }
                 className={chipClass(active)}
               >
                 {label}

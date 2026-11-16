@@ -21,9 +21,7 @@ function Thumb({ post }) {
 
 const unreadText = (pending) => (pending > 0 ? `, ${pending} manh mối chưa xem` : '')
 
-// Danh sách bài của tôi để chọn xem manh mối: cột trái ở máy tính, cả trang ở điện thoại.
-// Mỗi bài chỉ có ảnh, tiêu đề, loại bài và số manh mối chưa xem (pending).
-// current null khi điện thoại đang ở danh sách, không tô bài nào
+// Bài của tôi để chọn xem manh mối; current null thì không tô bài nào
 export default function PostPicker({ groups, current, onSelect }) {
   return (
     <nav aria-label="Bài của bạn" className={cx(cardClass, 'p-2')}>

@@ -13,10 +13,13 @@ import { communityStatItems } from '../../src/lib/user/reputation.js'
 
 describe('UC36 - Lý do gợi ý ghép cặp', () => {
   it('diễn giải từng tiêu chí theo dữ liệu server trả về', () => {
-    expect(evidenceLabel({ key: 'location', w: 3, detail: { distance: 783 } })).toBe('Cách ~780 m')
-    expect(evidenceLabel({ key: 'location', w: 1, detail: { distance: 1250 } })).toBe(
-      'Cách ~1,3 km'
+    expect(evidenceLabel({ key: 'location', w: 3, detail: { within: 500 } })).toBe(
+      'Cách dưới 500 m'
     )
+    expect(evidenceLabel({ key: 'location', w: 1, detail: { within: 2000 } })).toBe(
+      'Cách dưới 2 km'
+    )
+    expect(evidenceLabel({ key: 'location', w: -1, detail: { within: null } })).toBe('Cách khá xa')
     expect(evidenceLabel({ key: 'time', w: 1, detail: { gapDays: 0 } })).toBe(
       'Cùng khoảng thời gian'
     )
@@ -34,15 +37,16 @@ describe('UC36 - Lý do gợi ý ghép cặp', () => {
         detail: { name: 'Giống', value: 'Poodle', other: 'Corgi' },
       })
     ).toBe('Giống khác nhau (Poodle / Corgi)')
-    expect(evidenceLabel({ key: 'contents', w: 1, detail: { shared: ['CCCD', 'Tiền mặt'] } })).toBe(
-      'Cùng có cccd, tiền mặt'
+    // Không hiện tên món bên trong, chỉ số món trùng
+    expect(evidenceLabel({ key: 'contents', w: 1, detail: { sharedCount: 2 } })).toBe(
+      'Trùng 2 món bên trong'
     )
   })
 
   it('tiêu chí ủng hộ mạnh nhất lên trước, tiêu chí lạ bị bỏ', () => {
     const items = sortedEvidence([
       { key: 'text', w: -0.5, detail: {} },
-      { key: 'location', w: 4, detail: { distance: 100 } },
+      { key: 'location', w: 4, detail: { within: 200 } },
       { key: 'image', w: 9, detail: {} },
     ])
     expect(items.map((item) => item.key)).toEqual(['location', 'text'])
@@ -50,7 +54,7 @@ describe('UC36 - Lý do gợi ý ghép cặp', () => {
 
   it('hiện 3 lý do mạnh nhất cùng mọi khác biệt; trùng giá trị phổ biến không bị coi là khác', () => {
     const { shown, hidden } = splitEvidence([
-      { key: 'location', w: 4, detail: { distance: 80 } },
+      { key: 'location', w: 4, detail: { within: 200 } },
       { key: 'category', w: 3, detail: { name: 'Ví', related: false } },
       { key: 'time', w: 1.5, detail: { gapDays: 0 } },
       { key: 'text', w: 0.5, detail: {} },

@@ -3,10 +3,11 @@ export const isMatchable = (post) => ['searching', 'contacted'].includes(post.st
 
 export const matchPercent = (score) => `${Math.round(score * 100)}%`
 
-const formatDistance = (meters) =>
-  meters < 1000
-    ? `${Math.max(10, Math.round(meters / 10) * 10)} m`
-    : `${(Math.round(meters / 100) / 10).toLocaleString('vi-VN')} km`
+// API chỉ trả nấc khoảng cách (m), null là xa hơn nấc lớn nhất
+const formatBand = (meters) =>
+  meters < 1000 ? `${meters} m` : `${(meters / 1000).toLocaleString('vi-VN')} km`
+
+const formatWithin = (within) => (within ? `Cách dưới ${formatBand(within)}` : 'Cách khá xa')
 
 const formatGap = (days) => {
   if (days === 0) return 'Cùng khoảng thời gian'
@@ -21,21 +22,21 @@ const LABELS = {
   category: ({ detail }) =>
     detail.related ? `Danh mục liên quan: ${detail.name}` : `Cùng danh mục ${detail.name}`,
   time: ({ detail }) => formatGap(detail.gapDays ?? 0),
-  location: ({ detail }) => `Cách ~${formatDistance(detail.distance ?? 0)}`,
+  location: ({ detail }) => formatWithin(detail.within),
   attribute: ({ detail }) =>
     detail.other
       ? `${detail.name} khác nhau (${detail.value} / ${detail.other})`
       : `Cùng ${lower(detail.name)} ${detail.value}`,
   text: ({ w }) => (w > 0 ? 'Mô tả có nhiều điểm giống' : 'Mô tả ít điểm giống'),
   contents: ({ w, detail }) =>
-    w > 0 && detail.shared?.length
-      ? `Cùng có ${detail.shared.join(', ').toLowerCase()}`
+    w > 0 && detail.sharedCount
+      ? `Trùng ${detail.sharedCount} món bên trong`
       : 'Đồ bên trong không giống',
 }
 
 export const evidenceLabel = (item) => LABELS[item.key]?.({ detail: {}, ...item }) ?? ''
 
-// Điểm khác biệt giữa hai bài. Trùng một giá trị phổ biến (w hơi âm) vẫn là trùng, không tính
+// Khác biệt giữa hai bài; trùng giá trị phổ biến (w hơi âm) vẫn là trùng
 export const isConflict = (item) =>
   item.key === 'attribute' ? Boolean(item.detail?.other) : item.w < 0
 
@@ -53,8 +54,7 @@ export function splitEvidence(evidence, limit = 3) {
   return { shown: [...supports.slice(0, limit), ...conflicts], hidden: supports.slice(limit) }
 }
 
-// Bảng so sánh bài của tôi với bài đối ứng (dữ liệu đã qua toFeedPost, kèm traits).
-// differs chỉ đánh dấu đặc điểm cả hai bài đều điền mà khác giá trị
+// Bảng so sánh hai bài; differs khi cả hai cùng điền mà khác giá trị
 export function compareRows(mine, other, place) {
   const rows = [
     { label: 'Thời điểm', mine: mine.timeWindow, other: other.timeWindow },
@@ -70,14 +70,13 @@ export function compareRows(mine, other, place) {
   return rows
 }
 
-// Nhóm bài theo id hoặc slug trên URL (thông báo dẫn tới bằng slug).
-// Không chỉ định bài thì mở bài đầu tiên có gợi ý
+// Bài theo id hoặc slug trên URL, không có thì bài đầu tiên có gợi ý
 export const findGroup = (groups, key) =>
   groups.find((group) => key && [String(group.post.id), group.post.slug].includes(key)) ??
   groups.find((group) => group.items.length) ??
   groups[0]
 
-// Số gợi ý mình chưa phản hồi của một bài, trùng cách đếm của huy hiệu tab Ghép cặp
+// Số gợi ý chưa phản hồi của một bài, cùng cách đếm với huy hiệu tab Manh mối
 export const pendingCount = (group) => group.items.filter((item) => !item.match.confirmed).length
 
 // Bài nhiều gợi ý chưa phản hồi lên trước, rồi theo tổng số gợi ý; bằng nhau giữ thứ tự mới nhất

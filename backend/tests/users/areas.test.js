@@ -107,14 +107,16 @@ describe('UC48 - Đăng ký cảnh báo khu vực', () => {
 })
 
 describe('UC48 - Báo bài mới được duyệt trong khu vực đang bật', () => {
-  test('chỉ báo người có vùng đang bật chứa vị trí bài, trừ chủ bài và người đã chặn chủ bài', async () => {
+  test('chỉ báo người có vùng đang bật chứa vị trí bài, trừ chủ bài và người chặn hoặc bị chủ bài chặn', async () => {
     const wallet = await createWalletCategory()
     const owner = await createUser({ username: 'chubai', email: 'owner@example.com' })
     const near = await createUser({ username: 'ganday', email: 'near@example.com' })
     const far = await createUser({ username: 'xaqua', email: 'far@example.com' })
     const muted = await createUser({ username: 'tatvung', email: 'muted@example.com' })
     const blocker = await createUser({ username: 'dachan', email: 'blocker@example.com' })
+    const blocked = await createUser({ username: 'bichan', email: 'blocked@example.com' })
     await UserBlock.create({ blocker: blocker._id, blocked: owner._id })
+    await UserBlock.create({ blocker: owner._id, blocked: blocked._id })
 
     const subscribe = (user, lng, fields = {}) =>
       GeofenceSubscription.create({
@@ -129,6 +131,7 @@ describe('UC48 - Báo bài mới được duyệt trong khu vực đang bật', 
     await subscribe(far, BEN_THANH.lng + 0.02)
     await subscribe(muted, BEN_THANH.lng, { active: false })
     await subscribe(blocker, BEN_THANH.lng)
+    await subscribe(blocked, BEN_THANH.lng)
     await subscribe(owner, BEN_THANH.lng)
 
     const post = await makePost(owner, wallet.category, { title: 'Mất ví ở chợ' })
@@ -139,6 +142,17 @@ describe('UC48 - Báo bài mới được duyệt trong khu vực đang bật', 
     assert.equal(String(notes[0].user), String(near._id))
     assert.equal(String(notes[0].refId), post.id)
     assert.equal(notes[0].preview, 'Mất ví ở chợ')
+  })
+
+  test('bài được duyệt lại sau khi sửa không báo lại người đã nhận cảnh báo', async () => {
+    const wallet = await createWalletCategory()
+    const owner = await createUser({ username: 'chubai', email: 'owner@example.com' })
+    await api.post(path, area())
+    const post = await makePost(owner, wallet.category)
+
+    assert.deepEqual(await notifyAreaSubscribers(post._id), { notified: 1 })
+    assert.deepEqual(await notifyAreaSubscribers(post._id), { notified: 0 })
+    assert.equal(await Notification.countDocuments({ user: me._id, type: 'area_post' }), 1)
   })
 
   test('đoạn đường đi qua vùng theo dõi cũng được tính', async () => {
