@@ -1,7 +1,7 @@
 const SETTING_DEFINITIONS = Object.freeze({
   reportDays: { default: 5, min: 1, max: 365, integer: true },
   contactHours: { default: 12, min: 1, max: 72, integer: true },
-  returnReminderDays: { default: 7, min: 1, max: Number.MAX_SAFE_INTEGER, integer: true },
+  returnReminderDays: { default: 7, min: 1, max: 365, integer: true },
   mCategory: { default: 0.95, min: 0, max: 1, exclusive: true },
   mTime: { default: 0.9, min: 0, max: 1, exclusive: true },
   mLocation: { default: 0.9, min: 0, max: 1, exclusive: true },
