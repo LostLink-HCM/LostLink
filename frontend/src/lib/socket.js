@@ -2,15 +2,19 @@ import { io } from 'socket.io-client'
 import { API_BASE, refreshSession } from './api'
 import { getAccessToken } from './session'
 
-// Socket chung cho cả khu người dùng. Server nằm cùng địa chỉ với API, bỏ phần /api
-const SERVER_URL = new URL(API_BASE).origin
+export function socketTarget(apiBase, pageOrigin) {
+  const url = new URL(apiBase, pageOrigin)
+  return { origin: url.origin, path: `${url.pathname.replace(/\/+$/, '')}/socket.io` }
+}
 
 let socket = null
 
 // Mỗi lần kết nối lại đều lấy access token mới nhất
 export function connectSocket() {
   if (socket) return socket
-  socket = io(SERVER_URL, {
+  const target = socketTarget(API_BASE, window.location.origin)
+  socket = io(target.origin, {
+    path: target.path,
     auth: (cb) => cb({ token: getAccessToken() }),
     withCredentials: true,
   })

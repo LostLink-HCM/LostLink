@@ -102,7 +102,7 @@ test.describe('UC04 - Xem chi tiết bài đăng', () => {
     await expect(page.getByText(`${card.counts.views} lượt xem`)).toBeVisible()
     await expect(page.getByRole('button', { name: 'Tôi đang giữ món này' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: /Báo cáo bài đăng này/ })).toHaveCount(0)
-    // Khối gợi ý ghép cặp chỉ hiện với bài của chính mình
-    await expect(page.getByRole('heading', { name: 'Gợi ý ghép cặp' })).toBeVisible()
+    // Khối manh mối (gợi ý ghép cặp) chỉ hiện với bài của chính mình
+    await expect(page.getByRole('heading', { name: 'Manh mối' })).toBeVisible()
   })
 })

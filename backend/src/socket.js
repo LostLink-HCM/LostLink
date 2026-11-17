@@ -4,12 +4,17 @@ const env = require('./config/env')
 const authService = require('./services/authService')
 const { verifyAccessToken } = require('./utils/token')
 
+const SOCKET_PATH = '/api/socket.io'
+
 let io = null
 
 const userRoom = (id) => `user:${id}`
 
 const attachSocket = (server) => {
-  io = new Server(server, { cors: { origin: env.clientUrl, credentials: true } })
+  io = new Server(server, {
+    path: SOCKET_PATH,
+    cors: { origin: env.clientUrl, credentials: true },
+  })
   io.use(async (socket, next) => {
     try {
       const payload = verifyAccessToken(socket.handshake.auth?.token)
@@ -36,4 +41,4 @@ const closeSocket = () =>
     io = null
   })
 
-module.exports = { attachSocket, emitToUsers, closeSocket }
+module.exports = { SOCKET_PATH, attachSocket, emitToUsers, closeSocket }

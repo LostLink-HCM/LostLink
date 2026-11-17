@@ -50,8 +50,6 @@ export const EMPTY_FORM = {
   contents: [],
   title: '',
   description: '',
-  // Khối thuộc tính đã điền sẵn vào mô tả lần gần nhất, để biết còn thay được hay không
-  attributeBlock: '',
   images: [],
   date: '',
   dayPart: '',
@@ -298,29 +296,6 @@ export function selectedAttributes(form, category) {
     .filter((item) => item.value)
 }
 
-// Mỗi thuộc tính một dòng "- Tên: giá trị"
-export function describeAttributes(form, category) {
-  const lines = selectedAttributes(form, category).map((item) => `- ${item.name}: ${item.value}`)
-  if (form.contents.length) lines.push(`- Bên trong có: ${form.contents.join(', ')}`)
-  return lines.join('\n')
-}
-
-// Điền sẵn thuộc tính vào mô tả, dòng đầu để trống cho người dùng viết.
-export function prefillDescription(form, category) {
-  const block = describeAttributes(form, category)
-  const { description, attributeBlock } = form
-  if (block === attributeBlock) return null
-  if (!description.trim()) return { description: block && `\n${block}`, attributeBlock: block }
-  if (!attributeBlock) {
-    return block
-      ? { description: `${description.trimEnd()}\n${block}`, attributeBlock: block }
-      : null
-  }
-  if (!description.endsWith(attributeBlock)) return null
-  const head = description.slice(0, -attributeBlock.length)
-  return { description: block ? head + block : head.trimEnd(), attributeBlock: block }
-}
-
 export function describeTime({ date, dayPart, timePreset }) {
   if (!date) return ''
   const day = new Date(`${date}T00:00:00`).toLocaleDateString('vi-VN', {
@@ -406,7 +381,7 @@ export const moveToCover = (images, id) => {
   return image ? [image, ...images.filter((item) => item.id !== id)] : images
 }
 
-// Bài từ API Sửa bài → dữ liệu form. Đặt sẵn attributeBlock để bước Nội dung không điền lại
+// Bài từ API Sửa bài → dữ liệu form
 export function formFromPost(post, categories) {
   const { location: saved } = post
   const area = saved.area ?? ''
@@ -458,9 +433,7 @@ export function formFromPost(post, categories) {
     question,
   }
   const patch = reconcileClassification(form, categories)
-  const next = patch ? { ...form, ...patch } : form
-  const category = categories.find((item) => item.slug === next.category)
-  return { ...next, attributeBlock: describeAttributes(next, category) }
+  return patch ? { ...form, ...patch } : form
 }
 
 // Bỏ phân loại, thuộc tính, đồ bên trong của bản nháp không còn khớp danh mục hiện có
@@ -586,7 +559,6 @@ export function restoreDraft(draft) {
     contents: Array.isArray(saved.contents) ? saved.contents : [],
     title: text(saved.title),
     description: text(saved.description),
-    attributeBlock: text(saved.attributeBlock),
     date: text(saved.date),
     dayPart: text(saved.dayPart),
     timePreset: text(saved.timePreset),

@@ -1,12 +1,19 @@
 const { Router } = require('express')
 
 const ctrl = require('../controllers/userController')
+const areaCtrl = require('../controllers/areaController')
 const interactionCtrl = require('../controllers/interactionController')
 const reportCtrl = require('../controllers/reportController')
 const validate = require('../middleware/validate')
 const { protect } = require('../middleware/authMiddleware')
 const { parseReportForm } = require('../middleware/postForm')
 const { reportLimiter } = require('../middleware/rateLimiter')
+const {
+  areaIdRules,
+  createAreaRules,
+  rejectInvalidAreaId,
+  updateAreaRules,
+} = require('../middleware/validation/areaValidation')
 const { userReportRules } = require('../middleware/validation/reportValidation')
 const {
   rejectInvalidUsername,
@@ -20,6 +27,13 @@ router.get('/me', protect, ctrl.getMyProfile)
 router.post('/me/activity', protect, ctrl.recordActivity)
 router.get('/me/saved', protect, interactionCtrl.getSavedPosts)
 router.get('/me/blocks', protect, ctrl.listBlocks)
+
+// Khu vực để ý: thêm, bật/tắt, xoá
+const byArea = [protect, areaIdRules, rejectInvalidAreaId]
+router.get('/me/areas', protect, areaCtrl.listAreas)
+router.post('/me/areas', protect, createAreaRules, validate, areaCtrl.createArea)
+router.patch('/me/areas/:id', ...byArea, updateAreaRules, validate, areaCtrl.updateArea)
+router.delete('/me/areas/:id', ...byArea, areaCtrl.deleteArea)
 
 // Hồ sơ người dùng khác, cần đăng nhập
 const byUsername = [protect, usernamePathRules, rejectInvalidUsername]

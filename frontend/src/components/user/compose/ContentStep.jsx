@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { DESCRIPTION_MAX, TITLE_MAX } from '../../../lib/user/composePost'
+import { DESCRIPTION_MAX, TITLE_MAX, selectedAttributes } from '../../../lib/user/composePost'
 import { cx } from '../classes'
 import ImagePicker from '../ImagePicker'
 import { inputClass } from './styles'
@@ -14,9 +14,51 @@ function Counter({ value, max }) {
   )
 }
 
+const chipClass = 'flex items-center gap-1.5 rounded-full bg-surface px-3 py-1.5 text-caption'
+
+// Đặc điểm đã chọn ở bước Phân loại, để người dùng không phải ghi lại trong mô tả
+function ChosenTraits({ form, category }) {
+  const traits = selectedAttributes(form, category)
+  if (!traits.length && !form.contents.length) return null
+
+  return (
+    <div className="mb-3 rounded-xl bg-line-subtle/60 px-3.5 py-3">
+      <p className="m-0 mb-2 text-tiny font-semibold tracking-wide text-ink-subtle uppercase">
+        Đặc điểm đã chọn
+      </p>
+      <dl className="m-0 flex flex-wrap gap-2">
+        {traits.map(({ name, value }) => (
+          <div key={name} className={chipClass}>
+            <dt className="text-ink-muted">{name}:</dt>
+            <dd className="m-0 font-semibold text-ink">{value}</dd>
+          </div>
+        ))}
+        {form.contents.length > 0 && (
+          <div className={chipClass}>
+            <dt className="text-ink-muted">Bên trong có:</dt>
+            <dd className="m-0 font-semibold text-ink">{form.contents.join(', ')}</dd>
+          </div>
+        )}
+      </dl>
+      <p className="m-0 mt-2 text-caption leading-relaxed text-ink-muted">
+        {traits.length > 0 && 'Đặc điểm hiển thị riêng trên bài đăng, bạn không cần ghi lại. '}
+        {form.contents.length > 0 &&
+          'Đồ bên trong chỉ dùng để tìm manh mối, không hiển thị công khai.'}
+      </p>
+    </div>
+  )
+}
+
+const PLACEHOLDERS = {
+  lost: 'Đặc điểm riêng giúp người khác nhận ra: vết xước, móc khóa, sticker, đồ đi kèm… và hoàn cảnh bị mất.',
+  found:
+    'Nơi và hoàn cảnh nhặt được, đặc điểm dễ thấy bên ngoài. Đừng ghi chi tiết chỉ chủ nhân mới biết.',
+}
+
 // Tiêu đề, mô tả và ảnh
 export default function ContentStep({
   form,
+  category,
   errors,
   onChange,
   onAddImages,
@@ -25,11 +67,6 @@ export default function ContentStep({
 }) {
   const id = useId()
   const found = form.type === 'found'
-  const focusFirstLine = (e) => {
-    if (!form.attributeBlock || form.description !== `\n${form.attributeBlock}`) return
-    const textarea = e.currentTarget
-    requestAnimationFrame(() => textarea.setSelectionRange(0, 0))
-  }
 
   return (
     <>
@@ -63,12 +100,13 @@ export default function ContentStep({
           </label>
           <Counter value={form.description} max={DESCRIPTION_MAX} />
         </div>
+        <ChosenTraits form={form} category={category} />
         <textarea
           id={`${id}-desc`}
           value={form.description}
           maxLength={DESCRIPTION_MAX}
+          placeholder={PLACEHOLDERS[form.type] ?? PLACEHOLDERS.lost}
           onChange={(e) => onChange({ description: e.target.value })}
-          onFocus={focusFirstLine}
           aria-invalid={errors.description ? true : undefined}
           aria-describedby={errors.description ? `${id}-desc-error` : undefined}
           className={cx(inputClass, 'min-h-32 resize-y py-2.5 leading-relaxed')}

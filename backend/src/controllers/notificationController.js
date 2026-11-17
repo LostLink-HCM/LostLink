@@ -25,4 +25,24 @@ const markAllRead = asyncHandler(async (req, res) => {
   res.json({ success: true, data })
 })
 
-module.exports = { listNotifications, unreadCount, markRead, markAllRead }
+const getSettings = asyncHandler(async (req, res) => {
+  const data = await notificationService.getSettings(req.user)
+  res.json({ success: true, data })
+})
+
+const updateSettings = asyncHandler(async (req, res) => {
+  const data = await notificationService.updateSettings(
+    req.user,
+    matchedData(req, { locations: ['body'] })
+  )
+  res.json({ success: true, data })
+})
+
+module.exports = {
+  listNotifications,
+  unreadCount,
+  markRead,
+  markAllRead,
+  getSettings,
+  updateSettings,
+}

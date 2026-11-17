@@ -12,6 +12,7 @@ const {
   VerificationChallenge,
 } = require('../models')
 const imageService = require('./imageService')
+const { syncPostMatchNotices } = require('./matchingService')
 const { notify } = require('./notificationService')
 const returnService = require('./returnService')
 const {
@@ -50,12 +51,14 @@ const findOwnPost = async (id, user, action) => {
 
 const matchesOf = (postId) => ({ $or: [{ postLost: postId }, { postFound: postId }] })
 
-// Gợi ý ghép cặp đang chờ hết hiệu lực khi bài được sửa, đóng hoặc trao trả
-const staleMatchesOf = (postId) =>
-  MatchSuggestion.updateMany(
+// Gợi ý ghép cặp đang chờ hết hiệu lực khi bài được sửa, đóng hoặc trao trả; ẩn thông báo theo
+const staleMatchesOf = async (postId) => {
+  await MatchSuggestion.updateMany(
     { ...matchesOf(postId), state: { $in: ACTIVE_MATCH_STATES } },
     { $set: { state: 'stale' } }
   )
+  await syncPostMatchNotices(postId)
+}
 
 // Xoá ảnh Cloudinary không còn dùng, lỗi chỉ ghi log
 const deleteUnusedImages = async (urls) => {
@@ -266,6 +269,7 @@ const deletePost = async (id, user) => {
   if (!deletedCount) return
 
   const where = { post: post._id }
+  const matchIds = await MatchSuggestion.find(matchesOf(post._id)).distinct('_id')
   await Promise.all([
     returnService.keepReturnsOfDeletedPost(post),
     Comment.deleteMany(where),
@@ -277,6 +281,7 @@ const deletePost = async (id, user) => {
     VerificationChallenge.deleteMany(where),
     challenge ? VerificationAttempt.deleteMany({ challenge: challenge._id }) : null,
     Notification.deleteMany({ refType: 'Post', refId: post._id }),
+    Notification.deleteMany({ match: { $in: matchIds } }),
     // locked: hội thoại không nhắn tiếp được
     Conversation.updateMany(
       { _id: { $in: talks.map((talk) => talk._id) } },

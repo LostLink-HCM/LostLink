@@ -35,8 +35,38 @@ const LOCALE = {
 const toLngLat = ({ lat, lng }) => [lng, lat]
 const fromLngLat = ({ lat, lng }) => ({ lat, lng })
 
+const CIRCLE_STEPS = 64
+const METERS_PER_DEGREE = 111320
+function circlePolygon({ lat, lng }, radius) {
+  const coordinates = Array.from({ length: CIRCLE_STEPS + 1 }, (_, index) => {
+    const angle = (index / CIRCLE_STEPS) * 2 * Math.PI
+    return [
+      lng + (radius * Math.cos(angle)) / (METERS_PER_DEGREE * Math.cos((lat * Math.PI) / 180)),
+      lat + (radius * Math.sin(angle)) / METERS_PER_DEGREE,
+    ]
+  })
+  return {
+    type: 'Feature',
+    properties: {},
+    geometry: { type: 'Polygon', coordinates: [coordinates] },
+  }
+}
+
 // Phải thêm lại mỗi lần đổi style
 function addOverlayLayers(map) {
+  map.addSource('circle', { type: 'geojson', data: EMPTY })
+  map.addLayer({
+    id: 'circle-fill',
+    type: 'fill',
+    source: 'circle',
+    paint: { 'fill-color': PRIMARY, 'fill-opacity': 0.12 },
+  })
+  map.addLayer({
+    id: 'circle-line',
+    type: 'line',
+    source: 'circle',
+    paint: { 'line-color': PRIMARY, 'line-width': 2, 'line-opacity': 0.7 },
+  })
   map.addSource('road', { type: 'geojson', data: EMPTY })
   map.addLayer({
     id: 'road-line',
@@ -55,10 +85,12 @@ function endpointElement() {
 }
 
 // mode 'point': một ghim kéo được; 'road': hai đầu đoạn đường kéo được.
-// onMapClick nhận { lat, lng } khi bấm bản đồ hoặc nút đặt điểm ở giữa bản đồ
+// onMapClick nhận { lat, lng } khi bấm bản đồ hoặc nút đặt điểm ở giữa bản đồ.
+// radius: vẽ vòng bán kính (mét) quanh ghim, dùng cho khu vực để ý
 export default function VietMapView({
   mode,
   point,
+  radius,
   pointOutside,
   road = [],
   roadOutside,
@@ -169,6 +201,13 @@ export default function VietMapView({
       map.flyTo({ center: toLngLat(point), zoom: FOCUS_ZOOM })
     }
   }, [point, pointOutside, mode, styleVersion])
+
+  // Vòng bán kính quanh ghim
+  useEffect(() => {
+    const source = mapRef.current?.getSource('circle')
+    if (!source) return
+    source.setData(mode === 'point' && point && radius ? circlePolygon(point, radius) : EMPTY)
+  }, [point, radius, mode, styleVersion])
 
   // Đoạn đường: đường nối và hai đầu kéo được
   useEffect(() => {

@@ -63,8 +63,8 @@ export function ClosePostDialog({ post, onClose, onDone, onFailed }) {
       }
     >
       <p className="m-0 mb-3 text-small text-ink-secondary">
-        Bài <strong className="text-ink">{post.title}</strong> sẽ không nhận thêm gợi ý ghép cặp hay
-        yêu cầu liên hệ mới.
+        Bài <strong className="text-ink">{post.title}</strong> sẽ không nhận thêm manh mối hay yêu
+        cầu liên hệ mới.
       </p>
       <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
         <legend className="sr-only">Chọn trạng thái mới</legend>

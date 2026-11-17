@@ -1,14 +1,19 @@
 import { TAKEN_EMAILS } from '../../data/userSettings'
 
-// Bán kính khu vực để ý (mét); đặc tả chưa chốt phạm vi nên tạm 0,5–5 km
 export const RADIUS_MIN = 500
 export const RADIUS_MAX = 5000
 export const RADIUS_STEP = 500
 export const DEFAULT_RADIUS = 1000
-// Bề ngang bản đồ minh hoạ ứng với bao nhiêu km, để vẽ vòng bán kính đúng tỉ lệ
-export const MAP_WIDTH_KM = 12
 
-// Mã xác thực email mới: 6 chữ số, hiệu lực 10 phút, sai tối đa 5 lần, gửi lại sau 45 giây
+export const AREA_PRESETS = [
+  { label: 'Phố đi bộ Nguyễn Huệ', lat: 10.7743, lng: 106.7038 },
+  { label: 'Chợ Bến Thành', lat: 10.7725, lng: 106.698 },
+  { label: 'Hồ Con Rùa', lat: 10.7827, lng: 106.6958 },
+  { label: 'Crescent Mall', lat: 10.729, lng: 106.7189 },
+  { label: 'Đại học Bách Khoa, 268 Lý Thường Kiệt', lat: 10.7726, lng: 106.6579 },
+  { label: 'Landmark 81', lat: 10.795, lng: 106.7218 },
+]
+
 export const OTP_LENGTH = 6
 export const OTP_TTL_MS = 10 * 60 * 1000
 export const MAX_OTP_ATTEMPTS = 5
@@ -21,10 +26,6 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 export const formatRadius = (meters) =>
   meters < 1000 ? `${meters} m` : `${(meters / 1000).toLocaleString('vi-VN')} km`
 
-// Đường kính vòng bán kính tính theo % bề ngang bản đồ
-export const radiusToPercent = (meters) => ((meters * 2) / 1000 / MAP_WIDTH_KM) * 100
-
-// Cùng thứ tự và câu báo với quy tắc mật khẩu ở backend (authValidation.js)
 export function passwordProblem(password) {
   if (!/^[\x21-\x7E]*$/.test(password))
     return 'Mật khẩu không được chứa chữ có dấu hoặc khoảng trắng.'

@@ -12,7 +12,7 @@ export const NOTIFICATION_TYPES = {
 
 // Tab lọc, trùng tên nhóm với API
 export const NOTIFICATION_GROUPS = {
-  trade: { label: 'Ghép cặp & liên hệ', short: 'Ghép cặp', types: ['match', 'contact'] },
+  trade: { label: 'Manh mối & liên hệ', short: 'Manh mối', types: ['match', 'contact'] },
   post: { label: 'Bài đăng', types: ['post', 'comment', 'area'] },
   system: { label: 'Hệ thống', types: ['report'] },
 }
@@ -59,7 +59,7 @@ const DESCRIBE = {
     title: `${item.actor?.username ?? 'Người bạn theo dõi'} vừa đăng bài mới`,
     body: item.post?.title ?? item.text,
   }),
-  match: (item) => ({ kind: 'match', title: 'Có gợi ý ghép cặp mới', body: item.text }),
+  match: (item) => ({ kind: 'match', title: 'Có manh mối mới cho bài của bạn', body: item.text }),
   contact_request: (item) => ({
     kind: 'contact',
     title: `${item.actor?.username ?? 'Ai đó'} muốn trò chuyện về bài ${quote(item.post?.title)}`,
@@ -164,6 +164,8 @@ export function describeNotification(item) {
   }
   const post = item.post
   const toMessages = MESSAGE_TYPES.includes(item.type)
+  // Thông báo manh mối mở trang Manh mối của bài đó
+  const toMatches = item.type === 'match' && post?.available
   return {
     ...described,
     visual: VISUALS[item.type] ?? GROUP_VISUALS[GROUP_OF[item.type] ?? 'post'],
@@ -171,14 +173,16 @@ export function describeNotification(item) {
     id: item.id,
     unread: !item.isRead,
     createdAt: item.createdAt,
-    action: toMessages ? 'Mở tin nhắn' : post ? 'Xem bài' : null,
+    action: toMessages ? 'Mở tin nhắn' : toMatches ? 'Xem manh mối' : post ? 'Xem bài' : null,
     link: toMessages
       ? { to: '/messages' }
-      : post
-        ? post.available
-          ? { to: postPath(post) }
-          : { unavailable: true }
-        : null,
+      : toMatches
+        ? { to: `/matches?post=${encodeURIComponent(post.slug)}` }
+        : post
+          ? post.available
+            ? { to: postPath(post) }
+            : { unavailable: true }
+          : null,
   }
 }
 

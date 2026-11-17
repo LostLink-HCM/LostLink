@@ -1,4 +1,13 @@
-const { Comment, Notification, Post, PostFollow, PostLike, User } = require('../models')
+const {
+  Comment,
+  MatchSuggestion,
+  Notification,
+  Post,
+  PostFollow,
+  PostLike,
+  User,
+} = require('../models')
+const { loadConfig } = require('../services/matchingService')
 const POSTS = require('./data/posts')
 
 const HOUR = 60 * 60 * 1000
@@ -130,6 +139,31 @@ const seedNotifications = async () => {
       owner,
       { type: 'comment', actor: comment.user, refId: comment.post, preview: comment.body },
       comment.createdAt
+    )
+  }
+
+  // Manh mối mạnh báo cho cả hai bên như lúc duyệt bài, gợi ý yếu chỉ hiện ở trang Manh mối
+  const { strong } = await loadConfig()
+  const strongMatches = await MatchSuggestion.find({
+    postLost: { $in: postIds },
+    state: { $in: ['pending', 'confirmed_one'] },
+    score: { $gte: strong },
+  }).lean()
+  const titleOf = new Map(posts.map((post) => [String(post._id), post.title]))
+  for (const match of strongMatches) {
+    const lostOwner = ownerOf.get(String(match.postLost))
+    const foundOwner = ownerOf.get(String(match.postFound))
+    if (!lostOwner || !foundOwner) continue
+    const fields = { type: 'match', match: match._id, isSuppressed: false }
+    add(
+      lostOwner,
+      { ...fields, refId: match.postLost, preview: titleOf.get(String(match.postFound)) },
+      match.createdAt
+    )
+    add(
+      foundOwner,
+      { ...fields, refId: match.postFound, preview: titleOf.get(String(match.postLost)) },
+      match.createdAt
     )
   }
 

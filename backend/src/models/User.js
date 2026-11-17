@@ -1,7 +1,5 @@
 const mongoose = require('mongoose')
 
-const Notification = require('./Notification')
-
 const { Schema } = mongoose
 
 // So sánh không phân biệt hoa thường
@@ -52,10 +50,13 @@ const userSchema = new Schema(
     // Lần trả đồ trên bài đã bị xoá, giữ riêng để returnCount không bị trừ khi chủ bài xoá bài
     deletedPostReturns: { type: Number, default: 0, min: 0 },
 
-    // Thiết lập thông báo, notificationTypes rỗng nghĩa là nhận tất cả các loại
     emailOptIn: { type: Boolean, default: true },
     pushOptIn: { type: Boolean, default: true },
-    notificationTypes: [{ type: String, enum: Notification.TYPES }],
+    notificationGroups: {
+      trade: { type: Boolean, default: true },
+      post: { type: Boolean, default: true },
+      system: { type: Boolean, default: true },
+    },
 
     status: {
       type: String,

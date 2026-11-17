@@ -18,8 +18,9 @@ import PostActionSheet from '../../components/user/post/PostActionSheet'
 import PostGallery from '../../components/user/post/PostGallery'
 import { ClosePostDialog, DeletePostDialog } from '../../components/user/post/PostManageDialogs'
 import PostStatusTag from '../../components/user/post/PostStatusTag'
+import { useMatchCount } from '../../hooks/useMatchCount'
 import { formatCount, placeLabel, placeLines, timeAgo, toDetailPost } from '../../lib/user/homeFeed'
-import { isMatchable, suggestionsFor } from '../../lib/user/matches'
+import { isMatchable } from '../../lib/user/matches'
 import { profilePath } from '../../lib/user/profiles'
 
 const formatDate = (iso, options) => new Date(iso).toLocaleDateString('vi-VN', options)
@@ -166,7 +167,7 @@ function PostDetail({ post, onChanged }) {
 
   // Bài của chính mình: không nhận đồ hay báo cáo, thay bằng lối vào gợi ý ghép cặp
   const showMatches = isMine && isMatchable(post)
-  const matchCount = showMatches ? suggestionsFor(post, ctx.posts, ctx.matches).length : 0
+  const matchCount = useMatchCount(post.id, showMatches)
   const matchesPath = `/matches?post=${post.id}`
 
   // Sửa, Đóng bài, Xóa của chủ bài, theo quyền server trả về
@@ -249,7 +250,7 @@ function PostDetail({ post, onChanged }) {
   const sheetActions = isMine
     ? [
         matchCount > 0 && {
-          label: `Xem ${matchCount} gợi ý ghép cặp`,
+          label: `Xem ${matchCount} manh mối`,
           icon: 'search',
           tone: 'primary',
           onClick: () => navigate(matchesPath),
@@ -433,7 +434,7 @@ function PostDetail({ post, onChanged }) {
 
           {showMatches && (
             <Card as="section" padding="md">
-              <h2 className="m-0 mb-1.5 text-body font-bold text-ink">Gợi ý ghép cặp</h2>
+              <h2 className="m-0 mb-1.5 text-body font-bold text-ink">Manh mối</h2>
               <p
                 className={cx(
                   'm-0 text-caption leading-relaxed text-ink-muted',
@@ -449,7 +450,7 @@ function PostDetail({ post, onChanged }) {
                   to={matchesPath}
                   className={buttonClass({ variant: 'primary', size: 'xl', block: true })}
                 >
-                  Xem {matchCount} gợi ý ghép cặp
+                  Xem {matchCount} manh mối
                 </Link>
               )}
             </Card>
