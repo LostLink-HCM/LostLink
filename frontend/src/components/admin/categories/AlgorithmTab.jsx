@@ -1,7 +1,7 @@
 import { useState } from 'react'
+import useSystemSettings from '../../../hooks/useSystemSettings'
 import Icon from '../../common/Icon'
 import { isSame, validateAlgorithm } from '../../../lib/admin/categories'
-import { readSettings } from '../../../lib/admin/settings'
 import {
   TIME_SHAPES,
   filterRadius,
@@ -81,9 +81,11 @@ function Preview({ form, valid, frequency, sMin }) {
   )
 }
 
-export default function AlgorithmTab({ category, onSave }) {
+export default function AlgorithmTab({ category, onSave, active }) {
   const saved = pick(category)
-  const sMin = readSettings(window.localStorage).values.sMin
+  const { systemSettings, settingsLoading, settingsError, reloadSystemSettings } =
+    useSystemSettings({ scope: 'matching', enabled: active })
+  const sMin = systemSettings?.values.sMin
   const [form, setForm] = useState(saved)
   const [shape, setShape] = useState(() => timeShapeKey(saved.timeShape))
   const [errors, setErrors] = useState({})
@@ -171,7 +173,32 @@ export default function AlgorithmTab({ category, onSave }) {
         </Card>
       </div>
 
-      <Preview form={form} valid={valid} frequency={category.frequency} sMin={sMin} />
+      {settingsLoading && (
+        <p role="status" className="text-small text-ink-muted">
+          Đang tải cấu hình ghép cặp…
+        </p>
+      )}
+      {settingsError && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center gap-3 rounded-lg border border-danger-soft bg-danger-soft p-3 text-small text-danger-ink"
+        >
+          <p className="min-w-0 flex-1">Không tải được cấu hình ghép cặp. {settingsError}</p>
+          <button
+            type="button"
+            className="rounded-lg border border-current px-3 py-2 font-semibold focus-visible:outline-2 focus-visible:outline-focus"
+            onClick={reloadSystemSettings}
+          >
+            Thử lại
+          </button>
+        </div>
+      )}
+      <Preview
+        form={form}
+        valid={valid && Number.isFinite(sMin)}
+        frequency={category.frequency}
+        sMin={sMin}
+      />
 
       <SaveBar formId="category-algorithm-form" dirty={dirty} onReset={reset} />
     </form>

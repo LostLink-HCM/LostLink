@@ -39,6 +39,31 @@ export default function BackofficeLayout({
   const closeSidebar = () => setSidebarOpen(false)
   const homeHref = `${basePath}${homePath}`
 
+  const navigateFromSidebar = (event, to) => {
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    )
+      return
+    const guard = outletContext?.requestSettingsNavigation
+    if (
+      currentPath !== to &&
+      guard &&
+      !guard(() => {
+        closeSidebar()
+        navigate(to)
+      })
+    ) {
+      event.preventDefault()
+      return
+    }
+    closeSidebar()
+  }
+
   return (
     <div className="flex min-h-dvh w-full bg-canvas font-sans text-small text-ink">
       {sidebarOpen && (
@@ -72,7 +97,7 @@ export default function BackofficeLayout({
               collapsed && 'lg:justify-center',
               focusRing
             )}
-            onClick={closeSidebar}
+            onClick={(event) => navigateFromSidebar(event, homeHref)}
           >
             <span className="grid place-items-center rounded-lg bg-white p-0.75">
               <Logo size={32} animated />
@@ -114,7 +139,7 @@ export default function BackofficeLayout({
                   focusRing
                 )
               }
-              onClick={closeSidebar}
+              onClick={(event) => navigateFromSidebar(event, `${basePath}${item.path}`)}
             >
               <Icon name={item.icon} />
               <span className={cx('min-w-0 truncate', collapsed && 'lg:hidden')}>{item.label}</span>
@@ -191,6 +216,26 @@ export default function BackofficeLayout({
           </div>
         </header>
         <main className="pb-7">
+          {outletContext?.settingsError && (
+            <div
+              role="alert"
+              className="mx-6 mt-5 flex flex-wrap items-center gap-3 rounded-lg border border-danger-soft bg-danger-soft p-4 text-small text-danger-ink max-sm:mx-4"
+            >
+              <p className="min-w-0 flex-1">
+                Không tải được cấu hình hệ thống. {outletContext.settingsError}
+              </p>
+              <button
+                type="button"
+                onClick={outletContext.reloadSystemSettings}
+                className={cx(
+                  'rounded-lg border border-current px-3 py-2 font-semibold',
+                  focusRing
+                )}
+              >
+                Thử lại
+              </button>
+            </div>
+          )}
           <Outlet context={outletContext} />
         </main>
       </div>

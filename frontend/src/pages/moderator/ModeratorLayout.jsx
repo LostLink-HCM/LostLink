@@ -4,7 +4,7 @@ import { createWorkspacePosts } from '../../data/workspacePosts'
 import { moderatorReports } from '../../data/moderatorReports'
 import { createModeratorMessages } from '../../data/moderatorMessages'
 import { createModeratorNotifications } from '../../data/moderatorNotifications'
-import { readQuickReplies } from '../../lib/backoffice/quickReplies'
+import useSystemSettings from '../../hooks/useSystemSettings'
 import { listModeratorPendingPosts } from '../../lib/moderator/reviewPosts'
 
 const navigation = [
@@ -23,7 +23,7 @@ export default function ModeratorLayout() {
   const [reviewError, setReviewError] = useState('')
   const [reports, setReports] = useState(moderatorReports)
   const [messageState, setMessageState] = useState(createModeratorMessages)
-  const [quickReplies, setQuickReplies] = useState(() => readQuickReplies(window.localStorage))
+  const settings = useSystemSettings()
   const [notificationState, setNotificationState] = useState(createModeratorNotifications)
   const loadReviewPosts = useCallback(async () => {
     setReviewLoading(true)
@@ -81,8 +81,7 @@ export default function ModeratorLayout() {
         setReports,
         messageState,
         setMessageState,
-        quickReplies,
-        setQuickReplies,
+        ...settings,
         notificationState,
         setNotificationState,
       }}

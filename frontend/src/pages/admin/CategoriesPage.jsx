@@ -210,7 +210,11 @@ export default function Categories() {
                 />
               </div>
               <div {...panelProps('algorithm')}>
-                <AlgorithmTab category={selected} onSave={patchSelected} />
+                <AlgorithmTab
+                  category={selected}
+                  onSave={patchSelected}
+                  active={tab === 'algorithm'}
+                />
               </div>
               <div {...panelProps('questions')}>
                 <QuestionsTab

@@ -1,6 +1,5 @@
 import { DEFAULT_QUICK_REPLIES } from '../../data/backofficeQuickReplies'
 
-export const QUICK_REPLIES_STORAGE_KEY = 'll_backoffice_quick_replies_v1'
 export const QUICK_REPLY_TEXT_LIMIT = 500
 
 const QUICK_REPLY_GROUPS = ['user', 'internal']
@@ -55,31 +54,4 @@ export function validateQuickReplies(value) {
   }
 
   return errors
-}
-
-export function readQuickReplies(storage) {
-  const fallback = cloneQuickReplies()
-
-  try {
-    const raw = storage.getItem(QUICK_REPLIES_STORAGE_KEY)
-    if (!raw) return fallback
-
-    const stored = JSON.parse(raw)
-    const normalized = cloneQuickReplies(stored)
-
-    return Object.keys(validateQuickReplies(normalized)).length ? fallback : normalized
-  } catch {
-    return fallback
-  }
-}
-
-export function saveQuickReplies(storage, value) {
-  const normalized = cloneQuickReplies(value)
-
-  if (Object.keys(validateQuickReplies(normalized)).length) {
-    throw new Error('Mẫu trả lời nhanh chưa hợp lệ.')
-  }
-
-  storage.setItem(QUICK_REPLIES_STORAGE_KEY, JSON.stringify(normalized))
-  return normalized
 }

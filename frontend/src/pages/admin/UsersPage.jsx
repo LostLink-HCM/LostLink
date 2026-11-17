@@ -18,8 +18,8 @@ import {
 } from '../../lib/admin/users'
 import { applyAdminUserAction, getAdminUser, listAdminUsers } from '../../lib/admin/usersApi'
 import usePaginatedFilter from '../../hooks/usePaginatedFilter'
+import useBackofficePageSize from '../../hooks/useBackofficePageSize'
 
-const PAGE_SIZE = 8
 const identityFilter = (items) => items
 const completedActions = {
   lock: 'Đã khóa tài khoản',
@@ -538,6 +538,7 @@ function UserActionDialog({
 }
 
 export default function Users() {
+  const pageSize = useBackofficePageSize()
   const { user } = useAuth()
   const actor = user
   const [listState, setListState] = useState({ key: null, items: [], error: '' })
@@ -554,7 +555,7 @@ export default function Users() {
     items: listState.items,
     initialFilters: USER_FILTERS,
     filterFn: identityFilter,
-    pageSize: PAGE_SIZE,
+    pageSize,
   })
   const requestFilters = useMemo(
     () => ({
@@ -572,7 +573,7 @@ export default function Users() {
   const listError = !loading ? listState.error : ''
   const users = loading || listError ? [] : listState.items
   const filtered = users
-  const visible = users.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const visible = users.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   const profileId = modal?.id || null
   const profileKey = profileId ? JSON.stringify([profileId, profileVersion]) : null
   const profileIsCurrent = profileState.key === profileKey
@@ -796,9 +797,8 @@ export default function Users() {
           'Đang tải danh sách người dùng…'
         ) : (
           <>
-            Hiển thị {filtered.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0}–
-            {Math.min(currentPage * PAGE_SIZE, filtered.length)} trong số {filtered.length} tài
-            khoản
+            Hiển thị {filtered.length ? (currentPage - 1) * pageSize + 1 : 0}–
+            {Math.min(currentPage * pageSize, filtered.length)} trong số {filtered.length} tài khoản
           </>
         )}
       </p>
@@ -917,7 +917,7 @@ export default function Users() {
         <Pagination
           page={currentPage}
           total={filtered.length}
-          pageSize={PAGE_SIZE}
+          pageSize={pageSize}
           onChange={setPage}
           noun="tài khoản"
           showSummary={false}
