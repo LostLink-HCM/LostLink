@@ -484,7 +484,7 @@ function QuickReplyManager({
   )
 }
 
-function SettingsEditor({ initialSettings, onSaved, registerNavigationGuard }) {
+function SettingsEditor({ initialSettings, onSaved, registerNavigationGuard, readOnly = false }) {
   const [saved, setSaved] = useState(initialSettings)
   const [draft, setDraft] = useState(() => ({ ...saved.values }))
   const [savedQuickReplies, setSavedQuickReplies] = useState(() =>
@@ -693,7 +693,7 @@ function SettingsEditor({ initialSettings, onSaved, registerNavigationGuard }) {
 
   const submit = (event) => {
     event.preventDefault()
-    if (saveInFlight.current) return
+    if (readOnly || saveInFlight.current) return
     setSubmittedTabs((current) => ({ ...current, [activeTab]: true }))
     setNotice(null)
 
@@ -791,35 +791,39 @@ function SettingsEditor({ initialSettings, onSaved, registerNavigationGuard }) {
         </div>
 
         <form id="admin-settings-form" ref={formRef} noValidate onSubmit={submit}>
-          <fieldset disabled={saving} className="m-0 min-w-0 border-0 p-0" aria-busy={saving}>
-            <div
-              className="mb-5 flex gap-1 overflow-x-auto border-b border-line"
-              role="tablist"
-              aria-label="Nhóm cấu hình hệ thống"
-            >
-              {SETTINGS_TABS.map((tab) => {
-                const selected = activeTab === tab.key
-                return (
-                  <button
-                    key={tab.key}
-                    id={`settings-tab-${tab.key}`}
-                    type="button"
-                    role="tab"
-                    aria-selected={selected}
-                    aria-controls="settings-tab-panel"
-                    className={cx(
-                      'min-h-[45px] shrink-0 border-b-2 px-4 text-small font-semibold transition-colors',
-                      selected
-                        ? 'border-primary text-primary'
-                        : 'border-transparent text-ink-muted hover:text-primary'
-                    )}
-                    onClick={() => changeTab(tab.key)}
-                  >
-                    {tab.label}
-                  </button>
-                )
-              })}
-            </div>
+          <div
+            className="mb-5 flex gap-1 overflow-x-auto border-b border-line"
+            role="tablist"
+            aria-label="Nhóm cấu hình hệ thống"
+          >
+            {SETTINGS_TABS.map((tab) => {
+              const selected = activeTab === tab.key
+              return (
+                <button
+                  key={tab.key}
+                  id={`settings-tab-${tab.key}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  aria-controls="settings-tab-panel"
+                  className={cx(
+                    'min-h-[45px] shrink-0 border-b-2 px-4 text-small font-semibold transition-colors',
+                    selected
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-ink-muted hover:text-primary'
+                  )}
+                  onClick={() => changeTab(tab.key)}
+                >
+                  {tab.label}
+                </button>
+              )
+            })}
+          </div>
+          <fieldset
+            disabled={saving || readOnly}
+            className="m-0 min-w-0 border-0 p-0"
+            aria-busy={saving}
+          >
             <div
               id="settings-tab-panel"
               role="tabpanel"
@@ -913,7 +917,7 @@ function SettingsEditor({ initialSettings, onSaved, registerNavigationGuard }) {
                       'Nhắc nếu hội thoại vẫn mở sau',
                       'Chỉ nhắc khi hội thoại chưa được đánh dấu “Đã trao trả” hoặc “Đã đóng”.',
                       'ngày',
-                      { min: 1, step: 1 }
+                      { min: 1, max: 365, step: 1 }
                     )}
                   </div>
                 </SettingsCard>
@@ -1048,13 +1052,36 @@ export default function Settings() {
     systemSettings,
     settingsLoading,
     settingsError,
+    settingsInitialized,
     reloadSystemSettings,
     applySystemSettings,
+    initializeSettings,
   } = useSystemSettings({ scope: 'full', onLoaded: applySharedSettings })
+  const [initializing, setInitializing] = useState(false)
+  const [initializationError, setInitializationError] = useState('')
+  const initializationInFlight = useRef(false)
 
   const saved = (data) => {
     applySystemSettings(data)
     applySharedSettings(data)
+  }
+  const initialize = async () => {
+    if (initializationInFlight.current) return
+    initializationInFlight.current = true
+    setInitializing(true)
+    setInitializationError('')
+    try {
+      await initializeSettings()
+    } catch (error) {
+      const details = Object.values(error.fieldErrors || {}).join(' ')
+      setInitializationError(
+        [error.message, details].filter(Boolean).join(' ') ||
+          'Không thể khởi tạo cấu hình hệ thống. Vui lòng thử lại.'
+      )
+    } finally {
+      initializationInFlight.current = false
+      setInitializing(false)
+    }
   }
   return (
     <>
@@ -1068,11 +1095,35 @@ export default function Settings() {
         </div>
       )}
       {systemSettings ? (
-        <SettingsEditor
-          initialSettings={systemSettings}
-          onSaved={saved}
-          registerNavigationGuard={registerSettingsNavigationGuard}
-        />
+        <>
+          {!settingsInitialized && (
+            <div
+              role="status"
+              className="mx-6 mt-5 flex flex-wrap items-center gap-3 rounded-lg border border-primary-soft bg-primary-subtle p-4 text-small text-primary max-sm:mx-4"
+            >
+              <Icon name="info" size={18} />
+              <p className="min-w-0 flex-1">
+                Cấu hình hệ thống chưa được khởi tạo đầy đủ. Các mục còn thiếu đang hiển thị giá trị
+                mặc định; bạn có thể xem cấu hình và cần khởi tạo trước khi chỉnh sửa.
+              </p>
+              {initializationError && (
+                <p role="alert" className="basis-full text-danger-ink">
+                  {initializationError}
+                </p>
+              )}
+              <Button type="button" variant="primary" disabled={initializing} onClick={initialize}>
+                {initializing ? 'Đang khởi tạo…' : 'Khởi tạo cấu hình mặc định'}
+              </Button>
+            </div>
+          )}
+          <SettingsEditor
+            key={settingsInitialized ? 'initialized' : 'uninitialized'}
+            initialSettings={systemSettings}
+            onSaved={saved}
+            registerNavigationGuard={registerSettingsNavigationGuard}
+            readOnly={!settingsInitialized}
+          />
+        </>
       ) : settingsLoading ? (
         <p role="status" className="px-8 py-7 text-small text-ink-muted max-sm:px-4">
           Đang tải cấu hình hệ thống…

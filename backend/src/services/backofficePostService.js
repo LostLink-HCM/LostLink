@@ -10,6 +10,7 @@ const {
 const ApiError = require('../utils/ApiError')
 const { escapeRegex, lowercaseText, normalizeText } = require('../utils/text')
 const { endOfVnDay, startOfVnDay } = require('../utils/vnTime')
+const { syncPostMatchNotices } = require('./matchingService')
 const returnService = require('./returnService')
 const { ACTIVE_MATCH_STATES } = require('./postService')
 
@@ -292,6 +293,7 @@ const updateStatus = async (id, actor, status, reason = '') => {
   }
   if (status === 'returned') effects.push(returnService.refreshReturnersOf(updated))
   await Promise.all(effects)
+  if (!MATCHABLE_STATUSES.includes(status)) await syncPostMatchNotices(updated._id)
 
   return { id: String(updated._id), code: updated.code, status: updated.status, changedAt }
 }
@@ -315,6 +317,7 @@ const updateVisibility = async (id, isHidden, reason = '') => {
     runValidators: true,
   }).select('code isHidden hiddenReason')
   if (!post) throw statusChanged()
+  await syncPostMatchNotices(post._id)
 
   return {
     id: String(post._id),

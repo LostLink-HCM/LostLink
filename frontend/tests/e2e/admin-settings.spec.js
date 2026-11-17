@@ -107,8 +107,33 @@ test.describe('Cấu hình hệ thống của admin', () => {
     const login = await api.post('auth/login', { data: ADMIN })
     expect(login.status()).toBe(200)
     const token = (await login.json()).data.accessToken
+    const headers = { Authorization: `Bearer ${token}` }
+    const beforeResponse = await api.get('admin/settings', {
+      headers,
+    })
+    expect(beforeResponse.status()).toBe(200)
+    const before = (await beforeResponse.json()).data
+    expect([...before.missing.values].sort()).toEqual(Object.keys(DEFAULT_SETTINGS).sort())
+    expect(before.missing.quickReplies).toEqual(['user', 'internal'])
+    expect(before.updatedAt).toBeNull()
+    await expect(
+      page.getByRole('status').filter({ hasText: 'Cấu hình hệ thống chưa được khởi tạo đầy đủ.' })
+    ).toBeVisible()
+    await expect(field(page, 'mCategory')).toBeDisabled()
+
+    const initializationResponse = page.waitForResponse(
+      (response) =>
+        response.url().endsWith('/api/admin/settings/initialize') &&
+        response.request().method() === 'POST'
+    )
+    await page.getByRole('button', { name: 'Khởi tạo cấu hình mặc định' }).click()
+    expect((await initializationResponse).ok()).toBeTruthy()
+    await expect(
+      page.getByRole('status').filter({ hasText: 'Cấu hình hệ thống chưa được khởi tạo đầy đủ.' })
+    ).toHaveCount(0)
+
     const response = await api.get('admin/settings', {
-      headers: { Authorization: `Bearer ${token}` },
+      headers,
     })
     expect(response.status()).toBe(200)
     const { values, quickReplies, missing } = (await response.json()).data

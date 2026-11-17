@@ -20,9 +20,7 @@ const loadSettings = async (scope) => {
     return sharedSettings(data)
   }
   if (scope === 'matching') return getMatchingSettings()
-  const data = await getAdminSettings()
-  if (!data.missing.values.length && !data.missing.quickReplies.length) return data
-  return initializeSystemSettings({})
+  return getAdminSettings()
 }
 
 export default function useSystemSettings({ scope = 'shared', enabled = true, onLoaded } = {}) {
@@ -79,15 +77,27 @@ export default function useSystemSettings({ scope = 'shared', enabled = true, on
     },
     [key, owner, scope]
   )
+  const initializeSettings = useCallback(async () => {
+    const data = await initializeSystemSettings({})
+    revision.current += 1
+    setState({ key, owner, data, error: '' })
+    onLoadedRef.current?.(data)
+    return data
+  }, [key, owner])
   const reloadSystemSettings = useCallback(() => setAttempt((current) => current + 1), [])
   const data = state.owner === owner ? state.data : null
+  const settingsInitialized =
+    scope !== 'full' ||
+    Boolean(data && !data.missing?.values?.length && !data.missing?.quickReplies?.length)
   return {
     systemSettings: data,
+    settingsInitialized,
     settingsLoading: enabled && state.key !== key,
     settingsError: state.key === key ? state.error : '',
     paginationPageSize: data?.values.paginationPageSize ?? DEFAULT_SETTINGS.paginationPageSize,
     quickReplies: cloneQuickReplies(data?.quickReplies ?? { user: [], internal: [] }),
     applySystemSettings,
+    initializeSettings,
     reloadSystemSettings,
   }
 }

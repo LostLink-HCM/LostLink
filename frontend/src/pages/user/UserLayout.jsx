@@ -6,13 +6,12 @@ import { cx } from '../../components/user/classes'
 import MobileTabBar from '../../components/user/home/MobileTabBar'
 import SiteHeader from '../../components/user/home/SiteHeader'
 import { createFeedComments, createFeedPosts, createMyPosts } from '../../data/homeFeed'
-import { createMatchSuggestions } from '../../data/matchSuggestions'
-import { createUserNotifications } from '../../data/userNotifications'
-import { createWatchAreas } from '../../data/userSettings'
 import { DEFAULT_FILTERS } from '../../lib/user/homeFeed'
 import { inboxUnread } from '../../lib/user/messages'
 import { hidesTabBar } from '../../lib/user/navigation'
+import { useBrowserNotifications } from '../../hooks/useBrowserNotifications'
 import { useInbox } from '../../hooks/useInbox'
+import { usePendingMatches } from '../../hooks/usePendingMatches'
 import { usePostInteractions } from '../../hooks/usePostInteractions'
 import useTimeOfDay from '../../hooks/useTimeOfDay'
 import { useUnreadNotifications } from '../../hooks/useUnreadNotifications'
@@ -41,16 +40,12 @@ export default function UserLayout() {
   const location = useLocation()
 
   const [posts, setPosts] = useState(() => [...createMyPosts(), ...createFeedPosts()])
-  const [matches, setMatches] = useState(createMatchSuggestions)
   const [comments, setComments] = useState(createFeedComments)
   const [now] = useState(Date.now)
   const [liked, setLiked] = useState(() => new Set())
   const [saved, setSaved] = useState(() => new Set())
   const [followed, setFollowed] = useState(() => new Set())
   const [lastCommentAt, setLastCommentAt] = useState(0)
-  const [notifications, setNotifications] = useState(createUserNotifications)
-  // Khu vực để ý, chỉnh ở Cài đặt
-  const [watchAreas, setWatchAreas] = useState(createWatchAreas)
   // Thay đổi ở mục Tài khoản (chưa có API): email mới đã xác thực, lần đổi mật khẩu gần nhất
   const [account, setAccount] = useState({ email: '', passwordChangedAt: null })
 
@@ -77,6 +72,8 @@ export default function UserLayout() {
   const { unread: unreadNotifications, setUnread: setUnreadNotifications } =
     useUnreadNotifications(user)
   const inbox = useInbox(user)
+  useBrowserNotifications(user)
+  const matchBadge = usePendingMatches(user)
 
   const memberToggle = (setter) => (id) => {
     if (requireMember()) setter((prev) => toggleIn(prev, id))
@@ -117,11 +114,6 @@ export default function UserLayout() {
         : posts.filter((post) => !post.mine),
     [posts, user]
   )
-
-  // Phản hồi gợi ý ghép cặp: confirmed_one khi xác nhận, rejected khi bấm Không phải,
-  // stale khi bài đối ứng không còn nhận gợi ý
-  const respondToMatch = (id, state) =>
-    setMatches((prev) => prev.map((match) => (match.id === id ? { ...match, state } : match)))
 
   const refreshInbox = () => {
     inbox.reload().catch(() => {})
@@ -185,6 +177,7 @@ export default function UserLayout() {
         search={search}
         unreadMessages={unreadMessages}
         unreadNotifications={unreadNotifications}
+        pendingMatches={matchBadge.pending}
       />
 
       <Outlet
@@ -211,21 +204,20 @@ export default function UserLayout() {
           inbox,
           contactAbout: claimPost,
           claimPost,
-          matches,
-          respondToMatch,
-          notifications,
-          setNotifications,
           setUnreadNotifications,
+          refreshPendingMatches: matchBadge.refresh,
           interactions,
-          watchAreas,
-          setWatchAreas,
           account,
           setAccount,
           notify: setToast,
         }}
       />
 
-      <MobileTabBar unreadMessages={unreadMessages} unreadNotifications={unreadNotifications} />
+      <MobileTabBar
+        unreadMessages={unreadMessages}
+        unreadNotifications={unreadNotifications}
+        pendingMatches={matchBadge.pending}
+      />
 
       {toast && (
         <div

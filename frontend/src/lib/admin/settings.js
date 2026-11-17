@@ -59,9 +59,7 @@ export function validateSettings(values) {
 
   integer('reportDays', 1, 365, 'ngày')
   integer('contactHours', 1, 72, 'giờ')
-  if (!Number.isSafeInteger(parsed.returnReminderDays) || parsed.returnReminderDays < 1) {
-    errors.returnReminderDays = 'Nhập số ngày nguyên dương.'
-  }
+  integer('returnReminderDays', 1, 365, 'ngày')
 
   for (const { key } of RELIABILITY_FIELDS) {
     if (!(parsed[key] > 0 && parsed[key] < 1)) errors[key] = 'Nhập số lớn hơn 0 và nhỏ hơn 1.'

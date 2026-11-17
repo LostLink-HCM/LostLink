@@ -15,7 +15,7 @@ import CommentSection from '../../components/user/post/CommentSection'
 import PostActionSheet from '../../components/user/post/PostActionSheet'
 import PostGallery from '../../components/user/post/PostGallery'
 import { formatCount, publicTraits, timeAgo } from '../../lib/user/homeFeed'
-import { isMatchable, suggestionsFor } from '../../lib/user/matches'
+import { isMatchable } from '../../lib/user/matches'
 import { profilePath } from '../../lib/user/profiles'
 import { reputationOf } from '../../lib/user/reputation'
 
@@ -101,14 +101,14 @@ export default function MockPostDetailPage() {
   // Bài của chính mình: không nhận đồ hay báo cáo, thay bằng lối vào gợi ý ghép cặp
   const isMine = post.author === user?.username
   const showMatches = isMine && isMatchable(post)
-  const matchCount = showMatches ? suggestionsFor(post, posts, ctx.matches).length : 0
+  const matchCount = 0
   const matchesPath = `/matches?post=${post.id}`
 
   // Trên mobile các hành động gom vào nút ⋯ thay cho hai khối ở cột phải
   const sheetActions = isMine
     ? [
         matchCount > 0 && {
-          label: `Xem ${matchCount} gợi ý ghép cặp`,
+          label: `Xem ${matchCount} manh mối`,
           icon: 'search',
           tone: 'primary',
           onClick: () => navigate(matchesPath),
@@ -270,7 +270,7 @@ export default function MockPostDetailPage() {
 
           {showMatches && (
             <Card as="section" padding="md">
-              <h2 className="m-0 mb-1.5 text-body font-bold text-ink">Gợi ý ghép cặp</h2>
+              <h2 className="m-0 mb-1.5 text-body font-bold text-ink">Manh mối</h2>
               <p
                 className={cx(
                   'm-0 text-caption leading-relaxed text-ink-muted',
@@ -286,7 +286,7 @@ export default function MockPostDetailPage() {
                   to={matchesPath}
                   className={buttonClass({ variant: 'primary', size: 'xl', block: true })}
                 >
-                  Xem {matchCount} gợi ý ghép cặp
+                  Xem {matchCount} manh mối
                 </Link>
               )}
             </Card>

@@ -61,7 +61,7 @@ export default function RegisterPage() {
       <h1 className="sr-only">Đăng ký</h1>
       <AuthTabs />
       <p className="mb-4 text-au-body text-au-ink/60">
-        Đăng tin và nhận gợi ý ghép cặp cho món đồ thất lạc.
+        Đăng tin và nhận manh mối cho món đồ thất lạc.
       </p>
 
       {error && (

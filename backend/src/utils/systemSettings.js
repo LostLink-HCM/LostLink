@@ -11,9 +11,7 @@ const settingError = (key, value) => {
     return value > rule.min && value < rule.max ? null : 'Nhập số lớn hơn 0 và nhỏ hơn 1.'
   }
   if (value < rule.min || value > rule.max) {
-    return rule.max === Number.MAX_SAFE_INTEGER
-      ? 'Nhập số ngày nguyên dương hợp lệ.'
-      : `Nhập số từ ${rule.min.toLocaleString('vi-VN')} đến ${rule.max.toLocaleString('vi-VN')}.`
+    return `Nhập số từ ${rule.min.toLocaleString('vi-VN')} đến ${rule.max.toLocaleString('vi-VN')}.`
   }
   return null
 }

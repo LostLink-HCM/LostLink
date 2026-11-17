@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
-import { communityStats } from '../../../data/homeFeed'
+import { useCommunityBoard } from '../../../hooks/useCommunityBoard'
 import { profilePath } from '../../../lib/user/profiles'
-import { quarterLabel, quarterLeaders } from '../../../lib/user/reputation'
+import { communityStatItems, quarterLabel } from '../../../lib/user/reputation'
 import Avatar from '../Avatar'
 import Card from '../Card'
 import { cx, focusRing } from '../classes'
@@ -43,7 +43,8 @@ function LeaderRow({ leader }) {
 }
 export default function RightRail({ isGuest, limit = 5, titled = true }) {
   const { pathname } = useLocation()
-  const leaders = quarterLeaders().slice(0, limit)
+  const { leaders, stats, loading, failed } = useCommunityBoard(limit)
+  if (failed) return null
 
   return (
     <div className="flex flex-col gap-4">
@@ -57,7 +58,13 @@ export default function RightRail({ isGuest, limit = 5, titled = true }) {
         <p className="mt-0 mb-3 text-tiny text-ink-muted">
           Xếp theo điểm uy tín kiếm được trong quý
         </p>
-        {leaders.length ? (
+        {loading ? (
+          <div role="status" aria-label="Đang tải bảng vinh danh" className="flex flex-col gap-2">
+            {[0, 1, 2].map((key) => (
+              <div key={key} className="h-10 animate-pulse rounded-xl bg-line-subtle" />
+            ))}
+          </div>
+        ) : leaders.length ? (
           <ol className="m-0 flex list-none flex-col gap-0.5 p-0">
             {leaders.map((leader) => (
               <li key={leader.username}>
@@ -88,7 +95,7 @@ export default function RightRail({ isGuest, limit = 5, titled = true }) {
       <section className="rounded-2xl bg-[#1b3358] p-4.5 text-white">
         <h2 className="m-0 mb-4.5 text-body font-bold">Cộng đồng LostLink</h2>
         <dl className="m-0 grid grid-cols-2 gap-x-3 gap-y-5">
-          {communityStats.map((stat) => (
+          {(stats ? communityStatItems(stats) : []).map((stat) => (
             <div key={stat.label} className="flex flex-col-reverse">
               <dt className="mt-0.5 text-micro text-[#94a4bc]">{stat.label}</dt>
               <dd
