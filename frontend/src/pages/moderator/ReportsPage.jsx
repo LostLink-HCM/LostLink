@@ -21,8 +21,8 @@ import {
 } from '../../lib/moderator/moderation'
 import { downloadCsv } from '../../lib/csv'
 import usePaginatedFilter from '../../hooks/usePaginatedFilter'
+import useBackofficePageSize from '../../hooks/useBackofficePageSize'
 
-const PAGE_SIZE = 6
 const EMPTY_FILTERS = { targetType: 'account', severity: '', from: '', to: '', query: '' }
 
 const SEVERITY_TONES = { high: 'danger', medium: 'warning', low: 'success' }
@@ -105,6 +105,7 @@ function RelatedReportHistory({ reports }) {
 }
 
 export default function Reports() {
+  const pageSize = useBackofficePageSize()
   const { reports, setReports, posts } = useOutletContext()
   const [modal, setModal] = useState(null)
   const [notice, setNotice] = useState('')
@@ -120,7 +121,7 @@ export default function Reports() {
     items: reports,
     initialFilters: EMPTY_FILTERS,
     filterFn: filterModeratorReports,
-    pageSize: PAGE_SIZE,
+    pageSize,
   })
   const selected = modal && reports.find((report) => report.id === modal.id && !report.resolution)
   const selectedCode = selected ? getDisplayCode(selected, posts) : ''
@@ -326,7 +327,7 @@ export default function Reports() {
       <Pagination
         page={currentPage}
         total={filtered.length}
-        pageSize={PAGE_SIZE}
+        pageSize={pageSize}
         onChange={setPage}
         noun="report"
       />

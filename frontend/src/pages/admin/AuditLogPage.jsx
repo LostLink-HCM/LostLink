@@ -10,6 +10,7 @@ import IconButton from '../../components/backoffice/IconButton'
 import Notice from '../../components/backoffice/Notice'
 import Pagination from '../../components/backoffice/Pagination'
 import { createAdminAudit } from '../../data/adminAudit'
+import useBackofficePageSize from '../../hooks/useBackofficePageSize'
 import { downloadCsv } from '../../lib/csv'
 import {
   AUDIT_ACTIONS,
@@ -24,8 +25,6 @@ import {
   formatAuditDate,
 } from '../../lib/admin/audit'
 
-const PAGE_SIZE = 8
-
 const actionIcons = {
   lock: 'lock',
   hide: 'lock',
@@ -37,14 +36,15 @@ const actionIcons = {
 const roleTones = { Admin: 'primary', Moderator: 'info' }
 
 export default function AuditLog() {
+  const pageSize = useBackofficePageSize()
   const [filters, setFilters] = useState(AUDIT_FILTERS)
   const [page, setPage] = useState(1)
   const [notice, setNotice] = useState('')
   const [logs] = useState(createAdminAudit)
   const filtered = useMemo(() => filterAuditLogs(logs, filters), [filters, logs])
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
   const currentPage = Math.min(page, pageCount)
-  const visible = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   useEffect(() => {
     if (!notice) return undefined
@@ -221,7 +221,7 @@ export default function AuditLog() {
       <Pagination
         page={currentPage}
         total={filtered.length}
-        pageSize={PAGE_SIZE}
+        pageSize={pageSize}
         onChange={setPage}
         noun="bản ghi"
       />

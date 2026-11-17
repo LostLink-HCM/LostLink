@@ -14,6 +14,8 @@ const notificationRoutes = require('./notificationRoutes')
 const claimRoutes = require('./claimRoutes')
 const conversationRoutes = require('./conversationRoutes')
 const adminUserRoutes = require('./adminUserRoutes')
+const adminSettingsRoutes = require('./adminSettingsRoutes')
+const backofficeSettingsRoutes = require('./backofficeSettingsRoutes')
 
 const router = Router()
 
@@ -33,6 +35,7 @@ router.get('/health', (req, res) => {
 router.use('/auth', authRoutes)
 router.use('/posts', postRoutes)
 router.use('/moderator', moderationRoutes)
+router.use('/backoffice/settings', backofficeSettingsRoutes)
 router.use('/backoffice', backofficePostRoutes)
 router.use('/geo', geoRoutes)
 router.use('/categories', categoryRoutes)
@@ -41,6 +44,7 @@ router.use('/comments', commentRoutes)
 router.use('/notifications', notificationRoutes)
 router.use('/claims', claimRoutes)
 router.use('/conversations', conversationRoutes)
+router.use('/admin/settings', adminSettingsRoutes)
 router.use('/admin', adminUserRoutes)
 
 module.exports = router

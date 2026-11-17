@@ -22,9 +22,9 @@ import {
 } from '../../lib/moderator/reviewPosts'
 import { downloadCsv } from '../../lib/csv'
 import usePaginatedFilter from '../../hooks/usePaginatedFilter'
+import useBackofficePageSize from '../../hooks/useBackofficePageSize'
 
 const EMPTY_FILTERS = { category: '', type: '', district: '', from: '', to: '', query: '' }
-const PAGE_SIZE = 8
 
 const CATEGORY_TONES = {
   'Đồ điện tử': 'primary',
@@ -55,6 +55,7 @@ function Meta({ icon, children }) {
 }
 
 export default function Review() {
+  const pageSize = useBackofficePageSize()
   const {
     reviewPosts: posts,
     setReviewPosts,
@@ -95,7 +96,7 @@ export default function Review() {
     items: apiPosts ?? posts,
     initialFilters: EMPTY_FILTERS,
     filterFn: keepServerFilteredPosts,
-    pageSize: PAGE_SIZE,
+    pageSize,
   })
   const hasActiveFilters = Boolean(
     filters.query.trim() ||
@@ -346,8 +347,8 @@ export default function Review() {
       </section>
 
       <p className="mt-4 mb-2.5 text-small text-ink-subtle">
-        Hiển thị {filtered.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0}–
-        {Math.min(currentPage * PAGE_SIZE, filtered.length)} trong số {filtered.length} bài đăng
+        Hiển thị {filtered.length ? (currentPage - 1) * pageSize + 1 : 0}–
+        {Math.min(currentPage * pageSize, filtered.length)} trong số {filtered.length} bài đăng
       </p>
       {listLoading && (
         <Notice>
@@ -453,7 +454,7 @@ export default function Review() {
       <Pagination
         page={currentPage}
         total={filtered.length}
-        pageSize={PAGE_SIZE}
+        pageSize={pageSize}
         onChange={setPage}
         noun="bài đăng"
         showSummary={false}
