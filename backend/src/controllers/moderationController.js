@@ -17,14 +17,14 @@ const getPendingPostDetails = asyncHandler(async (req, res) => {
 
 const approvePendingPost = asyncHandler(async (req, res) => {
   const { id } = matchedData(req, { locations: ['params'] })
-  const data = await moderationService.approvePendingPost(id, req.user._id)
+  const data = await moderationService.approvePendingPost(id, req.user)
   res.json({ success: true, data })
 })
 
 const rejectPendingPost = asyncHandler(async (req, res) => {
   const { id } = matchedData(req, { locations: ['params'] })
   const { reason } = matchedData(req, { locations: ['body'] })
-  const data = await moderationService.rejectPendingPost(id, req.user._id, reason)
+  const data = await moderationService.rejectPendingPost(id, req.user, reason)
   res.json({ success: true, data })
 })
 

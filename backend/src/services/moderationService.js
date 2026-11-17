@@ -5,6 +5,7 @@ const { runMatching } = require('./matchingService')
 const { notify } = require('./notificationService')
 const { escapeRegex, lowercaseText, normalizeText } = require('../utils/text')
 const { endOfVnDay, startOfVnDay } = require('../utils/vnTime')
+const { updatePostWithAudit } = require('./postAuditService')
 
 const categoryNotFound = () =>
   new ApiError(
@@ -134,22 +135,28 @@ const afterApproved = async (postId) => {
   }
 }
 
-const changePendingPostStatus = async ({ id, moderatorId, status, note = '' }) => {
-  const post = await Post.findOneAndUpdate(
-    { _id: id, status: 'pending' },
-    {
+const changePendingPostStatus = async ({ id, moderator, status, note = '' }) => {
+  const moderatorId = moderator._id
+  const changedAt = new Date()
+  const post = await updatePostWithAudit({
+    filter: { _id: id, status: 'pending' },
+    actor: moderator,
+    action: status === 'searching' ? 'approve' : 'reject',
+    reason: note,
+    fields: ['status'],
+    changedAt,
+    update: {
       $set: { status },
       $push: {
         statusHistory: {
           status,
           changedBy: moderatorId,
           note,
-          changedAt: new Date(),
+          changedAt,
         },
       },
     },
-    { returnDocument: 'after', runValidators: true }
-  ).select('_id code status owner title')
+  })
 
   if (!post) {
     const exists = await Post.exists({ _id: id })
@@ -183,11 +190,11 @@ const changePendingPostStatus = async ({ id, moderatorId, status, note = '' }) =
   return { id: String(post._id), code: post.code, status: post.status }
 }
 
-const approvePendingPost = (id, moderatorId) =>
-  changePendingPostStatus({ id, moderatorId, status: 'searching' })
+const approvePendingPost = (id, moderator) =>
+  changePendingPostStatus({ id, moderator, status: 'searching' })
 
-const rejectPendingPost = (id, moderatorId, reason) =>
-  changePendingPostStatus({ id, moderatorId, status: 'rejected', note: reason })
+const rejectPendingPost = (id, moderator, reason) =>
+  changePendingPostStatus({ id, moderator, status: 'rejected', note: reason })
 
 module.exports = {
   listPendingPosts,

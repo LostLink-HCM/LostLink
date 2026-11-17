@@ -9,6 +9,7 @@
     "dev": "nodemon server.js",
     "seed": "node src/seeds/index.js",
     "seed:settings": "node src/seeds/index.js --settings-only",
+    "seed:audit": "node src/seeds/index.js --audit-only",
     "seed:demo": "node src/seeds/index.js --demo",
     "db:sync-indexes": "node src/scripts/syncIndexes.js",
     "lint": "oxlint --deny-warnings",
