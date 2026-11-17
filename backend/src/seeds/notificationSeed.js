@@ -154,15 +154,15 @@ const seedNotifications = async () => {
     const lostOwner = ownerOf.get(String(match.postLost))
     const foundOwner = ownerOf.get(String(match.postFound))
     if (!lostOwner || !foundOwner) continue
-    const fields = {
-      type: 'match',
-      refId: match.postLost,
-      preview: titleOf.get(String(match.postFound)),
-    }
-    add(lostOwner, fields, match.createdAt)
+    const fields = { type: 'match', match: match._id, isSuppressed: false }
+    add(
+      lostOwner,
+      { ...fields, refId: match.postLost, preview: titleOf.get(String(match.postFound)) },
+      match.createdAt
+    )
     add(
       foundOwner,
-      { type: 'match', refId: match.postFound, preview: titleOf.get(String(match.postLost)) },
+      { ...fields, refId: match.postFound, preview: titleOf.get(String(match.postLost)) },
       match.createdAt
     )
   }

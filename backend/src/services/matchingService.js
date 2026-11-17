@@ -5,6 +5,7 @@ const {
   CategoryMatchRelation,
   CategoryMatchRelationMember,
   MatchSuggestion,
+  Notification,
   Post,
   SystemConfig,
   UserBlock,
@@ -239,6 +240,7 @@ const saveSuggestion = async (lost, found, result, config) => {
     if (existing && existing.state !== 'stale') {
       existing.state = 'stale'
       await existing.save()
+      await syncMatchNotices([existing._id])
     }
     return null
   }
@@ -256,14 +258,72 @@ const saveSuggestion = async (lost, found, result, config) => {
     if (error.code === 11000) return null
     throw error
   }
-  return { revived: !wasActive, wasStrong }
+  return { id: suggestion._id, revived: !wasActive, wasStrong }
 }
 
-const notifyMatch = (lost, found) =>
-  Promise.all([
-    notify([lost.owner], { type: 'match', refType: 'Post', refId: lost._id, text: found.title }),
-    notify([found.owner], { type: 'match', refType: 'Post', refId: found._id, text: lost.title }),
+// Ẩn thông báo manh mối khi manh mối hết hiệu lực hoặc một trong hai bài bị ẩn/xoá
+const syncMatchNotices = async (matchIds) => {
+  if (!matchIds.length) return
+  const matches = await MatchSuggestion.find({ _id: { $in: matchIds } })
+    .select('postLost postFound state')
+    .lean()
+  const shownPosts = new Set(
+    (
+      await Post.find({
+        _id: { $in: matches.flatMap((match) => [match.postLost, match.postFound]) },
+        isHidden: false,
+      }).distinct('_id')
+    ).map(String)
+  )
+  const shown = matches
+    .filter(
+      (match) =>
+        VISIBLE_STATES.includes(match.state) &&
+        shownPosts.has(String(match.postLost)) &&
+        shownPosts.has(String(match.postFound))
+    )
+    .map((match) => String(match._id))
+  const shownSet = new Set(shown)
+  const suppressed = matchIds.map(String).filter((id) => !shownSet.has(id))
+  await Promise.all([
+    shown.length &&
+      Notification.updateMany(
+        { match: { $in: shown }, isSuppressed: true },
+        { isSuppressed: false }
+      ),
+    suppressed.length &&
+      Notification.updateMany(
+        { match: { $in: suppressed }, isSuppressed: { $ne: true } },
+        { isSuppressed: true }
+      ),
   ])
+}
+
+// Mọi manh mối có bài này ở một phía, dùng khi bài bị ẩn/hiện hoặc đổi trạng thái
+const syncPostMatchNotices = async (postId) =>
+  syncMatchNotices(
+    await MatchSuggestion.find({ $or: [{ postLost: postId }, { postFound: postId }] }).distinct(
+      '_id'
+    )
+  )
+
+// Báo hai bên; bên nào đã có thông báo của cặp này (đang ẩn rồi được hiện lại) thì không báo trùng
+const notifyMatch = async (lost, found, matchId) => {
+  const notified = new Set(
+    (await Notification.distinct('user', { type: 'match', match: matchId })).map(String)
+  )
+  const sides = [
+    [lost.owner, lost._id, found.title],
+    [found.owner, found._id, lost.title],
+  ]
+  await Promise.all(
+    sides
+      .filter(([owner]) => !notified.has(String(owner)))
+      .map(([owner, refId, text]) =>
+        notify([owner], { type: 'match', refType: 'Post', refId, match: matchId, text })
+      )
+  )
+}
 
 const blockedUsersOf = async (userId) => {
   const blocks = await UserBlock.find({ $or: [{ blocker: userId }, { blocked: userId }] }).lean()
@@ -331,10 +391,13 @@ const runMatching = async (postId, { silent = false } = {}) => {
     if (!result) continue
     const saved = await saveSuggestion(lost, found, result, config)
     if (!saved) continue
-    if (saved.revived) created += 1
+    if (saved.revived) {
+      created += 1
+      await syncMatchNotices([saved.id])
+    }
     // Chỉ báo khi gợi ý vừa thành mạnh, gợi ý yếu chỉ hiện trong danh sách
     if (!silent && result.score >= config.strong && !saved.wasStrong) {
-      await notifyMatch(lost, found)
+      await notifyMatch(lost, found, saved.id)
     }
   }
   return { created }
@@ -391,7 +454,7 @@ const traitsOf = async (posts) => {
 const listMyMatches = async (user) => {
   const config = await loadConfig()
   const myPosts = await populatePost(
-    Post.find({ owner: user._id, status: { $in: MATCHABLE_STATUSES } }).sort({
+    Post.find({ owner: user._id, status: { $in: MATCHABLE_STATUSES }, isHidden: false }).sort({
       createdAt: -1,
       _id: -1,
     })
@@ -447,7 +510,11 @@ const listMyMatches = async (user) => {
 
 // Số gợi ý chưa phản hồi cho huy hiệu, cùng điều kiện với listMyMatches
 const countPendingMatches = async (user) => {
-  const myPosts = await Post.find({ owner: user._id, status: { $in: MATCHABLE_STATUSES } })
+  const myPosts = await Post.find({
+    owner: user._id,
+    status: { $in: MATCHABLE_STATUSES },
+    isHidden: false,
+  })
     .select('type')
     .lean()
   if (!myPosts.length) return { pending: 0 }
@@ -512,6 +579,7 @@ const confirmMatch = async (id, user) => {
       { _id: match._id, state: { $in: ACTIVE_STATES } },
       { $set: { state: 'stale' } }
     )
+    await syncMatchNotices([match._id])
     throw matchStale()
   }
   // Một lệnh duy nhất để hai bên xác nhận cùng lúc vẫn đúng
@@ -552,6 +620,7 @@ const rejectMatch = async (id, user) => {
   if (!updated) {
     throw ApiError.conflict('Cả hai bên đã xác nhận manh mối này.', 'MATCH_CONFIRMED')
   }
+  await syncMatchNotices([updated._id])
   return { id: updated._id, state: updated.state }
 }
 
@@ -564,4 +633,6 @@ module.exports = {
   countPendingMatches,
   confirmMatch,
   rejectMatch,
+  syncMatchNotices,
+  syncPostMatchNotices,
 }

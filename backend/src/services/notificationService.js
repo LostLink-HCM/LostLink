@@ -83,7 +83,7 @@ const pushNew = async (docs, pushOf) => {
     actor ? User.findById(actor).select('username avatarUrl').lean() : null,
     refType === 'Post' ? Post.findById(refId).select(POST_REF_FIELDS).lean() : null,
     Notification.aggregate([
-      { $match: { user: { $in: docs.map((doc) => doc.user) }, isRead: false } },
+      { $match: { user: { $in: docs.map((doc) => doc.user) }, isRead: false, ...SHOWN } },
       { $group: { _id: '$user', unread: { $sum: 1 } } },
     ]),
   ])
@@ -98,10 +98,16 @@ const pushNew = async (docs, pushOf) => {
   }
 }
 
+// Thông báo đang bị ẩn (manh mối tạm không hiệu lực) coi như không có
+const SHOWN = { isSuppressed: { $ne: true } }
+
 const groupOf = (type) => Object.keys(GROUPS).find((group) => GROUPS[group].includes(type))
 
 // Chỗ duy nhất tạo thông báo. Bỏ người trùng, người gây ra và người đã tắt nhóm thông báo này
-const notify = async (userIds, { type, actor = null, refType = null, refId = null, text = '' }) => {
+const notify = async (
+  userIds,
+  { type, actor = null, refType = null, refId = null, match = null, text = '' }
+) => {
   const ids = [...new Set(userIds.map(String))].filter((id) => id !== String(actor))
   if (!ids.length) return
   const settings = await User.find({ _id: { $in: ids } })
@@ -116,7 +122,7 @@ const notify = async (userIds, { type, actor = null, refType = null, refId = nul
   const recipients = ids.filter((id) => !muted.has(id))
   if (!recipients.length) return
   const docs = await Notification.insertMany(
-    recipients.map((user) => ({ user, type, actor, refType, refId, preview: preview(text) }))
+    recipients.map((user) => ({ user, type, actor, refType, refId, match, preview: preview(text) }))
   )
   // Thông báo đã lưu, lỗi khi đẩy qua socket chỉ ghi log
   try {
@@ -133,10 +139,10 @@ const groupFilter = (group) => (group ? { type: { $in: GROUPS[group] } } : {})
 
 // Mới nhất trước, lọc theo nhóm, kèm tổng số và số chưa đọc
 const listNotifications = async (user, { group, page = 1, limit = 20 }) => {
-  const filter = { user: user._id, ...groupFilter(group) }
+  const filter = { user: user._id, ...SHOWN, ...groupFilter(group) }
   const [total, unread, items] = await Promise.all([
     Notification.countDocuments(filter),
-    Notification.countDocuments({ user: user._id, isRead: false }),
+    Notification.countDocuments({ user: user._id, isRead: false, ...SHOWN }),
     Notification.find(filter)
       .sort({ createdAt: -1, _id: -1 })
       .skip((page - 1) * limit)
@@ -156,12 +162,15 @@ const listNotifications = async (user, { group, page = 1, limit = 20 }) => {
 }
 
 const unreadCount = async (user) => ({
-  unread: await Notification.countDocuments({ user: user._id, isRead: false }),
+  unread: await Notification.countDocuments({ user: user._id, isRead: false, ...SHOWN }),
 })
 
 // Chỉ đánh dấu thông báo của mình, của người khác coi như không tồn tại
 const markRead = async (user, id) => {
-  const result = await Notification.updateOne({ _id: id, user: user._id }, { isRead: true })
+  const result = await Notification.updateOne(
+    { _id: id, user: user._id, ...SHOWN },
+    { isRead: true }
+  )
   if (!result.matchedCount) {
     throw new ApiError(404, 'Thông báo không tồn tại.', undefined, 'NOTIFICATION_NOT_FOUND')
   }
@@ -169,7 +178,8 @@ const markRead = async (user, id) => {
 }
 
 const markAllRead = async (user) => {
-  await Notification.updateMany({ user: user._id, isRead: false }, { isRead: true })
+  // Thông báo đang ẩn giữ nguyên trạng thái để hiện lại đúng như cũ
+  await Notification.updateMany({ user: user._id, isRead: false, ...SHOWN }, { isRead: true })
   return { unread: 0 }
 }
 

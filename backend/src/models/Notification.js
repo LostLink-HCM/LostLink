@@ -50,6 +50,9 @@ const notificationSchema = new Schema(
 
     preview: { type: String, default: '' },
 
+    match: { type: Schema.Types.ObjectId, ref: 'MatchSuggestion', default: null, index: true },
+    isSuppressed: { type: Boolean, default: false },
+
     isRead: { type: Boolean, default: false },
     // Moderator/Admin ghim thông báo quan trọng
     isPinned: { type: Boolean, default: false },
