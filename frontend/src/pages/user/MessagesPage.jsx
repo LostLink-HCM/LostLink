@@ -457,7 +457,7 @@ export default function MessagesPage() {
                 onClick={() => setMobileConversation(false)}
               />
               <span className="max-sm:hidden">
-                <Avatar initials={active.peer.initials} />
+                <Avatar initials={active.peer.initials} src={active.peer.avatarUrl} />
               </span>
               <div className="min-w-0 flex-1">
                 <h2 className="m-0 truncate text-small font-semibold text-ink">
@@ -469,7 +469,7 @@ export default function MessagesPage() {
                 </p>
               </div>
               <div className="flex shrink-0 gap-1">
-                {trade && (
+                {trade && !active.peer.deleted && (
                   <>
                     <IconButton
                       icon="user"

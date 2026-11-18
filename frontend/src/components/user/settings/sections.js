@@ -1,5 +1,10 @@
-// Các mục của trang Cài đặt, dùng cho menu bên trái (desktop) và danh sách mục (mobile)
 export const SETTINGS_SECTIONS = [
+  {
+    to: 'profile',
+    label: 'Trang cá nhân',
+    icon: 'user',
+    description: 'Ảnh đại diện, giới thiệu',
+  },
   {
     to: 'account',
     label: 'Tài khoản',
@@ -14,7 +19,7 @@ export const SETTINGS_SECTIONS = [
   },
   {
     to: 'areas',
-    label: 'Khu vực để ý',
+    label: 'Khu vực theo dõi',
     icon: 'pin',
     description: 'Vùng muốn nhận tin bài mới',
   },
@@ -25,6 +30,4 @@ export const SETTINGS_SECTIONS = [
     description: 'Người bạn đã chặn, bỏ chặn khi đổi ý',
   },
 ]
-
-// Màn từ breakpoint lg trở lên có menu bên trái, nhỏ hơn thì dùng danh sách mục
 export const DESKTOP_QUERY = '(min-width: 64rem)'

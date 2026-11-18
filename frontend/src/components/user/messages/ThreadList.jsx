@@ -116,7 +116,7 @@ export default function ThreadList({
                   focusRing
                 )}
               >
-                <Avatar initials={thread.peer.initials} />
+                <Avatar initials={thread.peer.initials} src={thread.peer.avatarUrl} />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-baseline justify-between gap-2">
                     <strong

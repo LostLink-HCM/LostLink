@@ -28,17 +28,18 @@ export default function Composer({
   const galleryRef = useRef(null)
   const { status, peer } = thread
 
-  // Hội thoại bị khoá: hai bên chặn nhau, hoặc bài đăng đã bị xoá
   if (status === 'locked') {
     return (
       <p className="m-0 flex flex-wrap items-center gap-2 border-t border-line bg-surface-muted px-5 py-4 text-caption text-ink-muted">
         <Icon name="lock" size={15} className="shrink-0" />
         <span className="min-w-0 flex-1">
-          {thread.post
-            ? 'Không thể nhắn tin vì hai bên đã chặn nhau.'
-            : 'Bài đăng đã bị xoá nên hội thoại đã đóng.'}
+          {peer.deleted
+            ? 'Người kia đã xóa tài khoản nên hội thoại đã đóng.'
+            : thread.post
+              ? 'Không thể nhắn tin vì hai bên đã chặn nhau.'
+              : 'Bài đăng đã bị xoá nên hội thoại đã đóng.'}
         </span>
-        {thread.post && (
+        {thread.post && !peer.deleted && (
           <Link
             to={profilePath(peer.name)}
             className={cx(

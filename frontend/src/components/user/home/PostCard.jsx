@@ -11,7 +11,6 @@ const Dot = () => (
   <span aria-hidden="true" className="size-0.75 shrink-0 rounded-full bg-line-strong" />
 )
 
-// Ảnh cao theo phần chữ của thẻ, không để lại khoảng trống dưới mô tả
 const imageClass = 'absolute inset-0 size-full rounded-xl bg-line-subtle'
 
 // Thứ hạng ở trang Tin hot: ba bài đầu nổi bật hơn
@@ -125,8 +124,7 @@ export default function PostCard({
         <div className="mt-auto flex items-center gap-x-3.5 text-tiny text-ink-subtle">
           <LikeButton
             liked={liked}
-            // likeCount từ API đã gồm lượt của mình, dữ liệu mẫu thì cộng thêm
-            count={likeCount ?? post.likes + (liked ? 1 : 0)}
+            count={likeCount}
             onClick={onToggleLike}
             className="relative z-10 h-7 px-2.5"
           />

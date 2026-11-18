@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { cx } from './classes'
 
 const sizes = {
@@ -14,18 +15,31 @@ const tones = {
   neutral: 'bg-line-subtle text-ink-secondary',
 }
 
-export default function Avatar({ name, initials, size = 'lg', tone = 'primary', className }) {
+export default function Avatar({ name, initials, src, size = 'lg', tone = 'primary', className }) {
+  const [failedSrc, setFailedSrc] = useState(null)
+  const showImage = src && failedSrc !== src
+
   return (
     <span
       aria-hidden="true"
       className={cx(
-        'grid shrink-0 place-items-center rounded-full font-bold',
+        'grid shrink-0 place-items-center overflow-hidden rounded-full font-bold',
         sizes[size],
         tones[tone],
         className
       )}
     >
-      {initials ?? name.slice(0, 2).toUpperCase()}
+      {showImage ? (
+        <img
+          src={src}
+          alt=""
+          loading="lazy"
+          className="size-full object-cover"
+          onError={() => setFailedSrc(src)}
+        />
+      ) : (
+        (initials ?? name.slice(0, 2).toUpperCase())
+      )}
     </span>
   )
 }

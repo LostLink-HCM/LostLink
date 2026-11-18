@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { AREAS, CATEGORIES } from '../../../data/homeFeed'
+import { AREAS } from '../../../data/homeFeed'
+import { useFeedCategories } from '../../../hooks/useFeedCategories'
 import { TIME_RANGES, TYPE_LABELS } from '../../../lib/user/homeFeed'
 import Icon from '../../common/Icon'
 import Button from '../Button'
@@ -52,6 +53,8 @@ export default function FeedFilters({
   scrollBody = false,
 }) {
   const setDate = (key) => (e) => onChange({ [key]: e.target.value, range: 'custom' })
+  const categories = useFeedCategories()
+  const categoryName = (slug) => categories.find((item) => item.slug === slug)?.name ?? ''
 
   return (
     <form
@@ -122,10 +125,11 @@ export default function FeedFilters({
         <PickList
           legend="Danh mục"
           value={draft.category}
-          options={CATEGORIES}
+          options={categories.map((item) => item.slug)}
+          labelOf={categoryName}
           allLabel="Tất cả danh mục"
           unit="danh mục"
-          renderIcon={(name) => <CategoryIcon name={name || 'Tất cả'} size={14} />}
+          renderIcon={(slug) => <CategoryIcon name={categoryName(slug) || 'Tất cả'} size={14} />}
           onPick={(category) => onChange({ category })}
         />
 
@@ -199,7 +203,17 @@ export default function FeedFilters({
 
 // Danh sách chọn một: thu gọn chỉ còn hàng đang chọn ('' = Tất cả), bấm "Xem tất cả" để mở,
 // chọn xong tự thu gọn. Dùng chung cho Danh mục và Khu vực
-function PickList({ legend, value, options, allLabel, unit, renderIcon, onPick }) {
+// labelOf: giá trị → tên hiển thị (danh mục lưu slug, hiện tên)
+function PickList({
+  legend,
+  value,
+  options,
+  labelOf = (option) => option,
+  allLabel,
+  unit,
+  renderIcon,
+  onPick,
+}) {
   const [expanded, setExpanded] = useState(false)
   const shown = expanded ? ['', ...options] : [value]
 
@@ -234,7 +248,7 @@ function PickList({ legend, value, options, allLabel, unit, renderIcon, onPick }
               >
                 {renderIcon(option)}
               </span>
-              {option || allLabel}
+              {option ? labelOf(option) || option : allLabel}
             </button>
           )
         })}

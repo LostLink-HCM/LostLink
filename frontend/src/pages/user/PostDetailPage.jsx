@@ -206,6 +206,7 @@ function PostDetail({ post, onChanged }) {
   const toCommentItem = (data) => ({
     id: data.id,
     author: data.author?.username ?? user.username,
+    authorAvatar: data.author?.avatarUrl ?? user.avatarUrl ?? null,
     text: data.body,
     createdAt: data.createdAt,
     editedAt: data.editedAt,
@@ -325,7 +326,7 @@ function PostDetail({ post, onChanged }) {
                 focusRing
               )}
             >
-              <Avatar name={post.author} size="xs" />
+              <Avatar name={post.author} src={post.authorAvatar} size="xs" />
               {post.author}
               <Icon name="next" size={14} className="text-ink-subtle" />
             </button>
@@ -404,7 +405,7 @@ function PostDetail({ post, onChanged }) {
         >
           <Card as="section" padding="md">
             <div className="mb-4 flex items-center gap-3">
-              <Avatar name={post.author} size="xl" />
+              <Avatar name={post.author} src={post.authorAvatar} size="xl" />
               <h2 className="m-0 min-w-0 truncate text-body font-semibold text-ink">
                 {post.author}
               </h2>

@@ -1,16 +1,5 @@
 import { postPath } from './homeFeed'
 
-// Biểu tượng và màu theo nhóm hiển thị
-export const NOTIFICATION_TYPES = {
-  match: { icon: 'search', tone: 'bg-primary-soft text-primary' },
-  contact: { icon: 'chat', tone: 'bg-success-soft text-success' },
-  comment: { icon: 'reply', tone: 'bg-warning-soft text-warning' },
-  post: { icon: 'check', tone: 'bg-info-soft text-info' },
-  report: { icon: 'flag', tone: 'bg-neutral-soft text-neutral' },
-  area: { icon: 'pin', tone: 'bg-danger-soft text-danger-ink' },
-}
-
-// Tab lọc, trùng tên nhóm với API
 export const NOTIFICATION_GROUPS = {
   trade: { label: 'Manh mối & liên hệ', short: 'Manh mối', types: ['match', 'contact'] },
   post: { label: 'Bài đăng', types: ['post', 'comment', 'area'] },
@@ -53,7 +42,11 @@ const DESCRIBE = {
     title: 'Một bài bạn đang trao đổi đã bị xoá',
     body: item.text,
   }),
-  area_post: (item) => ({ kind: 'area', title: 'Có bài mới ở khu vực bạn để ý', body: item.text }),
+  area_post: (item) => ({
+    kind: 'area',
+    title: 'Có bài mới trong khu vực bạn theo dõi',
+    body: item.text,
+  }),
   following_post: (item) => ({
     kind: 'post',
     title: `${item.actor?.username ?? 'Người bạn theo dõi'} vừa đăng bài mới`,
@@ -170,6 +163,7 @@ export function describeNotification(item) {
     ...described,
     visual: VISUALS[item.type] ?? GROUP_VISUALS[GROUP_OF[item.type] ?? 'post'],
     person: PERSONAL_TYPES.includes(item.type) ? (item.actor?.username ?? null) : null,
+    personAvatar: item.actor?.avatarUrl ?? null,
     id: item.id,
     unread: !item.isRead,
     createdAt: item.createdAt,
