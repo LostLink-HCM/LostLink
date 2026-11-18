@@ -6,7 +6,6 @@ import Card from '../../../components/user/Card'
 import { cx, focusRing } from '../../../components/user/classes'
 import { SETTINGS_SECTIONS } from '../../../components/user/settings/sections'
 
-// Cài đặt: desktop có menu các mục bên trái, Mobile chọn mục ở danh sách rồi vào trang con
 export default function SettingsLayout() {
   // Chuyển tiếp dữ liệu của UserLayout xuống các mục con
   const context = useOutletContext()
@@ -34,7 +33,7 @@ export default function SettingsLayout() {
         )}
       </h1>
       <p className={cx('m-0 mb-5 text-small text-ink-muted', current && 'max-lg:hidden')}>
-        Quản lý tài khoản, thông báo, khu vực để ý và những người bạn đã chặn.
+        Quản lý tài khoản, thông báo, khu vực theo dõi và những người bạn đã chặn.
       </p>
 
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">

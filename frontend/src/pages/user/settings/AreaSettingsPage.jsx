@@ -19,7 +19,6 @@ const FAILED = 'Đã có lỗi xảy ra, vui lòng thử lại.'
 
 const areaName = (area) => area.name || 'Khu vực không tên'
 
-// Mục Khu vực để ý: bật/tắt và thêm vùng chỉ lưu khi bấm "Lưu thay đổi", xóa thì lưu ngay
 export default function AreaSettingsPage() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -40,7 +39,7 @@ export default function AreaSettingsPage() {
     return (
       <div
         role="status"
-        aria-label="Đang tải khu vực để ý"
+        aria-label="Đang tải khu vực theo dõi"
         className="h-64 animate-pulse rounded-2xl bg-line-subtle"
       />
     )
@@ -48,7 +47,7 @@ export default function AreaSettingsPage() {
   if (!areas) {
     return (
       <Card className="pb-8">
-        <EmptyState icon="warning" title="Không thể tải khu vực để ý, vui lòng thử lại" />
+        <EmptyState icon="warning" title="Không thể tải khu vực theo dõi, vui lòng thử lại" />
         <div className="flex justify-center">
           <Button onClick={reload}>Thử lại</Button>
         </div>
@@ -135,7 +134,7 @@ export default function AreaSettingsPage() {
   return (
     <>
       <SettingsCard
-        title="Khu vực để ý"
+        title="Khu vực theo dõi"
         description="Khi có bài mới được duyệt trong các khu vực đang bật, LostLink sẽ báo cho bạn."
         actions={
           !adding && (

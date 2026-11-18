@@ -21,20 +21,18 @@ export function validateMessage(text, { intro = false } = {}) {
   return ''
 }
 
-const peerNamed = (name, role = 'user') => ({
+// Server trả peer null khi người kia đã xóa tài khoản
+export const DELETED_ACCOUNT = 'Tài khoản đã bị xóa'
+
+const peerNamed = (name, role = 'user', avatarUrl = null) => ({
   name,
   initials: name.slice(0, 2).toUpperCase(),
   role,
+  avatarUrl,
 })
 
-export const peerOf = (post) => peerNamed(post.author)
+export const peerOf = (post) => peerNamed(post.author, 'user', post.authorAvatar ?? null)
 
-// ----- Ba loại mục trong danh sách Tin nhắn:
-// conversation: kênh trò chuyện đã mở (trao trả hoặc hỗ trợ), dữ liệu từ /conversations
-// claim: yêu cầu liên hệ đang chờ hoặc bị từ chối, dữ liệu từ /claims
-// request: lời giới thiệu đang soạn, chỉ có trên máy cho tới khi gửi
-
-// Chủ bài: bài Nhặt được thì chủ bài là người nhặt (không phải người nhận lại đồ) và ngược lại
 const ownsPost = (post, receiver) => (post.type === 'found') !== Boolean(receiver)
 
 export function conversationThread(item) {
@@ -46,7 +44,9 @@ export function conversationThread(item) {
     kind: item.kind,
     peer: support
       ? { ...peerNamed(item.peer?.username ?? 'Moderator', 'moderator'), label: 'Hỗ trợ LostLink' }
-      : peerNamed(item.peer?.username ?? 'Người dùng'),
+      : item.peer
+        ? peerNamed(item.peer.username, 'user', item.peer.avatarUrl ?? null)
+        : { ...peerNamed(DELETED_ACCOUNT), deleted: true },
     post: item.post ? { ...item.post, mine: ownsPost(item.post, item.receiver) } : null,
     status: item.status === 'locked' ? 'locked' : item.returned ? 'returned' : 'open',
     receiver: item.receiver,
@@ -69,7 +69,7 @@ export function claimThread(claim) {
     type: 'claim',
     claimId: claim.id,
     kind: 'trade',
-    peer: peerNamed(claim.peer?.username ?? 'Người dùng'),
+    peer: peerNamed(claim.peer?.username ?? 'Người dùng', 'user', claim.peer?.avatarUrl ?? null),
     post: { ...claim.post, mine: !outgoing },
     status,
     closedBy: null,

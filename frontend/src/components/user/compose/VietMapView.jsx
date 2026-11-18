@@ -86,7 +86,7 @@ function endpointElement() {
 
 // mode 'point': một ghim kéo được; 'road': hai đầu đoạn đường kéo được.
 // onMapClick nhận { lat, lng } khi bấm bản đồ hoặc nút đặt điểm ở giữa bản đồ.
-// radius: vẽ vòng bán kính (mét) quanh ghim, dùng cho khu vực để ý
+// radius: vẽ vòng bán kính (mét) quanh ghim, dùng cho khu vực theo dõi
 export default function VietMapView({
   mode,
   point,

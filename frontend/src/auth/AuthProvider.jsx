@@ -12,7 +12,7 @@ export default function AuthProvider({ children }) {
   // false cho tới khi biết người dùng có phiên cũ hay không
   const [ready, setReady] = useState(false)
   const activityInFlight = useRef(null)
-  const userId = user?.id
+  const userId = user?.deletion ? null : user?.id
 
   // Khôi phục phiên khi mở app
   useEffect(() => {
@@ -60,6 +60,9 @@ export default function AuthProvider({ children }) {
     setAccessToken(accessToken)
     setUser(nextUser)
   }, [])
+  const updateUser = useCallback((patch) => {
+    setUser((prev) => (prev ? { ...prev, ...patch } : prev))
+  }, [])
 
   const signOut = useCallback(async () => {
     // Lỗi mạng vẫn xoá phiên ở FE, cookie sẽ tự hết hạn
@@ -68,7 +71,10 @@ export default function AuthProvider({ children }) {
     setUser(null)
   }, [])
 
-  const value = useMemo(() => ({ user, ready, signIn, signOut }), [user, ready, signIn, signOut])
+  const value = useMemo(
+    () => ({ user, ready, signIn, signOut, updateUser }),
+    [user, ready, signIn, signOut, updateUser]
+  )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

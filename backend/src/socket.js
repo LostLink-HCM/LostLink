@@ -18,7 +18,9 @@ const attachSocket = (server) => {
   io.use(async (socket, next) => {
     try {
       const payload = verifyAccessToken(socket.handshake.auth?.token)
-      socket.data.userId = String((await authService.findSessionUser(payload))._id)
+      const user = await authService.findSessionUser(payload)
+      if (user.deleteRequestedAt) throw new Error('ACCOUNT_PENDING_DELETION')
+      socket.data.userId = String(user._id)
       next()
     } catch {
       next(new Error('UNAUTHORIZED'))
@@ -34,6 +36,11 @@ const emitToUsers = (userIds, event, payload = {}) => {
   if (rooms.length) io.to(rooms).emit(event, payload)
 }
 
+// Ngắt mọi kết nối của người dùng, vd khi thu hồi toàn bộ phiên
+const disconnectUser = (userId) => {
+  io?.in(userRoom(userId)).disconnectSockets(true)
+}
+
 const closeSocket = () =>
   new Promise((resolve) => {
     if (!io) return resolve()
@@ -41,4 +48,4 @@ const closeSocket = () =>
     io = null
   })
 
-module.exports = { SOCKET_PATH, attachSocket, emitToUsers, closeSocket }
+module.exports = { SOCKET_PATH, attachSocket, emitToUsers, disconnectUser, closeSocket }

@@ -1,4 +1,4 @@
-import { badgeTone, joinedLabel } from '../../../lib/user/profiles'
+import { joinedLabel } from '../../../lib/user/profiles'
 import { quarterLabel } from '../../../lib/user/reputation'
 import Avatar from '../Avatar'
 import Card from '../Card'
@@ -21,7 +21,7 @@ export default function ProfileHeader({ profile, actions, children }) {
   return (
     <Card as="section" aria-label={`Hồ sơ của ${profile.username}`} className="mb-5 p-5 sm:p-7">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
-        <Avatar initials={profile.initials} size="2xl" />
+        <Avatar initials={profile.initials} src={profile.avatarUrl} size="2xl" />
 
         <div className="min-w-0 flex-1">
           <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -37,10 +37,8 @@ export default function ProfileHeader({ profile, actions, children }) {
 
           {profile.badges.length > 0 && (
             <ul aria-label="Huy hiệu" className="m-0 mb-2.5 flex list-none flex-wrap gap-1.5 p-0">
-              {/* Huy hiệu từ API có sẵn tone, dữ liệu mẫu chỉ có tên */}
               {profile.badges.map((badge) => {
-                const name = typeof badge === 'string' ? badge : badge.name
-                const tone = typeof badge === 'string' ? badgeTone(badge) : badge.tone
+                const { name, tone } = badge
                 return (
                   <li
                     key={name}

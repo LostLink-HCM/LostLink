@@ -37,18 +37,24 @@ export default function ReviewList({ reviews, me, emptyText }) {
         <ul className="m-0 flex list-none flex-col gap-4 p-0">
           {reviews.map((review) => (
             <li key={review.id} className="flex gap-3">
-              <Avatar name={review.author} size="sm" tone="neutral" />
+              <Avatar name={review.author} src={review.authorAvatar} size="sm" tone="neutral" />
               <div className="min-w-0 flex-1">
                 <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                  <Link
-                    to={profilePath(review.author)}
-                    className={cx(
-                      'rounded text-caption font-semibold text-ink no-underline hover:text-primary',
-                      focusRing
-                    )}
-                  >
-                    {review.author}
-                  </Link>
+                  {review.authorDeleted ? (
+                    <span className="text-caption font-semibold text-ink-muted">
+                      {review.author}
+                    </span>
+                  ) : (
+                    <Link
+                      to={profilePath(review.author)}
+                      className={cx(
+                        'rounded text-caption font-semibold text-ink no-underline hover:text-primary',
+                        focusRing
+                      )}
+                    >
+                      {review.author}
+                    </Link>
+                  )}
                   {review.author === me && (
                     <span className="text-micro font-semibold text-primary">Bạn</span>
                   )}

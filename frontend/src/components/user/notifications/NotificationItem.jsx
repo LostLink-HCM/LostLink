@@ -2,24 +2,11 @@ import Icon from '../../common/Icon'
 import Avatar from '../Avatar'
 import { cx, focusRing } from '../classes'
 import { timeAgo } from '../../../lib/user/homeFeed'
-import { NOTIFICATION_TYPES } from '../../../lib/user/notifications'
-
-// Icon nổi trên nền gradient, rê chuột thì nảy nhẹ (tắt khi máy bật giảm chuyển động)
 const lift =
   'transition-transform duration-200 motion-safe:group-hover:-translate-y-0.5 motion-safe:group-hover:scale-105'
 
-// Thông báo thật: ô gradient theo loại, hoặc ảnh đại diện người làm kèm huy hiệu icon ở góc.
-// Dữ liệu mẫu cũ (chưa có visual) giữ kiểu ô màu nhạt
 function NotificationIcon({ item }) {
   const { visual } = item
-  if (!visual) {
-    const type = NOTIFICATION_TYPES[item.kind ?? item.type] ?? NOTIFICATION_TYPES.post
-    return (
-      <span className={cx('grid size-9.5 shrink-0 place-items-center rounded-xl', type.tone, lift)}>
-        <Icon name={item.rejected ? 'warning' : type.icon} size={17} />
-      </span>
-    )
-  }
 
   const badge = (size, iconSize, className) => (
     <span
@@ -37,7 +24,7 @@ function NotificationIcon({ item }) {
   if (item.person) {
     return (
       <span className={cx('relative shrink-0', lift)}>
-        <Avatar name={item.person} size="lg" tone="neutral" />
+        <Avatar name={item.person} src={item.personAvatar} size="lg" tone="neutral" />
         {badge('size-5 rounded-full ring-2 ring-surface', 11, 'absolute -right-1 -bottom-1')}
       </span>
     )

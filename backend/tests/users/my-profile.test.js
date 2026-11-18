@@ -53,6 +53,14 @@ describe('UC13 - Xem hồ sơ cá nhân', () => {
     }
   })
 
+  test('tài khoản cũ chưa có field giới thiệu thì trả chuỗi rỗng', async () => {
+    await User.collection.updateOne({ _id: me._id }, { $unset: { bio: '' } })
+
+    const { profile } = await myProfile()
+
+    assert.equal(profile.bio, '')
+  })
+
   test('bài của tôi: Đang tìm và Đã liên hệ; Chờ duyệt và Bị từ chối ở mục riêng có lý do', async () => {
     const searching = await makePost(me, wallet.category, { title: 'Đang tìm' })
     const contacted = await makePost(me, wallet.category, {

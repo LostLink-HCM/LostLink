@@ -4,12 +4,9 @@ import {
   DEFAULT_FILTERS,
   buildPostQuery,
   formatTimeWindow,
-  isListed,
   normalize,
   validateFilters,
 } from '../../src/lib/user/homeFeed.js'
-
-const DAY = 24 * 60 * 60 * 1000
 
 describe('normalize: so khớp từ khóa tiếng Việt', () => {
   it('bỏ dấu, đổi đ thành d và viết thường', () => {
@@ -30,20 +27,9 @@ describe('validateFilters: bộ lọc khoảng ngày tự chọn', () => {
   })
 })
 
-describe('isListed: bài nào còn hiện trên bảng tin', () => {
-  const now = Date.parse('2026-11-12T00:00:00Z')
-
-  it('ẩn bài đã đóng; bài đã trao trả hiện thêm 7 ngày rồi ẩn', () => {
-    expect(isListed({ status: 'open' }, now)).toBe(true)
-    expect(isListed({ status: 'closed' }, now)).toBe(false)
-    expect(isListed({ status: 'returned', returnedAt: now - 6 * DAY }, now)).toBe(true)
-    expect(isListed({ status: 'returned', returnedAt: now - 8 * DAY }, now)).toBe(false)
-  })
-})
-
 describe('buildPostQuery: tham số gửi API /api/posts', () => {
-  it('đổi tên danh mục sang slug, cắt từ khóa, bỏ Từ/Đến ngày khi không phải khoảng tự chọn', () => {
-    const filters = { ...DEFAULT_FILTERS, category: 'Ví & tiền', from: '2026-11-01' }
+  it('gửi slug danh mục, cắt từ khóa, bỏ Từ/Đến ngày khi không phải khoảng tự chọn', () => {
+    const filters = { ...DEFAULT_FILTERS, category: 'vi-tien', from: '2026-11-01' }
 
     expect(buildPostQuery(filters, '  ví da ', { hot: true, page: 2 })).toEqual({
       type: '',

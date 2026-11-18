@@ -130,6 +130,7 @@ const postSchema = new Schema(
     // Moderator ẩn bài hoặc bài tự ẩn 7 ngày sau khi trao trả
     isHidden: { type: Boolean, default: false, index: true },
     hiddenReason: { type: String, default: '' },
+    hiddenForDeletion: { type: Boolean, default: false },
 
     viewCount: { type: Number, default: 0 },
     likeCount: { type: Number, default: 0 },

@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useOutletContext } from 'react-router-dom'
+import { Link, useNavigate, useOutletContext } from 'react-router-dom'
+import {
+  changePassword,
+  confirmEmailChange,
+  getAccount,
+  requestAccountDeletion,
+  requestEmailChange,
+} from '../../../api/auth'
 import { useAuth } from '../../../auth/AuthContext'
 import Button from '../../../components/user/Button'
 import Dialog from '../../../components/user/Dialog'
@@ -7,18 +14,23 @@ import Note from '../../../components/user/Note'
 import PasswordRules from '../../../components/user/settings/PasswordRules'
 import SettingsCard from '../../../components/user/settings/SettingsCard'
 import TextField from '../../../components/user/settings/TextField'
+import { useProfileData } from '../../../hooks/useProfileData'
 import {
-  DEMO_OTP,
   OTP_LENGTH,
-  RESEND_COOLDOWN_S,
-  checkOtp,
   validateNewEmail,
+  validateOtp,
   validatePasswordChange,
 } from '../../../lib/user/settings'
 
 const EMPTY_PASSWORDS = { current: '', next: '', confirm: '' }
 const DELETE_WARNING =
   'Mọi bài đăng và tin nhắn của bạn sẽ bị xóa. Sau 3 ngày, tài khoản không thể khôi phục.'
+const GENERIC_ERROR = 'Đã có lỗi xảy ra, vui lòng thử lại.'
+const PASSWORD_FIELDS = {
+  currentPassword: 'current',
+  newPassword: 'next',
+  confirmPassword: 'confirm',
+}
 
 const formatDateTime = (iso) =>
   new Date(iso).toLocaleString('vi-VN', {
@@ -29,7 +41,11 @@ const formatDateTime = (iso) =>
     year: 'numeric',
   })
 
-// Đếm ngược số giây còn phải chờ trước khi được gửi lại mã
+const messageOf = (error, field) =>
+  error.status >= 400 && error.status < 500
+    ? (error.fieldErrors?.[field] ?? error.message)
+    : GENERIC_ERROR
+
 function useCountdown() {
   const [seconds, setSeconds] = useState(0)
   useEffect(() => {
@@ -40,48 +56,80 @@ function useCountdown() {
   return [seconds, setSeconds]
 }
 
-// Đổi email và xác thực email mới bằng mã 6 chữ số
-function EmailCard({ email, verified, onChanged }) {
+function EmailCard({ email, verified, hasPassword, onChanged }) {
+  const byEmail = hasPassword === false
+  const confirmField = byEmail ? 'currentEmail' : 'password'
   const [step, setStep] = useState('idle') // idle | email | otp
   const [newEmail, setNewEmail] = useState('')
+  const [confirmValue, setConfirmValue] = useState('')
+  const [confirmError, setConfirmError] = useState('')
+  const [target, setTarget] = useState('')
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
-  const [otp, setOtp] = useState({ sentAt: 0, attempts: 0, expired: false })
+  const [locked, setLocked] = useState(false)
+  const [busy, setBusy] = useState(false)
   const [cooldown, setCooldown] = useCountdown()
 
   const close = () => {
     setStep('idle')
     setNewEmail('')
+    setConfirmValue('')
+    setConfirmError('')
+    setTarget('')
     setCode('')
     setError('')
+    setLocked(false)
   }
 
-  // Chưa có API: giả lập gửi mã, mã thử là DEMO_OTP
-  const issueCode = () => {
-    setOtp({ sentAt: Date.now(), attempts: 0, expired: false })
-    setCooldown(RESEND_COOLDOWN_S)
-    setCode('')
-    setError('')
+  const issueCode = async (address) => {
+    setBusy(true)
+    try {
+      const { data } = await requestEmailChange({ email: address, [confirmField]: confirmValue })
+      setTarget(data.email)
+      setCooldown(data.resendAfterSeconds)
+      setCode('')
+      setError('')
+      setLocked(false)
+      setStep('otp')
+    } catch (failure) {
+      const wrongConfirm = failure.fieldErrors?.[confirmField]
+      if (wrongConfirm && step === 'email') setConfirmError(wrongConfirm)
+      else setError(wrongConfirm ?? messageOf(failure, 'email'))
+    } finally {
+      setBusy(false)
+    }
   }
 
   const sendCode = (event) => {
     event.preventDefault()
     const problem = validateNewEmail(newEmail, email)
+    const missing = confirmValue.trim()
+      ? ''
+      : byEmail
+        ? 'Vui lòng nhập email.'
+        : 'Vui lòng nhập mật khẩu.'
     setError(problem)
-    if (problem) return
-    setNewEmail(newEmail.trim().toLowerCase())
-    issueCode()
-    setStep('otp')
+    setConfirmError(missing)
+    if (!problem && !missing) issueCode(newEmail.trim().toLowerCase())
   }
 
-  const confirm = (event) => {
+  const confirm = async (event) => {
     event.preventDefault()
-    const result = checkOtp({ code, ...otp })
-    setOtp((prev) => ({ ...prev, attempts: result.attempts, expired: Boolean(result.expired) }))
-    setError(result.error)
-    if (result.error) return
-    onChanged(newEmail)
-    close()
+    const problem = validateOtp(code)
+    setError(problem)
+    if (problem) return
+
+    setBusy(true)
+    try {
+      const { data } = await confirmEmailChange(code)
+      onChanged(data.user)
+      close()
+    } catch (failure) {
+      setError(messageOf(failure, 'code'))
+      if (failure.code === 'OTP_TOO_MANY_ATTEMPTS') setLocked(true)
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -99,7 +147,7 @@ function EmailCard({ email, verified, onChanged }) {
           )}
         </div>
         {step === 'idle' && (
-          <Button size="lg" onClick={() => setStep('email')}>
+          <Button size="lg" onClick={() => setStep('email')} disabled={hasPassword === null}>
             Đổi email
           </Button>
         )}
@@ -110,15 +158,30 @@ function EmailCard({ email, verified, onChanged }) {
           <TextField
             label="Email mới"
             type="email"
-            autoComplete="email"
+            noAutofill
             value={newEmail}
             error={error}
-            onChange={(event) => setNewEmail(event.target.value)}
+            onChange={(event) => {
+              setNewEmail(event.target.value)
+              setError('')
+            }}
             autoFocus
+          />
+          <TextField
+            label={byEmail ? 'Email hiện tại để xác nhận' : 'Mật khẩu hiện tại để xác nhận'}
+            password={!byEmail}
+            type={byEmail ? 'email' : undefined}
+            noAutofill
+            value={confirmValue}
+            error={confirmError}
+            onChange={(event) => {
+              setConfirmValue(event.target.value)
+              setConfirmError('')
+            }}
           />
           <div className="flex flex-wrap justify-end gap-2">
             <Button onClick={close}>Hủy</Button>
-            <Button type="submit" variant="primary">
+            <Button type="submit" variant="primary" disabled={busy}>
               Gửi mã xác thực
             </Button>
           </div>
@@ -128,8 +191,8 @@ function EmailCard({ email, verified, onChanged }) {
       {step === 'otp' && (
         <form noValidate onSubmit={confirm} className="mt-4 flex flex-col gap-3">
           <Note>
-            Mã gồm {OTP_LENGTH} chữ số đã gửi tới <strong>{newEmail}</strong>, có hiệu lực trong 10
-            phút. Bản giao diện chưa gửi email thật, nhập <strong>{DEMO_OTP}</strong> để thử.
+            Mã gồm {OTP_LENGTH} chữ số đã gửi tới <strong>{target}</strong>, có hiệu lực trong 10
+            phút.
           </Note>
           <TextField
             label="Mã xác thực"
@@ -138,18 +201,21 @@ function EmailCard({ email, verified, onChanged }) {
             maxLength={OTP_LENGTH}
             value={code}
             error={error}
-            disabled={otp.expired}
+            disabled={locked}
             onChange={(event) => setCode(event.target.value.replace(/\D/g, ''))}
             autoFocus
           />
           <div className="flex flex-wrap items-center gap-2">
-            {/* Gửi lại mã sau 45 giây, mã cũ bị hủy */}
-            <Button variant="ghost" disabled={cooldown > 0} onClick={issueCode}>
+            <Button
+              variant="ghost"
+              disabled={cooldown > 0 || busy}
+              onClick={() => issueCode(target)}
+            >
               {cooldown > 0 ? `Gửi lại mã sau ${cooldown} giây` : 'Gửi lại mã'}
             </Button>
             <div className="ml-auto flex gap-2">
               <Button onClick={close}>Hủy</Button>
-              <Button type="submit" variant="primary" disabled={otp.expired}>
+              <Button type="submit" variant="primary" disabled={locked || busy}>
                 Xác nhận
               </Button>
             </div>
@@ -160,11 +226,11 @@ function EmailCard({ email, verified, onChanged }) {
   )
 }
 
-// Đổi mật khẩu: xong thì các phiên đăng nhập cũ bị thu hồi
-function PasswordCard({ changedAt, onChanged }) {
+function PasswordCard({ hasPassword, changedAt, onChanged }) {
   const [open, setOpen] = useState(false)
   const [values, setValues] = useState(EMPTY_PASSWORDS)
   const [errors, setErrors] = useState({})
+  const [busy, setBusy] = useState(false)
 
   const set = (key) => (event) => {
     setValues((prev) => ({ ...prev, [key]: event.target.value }))
@@ -177,26 +243,61 @@ function PasswordCard({ changedAt, onChanged }) {
     setErrors({})
   }
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault()
     const problems = validatePasswordChange(values)
     setErrors(problems)
     if (Object.keys(problems).length) return
-    onChanged()
-    close()
+
+    setBusy(true)
+    try {
+      const { data } = await changePassword({
+        currentPassword: values.current,
+        newPassword: values.next,
+        confirmPassword: values.confirm,
+      })
+      onChanged(data)
+      close()
+    } catch (failure) {
+      const fieldErrors = Object.entries(failure.fieldErrors ?? {})
+        .filter(([field]) => PASSWORD_FIELDS[field])
+        .map(([field, message]) => [PASSWORD_FIELDS[field], message])
+      setErrors(
+        failure.status < 500 && fieldErrors.length
+          ? Object.fromEntries(fieldErrors)
+          : { current: messageOf(failure) }
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const description = changedAt
+    ? `Lần đổi gần nhất: ${formatDateTime(changedAt)}`
+    : 'Đổi xong, các thiết bị khác đang đăng nhập sẽ phải đăng nhập lại.'
+
+  // Tài khoản Google chưa có mật khẩu thì tạo mật khẩu qua Quên mật khẩu
+  if (hasPassword === false) {
+    return (
+      <SettingsCard title="Mật khẩu" description={description}>
+        <Note>
+          Tài khoản đăng nhập bằng Google chưa có mật khẩu, vui lòng dùng chức năng{' '}
+          <Link to="/forgot-password" className="font-semibold text-primary">
+            Quên mật khẩu
+          </Link>{' '}
+          để tạo mật khẩu.
+        </Note>
+      </SettingsCard>
+    )
   }
 
   return (
     <SettingsCard
       title="Mật khẩu"
-      description={
-        changedAt
-          ? `Lần đổi gần nhất: ${formatDateTime(changedAt)}`
-          : 'Đổi xong, các thiết bị khác đang đăng nhập sẽ phải đăng nhập lại.'
-      }
+      description={description}
       actions={
         !open && (
-          <Button size="lg" onClick={() => setOpen(true)}>
+          <Button size="lg" onClick={() => setOpen(true)} disabled={hasPassword === null}>
             Đổi mật khẩu
           </Button>
         )
@@ -207,7 +308,7 @@ function PasswordCard({ changedAt, onChanged }) {
           <TextField
             label="Mật khẩu hiện tại"
             password
-            autoComplete="current-password"
+            noAutofill
             value={values.current}
             error={errors.current}
             onChange={set('current')}
@@ -234,7 +335,7 @@ function PasswordCard({ changedAt, onChanged }) {
           />
           <div className="flex flex-wrap justify-end gap-2">
             <Button onClick={close}>Hủy</Button>
-            <Button type="submit" variant="primary">
+            <Button type="submit" variant="primary" disabled={busy}>
               Lưu mật khẩu
             </Button>
           </div>
@@ -244,24 +345,33 @@ function PasswordCard({ changedAt, onChanged }) {
   )
 }
 
-// Xóa tài khoản: xác nhận bằng mật khẩu, tài khoản chờ xóa 3 ngày rồi mới xóa vĩnh viễn
-function DeleteAccountCard({ onDeleted }) {
+function DeleteAccountCard({ hasPassword, onDeleted }) {
   const [open, setOpen] = useState(false)
-  const [password, setPassword] = useState('')
+  const [value, setValue] = useState('')
   const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const byEmail = hasPassword === false
+  const field = byEmail ? 'email' : 'password'
 
   const close = () => {
     setOpen(false)
-    setPassword('')
+    setValue('')
     setError('')
   }
 
-  const confirm = () => {
-    if (!password) {
-      setError('Vui lòng nhập mật khẩu.')
+  const confirm = async () => {
+    if (!value.trim()) {
+      setError(byEmail ? 'Vui lòng nhập email.' : 'Vui lòng nhập mật khẩu.')
       return
     }
-    onDeleted()
+    setBusy(true)
+    try {
+      const { message } = await requestAccountDeletion({ [field]: value })
+      onDeleted(message)
+    } catch (failure) {
+      setError(messageOf(failure, field))
+      setBusy(false)
+    }
   }
 
   return (
@@ -269,7 +379,12 @@ function DeleteAccountCard({ onDeleted }) {
       title="Xóa tài khoản"
       description={DELETE_WARNING}
       actions={
-        <Button variant="dangerSoft" size="lg" onClick={() => setOpen(true)}>
+        <Button
+          variant="dangerSoft"
+          size="lg"
+          onClick={() => setOpen(true)}
+          disabled={hasPassword === null}
+        >
           Xóa tài khoản
         </Button>
       }
@@ -284,7 +399,7 @@ function DeleteAccountCard({ onDeleted }) {
               <Button onClick={close} data-autofocus>
                 Hủy
               </Button>
-              <Button variant="danger" onClick={confirm}>
+              <Button variant="danger" onClick={confirm} disabled={busy}>
                 Xóa tài khoản
               </Button>
             </>
@@ -294,13 +409,18 @@ function DeleteAccountCard({ onDeleted }) {
             {DELETE_WARNING}
           </Note>
           <TextField
-            label="Nhập mật khẩu hiện tại để xác nhận"
-            password
-            autoComplete="current-password"
-            value={password}
+            label={
+              byEmail
+                ? 'Nhập email của tài khoản để xác nhận'
+                : 'Nhập mật khẩu hiện tại để xác nhận'
+            }
+            password={!byEmail}
+            type={byEmail ? 'email' : undefined}
+            noAutofill
+            value={value}
             error={error}
             onChange={(event) => {
-              setPassword(event.target.value)
+              setValue(event.target.value)
               setError('')
             }}
           />
@@ -310,39 +430,45 @@ function DeleteAccountCard({ onDeleted }) {
   )
 }
 
-// Mục Tài khoản trong Cài đặt. Chưa có API nên chỉ giả lập kết quả trên giao diện
+// Mục Tài khoản trong Cài đặt: đổi email, đổi mật khẩu, xóa tài khoản
 export default function AccountSettingsPage() {
-  const { user, signOut } = useAuth()
+  const { user, signIn, signOut, updateUser } = useAuth()
   const navigate = useNavigate()
-  const { account, setAccount, notify } = useOutletContext()
-  const email = account.email || user.email
+  const { notify } = useOutletContext()
+  // hasPassword chỉ có ở /auth/me: null khi đang tải, tải lỗi thì vẫn cho mở form
+  const { data: account, loading } = useProfileData(getAccount)
+  const hasPassword = account ? account.user.hasPassword : loading ? null : undefined
 
-  const changeEmail = (nextEmail) => {
-    setAccount((prev) => ({ ...prev, email: nextEmail }))
+  const changeEmail = (nextUser) => {
+    updateUser(nextUser)
     notify('Đổi email thành công.')
   }
 
-  const changePassword = () => {
-    setAccount((prev) => ({ ...prev, passwordChangedAt: new Date().toISOString() }))
+  const changePasswordDone = (session) => {
+    signIn(session)
     notify('Đổi mật khẩu thành công.')
   }
 
-  // Chờ xóa xong thì đăng xuất và về Trang chủ
-  const deleteAccount = () => {
-    navigate('/')
-    notify('Đã nhận yêu cầu xóa tài khoản. Tài khoản sẽ bị xóa vĩnh viễn sau 3 ngày.')
-    signOut()
+  const deleteAccount = async (message) => {
+    await signOut()
+    navigate('/', { replace: true })
+    notify(message)
   }
 
   return (
     <>
       <EmailCard
-        email={email}
-        verified={account.email ? true : user.emailVerified}
+        email={user.email}
+        verified={user.emailVerified}
+        hasPassword={hasPassword}
         onChanged={changeEmail}
       />
-      <PasswordCard changedAt={account.passwordChangedAt} onChanged={changePassword} />
-      <DeleteAccountCard onDeleted={deleteAccount} />
+      <PasswordCard
+        hasPassword={hasPassword}
+        changedAt={user.passwordChangedAt}
+        onChanged={changePasswordDone}
+      />
+      <DeleteAccountCard hasPassword={hasPassword} onDeleted={deleteAccount} />
     </>
   )
 }

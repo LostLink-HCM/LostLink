@@ -93,4 +93,40 @@ const sendContactReminder = ({ to, postTitle, messagesUrl }) =>
       </div>`,
   })
 
-module.exports = { sendVerificationCode, sendResetLink, sendContactReminder }
+const sendEmailChangeCode = ({ to, code, minutes }) =>
+  sendMail({
+    to,
+    subject: 'Xác thực email mới cho tài khoản LostLink',
+    text: `Mã xác thực email mới của bạn là ${code}. Mã có hiệu lực trong ${minutes} phút.`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto">
+        <h2>Xác thực email mới</h2>
+        <p>Nhập mã sau để dùng email này cho tài khoản LostLink của bạn:</p>
+        <p style="font-size:32px;font-weight:bold;letter-spacing:8px">${code}</p>
+        <p style="color:#666">Mã có hiệu lực trong ${minutes} phút. Nếu bạn không yêu cầu, hãy bỏ qua email này.</p>
+      </div>`,
+  })
+
+const sendAccountDeletionNotice = ({ to, username, deleteAt }) => {
+  const when = deleteAt.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })
+  return sendMail({
+    to,
+    subject: 'LostLink đã nhận yêu cầu xóa tài khoản',
+    text: `Tài khoản ${username} sẽ bị xóa vĩnh viễn lúc ${when}. Đăng nhập lại trước thời điểm này và chọn Hủy yêu cầu xóa nếu bạn đổi ý.`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto">
+        <h2>Yêu cầu xóa tài khoản</h2>
+        <p>Tài khoản <strong>${escapeHtml(username)}</strong> sẽ bị xóa vĩnh viễn lúc <strong>${when}</strong>, cùng mọi bài đăng và tin nhắn.</p>
+        <p>Nếu đổi ý, hãy đăng nhập lại trước thời điểm này và chọn <strong>Hủy yêu cầu xóa</strong>.</p>
+        <p style="color:#666">Nếu bạn không yêu cầu, hãy đăng nhập, hủy yêu cầu xóa và đổi mật khẩu ngay.</p>
+      </div>`,
+  })
+}
+
+module.exports = {
+  sendVerificationCode,
+  sendResetLink,
+  sendContactReminder,
+  sendEmailChangeCode,
+  sendAccountDeletionNotice,
+}

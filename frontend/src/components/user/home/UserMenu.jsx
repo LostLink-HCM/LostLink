@@ -46,11 +46,11 @@ export default function UserMenu() {
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         className={cx(
-          'grid size-9 cursor-pointer place-items-center rounded-full border border-primary/25 bg-primary-soft text-caption font-bold text-primary transition-shadow hover:shadow-[0_2px_10px_rgb(46_109_180/0.22)]',
+          'grid size-9 cursor-pointer place-items-center overflow-hidden rounded-full border border-primary/25 bg-primary-soft p-0 text-caption font-bold text-primary transition-shadow hover:shadow-[0_2px_10px_rgb(46_109_180/0.22)]',
           focusRing
         )}
       >
-        {initials}
+        <Avatar initials={initials} src={user.avatarUrl} size="md" className="size-full" />
       </button>
 
       {open && (
@@ -59,7 +59,7 @@ export default function UserMenu() {
           className="absolute right-0 z-50 mt-2 w-64 rounded-2xl border border-line bg-surface p-1.5 shadow-dialog"
         >
           <div className="flex items-center gap-3 px-2.5 py-3">
-            <Avatar initials={initials} size="xl" />
+            <Avatar initials={initials} src={user.avatarUrl} size="xl" />
             <div className="min-w-0">
               <div className="truncate text-small font-semibold text-ink">{user.username}</div>
               <div className="truncate text-caption text-ink-muted">{user.email}</div>

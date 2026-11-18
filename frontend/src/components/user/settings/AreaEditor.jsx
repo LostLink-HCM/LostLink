@@ -24,7 +24,7 @@ const PRESET_LABELS = new Set(AREA_PRESETS.map((preset) => preset.label))
 // Tên trống hoặc đang là tên chip khác thì đổi theo chip mới, tên tự đặt thì giữ nguyên
 const presetName = (name, label) => (!name || PRESET_LABELS.has(name) ? label : name)
 
-// Chọn tâm trên bản đồ và chỉnh bán kính cho một khu vực để ý
+// Chọn tâm trên bản đồ và chỉnh bán kính cho một khu vực theo dõi
 export default function AreaEditor({ value, onChange, error }) {
   const radiusId = useId()
   const pick = (point) => onChange({ point })

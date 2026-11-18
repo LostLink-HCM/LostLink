@@ -58,7 +58,12 @@ function CommentItem({ comment, mine, now, onEdit, onDelete }) {
         aria-label={`Xem trang cá nhân của ${comment.author}`}
         className={cx('shrink-0 self-start rounded-full', focusRing)}
       >
-        <Avatar name={comment.author} size="md" tone={mine ? 'primary' : 'neutral'} />
+        <Avatar
+          name={comment.author}
+          src={comment.authorAvatar}
+          size="md"
+          tone={mine ? 'primary' : 'neutral'}
+        />
       </Link>
       <div className="min-w-0 flex-1">
         <div className="mb-1 flex flex-wrap items-center gap-x-2">
@@ -180,7 +185,7 @@ export default function CommentSection({ comments, user, now, onAdd, onEdit, onD
 
       {user ? (
         <form noValidate onSubmit={submit} className="mb-6 flex gap-3">
-          <Avatar name={user.username} size="md" />
+          <Avatar name={user.username} src={user.avatarUrl} size="md" />
           <div className="min-w-0 flex-1">
             <label htmlFor="new-comment" className="sr-only">
               Viết bình luận

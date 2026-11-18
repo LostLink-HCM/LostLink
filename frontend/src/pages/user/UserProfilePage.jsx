@@ -49,7 +49,7 @@ export default function UserProfilePage({ username }) {
   const { user } = useAuth()
   const ctx = useOutletContext()
   const { now, interactions, notify } = ctx
-  // Hội thoại còn là dữ liệu mẫu ở UserLayout, đồng bộ để khóa/mở khóa ở trang Tin nhắn
+  // Chặn/bỏ chặn xong tải lại hộp thư để hội thoại được khóa/mở khóa ở trang Tin nhắn
   const { blockUser: lockChat, unblockUser: unlockChat } = ctx
   const load = useCallback(() => getUserProfile(username), [username])
   const { data, error, loading, reload } = useProfileData(load)

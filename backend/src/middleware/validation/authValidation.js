@@ -1,6 +1,6 @@
 const { body } = require('express-validator')
-const email = () =>
-  body('email')
+const email = (field = 'email') =>
+  body(field)
     .exists({ values: 'falsy' })
     .withMessage('Vui lòng nhập email.')
     .bail()
@@ -17,8 +17,8 @@ const email = () =>
     .toLowerCase()
 
 // Chỉ cho ký tự ASCII in được, chữ có dấu có thể được mã hoá khác nhau giữa các thiết bị
-const password = () =>
-  body('password')
+const password = (field = 'password') =>
+  body(field)
     .isString()
     .withMessage('Mật khẩu không hợp lệ.')
     .bail()
@@ -126,7 +126,61 @@ const resetRules = [
   password(),
 ]
 
+const changePasswordRules = [
+  body('currentPassword')
+    .exists({ values: 'falsy' })
+    .withMessage('Vui lòng nhập mật khẩu hiện tại.')
+    .bail()
+    .isString()
+    .withMessage('Mật khẩu không hợp lệ.'),
+  password('newPassword')
+    .bail()
+    .custom((value, { req }) => value !== req.body.currentPassword)
+    .withMessage('Mật khẩu mới phải khác mật khẩu hiện tại.'),
+  body('confirmPassword')
+    .custom((value, { req }) => value === req.body.newPassword)
+    .withMessage('Mật khẩu nhập lại không khớp.'),
+]
+
+const emailChangeRules = [
+  email()
+    .custom((value, { req }) => value !== req.user.email)
+    .withMessage('Email mới phải khác email hiện tại.'),
+  body('password').optional().isString().withMessage('Mật khẩu không hợp lệ.'),
+  body('currentEmail')
+    .optional()
+    .isString()
+    .withMessage('Email không hợp lệ.')
+    .bail()
+    .trim()
+    .toLowerCase(),
+]
+
+const emailChangeVerifyRules = [
+  body('code')
+    .isString()
+    .withMessage('Vui lòng nhập đủ 6 chữ số.')
+    .bail()
+    .trim()
+    .matches(/^\d{6}$/)
+    .withMessage('Vui lòng nhập đủ 6 chữ số.'),
+]
+const deleteAccountRules = [
+  body('password').optional().isString().withMessage('Mật khẩu không hợp lệ.'),
+  body('email')
+    .optional()
+    .isString()
+    .withMessage('Email không hợp lệ.')
+    .bail()
+    .trim()
+    .toLowerCase(),
+]
+
 module.exports = {
+  changePasswordRules,
+  deleteAccountRules,
+  emailChangeRules,
+  emailChangeVerifyRules,
   registerRules,
   verifyRules,
   resendRules,

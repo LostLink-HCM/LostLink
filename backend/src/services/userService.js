@@ -1,5 +1,6 @@
 const { Post, Review, User, UserBlock, UserFollow } = require('../models')
 const ApiError = require('../utils/ApiError')
+const imageService = require('./imageService')
 const {
   activeTalksOf,
   ownerControls,
@@ -13,8 +14,7 @@ const LISTED_STATUSES = ['searching', 'contacted']
 const REVIEWING_STATUSES = ['pending', 'rejected']
 const REVIEWS_MAX = 20
 const ACTIVITY_UPDATE_INTERVAL_MS = 60 * 1000
-const PROFILE_FIELDS =
-  'username avatarUrl bio favoriteArea reputationScore returnCount badges createdAt'
+const PROFILE_FIELDS = 'username avatarUrl bio reputationScore returnCount badges createdAt'
 
 const userNotFound = () =>
   new ApiError(404, 'Không tìm thấy người dùng.', undefined, 'USER_NOT_FOUND')
@@ -34,7 +34,8 @@ const toReview = (review) => ({
 const toPublicProfile = (user) => ({
   username: user.username,
   avatarUrl: user.avatarUrl || null,
-  bio: user.bio,
+  // Tài khoản tạo trước khi có field bio (vd dữ liệu seed) đọc bằng lean() không có giá trị mặc định
+  bio: user.bio ?? '',
   reputationScore: user.reputationScore,
   returnCount: user.returnCount,
   // Huy hiệu đã bị Admin xoá thì bỏ qua
@@ -97,8 +98,7 @@ const getMyProfile = async (viewer) => {
   })
 
   return {
-    // Khu vực hay để ý chỉ chủ tài khoản thấy
-    profile: { id: user._id, ...toPublicProfile(user), favoriteArea: user.favoriteArea },
+    profile: { id: user._id, ...toPublicProfile(user) },
     posts: await withViewerState(
       posts.filter((post) => LISTED_STATUSES.includes(post.status)).map(toMyPost),
       viewer
@@ -118,7 +118,8 @@ const relationOf = async (viewerId, targetId) => {
 
 // Hồ sơ người khác: thông tin, bài công khai (như Trang chủ) và lời cảm ơn công khai
 const getUserProfile = async (username, viewer) => {
-  const user = await findProfileUser({ username })
+  // Tài khoản đang chờ xoá không hiện với người khác
+  const user = await findProfileUser({ username, deleteRequestedAt: null })
   if (!user) throw userNotFound()
   if (await UserBlock.exists({ blocker: user._id, blocked: viewer._id })) throw userNotFound()
 
@@ -153,4 +154,40 @@ const recordActivity = async (user) => {
   )
 }
 
-module.exports = { getMyProfile, getUserProfile, userNotFound, recordActivity }
+const updateProfile = async (user, { bio }) => {
+  const updated = await User.findByIdAndUpdate(
+    user._id,
+    { $set: { bio } },
+    { returnDocument: 'after', runValidators: true }
+  )
+  return { bio: updated.bio }
+}
+
+const changeAvatar = async (user, file) => {
+  if (!file) {
+    const message = 'Vui lòng chọn ảnh.'
+    throw new ApiError(422, 'Dữ liệu không hợp lệ.', [{ field: 'avatar', message }])
+  }
+
+  const uploaded = await imageService.uploadAvatar(file)
+  let previous
+  try {
+    previous = await User.findByIdAndUpdate(user._id, { $set: { avatarUrl: uploaded.url } })
+  } catch (err) {
+    await imageService.deleteImages([uploaded.publicId])
+    throw err
+  }
+
+  const oldPublicId = imageService.avatarPublicIdFromUrl(previous?.avatarUrl)
+  if (oldPublicId) await imageService.deleteImages([oldPublicId])
+  return { avatarUrl: uploaded.url }
+}
+
+module.exports = {
+  getMyProfile,
+  getUserProfile,
+  userNotFound,
+  recordActivity,
+  updateProfile,
+  changeAvatar,
+}

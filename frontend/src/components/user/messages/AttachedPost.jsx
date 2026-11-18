@@ -3,8 +3,6 @@ import Icon from '../../common/Icon'
 import TypeTag from '../home/TypeTag'
 import { cx, focusRing } from '../classes'
 
-// Bài đính kèm của hội thoại; bài đã bị xoá (post null) thì báo không còn tồn tại.
-// to: đường dẫn bài thật, mặc định là trang bài mẫu /posts/:id
 export default function AttachedPost({ post, linkable, to }) {
   if (!post) {
     return (
@@ -41,11 +39,11 @@ export default function AttachedPost({ post, linkable, to }) {
 
   const className = 'flex items-center gap-3 rounded-xl border border-line bg-surface p-2.5'
 
-  if (!linkable) return <div className={className}>{body}</div>
+  if (!linkable || !to) return <div className={className}>{body}</div>
 
   return (
     <Link
-      to={to ?? `/posts/${post.id}`}
+      to={to}
       className={cx(className, 'no-underline transition-colors hover:border-primary/40', focusRing)}
     >
       {body}
