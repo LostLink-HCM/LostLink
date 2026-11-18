@@ -6,8 +6,8 @@ const interactionCtrl = require('../controllers/interactionController')
 const reportCtrl = require('../controllers/reportController')
 const validate = require('../middleware/validate')
 const { protect } = require('../middleware/authMiddleware')
-const { parseReportForm } = require('../middleware/postForm')
-const { reportLimiter } = require('../middleware/rateLimiter')
+const { parseAvatarForm, parseReportForm } = require('../middleware/postForm')
+const { avatarLimiter, reportLimiter } = require('../middleware/rateLimiter')
 const {
   areaIdRules,
   createAreaRules,
@@ -17,6 +17,7 @@ const {
 const { userReportRules } = require('../middleware/validation/reportValidation')
 const {
   rejectInvalidUsername,
+  updateProfileRules,
   usernamePathRules,
 } = require('../middleware/validation/userValidation')
 
@@ -24,11 +25,13 @@ const router = Router()
 
 // Đặt trước /:username. Tên người dùng tối thiểu 3 ký tự nên không trùng "me"
 router.get('/me', protect, ctrl.getMyProfile)
+router.patch('/me', protect, updateProfileRules, validate, ctrl.updateProfile)
+router.put('/me/avatar', protect, avatarLimiter, parseAvatarForm, ctrl.changeAvatar)
 router.post('/me/activity', protect, ctrl.recordActivity)
 router.get('/me/saved', protect, interactionCtrl.getSavedPosts)
 router.get('/me/blocks', protect, ctrl.listBlocks)
 
-// Khu vực để ý: thêm, bật/tắt, xoá
+// Khu vực theo dõi: thêm, bật/tắt, xoá
 const byArea = [protect, areaIdRules, rejectInvalidAreaId]
 router.get('/me/areas', protect, areaCtrl.listAreas)
 router.post('/me/areas', protect, createAreaRules, validate, areaCtrl.createArea)

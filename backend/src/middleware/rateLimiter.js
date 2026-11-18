@@ -1,12 +1,10 @@
 const rateLimit = require('express-rate-limit')
-
 const WINDOW_MS = 15 * 60 * 1000
 const TOO_MANY = {
   success: false,
   message: 'Bạn thao tác quá nhiều lần. Vui lòng thử lại sau ít phút.',
 }
 
-// Đếm theo req.ip, nên TRUST_PROXY phải khớp số proxy phía trước để lấy đúng IP người dùng
 const limiter = (limit, options = {}) =>
   rateLimit({
     windowMs: WINDOW_MS,
@@ -32,6 +30,9 @@ const postCreateLimiter = limiter(10, { keyGenerator: (req) => `user:${req.user.
 
 // Sửa bài 20 lần/15 phút/tài khoản (có tải ảnh, gọi VietMap). Dùng sau protect
 const postEditLimiter = limiter(20, { keyGenerator: (req) => `user:${req.user.id}` })
+
+// Đổi ảnh đại diện 10 lần/15 phút/tài khoản (mỗi lần tải ảnh lên Cloudinary). Dùng sau protect
+const avatarLimiter = limiter(10, { keyGenerator: (req) => `user:${req.user.id}` })
 
 // Gửi báo cáo 5 lần/15 phút/tài khoản. Lần gửi bị từ chối (thiếu lý do...) không bị tính
 const reportLimiter = limiter(5, {
@@ -67,6 +68,7 @@ const messageLimiter = rateLimit({
 })
 
 module.exports = {
+  avatarLimiter,
   messageLimiter,
   authLimiter,
   claimLimiter,

@@ -12,10 +12,10 @@ const sessionService = require('./sessionService')
 
 const OTP_TTL_MINUTES = 10
 const RESET_TTL_MINUTES = 10
-// Áp dụng cho cả gửi lại OTP lẫn link đặt lại mật khẩu, mỗi lần gửi lại sẽ xoá mã cũ
 const RESEND_COOLDOWN_SECONDS = 45
 const MAX_OTP_ATTEMPTS = 5
 const BCRYPT_ROUNDS = 10
+const DELETION_GRACE_MS = 3 * 24 * 60 * 60 * 1000
 
 const INVALID_CODE = 'Mã xác thực không đúng hoặc đã hết hạn.'
 const TOO_MANY_ATTEMPTS = 'Nhập sai quá nhiều lần, vui lòng yêu cầu mã mới.'
@@ -35,11 +35,19 @@ const publicUser = (user) => ({
   id: user._id,
   username: user.username,
   email: user.email,
+  avatarUrl: user.avatarUrl || null,
   role: user.role,
   reputationScore: user.reputationScore,
   emailOptIn: user.emailOptIn,
   emailVerified: Boolean(user.emailVerifiedAt),
   status: user.status,
+  passwordChangedAt: user.passwordChangedAt ?? null,
+  deletion: user.deleteRequestedAt
+    ? {
+        requestedAt: user.deleteRequestedAt,
+        deleteAt: new Date(user.deleteRequestedAt.getTime() + DELETION_GRACE_MS),
+      }
+    : null,
   createdAt: user.createdAt,
 })
 
@@ -110,7 +118,7 @@ const consumeOtp = async (user, purpose, code) => {
   // Lần sai thứ 5: huỷ mã, người dùng phải yêu cầu mã mới
   if (record.attempts >= MAX_OTP_ATTEMPTS) {
     await record.deleteOne()
-    throw ApiError.badRequest(TOO_MANY_ATTEMPTS)
+    throw new ApiError(400, TOO_MANY_ATTEMPTS, undefined, 'OTP_TOO_MANY_ATTEMPTS')
   }
   throw ApiError.badRequest(INVALID_CODE)
 }
@@ -308,6 +316,7 @@ const resetPassword = async ({ token, password }) => {
   if (!user) throw ApiError.badRequest(INVALID_RESET_LINK)
 
   user.passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS)
+  user.passwordChangedAt = new Date()
   // Mở được link gửi qua email cũng chứng minh sở hữu email đó
   user.emailVerifiedAt ??= new Date()
   await user.save()
@@ -316,6 +325,100 @@ const resetPassword = async ({ token, password }) => {
   await sessionService.revokeAllSessions(user._id)
 
   return { email: user.email }
+}
+
+const fieldError = (field, message) => ApiError.badRequest(message, [{ field, message }])
+const confirmIdentity = async (user, { password, email }, { emailField = 'email' } = {}) => {
+  const account = await User.findById(user._id).select('+passwordHash')
+  if (account.passwordHash) {
+    if (!password) throw fieldError('password', 'Vui lòng nhập mật khẩu.')
+    if (!(await bcrypt.compare(password, account.passwordHash))) {
+      throw fieldError('password', 'Mật khẩu không đúng.')
+    }
+    return account
+  }
+  if (!email) throw fieldError(emailField, 'Vui lòng nhập email.')
+  if (email !== account.email) throw fieldError(emailField, 'Email không đúng.')
+  return account
+}
+const getAccount = async (user) => ({
+  ...publicUser(user),
+  hasPassword: Boolean(
+    await User.exists({ _id: user._id, passwordHash: { $type: 'string', $ne: '' } })
+  ),
+})
+const changePassword = async (user, { currentPassword, newPassword }) => {
+  const account = await User.findById(user._id).select('+passwordHash')
+  if (!account?.passwordHash) {
+    throw new ApiError(
+      409,
+      'Tài khoản đăng nhập bằng Google chưa có mật khẩu, vui lòng dùng chức năng Quên mật khẩu để tạo mật khẩu.',
+      undefined,
+      'PASSWORD_NOT_SET'
+    )
+  }
+  if (!(await bcrypt.compare(currentPassword, account.passwordHash))) {
+    throw fieldError('currentPassword', 'Mật khẩu hiện tại không đúng.')
+  }
+
+  account.passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS)
+  account.passwordChangedAt = new Date()
+  await account.save()
+  await EmailToken.deleteMany({ user: account._id, purpose: 'reset' })
+  await sessionService.revokeAllSessions(account._id)
+
+  return startSession(account)
+}
+
+const emailInUse = (email, userId) => User.exists({ email, _id: { $ne: userId } })
+const requestEmailChange = async (user, { email, password, currentEmail }) => {
+  await confirmIdentity(user, { password, email: currentEmail }, { emailField: 'currentEmail' })
+  if (await emailInUse(email, user._id)) throw ApiError.conflict(EMAIL_TAKEN)
+
+  const active = await findActiveCode(user, 'change_email')
+  if (!canResend(active)) {
+    const waitSeconds = Math.ceil(
+      RESEND_COOLDOWN_SECONDS - (Date.now() - active.createdAt.getTime()) / 1000
+    )
+    throw new ApiError(
+      429,
+      `Vui lòng chờ ${waitSeconds} giây trước khi gửi lại mã.`,
+      undefined,
+      'RESEND_COOLDOWN'
+    )
+  }
+
+  await EmailToken.deleteMany({ user: user._id, purpose: 'change_email' })
+  const code = generateOtp()
+  await EmailToken.create({
+    user: user._id,
+    purpose: 'change_email',
+    newEmail: email,
+    codeHash: hashToken(code),
+    expiresAt: new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000),
+  })
+
+  emailService
+    .sendEmailChangeCode({ to: email, code, minutes: OTP_TTL_MINUTES })
+    .catch((err) => console.error('Failed to send email change code:', err.message))
+
+  return codeTiming(email)
+}
+
+const confirmEmailChange = async (user, { code }) => {
+  const { newEmail } = await consumeOtp(user, 'change_email', code)
+  if (await emailInUse(newEmail, user._id)) throw ApiError.conflict(EMAIL_TAKEN)
+
+  const updated = await User.findByIdAndUpdate(
+    user._id,
+    { $set: { email: newEmail, emailVerifiedAt: new Date() } },
+    { returnDocument: 'after', runValidators: true }
+  ).catch((err) => {
+    throw duplicateKeyError(err)
+  })
+  await EmailToken.deleteMany({ user: user._id, purpose: 'reset' })
+
+  return { user: publicUser(updated) }
 }
 
 const hasSessionClaims = (payload) =>
@@ -379,6 +482,7 @@ const logout = async (refreshToken) => {
 }
 
 module.exports = {
+  DELETION_GRACE_MS,
   MAX_OTP_ATTEMPTS,
   publicUser,
   register,
@@ -391,4 +495,9 @@ module.exports = {
   findSessionUser,
   refreshSession,
   logout,
+  getAccount,
+  confirmIdentity,
+  changePassword,
+  requestEmailChange,
+  confirmEmailChange,
 }

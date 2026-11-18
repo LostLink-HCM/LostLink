@@ -2,9 +2,13 @@ const { Router } = require('express')
 
 const ctrl = require('../controllers/authController')
 const validate = require('../middleware/validate')
-const { protect } = require('../middleware/authMiddleware')
+const { protect, protectPendingDeletion } = require('../middleware/authMiddleware')
 const { authLimiter } = require('../middleware/rateLimiter')
 const {
+  changePasswordRules,
+  deleteAccountRules,
+  emailChangeRules,
+  emailChangeVerifyRules,
   registerRules,
   verifyRules,
   resendRules,
@@ -25,6 +29,25 @@ router.post('/forgot-password', authLimiter, forgotRules, validate, ctrl.forgotP
 router.post('/reset-password', authLimiter, resetRules, validate, ctrl.resetPassword)
 router.post('/refresh', ctrl.refresh)
 router.post('/logout', ctrl.logout)
-router.get('/me', protect, ctrl.me)
+router.get('/me', protectPendingDeletion, ctrl.me)
+router.patch('/password', authLimiter, protect, changePasswordRules, validate, ctrl.changePassword)
+router.post('/email', authLimiter, protect, emailChangeRules, validate, ctrl.requestEmailChange)
+router.post(
+  '/email/verify',
+  authLimiter,
+  protect,
+  emailChangeVerifyRules,
+  validate,
+  ctrl.confirmEmailChange
+)
+router.post(
+  '/account/deletion',
+  authLimiter,
+  protect,
+  deleteAccountRules,
+  validate,
+  ctrl.requestDeletion
+)
+router.delete('/account/deletion', protectPendingDeletion, ctrl.cancelDeletion)
 
 module.exports = router

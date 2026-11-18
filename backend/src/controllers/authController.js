@@ -4,6 +4,7 @@ const env = require('../config/env')
 const ApiError = require('../utils/ApiError')
 const asyncHandler = require('../utils/asyncHandler')
 const { expiryOf } = require('../utils/token')
+const accountService = require('../services/accountService')
 const authService = require('../services/authService')
 
 const REFRESH_COOKIE = 'refreshToken'
@@ -98,9 +99,39 @@ const logout = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Đã đăng xuất.' })
 })
 
-const me = (req, res) => {
-  res.json({ success: true, data: { user: authService.publicUser(req.user) } })
-}
+const me = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: { user: await authService.getAccount(req.user) } })
+})
+
+const changePassword = asyncHandler(async (req, res) => {
+  const data = await authService.changePassword(req.user, input(req))
+  sendSession(res, data, 'Đổi mật khẩu thành công.')
+})
+
+const requestEmailChange = asyncHandler(async (req, res) => {
+  const data = await authService.requestEmailChange(req.user, input(req))
+  res.json({ success: true, message: 'Đã gửi mã xác thực tới email mới.', data })
+})
+
+const confirmEmailChange = asyncHandler(async (req, res) => {
+  const data = await authService.confirmEmailChange(req.user, input(req))
+  res.json({ success: true, message: 'Đổi email thành công.', data })
+})
+
+const requestDeletion = asyncHandler(async (req, res) => {
+  const data = await accountService.requestDeletion(req.user, input(req))
+  clearRefreshCookie(res)
+  res.json({
+    success: true,
+    message: 'Đã nhận yêu cầu xóa tài khoản. Tài khoản sẽ bị xóa vĩnh viễn sau 3 ngày.',
+    data,
+  })
+})
+
+const cancelDeletion = asyncHandler(async (req, res) => {
+  const data = await accountService.cancelDeletion(req.user)
+  res.json({ success: true, message: 'Đã hủy yêu cầu xóa tài khoản.', data })
+})
 
 module.exports = {
   REFRESH_COOKIE,
@@ -114,4 +145,9 @@ module.exports = {
   refresh,
   logout,
   me,
+  changePassword,
+  requestEmailChange,
+  confirmEmailChange,
+  requestDeletion,
+  cancelDeletion,
 }
