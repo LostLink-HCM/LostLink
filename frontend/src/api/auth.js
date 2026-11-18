@@ -19,3 +19,10 @@ export const forgotPassword = (email) => api.post('/auth/forgot-password', { ema
 export const resetPassword = (payload) => api.post('/auth/reset-password', payload, pub)
 
 export const logout = () => api.post('/auth/logout', undefined, pub)
+export const getAccount = () => api.get('/auth/me')
+export const changePassword = (payload) => api.patch('/auth/password', payload)
+export const requestEmailChange = (payload) => api.post('/auth/email', payload)
+export const confirmEmailChange = (code) => api.post('/auth/email/verify', { code })
+export const requestAccountDeletion = (confirmation) =>
+  api.post('/auth/account/deletion', confirmation)
+export const cancelAccountDeletion = () => api.delete('/auth/account/deletion')

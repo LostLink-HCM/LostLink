@@ -3,7 +3,6 @@ import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import { getMyProfile } from '../../api/users'
 import Icon from '../../components/common/Icon'
 import BackLink from '../../components/user/BackLink'
-import Button from '../../components/user/Button'
 import { buttonClass } from '../../components/user/buttonClass'
 import EmptyState from '../../components/user/EmptyState'
 import PostCard from '../../components/user/home/PostCard'
@@ -21,8 +20,6 @@ import {
 import { useBack, useProfileData } from '../../hooks/useProfileData'
 import { toFeedPost } from '../../lib/user/homeFeed'
 import { PROFILE_TABS, toProfileView } from '../../lib/user/profiles'
-
-const COMING_SOON = 'Chức năng này đang được phát triển.'
 
 // Tất cả, Mất đồ, Nhặt được gồm cả bài chờ duyệt; Chờ duyệt gồm Chờ duyệt và Bị từ chối
 const REVIEWING_STATUSES = ['pending', 'rejected']
@@ -146,10 +143,10 @@ export default function MyProfilePage() {
       <ProfileHeader
         profile={profile}
         actions={
-          <Button onClick={() => notify(COMING_SOON)}>
+          <Link to="/settings/profile" className={buttonClass()}>
             <Icon name="edit" size={15} />
             Chỉnh sửa hồ sơ
-          </Button>
+          </Link>
         }
       />
 

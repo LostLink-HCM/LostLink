@@ -3,18 +3,21 @@ import Icon from '../../common/Icon'
 import { inputClass, labelClass } from '../compose/styles'
 import { cx, focusRing } from '../classes'
 
-// Ô nhập kèm nhãn, gợi ý và lỗi; password=true thì có nút hiện/ẩn mật khẩu
 export default function TextField({
   label,
   error,
   hint,
   password = false,
+  noAutofill = false,
+  type,
   className,
   inputRef,
+  onFocus,
   ...props
 }) {
   const id = useId()
   const [visible, setVisible] = useState(false)
+  const [locked, setLocked] = useState(noAutofill)
   const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined
 
   return (
@@ -26,11 +29,17 @@ export default function TextField({
         <input
           id={id}
           ref={inputRef}
-          type={password && !visible ? 'password' : password ? 'text' : props.type}
+          type={password ? (visible ? 'text' : 'password') : type}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
           className={cx(inputClass, 'h-11 [&::-ms-reveal]:hidden', password && 'pr-11')}
           {...props}
+          {...(noAutofill && { autoComplete: 'off', readOnly: locked })}
+          onPointerDown={() => setLocked(false)}
+          onFocus={(event) => {
+            setLocked(false)
+            onFocus?.(event)
+          }}
         />
         {password && (
           <button

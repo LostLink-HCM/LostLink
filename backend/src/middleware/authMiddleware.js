@@ -9,25 +9,31 @@ const extractToken = (req) => {
   return header.startsWith('Bearer ') ? header.slice(7).trim() : null
 }
 
-const protect = asyncHandler(async (req, res, next) => {
-  const token = extractToken(req)
-  if (!token) throw ApiError.unauthorized('Vui lòng đăng nhập.')
+const authenticate = ({ allowPendingDeletion = false } = {}) =>
+  asyncHandler(async (req, res, next) => {
+    const token = extractToken(req)
+    if (!token) throw ApiError.unauthorized('Vui lòng đăng nhập.')
 
-  let payload
-  try {
-    payload = verifyAccessToken(token)
-  } catch {
-    throw ApiError.unauthorized('Phiên đăng nhập không hợp lệ hoặc đã hết hạn.')
-  }
+    let payload
+    try {
+      payload = verifyAccessToken(token)
+    } catch {
+      throw ApiError.unauthorized('Phiên đăng nhập không hợp lệ hoặc đã hết hạn.')
+    }
 
-  req.user = await authService.findSessionUser(payload)
-  next()
-})
+    req.user = await authService.findSessionUser(payload)
+    if (req.user.deleteRequestedAt && !allowPendingDeletion) {
+      throw ApiError.forbidden(
+        'Tài khoản đang chờ xóa. Hủy yêu cầu xóa để tiếp tục sử dụng.',
+        'ACCOUNT_PENDING_DELETION'
+      )
+    }
+    next()
+  })
 
-// Cho API công khai mà người đăng nhập thấy khác Guest (vd ẩn bài của người đã chặn).
+const protect = authenticate()
+const protectPendingDeletion = authenticate({ allowPendingDeletion: true })
 const optionalAuth = (req, res, next) => (extractToken(req) ? protect(req, res, next) : next())
-
-// Dùng sau protect, vd: router.patch('/reports/:id', protect, can('report:review'), ...)
 const can = (permission) => (req, res, next) => {
   if (!req.user || !hasPermission(req.user.role, permission)) {
     return next(ApiError.forbidden('Bạn không có quyền thực hiện thao tác này.'))
@@ -46,7 +52,6 @@ const requireRole =
     next()
   }
 
-// Tài khoản bị hạn chế (HT06) không được đăng bài, gửi yêu cầu liên hệ. Dùng sau protect
 const restrictedFrom = (message) => (req, res, next) => {
   if (req.user?.status === 'restricted') {
     return next(ApiError.forbidden(message, 'ACCOUNT_RESTRICTED'))
@@ -63,6 +68,7 @@ const notRestrictedFromClaims = restrictedFrom(
 
 module.exports = {
   protect,
+  protectPendingDeletion,
   optionalAuth,
   can,
   requireRole,

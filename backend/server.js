@@ -4,6 +4,7 @@ const env = require('./src/config/env')
 const app = require('./src/app')
 const { connectDatabase, disconnectDatabase } = require('./src/config/database')
 const { attachSocket, closeSocket } = require('./src/socket')
+const { startJobs, stopJobs } = require('./src/jobs')
 
 async function start() {
   await connectDatabase()
@@ -12,9 +13,11 @@ async function start() {
     console.log(`Server running on http://localhost:${env.port} (${env.nodeEnv})`)
   })
   attachSocket(server)
+  startJobs()
 
   const shutdown = async (signal) => {
     console.log(`${signal} received, shutting down...`)
+    stopJobs()
     await closeSocket()
     server.close(async () => {
       await disconnectDatabase()

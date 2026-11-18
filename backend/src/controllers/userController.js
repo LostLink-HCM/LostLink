@@ -17,6 +17,16 @@ const getUserProfile = asyncHandler(async (req, res) => {
   res.json({ success: true, data })
 })
 
+const updateProfile = asyncHandler(async (req, res) => {
+  const data = await userService.updateProfile(req.user, matchedData(req, { locations: ['body'] }))
+  res.json({ success: true, message: 'Cập nhật hồ sơ thành công.', data })
+})
+
+const changeAvatar = asyncHandler(async (req, res) => {
+  const data = await userService.changeAvatar(req.user, req.files[0])
+  res.json({ success: true, message: 'Đổi ảnh đại diện thành công.', data })
+})
+
 const recordActivity = asyncHandler(async (req, res) => {
   await userService.recordActivity(req.user)
   res.status(204).end()
@@ -38,6 +48,8 @@ const relation = (action) =>
 module.exports = {
   getMyProfile,
   getUserProfile,
+  updateProfile,
+  changeAvatar,
   listBlocks,
   follow: relation('follow'),
   unfollow: relation('unfollow'),

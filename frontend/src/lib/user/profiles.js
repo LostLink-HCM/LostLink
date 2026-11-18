@@ -1,6 +1,3 @@
-import { BADGE_TONES, PROFILES } from '../../data/userProfiles'
-import { quarterLeaders, reputationOf } from './reputation'
-
 export const PROFILE_TABS = [
   { value: '', label: 'Tất cả' },
   { value: 'lost', label: 'Mất đồ' },
@@ -8,29 +5,6 @@ export const PROFILE_TABS = [
 ]
 
 export const profilePath = (username) => `/users/${encodeURIComponent(username)}`
-
-export const badgeTone = (name) => BADGE_TONES[name] ?? 'neutral'
-
-// Với chính mình thì lấy điểm uy tín và ngày tham gia từ tài khoản đang đăng nhập
-export function findProfile(username, { posts, me }) {
-  const isMe = username === me?.username
-  const stats = reputationOf(username)
-  const known = isMe || PROFILES[username] || stats || posts.some((p) => p.author === username)
-  if (!known) return null
-
-  const base = PROFILES[username] ?? {}
-  return {
-    username,
-    initials: username.slice(0, 2).toUpperCase(),
-    bio: base.bio ?? '',
-    joinedAt: base.joinedAt ?? (isMe ? me.createdAt : null),
-    badges: base.badges ?? [],
-    reputation: stats?.reputation ?? (isMe ? (me.reputationScore ?? 0) : 0),
-    returned: stats?.returned ?? 0,
-    rank: quarterLeaders().find((leader) => leader.username === username)?.rank ?? null,
-    isMe,
-  }
-}
 
 export const formatRating = (value) =>
   value.toLocaleString('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
@@ -45,6 +19,7 @@ export function joinedLabel(iso) {
 export const toProfileView = (profile, isMe) => ({
   username: profile.username,
   initials: profile.username.slice(0, 2).toUpperCase(),
+  avatarUrl: profile.avatarUrl ?? null,
   bio: profile.bio,
   joinedAt: profile.createdAt,
   badges: profile.badges,
@@ -58,7 +33,9 @@ export const toProfileView = (profile, isMe) => ({
 export const toReviewItems = (reviews) =>
   reviews.map((review) => ({
     id: review.id,
-    author: review.author?.username ?? 'Người dùng LostLink',
+    author: review.author?.username ?? 'Tài khoản đã bị xóa',
+    authorDeleted: !review.author,
+    authorAvatar: review.author?.avatarUrl ?? null,
     rating: review.rating,
     praises: review.praises,
     comment: review.comment,

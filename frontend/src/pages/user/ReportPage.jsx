@@ -238,11 +238,7 @@ function ReportView({ target, sent, onSubmit }) {
             </div>
           </div>
           {post && (
-            <AttachedPost
-              post={post}
-              linkable={Boolean(target.postLink) || post.id != null}
-              to={target.postLink}
-            />
+            <AttachedPost post={post} linkable={Boolean(target.postLink)} to={target.postLink} />
           )}
         </div>
 

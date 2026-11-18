@@ -1,4 +1,4 @@
-import { TAKEN_EMAILS } from '../../data/userSettings'
+import { ACCEPTED_IMAGE_TYPES, MAX_IMAGE_MB } from './composePost'
 
 export const RADIUS_MIN = 500
 export const RADIUS_MAX = 5000
@@ -15,11 +15,7 @@ export const AREA_PRESETS = [
 ]
 
 export const OTP_LENGTH = 6
-export const OTP_TTL_MS = 10 * 60 * 1000
-export const MAX_OTP_ATTEMPTS = 5
-export const RESEND_COOLDOWN_S = 45
-// Chưa có API gửi email nên dùng một mã cố định để thử trên giao diện
-export const DEMO_OTP = '123456'
+export const BIO_MAX = 500
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -38,7 +34,7 @@ export function passwordProblem(password) {
   return ''
 }
 
-// Đổi mật khẩu. Kiểm tra mật khẩu hiện tại đúng hay sai cần API
+// Đổi mật khẩu. Mật khẩu hiện tại đúng hay sai do server kiểm tra
 export function validatePasswordChange({ current, next, confirm }) {
   const errors = {}
   if (!current) errors.current = 'Vui lòng nhập mật khẩu hiện tại.'
@@ -49,30 +45,28 @@ export function validatePasswordChange({ current, next, confirm }) {
   return errors
 }
 
-// Đổi email
+// Đổi email. Email đã được tài khoản khác dùng hay chưa do server kiểm tra
 export function validateNewEmail(email, currentEmail) {
   const value = email.trim().toLowerCase()
   if (!value) return 'Vui lòng nhập email.'
   if (!EMAIL_PATTERN.test(value)) return 'Email không hợp lệ.'
   if (value === currentEmail?.toLowerCase()) return 'Email mới phải khác email hiện tại.'
-  if (TAKEN_EMAILS.includes(value)) return 'Email này đã được đăng ký.'
   return ''
 }
 
-// Kiểm tra mã xác thực: trả về lỗi và số lần sai mới; expired = mã đã bị hủy, phải gửi lại mã
-export function checkOtp({ code, sentAt, attempts }, now = Date.now()) {
-  if (!new RegExp(`^\\d{${OTP_LENGTH}}$`).test(code))
-    return { error: `Vui lòng nhập đủ ${OTP_LENGTH} chữ số.`, attempts }
-  if (code === DEMO_OTP && now - sentAt <= OTP_TTL_MS) return { error: '', attempts }
-  const wrong = attempts + 1
-  if (wrong >= MAX_OTP_ATTEMPTS)
-    return {
-      error: 'Nhập sai quá nhiều lần, vui lòng yêu cầu mã mới.',
-      attempts: wrong,
-      expired: true,
-    }
-  return { error: 'Mã xác thực không đúng hoặc đã hết hạn.', attempts: wrong }
-}
+export const validateOtp = (code) =>
+  code.length === OTP_LENGTH && /^\d+$/.test(code) ? '' : `Vui lòng nhập đủ ${OTP_LENGTH} chữ số.`
+
+export const AVATAR_ERROR = `Ảnh phải là JPG, PNG hoặc WEBP và không quá ${MAX_IMAGE_MB} MB.`
+export const AVATAR_ACCEPT = ACCEPTED_IMAGE_TYPES.join(',')
+
+export const validateAvatar = (file) =>
+  ACCEPTED_IMAGE_TYPES.includes(file.type) && file.size <= MAX_IMAGE_MB * 1024 * 1024
+    ? ''
+    : AVATAR_ERROR
+
+export const validateBio = (bio) =>
+  bio.trim().length > BIO_MAX ? `Giới thiệu tối đa ${BIO_MAX} ký tự.` : ''
 
 // Thêm khu vực
 export function validateArea({ point, radius }) {

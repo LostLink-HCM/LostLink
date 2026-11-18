@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { getClaimState } from '../../api/claims'
 import { useAuth } from '../../auth/AuthContext'
 import { cx } from '../../components/user/classes'
 import MobileTabBar from '../../components/user/home/MobileTabBar'
 import SiteHeader from '../../components/user/home/SiteHeader'
-import { createFeedComments, createFeedPosts, createMyPosts } from '../../data/homeFeed'
 import { DEFAULT_FILTERS } from '../../lib/user/homeFeed'
 import { inboxUnread } from '../../lib/user/messages'
 import { hidesTabBar } from '../../lib/user/navigation'
@@ -23,32 +22,14 @@ const userTheme = [
   '[--text-caption:9.5px] [--text-small:9.8px] [--text-body:10.2px] [--text-lead:10.8px] [--text-title:13px] [--text-heading:17.3px] [--text-display:22.4px] [--text-tiny:9px] [--text-micro:8.5px]',
 ].join(' ')
 
-// Chống spam bình luận
-const COMMENT_COOLDOWN_MS = 15 * 1000
 const TOAST_MS = 3000
-
-const toggleIn = (set, id) => {
-  const next = new Set(set)
-  if (next.has(id)) next.delete(id)
-  else next.add(id)
-  return next
-}
 
 export default function UserLayout() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
-  const [posts, setPosts] = useState(() => [...createMyPosts(), ...createFeedPosts()])
-  const [comments, setComments] = useState(createFeedComments)
   const [now] = useState(Date.now)
-  const [liked, setLiked] = useState(() => new Set())
-  const [saved, setSaved] = useState(() => new Set())
-  const [followed, setFollowed] = useState(() => new Set())
-  const [lastCommentAt, setLastCommentAt] = useState(0)
-  // Thay đổi ở mục Tài khoản (chưa có API): email mới đã xác thực, lần đổi mật khẩu gần nhất
-  const [account, setAccount] = useState({ email: '', passwordChangedAt: null })
-
   const [searchInput, setSearchInput] = useState('')
   const [keyword, setKeyword] = useState('')
   const [draft, setDraft] = useState(DEFAULT_FILTERS)
@@ -74,46 +55,6 @@ export default function UserLayout() {
   const inbox = useInbox(user)
   useBrowserNotifications(user)
   const matchBadge = usePendingMatches(user)
-
-  const memberToggle = (setter) => (id) => {
-    if (requireMember()) setter((prev) => toggleIn(prev, id))
-  }
-
-  // Mỗi lần mở trang chi tiết tính một lượt xem
-  const addView = useCallback((id) => {
-    setPosts((prev) =>
-      prev.map((post) => (post.id === id ? { ...post, views: post.views + 1 } : post))
-    )
-  }, [])
-
-  const addComment = (postId, text) => {
-    const wait = Math.ceil((lastCommentAt + COMMENT_COOLDOWN_MS - Date.now()) / 1000)
-    if (wait > 0) return `Bạn bình luận hơi nhanh, vui lòng chờ ${wait} giây.`
-    setComments((prev) => [
-      { id: Date.now(), postId, author: user.username, createdAt: new Date().toISOString(), text },
-      ...prev,
-    ])
-    setLastCommentAt(Date.now())
-    return ''
-  }
-
-  const editComment = (id, text) =>
-    setComments((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, text, editedAt: new Date().toISOString() } : item
-      )
-    )
-
-  const deleteComment = (id) => setComments((prev) => prev.filter((item) => item.id !== id))
-
-  // Bài mẫu `mine` thuộc về tài khoản đang đăng nhập, Guest không thấy
-  const visiblePosts = useMemo(
-    () =>
-      user
-        ? posts.map((post) => (post.mine ? { ...post, author: user.username } : post))
-        : posts.filter((post) => !post.mine),
-    [posts, user]
-  )
 
   const refreshInbox = () => {
     inbox.reload().catch(() => {})
@@ -182,37 +123,22 @@ export default function UserLayout() {
 
       <Outlet
         context={{
-          posts: visiblePosts,
-          comments,
           now,
           search,
           keyword,
           filters: { draft, setDraft, applied, setApplied },
-          liked,
-          toggleLike: memberToggle(setLiked),
-          saved,
-          toggleSaved: memberToggle(setSaved),
-          followed,
-          toggleFollowed: memberToggle(setFollowed),
           blockUser: refreshInbox,
           unblockUser: refreshInbox,
           requireMember,
-          addView,
-          addComment,
-          editComment,
-          deleteComment,
           inbox,
           contactAbout: claimPost,
           claimPost,
           setUnreadNotifications,
           refreshPendingMatches: matchBadge.refresh,
           interactions,
-          account,
-          setAccount,
           notify: setToast,
         }}
       />
-
       <MobileTabBar
         unreadMessages={unreadMessages}
         unreadNotifications={unreadNotifications}

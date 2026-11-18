@@ -1,21 +1,18 @@
 const multer = require('multer')
-
 const ApiError = require('../utils/ApiError')
-
 const MAX_IMAGES = 9
 const MAX_IMAGE_MB = 5
 const MAX_SCREENSHOTS = 3
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
-
 const invalid = (field, message) => new ApiError(422, 'Dữ liệu không hợp lệ.', [{ field, message }])
-
 const createImageForm = ({ field, maxImages, messages }) => {
+  const withData = Boolean(messages.json)
   const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
       fileSize: MAX_IMAGE_MB * 1024 * 1024,
       files: maxImages,
-      fields: 1,
+      fields: withData ? 1 : 0,
       fieldSize: 32 * 1024,
     },
     fileFilter: (req, file, cb) => {
@@ -27,7 +24,7 @@ const createImageForm = ({ field, maxImages, messages }) => {
   // Sau middleware này req.body là object đã parse từ field "data", req.files là danh sách ảnh
   return (req, res, next) => {
     if (!req.is('multipart/form-data')) {
-      return next(invalid('data', 'Dữ liệu phải gửi dạng multipart/form-data.'))
+      return next(invalid(withData ? 'data' : field, 'Dữ liệu phải gửi dạng multipart/form-data.'))
     }
 
     upload(req, res, (error) => {
@@ -36,10 +33,16 @@ const createImageForm = ({ field, maxImages, messages }) => {
         return next(
           imageMessage
             ? invalid(field, imageMessage)
-            : invalid('data', 'Dữ liệu gửi lên không hợp lệ.')
+            : invalid(withData ? 'data' : field, 'Dữ liệu gửi lên không hợp lệ.')
         )
       }
       if (error) return next(error)
+
+      req.files ??= []
+      if (!withData) {
+        req.body = {}
+        return next()
+      }
 
       let data
       try {
@@ -51,7 +54,6 @@ const createImageForm = ({ field, maxImages, messages }) => {
         return next(invalid('data', messages.json))
       }
       req.body = data
-      req.files ??= []
       next()
     })
   }
@@ -83,18 +85,35 @@ const parseReportForm = createImageForm({
   },
 })
 
-// Tin nhắn: field "data" (JSON nội dung) và tối đa một ảnh ở field "image"
-const MESSAGE_IMAGE_ERROR = `Ảnh phải là JPG, PNG hoặc WEBP và không quá ${MAX_IMAGE_MB} MB.`
+const SINGLE_IMAGE_ERROR = `Ảnh phải là JPG, PNG hoặc WEBP và không quá ${MAX_IMAGE_MB} MB.`
 const parseMessageForm = createImageForm({
   field: 'image',
   maxImages: 1,
   messages: {
-    type: () => MESSAGE_IMAGE_ERROR,
-    LIMIT_FILE_SIZE: MESSAGE_IMAGE_ERROR,
+    type: () => SINGLE_IMAGE_ERROR,
+    LIMIT_FILE_SIZE: SINGLE_IMAGE_ERROR,
     LIMIT_FILE_COUNT: 'Mỗi lần chỉ gửi được một ảnh.',
     LIMIT_UNEXPECTED_FILE: 'Mỗi lần chỉ gửi được một ảnh.',
     json: 'Dữ liệu tin nhắn không đúng định dạng JSON.',
   },
 })
 
-module.exports = { parsePostForm, parseReportForm, parseMessageForm, MAX_IMAGES, MAX_IMAGE_MB }
+const parseAvatarForm = createImageForm({
+  field: 'avatar',
+  maxImages: 1,
+  messages: {
+    type: () => SINGLE_IMAGE_ERROR,
+    LIMIT_FILE_SIZE: SINGLE_IMAGE_ERROR,
+    LIMIT_FILE_COUNT: 'Chỉ chọn một ảnh đại diện.',
+    LIMIT_UNEXPECTED_FILE: 'Chỉ chọn một ảnh đại diện.',
+  },
+})
+
+module.exports = {
+  parseAvatarForm,
+  parsePostForm,
+  parseReportForm,
+  parseMessageForm,
+  MAX_IMAGES,
+  MAX_IMAGE_MB,
+}

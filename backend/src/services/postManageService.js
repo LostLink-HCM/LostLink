@@ -245,10 +245,30 @@ const updatePost = async (id, input, user, files = []) => {
   return { id: post._id, code: post.code, slug: post.slug, type: post.type, status: post.status }
 }
 
-// ----- Xoá bài
+const removePost = async (post, challenge) => {
+  const { deletedCount } = await Post.deleteOne({ _id: post._id })
+  if (!deletedCount) return false
 
-// Xoá hẳn bài cùng thích, lưu, theo dõi, bình luận, câu hỏi, gợi ý ghép cặp, yêu cầu liên hệ.
-// Hội thoại được giữ, chưa trao trả xong thì khoá. Lượt trao trả của bài không bị trừ
+  const where = { post: post._id }
+  challenge ??= await VerificationChallenge.findOne(where).select('_id').lean()
+  const matchIds = await MatchSuggestion.find(matchesOf(post._id)).distinct('_id')
+  await Promise.all([
+    returnService.keepReturnsOfDeletedPost(post),
+    Comment.deleteMany(where),
+    PostLike.deleteMany(where),
+    SavedPost.deleteMany(where),
+    PostFollow.deleteMany(where),
+    Claim.deleteMany(where),
+    MatchSuggestion.deleteMany(matchesOf(post._id)),
+    VerificationChallenge.deleteMany(where),
+    challenge ? VerificationAttempt.deleteMany({ challenge: challenge._id }) : null,
+    Notification.deleteMany({ refType: 'Post', refId: post._id }),
+    Notification.deleteMany({ match: { $in: matchIds } }),
+  ])
+  await deleteUnusedImages(post.images.map((image) => image.url))
+  return true
+}
+
 const deletePost = async (id, user) => {
   const post = await findOwnPost(id, user, 'xóa')
 
@@ -264,25 +284,9 @@ const deletePost = async (id, user) => {
     VerificationChallenge.findOne({ post: post._id }).select('_id').lean(),
   ])
 
-  // Xoá đồng thời thì chỉ một yêu cầu đi tiếp, không cộng lượt trao trả hai lần
-  const { deletedCount } = await Post.deleteOne({ _id: post._id })
-  if (!deletedCount) return
+  if (!(await removePost(post, challenge))) return
 
-  const where = { post: post._id }
-  const matchIds = await MatchSuggestion.find(matchesOf(post._id)).distinct('_id')
   await Promise.all([
-    returnService.keepReturnsOfDeletedPost(post),
-    Comment.deleteMany(where),
-    PostLike.deleteMany(where),
-    SavedPost.deleteMany(where),
-    PostFollow.deleteMany(where),
-    Claim.deleteMany(where),
-    MatchSuggestion.deleteMany(matchesOf(post._id)),
-    VerificationChallenge.deleteMany(where),
-    challenge ? VerificationAttempt.deleteMany({ challenge: challenge._id }) : null,
-    Notification.deleteMany({ refType: 'Post', refId: post._id }),
-    Notification.deleteMany({ match: { $in: matchIds } }),
-    // locked: hội thoại không nhắn tiếp được
     Conversation.updateMany(
       { _id: { $in: talks.map((talk) => talk._id) } },
       { $set: { status: 'locked' } }
@@ -300,7 +304,6 @@ const deletePost = async (id, user) => {
       )
     ),
   ])
-  await deleteUnusedImages(post.images.map((image) => image.url))
 }
 
 // ----- Đóng bài / đánh dấu đã trao trả
@@ -354,4 +357,11 @@ const afterPostEnded = async (post, status, actorId, changedAt = new Date()) => 
   ])
 }
 
-module.exports = { getPostForEdit, updatePost, deletePost, changePostStatus, afterPostEnded }
+module.exports = {
+  getPostForEdit,
+  updatePost,
+  deletePost,
+  removePost,
+  changePostStatus,
+  afterPostEnded,
+}

@@ -1,9 +1,8 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { RequireAuth } from './auth/guards.jsx'
+import { PendingDeletionGate, RequireAuth } from './auth/guards.jsx'
 import HomePage from './pages/user/HomePage.jsx'
 import TrendingPage from './pages/user/TrendingPage.jsx'
-import MockPostDetailPage from './pages/user/MockPostDetailPage.jsx'
 import PostDetailPage from './pages/user/PostDetailPage.jsx'
 import VerifyPage from './pages/user/VerifyPage.jsx'
 import ReviewPage from './pages/user/ReviewPage.jsx'
@@ -30,6 +29,7 @@ const AdminRoutes = lazy(() => import('./pages/admin/AdminRoutes.jsx'))
 const SettingsLayout = lazy(() => import('./pages/user/settings/SettingsLayout.jsx'))
 const SettingsMenuPage = lazy(() => import('./pages/user/settings/SettingsMenuPage.jsx'))
 const AccountSettingsPage = lazy(() => import('./pages/user/settings/AccountSettingsPage.jsx'))
+const ProfileSettingsPage = lazy(() => import('./pages/user/settings/ProfileSettingsPage.jsx'))
 const NotificationSettingsPage = lazy(
   () => import('./pages/user/settings/NotificationSettingsPage.jsx')
 )
@@ -55,132 +55,133 @@ function SectionLoading() {
 function App() {
   return (
     <Suspense fallback={<PageLoading />}>
-      <Routes>
-        <Route path="/" element={<UserLayout />}>
-          <Route index element={<HomePage />} />
-          <Route path="trending" element={<TrendingPage />} />
-          <Route
-            path="posts/new"
-            element={
-              <RequireAuth>
-                <ComposePostPage key="new" />
-              </RequireAuth>
-            }
-          />
-          {/* Sửa bài của chính mình, dùng lại form Đăng bài */}
-          <Route
-            path="posts/:id/edit"
-            element={
-              <RequireAuth>
-                <EditPostPage />
-              </RequireAuth>
-            }
-          />
-          {/* Chi tiết bài thật theo loại tin và slug, vd /mat-do/mat-vi-da-mau-nau */}
-          <Route path="mat-do/:slug" element={<PostDetailPage type="lost" />} />
-          <Route path="nhat-duoc/:slug" element={<PostDetailPage type="found" />} />
-          {/* Bài mẫu của các màn hình chưa nối API (Ghép cặp, Tin nhắn, Hồ sơ) */}
-          <Route path="posts/:id" element={<MockPostDetailPage />} />
-          <Route path="leaderboard" element={<LeaderboardPage />} />
-          <Route
-            path="matches"
-            element={
-              <RequireAuth>
-                <MatchesPage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="notifications"
-            element={
-              <RequireAuth>
-                <NotificationsPage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="saved"
-            element={
-              <RequireAuth>
-                <SavedPostsPage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="posts/:id/verify"
-            element={
-              <RequireAuth>
-                <VerifyPage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="posts/:id/report"
-            element={
-              <RequireAuth>
-                <ReportPage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="messages/:threadId/review"
-            element={
-              <RequireAuth>
-                <ReviewPage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="settings"
-            element={
-              <RequireAuth>
-                {/* Giữ header của khu người dùng trong lúc tải trang Cài đặt */}
-                <Suspense fallback={<SectionLoading />}>
-                  <SettingsLayout />
-                </Suspense>
-              </RequireAuth>
-            }
-          >
-            <Route index element={<SettingsMenuPage />} />
-            <Route path="account" element={<AccountSettingsPage />} />
-            <Route path="notifications" element={<NotificationSettingsPage />} />
-            <Route path="areas" element={<AreaSettingsPage />} />
-            <Route path="blocked" element={<BlockedUsersPage />} />
+      <PendingDeletionGate>
+        <Routes>
+          <Route path="/" element={<UserLayout />}>
+            <Route index element={<HomePage />} />
+            <Route path="trending" element={<TrendingPage />} />
+            <Route
+              path="posts/new"
+              element={
+                <RequireAuth>
+                  <ComposePostPage key="new" />
+                </RequireAuth>
+              }
+            />
+            {/* Sửa bài của chính mình, dùng lại form Đăng bài */}
+            <Route
+              path="posts/:id/edit"
+              element={
+                <RequireAuth>
+                  <EditPostPage />
+                </RequireAuth>
+              }
+            />
+            {/* Chi tiết bài thật theo loại tin và slug, vd /mat-do/mat-vi-da-mau-nau */}
+            <Route path="mat-do/:slug" element={<PostDetailPage type="lost" />} />
+            <Route path="nhat-duoc/:slug" element={<PostDetailPage type="found" />} />
+            <Route path="leaderboard" element={<LeaderboardPage />} />
+            <Route
+              path="matches"
+              element={
+                <RequireAuth>
+                  <MatchesPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="notifications"
+              element={
+                <RequireAuth>
+                  <NotificationsPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="saved"
+              element={
+                <RequireAuth>
+                  <SavedPostsPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="posts/:id/verify"
+              element={
+                <RequireAuth>
+                  <VerifyPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="posts/:id/report"
+              element={
+                <RequireAuth>
+                  <ReportPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="messages/:threadId/review"
+              element={
+                <RequireAuth>
+                  <ReviewPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="settings"
+              element={
+                <RequireAuth>
+                  {/* Giữ header của khu người dùng trong lúc tải trang Cài đặt */}
+                  <Suspense fallback={<SectionLoading />}>
+                    <SettingsLayout />
+                  </Suspense>
+                </RequireAuth>
+              }
+            >
+              <Route index element={<SettingsMenuPage />} />
+              <Route path="profile" element={<ProfileSettingsPage />} />
+              <Route path="account" element={<AccountSettingsPage />} />
+              <Route path="notifications" element={<NotificationSettingsPage />} />
+              <Route path="areas" element={<AreaSettingsPage />} />
+              <Route path="blocked" element={<BlockedUsersPage />} />
+            </Route>
+            <Route
+              path="users/:username"
+              element={
+                <RequireAuth>
+                  <ProfilePage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="users/:username/report"
+              element={
+                <RequireAuth>
+                  <ReportPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="messages"
+              element={
+                <RequireAuth>
+                  <MessagesPage />
+                </RequireAuth>
+              }
+            />
           </Route>
-          <Route
-            path="users/:username"
-            element={
-              <RequireAuth>
-                <ProfilePage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="users/:username/report"
-            element={
-              <RequireAuth>
-                <ReportPage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="messages"
-            element={
-              <RequireAuth>
-                <MessagesPage />
-              </RequireAuth>
-            }
-          />
-        </Route>
-        <Route path="/moderator/*" element={<ModeratorRoutes />} />
-        <Route path="/admin/*" element={<AdminRoutes />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/verify-email" element={<VerifyEmailPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          <Route path="/moderator/*" element={<ModeratorRoutes />} />
+          <Route path="/admin/*" element={<AdminRoutes />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </PendingDeletionGate>
     </Suspense>
   )
 }

@@ -1,8 +1,13 @@
+import { lazy } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import ForbiddenPage from '../pages/errors/ForbiddenPage'
 import { useAuth } from './AuthContext'
 
-// Guard chỉ để điều hướng cho đúng; quyền thật do backend kiểm tra ở protect/can
+const PendingDeletionPage = lazy(() => import('../pages/auth/PendingDeletionPage.jsx'))
+export function PendingDeletionGate({ children }) {
+  const { user } = useAuth()
+  return user?.deletion ? <PendingDeletionPage /> : children
+}
 export function RequireAuth({ children }) {
   const { user, ready } = useAuth()
   const location = useLocation()

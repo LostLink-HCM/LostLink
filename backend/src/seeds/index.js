@@ -3,6 +3,7 @@ const env = require('../config/env')
 const { connectDatabase, disconnectDatabase } = require('../config/database')
 const { User } = require('../models')
 const { seedAuditLogs } = require('./auditLogSeed')
+const { seedAvatars } = require('./avatarSeed')
 const { seedCategories } = require('./categorySeed')
 const { seedConversations } = require('./conversationSeed')
 const { seedNotifications } = require('./notificationSeed')
@@ -23,26 +24,31 @@ const demo = process.argv.includes('--demo')
 const settingsOnly = process.argv.includes('--settings-only')
 const auditOnly = process.argv.includes('--audit-only')
 const reportsOnly = process.argv.includes('--reports-only')
+// Chỉ gán ảnh đại diện mẫu, chạy được trên production vì không đè ảnh người dùng tự tải lên
+const avatarsOnly = process.argv.includes('--avatars-only')
 const seeders = reportsOnly
   ? [seedReports]
   : auditOnly
     ? [seedAuditLogs]
-    : settingsOnly
-      ? [seedSystemSettings]
-      : demo
-        ? [seedMissingMembers, seedCategories, seedPosts, seedNotifications]
-        : [
-            seedUsers,
-            seedSystemSettings,
-            seedCategories,
-            seedPosts,
-            seedReports,
-            seedConversations,
-            seedNotifications,
-            seedUserActivityDates,
-            seedUserUpdateDates,
-            seedAuditLogs,
-          ]
+    : avatarsOnly
+      ? [seedAvatars]
+      : settingsOnly
+        ? [seedSystemSettings]
+        : demo
+          ? [seedMissingMembers, seedCategories, seedPosts, seedNotifications]
+          : [
+              seedUsers,
+              seedAvatars,
+              seedSystemSettings,
+              seedCategories,
+              seedPosts,
+              seedReports,
+              seedConversations,
+              seedNotifications,
+              seedUserActivityDates,
+              seedUserUpdateDates,
+              seedAuditLogs,
+            ]
 
 // Kiểm tra tài khoản không tự tạo được trước khi ghi, thiếu thì dừng khi chưa đổi gì trong DB.
 // Tác giả bài mẫu còn thiếu sẽ do seedMissingMembers tạo, findSeedAccounts kiểm lại trong seedPosts
@@ -52,16 +58,18 @@ const checkAccounts = async () => {
 }
 
 async function run() {
-  if (reportsOnly && (demo || settingsOnly || auditOnly))
+  if (reportsOnly && (demo || settingsOnly || auditOnly || avatarsOnly))
     throw new Error('Không kết hợp --reports-only với chế độ seed khác')
   if (reportsOnly && env.nodeEnv === 'production')
     throw new Error('Không chạy seed báo cáo trên production')
-  if (auditOnly && (demo || settingsOnly))
+  if (auditOnly && (demo || settingsOnly || avatarsOnly || reportsOnly))
     throw new Error('Không kết hợp --audit-only với chế độ seed khác')
+  if (avatarsOnly && (demo || settingsOnly || auditOnly || reportsOnly))
+    throw new Error('Không kết hợp --avatars-only với chế độ seed khác')
   if (auditOnly && env.nodeEnv === 'production')
     throw new Error('Không chạy seed nhật ký trên production')
   if (demo && settingsOnly) throw new Error('Không kết hợp --demo với --settings-only')
-  if (!demo && !settingsOnly && env.nodeEnv === 'production') {
+  if (!demo && !settingsOnly && !avatarsOnly && env.nodeEnv === 'production') {
     throw new Error('Không chạy seed đầy đủ trên production, dùng npm run seed:demo')
   }
 
@@ -71,11 +79,13 @@ async function run() {
     ? 'báo cáo'
     : auditOnly
       ? 'nhật ký thao tác'
-      : settingsOnly
-        ? 'cấu hình hệ thống'
-        : demo
-          ? 'demo'
-          : 'đầy đủ'
+      : avatarsOnly
+        ? 'ảnh đại diện'
+        : settingsOnly
+          ? 'cấu hình hệ thống'
+          : demo
+            ? 'demo'
+            : 'đầy đủ'
   console.log(`Seed ${mode} vào ${host}/${name}`)
 
   if (demo) await checkAccounts()

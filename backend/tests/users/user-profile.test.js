@@ -21,7 +21,6 @@ beforeEach(async () => {
     username: 'Hoang.Nam',
     email: 'owner@example.com',
     bio: 'Hay đi chợ Bến Thành',
-    favoriteArea: 'Quận 1',
     reputationScore: 80,
     returnCount: 2,
   })
@@ -41,7 +40,7 @@ const notFound = (res) => {
 }
 
 describe('UC20 - Xem hồ sơ người dùng khác', () => {
-  test('thông tin công khai, không lộ email, khu vực hay để ý hay trạng thái tài khoản', async () => {
+  test('thông tin công khai, không lộ email hay trạng thái tài khoản', async () => {
     const res = await profileOf('hoang.nam')
 
     assert.equal(res.status, 200, JSON.stringify(res.body))
@@ -51,7 +50,7 @@ describe('UC20 - Xem hồ sơ người dùng khác', () => {
     assert.equal(profile.reputationScore, 80)
     assert.equal(profile.returnCount, 2)
     assert.deepEqual(profile.badges, [])
-    for (const key of ['id', 'email', 'favoriteArea', 'status', 'role', 'passwordHash']) {
+    for (const key of ['id', 'email', 'status', 'role', 'passwordHash']) {
       assert.equal(key in profile, false, key)
     }
   })

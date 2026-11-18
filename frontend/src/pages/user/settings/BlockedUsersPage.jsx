@@ -14,7 +14,7 @@ const FAILED = 'Đã có lỗi xảy ra, vui lòng thử lại.'
 
 // Mục Chặn: danh sách người đã chặn, bỏ chặn sau khi xác nhận
 export default function BlockedUsersPage() {
-  // Hội thoại còn là dữ liệu mẫu ở UserLayout, đồng bộ để mở khóa ở trang Tin nhắn
+  // Bỏ chặn xong tải lại hộp thư để hội thoại được mở khóa ở trang Tin nhắn
   const { unblockUser: unlockChat, notify } = useOutletContext()
   const { data, error, loading, reload } = useProfileData(listBlockedUsers)
   const [removed, setRemoved] = useState(() => new Set())
@@ -67,7 +67,7 @@ export default function BlockedUsersPage() {
             key={item.username}
             className="flex items-center gap-3 border-t border-line-subtle py-2.5 first:border-t-0"
           >
-            <Avatar name={item.username} size="md" tone="neutral" />
+            <Avatar name={item.username} src={item.avatarUrl} size="md" tone="neutral" />
             <div className="min-w-0 flex-1">
               <Link
                 to={profilePath(item.username)}
