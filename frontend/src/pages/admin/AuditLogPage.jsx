@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
-import Badge from '../../components/backoffice/Badge'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { listAuditLogs } from '../../api/auditLogs'
 import Button from '../../components/backoffice/Button'
 import DataTable, { cell } from '../../components/backoffice/DataTable'
 import DateRange from '../../components/backoffice/DateRange'
@@ -7,67 +8,141 @@ import EmptyState from '../../components/backoffice/EmptyState'
 import Field, { Input, Select } from '../../components/backoffice/Field'
 import Icon from '../../components/common/Icon'
 import IconButton from '../../components/backoffice/IconButton'
-import Notice from '../../components/backoffice/Notice'
 import Pagination from '../../components/backoffice/Pagination'
-import { createAdminAudit } from '../../data/adminAudit'
 import useBackofficePageSize from '../../hooks/useBackofficePageSize'
-import { downloadCsv } from '../../lib/csv'
 import {
   AUDIT_ACTIONS,
   AUDIT_ENTITY_TYPES,
   AUDIT_FILTERS,
+  AUDIT_ROLES,
+  auditActorName,
+  auditDestination,
   auditDetail,
   auditEntityLabel,
   auditObjectCode,
   auditReason,
-  auditLogsToRows,
-  filterAuditLogs,
   formatAuditDate,
 } from '../../lib/admin/audit'
 
 const actionIcons = {
   lock: 'lock',
-  hide: 'lock',
+  unlock: 'unlock',
+  hide: 'eyeOff',
+  unhide: 'eyeCheck',
   revoke: 'lock',
   grant: 'check',
-  settings: 'settings',
+  approve: 'check',
+  reject: 'close',
+  restrict: 'warning',
+  warn: 'warning',
+  initialize: 'settings',
+  create: 'compose',
+  delete: 'trash',
 }
 
-const roleTones = { Admin: 'primary', Moderator: 'info' }
+function AuditDetails({ log }) {
+  const destination = auditDestination(log)
+  return (
+    <>
+      <span className="text-small font-semibold leading-relaxed text-ink">{auditDetail(log)}</span>
+      {auditReason(log) && (
+        <span className="mt-1 block text-caption leading-relaxed text-ink-muted">
+          Lý do: {auditReason(log)}
+        </span>
+      )}
+      {destination && (
+        <Link
+          to={destination.to}
+          state={destination.state}
+          className="mt-2 block w-fit rounded text-caption text-primary underline underline-offset-2 hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        >
+          {destination.label}
+        </Link>
+      )}
+    </>
+  )
+}
 
 export default function AuditLog() {
-  const pageSize = useBackofficePageSize()
+  const fallbackPageSize = useBackofficePageSize()
   const [filters, setFilters] = useState(AUDIT_FILTERS)
   const [page, setPage] = useState(1)
-  const [notice, setNotice] = useState('')
-  const [logs] = useState(createAdminAudit)
-  const filtered = useMemo(() => filterAuditLogs(logs, filters), [filters, logs])
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
-  const currentPage = Math.min(page, pageCount)
-  const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [retryCount, setRetryCount] = useState(0)
+  const [result, setResult] = useState({ key: null, data: null, error: '', fieldErrors: {} })
+  const pending = useRef(null)
+  const requestFilters = useMemo(
+    () => ({
+      query: debouncedQuery,
+      actorRole: filters.actorRole,
+      action: filters.action,
+      entityType: filters.entityType,
+      from: filters.from,
+      to: filters.to,
+      page,
+    }),
+    [
+      debouncedQuery,
+      filters.actorRole,
+      filters.action,
+      filters.entityType,
+      filters.from,
+      filters.to,
+      page,
+    ]
+  )
+  const requestKey = JSON.stringify([requestFilters, retryCount])
+  const queryDebouncing = filters.query.trim() !== debouncedQuery
+  const invalidRange = Boolean(filters.from && filters.to && filters.from > filters.to)
+  const current = result.key === requestKey && !queryDebouncing && !invalidRange
+  const loading = !invalidRange && (queryDebouncing || !current)
+  const error = current ? result.error : ''
+  const fieldErrors = current ? result.fieldErrors : {}
+  const data = current && !error ? result.data : null
+  const logs = data?.items || []
+  const pageSize = data?.pageSize ?? fallbackPageSize
+  const currentPage = data?.page ?? page
 
   useEffect(() => {
-    if (!notice) return undefined
-    const timeout = window.setTimeout(() => setNotice(''), 3000)
+    const timeout = window.setTimeout(() => setDebouncedQuery(filters.query.trim()), 300)
     return () => window.clearTimeout(timeout)
-  }, [notice])
+  }, [filters.query])
+
+  useEffect(() => {
+    if (queryDebouncing || invalidRange) return undefined
+    let active = true
+    if (pending.current?.key !== requestKey)
+      pending.current = { key: requestKey, promise: listAuditLogs(requestFilters) }
+    pending.current.promise.then(
+      (data) => {
+        if (active) setResult({ key: requestKey, data, error: '', fieldErrors: {} })
+      },
+      (error) => {
+        if (active)
+          setResult({
+            key: requestKey,
+            data: null,
+            error: error.message,
+            fieldErrors: error.fieldErrors || {},
+          })
+      }
+    )
+    return () => {
+      active = false
+    }
+  }, [requestFilters, requestKey, queryDebouncing, invalidRange])
 
   const changeFilter = (key, value) => {
     setFilters((current) => ({ ...current, [key]: value }))
     setPage(1)
-    setNotice('')
+    if (key === 'query' && !value.trim()) setDebouncedQuery('')
   }
 
   const resetFilters = () => {
     setFilters(AUDIT_FILTERS)
+    setDebouncedQuery('')
     setPage(1)
-    setNotice('')
-  }
-
-  const exportCsv = () => {
-    if (!filtered.length) return
-    downloadCsv('LostLink_Nhat_ky_thao_tac.csv', auditLogsToRows(filtered))
-    setNotice(`Đã xuất ${filtered.length} bản ghi nhật ký ra CSV.`)
+    setRetryCount((count) => count + 1)
   }
 
   return (
@@ -77,31 +152,35 @@ export default function AuditLog() {
         className="rounded-xl border border-line bg-surface p-4 shadow-card"
       >
         <div className="grid grid-cols-[minmax(220px,1.35fr)_repeat(3,minmax(0,1fr))] gap-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
-          <Field label="Tìm kiếm">
+          <Field label="Tìm kiếm" error={fieldErrors.q}>
             {(props) => (
               <Input
                 {...props}
                 type="search"
+                maxLength={100}
                 value={filters.query}
                 onChange={(event) => changeFilter('query', event.target.value)}
                 placeholder="Tên hoặc nội dung thao tác…"
               />
             )}
           </Field>
-          <Field label="Vai trò">
+          <Field label="Vai trò" error={fieldErrors.actorRole}>
             {(props) => (
               <Select
                 {...props}
-                value={filters.actor}
-                onChange={(event) => changeFilter('actor', event.target.value)}
+                value={filters.actorRole}
+                onChange={(event) => changeFilter('actorRole', event.target.value)}
               >
                 <option value="">Tất cả vai trò</option>
-                <option value="Admin">Admin</option>
-                <option value="Moderator">Moderator</option>
+                {Object.entries(AUDIT_ROLES).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
               </Select>
             )}
           </Field>
-          <Field label="Hành động">
+          <Field label="Hành động" error={fieldErrors.action}>
             {(props) => (
               <Select
                 {...props}
@@ -117,7 +196,7 @@ export default function AuditLog() {
               </Select>
             )}
           </Field>
-          <Field label="Đối tượng">
+          <Field label="Đối tượng" error={fieldErrors.entityType}>
             {(props) => (
               <Select
                 {...props}
@@ -143,88 +222,117 @@ export default function AuditLog() {
               size={36}
               onClick={resetFilters}
             />
-            <Button variant="primary" onClick={exportCsv} disabled={!filtered.length}>
-              <Icon name="download" size={16} />
-              Xuất CSV
-            </Button>
+            <span title="Xuất CSV sẽ được bổ sung sau.">
+              <Button variant="primary" disabled>
+                <Icon name="download" size={16} />
+                Xuất CSV
+              </Button>
+            </span>
           </div>
         </DateRange>
       </section>
 
-      {notice && <Notice>{notice}</Notice>}
-      <p className="mt-4 mb-2.5 text-small text-ink-muted" aria-live="polite">
-        Hiển thị <strong className="px-1 text-lead text-primary">{filtered.length}</strong> bản ghi
-        phù hợp
-      </p>
+      {error && (
+        <div
+          role="alert"
+          className="my-4 flex flex-wrap items-center gap-3 rounded-lg border border-danger-soft bg-danger-soft p-3 text-small text-danger-ink"
+        >
+          <p className="min-w-0 flex-1">
+            Không tải được nhật ký thao tác. {error}{' '}
+            {[fieldErrors.from, fieldErrors.to, fieldErrors.page].filter(Boolean).join(' ')}
+          </p>
+          <Button onClick={() => setRetryCount((count) => count + 1)}>Thử lại</Button>
+        </div>
+      )}
+      {data && (
+        <p className="mt-4 mb-2.5 text-small text-ink-subtle" aria-live="polite">
+          Hiển thị {data.total ? (currentPage - 1) * pageSize + 1 : 0}–
+          {Math.min(currentPage * pageSize, data.total)} trong số {data.total} bản ghi
+        </p>
+      )}
 
-      <DataTable
-        caption="Nhật ký thao tác của Admin và Moderator"
-        ariaLabel="Bảng nhật ký thao tác, cuộn ngang để xem thêm"
-        minWidth="min-w-[900px]"
-        variant="admin"
-        columns={[
-          ['Thời gian', 'w-[17%]'],
-          ['Người thực hiện', 'w-[17%]'],
-          ['Hành động', 'w-[19%]'],
-          ['Đối tượng', 'w-[23%]'],
-          ['Chi tiết', 'w-[24%]'],
-        ]}
-        empty={
-          !visible.length && (
-            <div className="pb-8 text-center">
-              <EmptyState
-                icon="history"
-                title="Không có bản ghi phù hợp"
-                description="Thay đổi bộ lọc để xem các thao tác khác."
-              />
-              <Button onClick={resetFilters}>Xóa bộ lọc</Button>
-            </div>
-          )
-        }
-      >
-        {visible.map((log) => (
-          <tr key={log.id} className="hover:bg-surface-muted">
-            <td className={cell}>
-              <time dateTime={log.createdAt} className="text-caption text-ink-secondary">
-                {formatAuditDate(log.createdAt)}
-              </time>
-            </td>
-            <td className={cell}>
-              <Badge tone={roleTones[log.actorRole] || 'neutral'}>{log.actorRole}</Badge>
-            </td>
-            <td className={cell}>
-              <span className="inline-flex items-center gap-1.5 text-small text-ink-secondary">
-                <Icon name={actionIcons[log.action] || 'history'} size={15} />
-                {AUDIT_ACTIONS[log.action] || log.detail}
-              </span>
-            </td>
-            <td className={cell}>
-              <div className="flex flex-col gap-1 text-small text-ink-secondary">
-                <span className="font-semibold text-ink">{auditEntityLabel(log)}</span>
-                <span className="text-caption text-ink-muted">{auditObjectCode(log)}</span>
-              </div>
-            </td>
-            <td className={cell}>
-              <span className="text-small font-semibold leading-relaxed text-ink">
-                {auditDetail(log)}
-              </span>
-              {auditReason(log) && (
-                <span className="mt-1 block text-caption leading-relaxed text-ink-muted">
-                  {auditReason(log)}
+      <div className="mt-3" aria-busy={loading}>
+        <DataTable
+          caption="Nhật ký thao tác của Admin và Moderator"
+          ariaLabel="Bảng nhật ký thao tác, cuộn ngang để xem thêm"
+          minWidth="min-w-[900px]"
+          variant="admin"
+          columns={[
+            ['Thời gian', 'w-[17%]'],
+            ['Người thực hiện', 'w-[17%]'],
+            ['Hành động', 'w-[19%]'],
+            ['Đối tượng', 'w-[23%]'],
+            ['Chi tiết', 'w-[24%]'],
+          ]}
+          empty={
+            loading ? (
+              <p role="status" className="px-4 py-8 text-center text-small text-ink-muted">
+                Đang tải nhật ký thao tác…
+              </p>
+            ) : (
+              !error &&
+              !invalidRange &&
+              !logs.length && (
+                <div className="pb-8 text-center">
+                  <EmptyState
+                    icon="history"
+                    title="Không có bản ghi phù hợp"
+                    description="Thay đổi bộ lọc để xem các thao tác khác."
+                  />
+                  <Button onClick={resetFilters}>Xóa bộ lọc</Button>
+                </div>
+              )
+            )
+          }
+        >
+          {logs.map((log) => (
+            <tr key={log.id} className="hover:bg-surface-muted">
+              <td className={cell}>
+                <time dateTime={log.createdAt} className="text-caption text-ink-secondary">
+                  {formatAuditDate(log.createdAt)}
+                </time>
+              </td>
+              <td className={cell}>
+                <span className="text-small font-semibold text-ink">{auditActorName(log)}</span>
+              </td>
+              <td className={cell}>
+                <span className="inline-flex items-center gap-1.5 text-small text-ink-secondary">
+                  <Icon name={actionIcons[log.action] || 'history'} size={15} />
+                  {AUDIT_ACTIONS[log.action] || log.action}
                 </span>
-              )}
-            </td>
-          </tr>
-        ))}
-      </DataTable>
+              </td>
+              <td className={cell}>
+                <div className="flex flex-col gap-1 text-small text-ink-secondary">
+                  <span className="font-semibold text-ink">{auditEntityLabel(log)}</span>
+                  {log.entityType === 'Category' &&
+                    log.detail?.entityName &&
+                    log.detail.entityName !== auditEntityLabel(log) && (
+                      <span className="text-caption text-ink-muted">{log.detail.entityName}</span>
+                    )}
+                  {!['Category', 'SystemConfig', 'QuickReply'].includes(log.entityType) &&
+                    auditObjectCode(log) && (
+                      <span className="text-caption text-ink-muted">{auditObjectCode(log)}</span>
+                    )}
+                </div>
+              </td>
+              <td className={cell}>
+                <AuditDetails log={log} />
+              </td>
+            </tr>
+          ))}
+        </DataTable>
+      </div>
 
-      <Pagination
-        page={currentPage}
-        total={filtered.length}
-        pageSize={pageSize}
-        onChange={setPage}
-        noun="bản ghi"
-      />
+      {data && (
+        <Pagination
+          page={currentPage}
+          total={data.total}
+          pageSize={pageSize}
+          onChange={setPage}
+          noun="bản ghi"
+          showSummary={false}
+        />
+      )}
     </div>
   )
 }

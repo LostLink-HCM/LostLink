@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import Icon from '../../common/Icon'
 import Button from '../../backoffice/Button'
-import { cx, focusRing } from '../../backoffice/classes'
+import { cx, focusRing, linkedHighlight } from '../../backoffice/classes'
 import CategoryAvatar from './CategoryAvatar'
 
 // Cột trái: ô tìm theo tên hoặc alias và danh sách danh mục đã lọc
@@ -13,6 +13,8 @@ export default function CategoryList({
   onQueryChange,
   onSelect,
   listRef,
+  highlightedId,
+  highlightRef,
 }) {
   const searchRef = useRef(null)
   const clearQuery = () => {
@@ -60,14 +62,19 @@ export default function CategoryList({
       >
         {categories.map((category) => {
           const active = selectedId === category.id
+          const highlighted = highlightedId === category.id
           return (
             <button
               key={category.id}
+              ref={highlighted ? highlightRef : null}
               type="button"
               aria-current={active || undefined}
               className={cx(
-                'flex w-full min-w-0 cursor-pointer items-center gap-3 rounded-xl px-2.5 py-2.5 text-left text-ink-secondary transition-colors hover:bg-primary-faint',
-                active && 'bg-primary-soft text-primary',
+                'flex w-full min-w-0 cursor-pointer items-center gap-3 rounded-xl px-2.5 py-2.5 text-left text-ink-secondary transition-colors',
+                active && 'text-primary',
+                highlighted
+                  ? linkedHighlight
+                  : cx('hover:bg-primary-faint', active && 'bg-primary-soft'),
                 focusRing
               )}
               onClick={() => onSelect(category.id)}

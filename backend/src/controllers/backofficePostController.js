@@ -25,7 +25,7 @@ const updateStatus = asyncHandler(async (req, res) => {
 const updateVisibility = asyncHandler(async (req, res) => {
   const { id } = matchedData(req, { locations: ['params'] })
   const { isHidden, reason } = matchedData(req, { locations: ['body'] })
-  const data = await backofficePostService.updateVisibility(id, isHidden, reason)
+  const data = await backofficePostService.updateVisibility(id, req.user, isHidden, reason)
   res.json({ success: true, data })
 })
 

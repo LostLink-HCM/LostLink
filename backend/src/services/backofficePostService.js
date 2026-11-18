@@ -13,6 +13,7 @@ const { endOfVnDay, startOfVnDay } = require('../utils/vnTime')
 const { syncPostMatchNotices } = require('./matchingService')
 const returnService = require('./returnService')
 const { ACTIVE_MATCH_STATES } = require('./postService')
+const { updatePostWithAudit } = require('./postAuditService')
 
 const MATCHABLE_STATUSES = ['searching', 'contacted']
 const FINAL_STATUSES = ['closed', 'returned']
@@ -250,9 +251,14 @@ const updateStatus = async (id, actor, status, reason = '') => {
   const previousReturners =
     previousStatus === 'returned' ? await returnService.returnersOf(current) : []
   const changedAt = new Date()
-  const updated = await Post.findOneAndUpdate(
-    { _id: id, status: previousStatus },
-    {
+  const updated = await updatePostWithAudit({
+    filter: { _id: id, status: previousStatus },
+    actor,
+    action: 'status',
+    reason,
+    fields: ['status'],
+    changedAt,
+    update: {
       $set: { status },
       $push: {
         statusHistory: {
@@ -263,8 +269,7 @@ const updateStatus = async (id, actor, status, reason = '') => {
         },
       },
     },
-    { returnDocument: 'after', runValidators: true }
-  )
+  })
   if (!updated) throw statusChanged()
 
   const effects = []
@@ -298,7 +303,7 @@ const updateStatus = async (id, actor, status, reason = '') => {
   return { id: String(updated._id), code: updated.code, status: updated.status, changedAt }
 }
 
-const updateVisibility = async (id, isHidden, reason = '') => {
+const updateVisibility = async (id, actor, isHidden, reason = '') => {
   const current = await Post.findById(id).select('code isHidden hiddenReason')
   if (!current) throw postNotFound()
   if (current.isHidden === isHidden && (!isHidden || current.hiddenReason === reason)) {
@@ -312,10 +317,15 @@ const updateVisibility = async (id, isHidden, reason = '') => {
 
   const update = { $set: { isHidden } }
   if (isHidden) update.$set.hiddenReason = reason
-  const post = await Post.findOneAndUpdate({ _id: id, isHidden: current.isHidden }, update, {
-    returnDocument: 'after',
-    runValidators: true,
-  }).select('code isHidden hiddenReason')
+  const post = await updatePostWithAudit({
+    filter: { _id: id, isHidden: current.isHidden, hiddenReason: current.hiddenReason },
+    update,
+    actor,
+    action: isHidden ? 'hide' : 'unhide',
+    reason: isHidden ? reason : '',
+    fields: ['isHidden', 'hiddenReason'],
+    changedAt: new Date(),
+  })
   if (!post) throw statusChanged()
   await syncPostMatchNotices(post._id)
 

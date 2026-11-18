@@ -1,4 +1,4 @@
-const { Notification, Post, Report, User } = require('../models')
+const { AuditLog, Notification, Post, Report, User } = require('../models')
 const ApiError = require('../utils/ApiError')
 const imageService = require('./imageService')
 const { notify } = require('./notificationService')
@@ -80,6 +80,55 @@ const saveReport = async (fields, files) => {
   }
 }
 
+const restrictWithAudit = async (userId, count) => {
+  const changedAt = new Date()
+  const apply = async (session) => {
+    const previous = await User.findOneAndUpdate(
+      { _id: userId, status: 'active' },
+      { $set: { status: 'restricted', updatedAt: changedAt } },
+      { returnDocument: 'before', timestamps: false, session }
+    ).select('username updatedAt')
+    if (!previous) return
+    const log = new AuditLog({
+      actor: null,
+      actorRole: 'system',
+      action: 'restrict',
+      entityType: 'User',
+      entityId: userId,
+      detail: {
+        displayCode: previous.username,
+        entityName: previous.username,
+        summary: 'Hệ thống hạn chế tài khoản',
+        reason: `Có ${count} người báo cáo trong 7 ngày.`,
+        before: { status: 'active' },
+        after: { status: 'restricted' },
+      },
+      createdAt: changedAt,
+    })
+    try {
+      await log.save({ session })
+    } catch (error) {
+      if (!session) {
+        const rollback = await User.updateOne(
+          { _id: userId, status: 'restricted', updatedAt: changedAt },
+          { $set: { status: 'active', updatedAt: previous.updatedAt } },
+          { timestamps: false }
+        )
+        if (!rollback.matchedCount)
+          throw new AggregateError(
+            [error],
+            'Không thể hoàn lại thao tác hạn chế tài khoản sau lỗi lưu nhật ký.'
+          )
+        await AuditLog.deleteOne({ _id: log._id })
+      }
+      throw error
+    }
+  }
+  const hello = await User.db.db.admin().command({ hello: 1 })
+  if (hello.setName || hello.msg === 'isdbgrid') await User.db.transaction(apply)
+  else await apply(null)
+}
+
 // Gắn cờ (nâng mức độ, báo Moderator) rồi hạn chế tài khoản khi đủ ngưỡng
 const applyThresholds = async (userId) => {
   const since = new Date(Date.now() - WINDOW_MS)
@@ -116,7 +165,7 @@ const applyThresholds = async (userId) => {
     })
   }
   if (count >= RESTRICT_REPORTERS) {
-    await User.updateOne({ _id: userId, status: 'active' }, { status: 'restricted' })
+    await restrictWithAudit(userId, count)
   }
 }
 

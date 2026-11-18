@@ -193,7 +193,15 @@ const persist = async (records, configChanges, replyChanges, actor, action, deta
     action,
     entityType: detail.section === 'quickReplies' ? 'QuickReply' : 'SystemConfig',
     entityId: detail.section === 'quickReplies' ? null : (configChanges[0]?.after._id ?? null),
-    detail,
+    detail: {
+      ...detail,
+      actorUsername: actor.username,
+      displayCode:
+        detail.section === 'quickReplies'
+          ? 'quickReplies'
+          : configChanges[0]?.after.key || detail.section,
+      entityName: detail.section === 'quickReplies' ? 'Mẫu trả lời nhanh' : 'Cấu hình hệ thống',
+    },
   })
   try {
     for (const change of configChanges) {

@@ -13,8 +13,6 @@ export default function Pagination({
   const first = total ? (page - 1) * pageSize + 1 : 0
   const pageNumbers = new Set([1, pages])
 
-  if (pages > 1) pageNumbers.add(2)
-  if (pages > 2) pageNumbers.add(pages - 1)
   for (let number = Math.max(1, page - 1); number <= Math.min(pages, page + 1); number += 1) {
     pageNumbers.add(number)
   }

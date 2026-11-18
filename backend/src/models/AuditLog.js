@@ -27,6 +27,6 @@ const auditLogSchema = new Schema(
   { timestamps: { createdAt: true, updatedAt: false }, collection: 'audit_logs' }
 )
 
-auditLogSchema.index({ createdAt: -1 })
+auditLogSchema.index({ createdAt: -1, _id: -1 })
 
 module.exports = mongoose.model('AuditLog', auditLogSchema)

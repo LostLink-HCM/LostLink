@@ -1,9 +1,10 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { useLocation, useOutletContext, useSearchParams } from 'react-router-dom'
 import { saveSystemSettings } from '../../api/systemSettings'
 import useSystemSettings from '../../hooks/useSystemSettings'
 import Button from '../../components/backoffice/Button'
-import { cx } from '../../components/backoffice/classes'
+import { cx, linkedHighlight } from '../../components/backoffice/classes'
+import useLinkedHighlight from '../../hooks/useLinkedHighlight'
 import Dialog from '../../components/backoffice/Dialog'
 import IconButton from '../../components/backoffice/IconButton'
 import Icon from '../../components/common/Icon'
@@ -86,6 +87,8 @@ function SettingField({
   unit,
   value,
   highlighted = false,
+  linkedHighlighted = false,
+  linkedRef,
   error,
   errorTextClassName = 'text-danger-ink',
   onChange,
@@ -104,13 +107,21 @@ function SettingField({
         {label}
       </label>
       <div
+        ref={linkedRef}
         className={cx(
           'flex h-9 items-center overflow-hidden rounded-lg border transition focus-within:border-focus focus-within:ring-2 focus-within:ring-focus/20',
           error
-            ? 'border-danger bg-danger-soft focus-within:border-danger focus-within:ring-danger/20'
+            ? 'border-danger focus-within:border-danger focus-within:ring-danger/20'
             : highlighted
-              ? 'border-amber-400 bg-amber-50'
-              : 'border-line-strong bg-surface'
+              ? 'border-amber-400'
+              : 'border-line-strong',
+          linkedHighlighted
+            ? linkedHighlight
+            : error
+              ? 'bg-danger-soft'
+              : highlighted
+                ? 'bg-amber-50'
+                : 'bg-surface'
         )}
       >
         {options ? (
@@ -220,6 +231,9 @@ function QuickReplyManager({
   editor,
   setEditor,
   highlightChanges,
+  linkedTargets = [],
+  linkedActive = false,
+  linkedRef,
 }) {
   const { activeGroup, newText, editingId, editingText } = editor
   const changeEditor = (key, next) => setEditor((current) => ({ ...current, [key]: next }))
@@ -231,6 +245,16 @@ function QuickReplyManager({
   const [actionError, setActionError] = useState('')
   const replies = value?.[activeGroup] || []
   const savedReplies = savedValue[activeGroup] || []
+  const relatedReplies = linkedTargets.flatMap((target) => {
+    const group = value?.[target.group] || []
+    const reply =
+      group.find((item) => item.text === target.text) || group.find((item) => item.id === target.id)
+    return reply ? [{ group: target.group, id: reply.id }] : []
+  })
+  const linkedReplyIds = relatedReplies
+    .filter((target) => target.group === activeGroup)
+    .map((target) => target.id)
+  const isLinked = (reply) => linkedActive && linkedReplyIds.includes(reply.id)
   const deletedReplies = savedReplies.filter(
     (reply) => !replies.some((item) => item.id === reply.id)
   )
@@ -387,11 +411,17 @@ function QuickReplyManager({
         {replies.map((reply) => (
           <div
             key={reply.id}
+            ref={isLinked(reply) && reply.id === linkedReplyIds[0] ? linkedRef : null}
             className={cx(
               'flex items-start gap-3 border-l-3 p-3 transition-colors',
               highlightChanges && changedReply(reply)
-                ? 'border-amber-400 bg-amber-50'
-                : 'border-[#d7e6f4] bg-[#f8fbff] hover:border-primary hover:bg-primary-soft/50'
+                ? 'border-amber-400'
+                : 'border-[#d7e6f4] hover:border-primary',
+              isLinked(reply)
+                ? linkedHighlight
+                : highlightChanges && changedReply(reply)
+                  ? 'bg-amber-50'
+                  : 'bg-[#f8fbff] hover:bg-primary-soft/50'
             )}
           >
             {editingId === reply.id ? (
@@ -451,6 +481,11 @@ function QuickReplyManager({
         )}
       </div>
 
+      {linkedTargets.length > 0 && !relatedReplies.length && (
+        <p role="status" className="text-small text-ink-muted">
+          Mẫu trả lời liên quan đã bị xóa hoặc thay đổi.
+        </p>
+      )}
       {(actionError || error) && (
         <p className="flex items-center gap-2 text-small text-danger-ink" role="alert">
           <Icon name="warning" size={16} />
@@ -485,6 +520,8 @@ function QuickReplyManager({
 }
 
 function SettingsEditor({ initialSettings, onSaved, registerNavigationGuard, readOnly = false }) {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
   const [saved, setSaved] = useState(initialSettings)
   const [draft, setDraft] = useState(() => ({ ...saved.values }))
   const [savedQuickReplies, setSavedQuickReplies] = useState(() =>
@@ -494,12 +531,50 @@ function SettingsEditor({ initialSettings, onSaved, registerNavigationGuard, rea
     cloneQuickReplies(saved.quickReplies)
   )
   const [touched, setTouched] = useState({})
-  const [activeTab, setActiveTab] = useState('matching')
+  const requestedTab = searchParams.get('tab')
+  const activeTab = SETTINGS_TABS.some((tab) => tab.key === requestedTab)
+    ? requestedTab
+    : 'matching'
+  const requestedFields = (searchParams.get('fields') || '').split(',')
+  const linkedFields = (SETTINGS_KEYS_BY_TAB[activeTab] || []).filter((key) =>
+    requestedFields.includes(key)
+  )
+  const linkedReplyTargets = Array.isArray(location.state?.auditReplyTargets)
+    ? location.state.auditReplyTargets
+    : []
+  const setActiveTab = (tab) =>
+    setSearchParams(
+      (current) => {
+        const params = new URLSearchParams(current)
+        if (tab === 'matching') params.delete('tab')
+        else params.set('tab', tab)
+        params.delete('highlight')
+        params.delete('fields')
+        return params
+      },
+      { replace: true }
+    )
+  const { active: linkedTargetActive, targetRef: linkedTargetRef } = useLinkedHighlight(
+    searchParams.get('highlight') === '1' && (linkedFields.length || linkedReplyTargets.length)
+      ? `${location.key}:${activeTab}`
+      : null
+  )
   const [submittedTabs, setSubmittedTabs] = useState({})
   const [notice, setNotice] = useState(null)
   const [confirmation, setConfirmation] = useState(null)
   const [pendingNavigation, setPendingNavigation] = useState(null)
-  const [replyEditor, setReplyEditor] = useState(EMPTY_REPLY_EDITOR)
+  const [replyEditor, setReplyEditor] = useState(() => {
+    const target =
+      linkedReplyTargets.find((target) =>
+        saved.quickReplies[target.group]?.some(
+          (reply) => reply.text === target.text || (target.id && reply.id === target.id)
+        )
+      ) || linkedReplyTargets[0]
+    return {
+      ...EMPTY_REPLY_EDITOR,
+      activeGroup: target?.group === 'internal' ? 'internal' : 'user',
+    }
+  })
   const [highlightedChanges, setHighlightedChanges] = useState(null)
   const [saving, setSaving] = useState(false)
   const [serverErrors, setServerErrors] = useState({})
@@ -532,7 +607,9 @@ function SettingsEditor({ initialSettings, onSaved, registerNavigationGuard, rea
         )
   const saveDisabled =
     saving || (activeTab === 'quickReplies' ? !quickRepliesChanged : !activeSectionDirty)
-  const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [advancedOpen, setAdvancedOpen] = useState(() =>
+    linkedFields.some((key) => ADVANCED_FIELDS.includes(key))
+  )
   const priorOdds = Number(draft.priorOdds)
   const bitsHint = (key) =>
     errors[key] || errors.priorOdds
@@ -614,6 +691,8 @@ function SettingsEditor({ initialSettings, onSaved, registerNavigationGuard, rea
       unit={unit}
       value={draft[name] ?? DEFAULT_SETTINGS[name] ?? ''}
       highlighted={Boolean(highlightedChanges) && changedSettings.includes(name)}
+      linkedHighlighted={linkedTargetActive && linkedFields.includes(name)}
+      linkedRef={linkedTargetActive && linkedFields[0] === name ? linkedTargetRef : null}
       error={submittedTabs[activeTab] || touched[name] ? errors[name] : null}
       onChange={change}
       onBlur={blur}
@@ -934,6 +1013,9 @@ function SettingsEditor({ initialSettings, onSaved, registerNavigationGuard, rea
                     value={quickReplyDraft}
                     savedValue={savedQuickReplies}
                     highlightChanges={Boolean(highlightedChanges)}
+                    linkedTargets={linkedReplyTargets}
+                    linkedActive={linkedTargetActive}
+                    linkedRef={linkedTargetRef}
                     onChange={changeQuickReplies}
                     editor={replyEditor}
                     setEditor={setReplyEditor}

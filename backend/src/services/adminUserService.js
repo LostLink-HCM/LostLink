@@ -175,6 +175,9 @@ const applyUserChange = async (id, actor, action, reason, session) => {
     entityType: 'User',
     entityId: current._id,
     detail: {
+      actorUsername: actor.username,
+      displayCode: current.username,
+      entityName: current.username,
       reason,
       before: { role: current.role, status: current.status },
       after: { role: updated.role, status: updated.status },
