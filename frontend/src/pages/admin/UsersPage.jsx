@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import Icon from '../../components/common/Icon'
 import Button from '../../components/backoffice/Button'
 import DataTable from '../../components/backoffice/DataTable'
 import Dialog from '../../components/backoffice/Dialog'
 import Pagination from '../../components/backoffice/Pagination'
-import { cx, focusRing } from '../../components/backoffice/classes'
+import { cx, focusRing, linkedHighlight } from '../../components/backoffice/classes'
 import { downloadCsv } from '../../lib/csv'
 import {
   isCurrentUser,
@@ -19,6 +20,7 @@ import {
 import { applyAdminUserAction, getAdminUser, listAdminUsers } from '../../lib/admin/usersApi'
 import usePaginatedFilter from '../../hooks/usePaginatedFilter'
 import useBackofficePageSize from '../../hooks/useBackofficePageSize'
+import useLinkedHighlight from '../../hooks/useLinkedHighlight'
 
 const identityFilter = (items) => items
 const completedActions = {
@@ -539,6 +541,12 @@ function UserActionDialog({
 
 export default function Users() {
   const pageSize = useBackofficePageSize()
+  const [searchParams] = useSearchParams()
+  const location = useLocation()
+  const linkedUserId = searchParams.get('user')
+  const focusKey = linkedUserId ? `${location.key}:${linkedUserId}` : null
+  const handledFocus = useRef(null)
+  const [rowFocus, setRowFocus] = useState({ key: null, id: null, missing: false })
   const { user } = useAuth()
   const actor = user
   const [listState, setListState] = useState({ key: null, items: [], error: '' })
@@ -551,7 +559,13 @@ export default function Users() {
   const actionInFlight = useRef(false)
   const [profileState, setProfileState] = useState({ key: null, account: null, error: '' })
   const [profileVersion, setProfileVersion] = useState(0)
-  const { filters, setFilter, resetFilters, setPage, currentPage } = usePaginatedFilter({
+  const {
+    filters,
+    setFilter,
+    resetFilters,
+    setPage,
+    currentPage: paginatedPage,
+  } = usePaginatedFilter({
     items: listState.items,
     initialFilters: USER_FILTERS,
     filterFn: identityFilter,
@@ -566,13 +580,27 @@ export default function Users() {
     }),
     [debouncedQuery, filters.role, filters.status, filters.sort]
   )
-  const requestKey = JSON.stringify([requestFilters, retryCount])
+  const requestKey = JSON.stringify([requestFilters, retryCount, focusKey])
   const listIsCurrent = listState.key === requestKey
   const queryDebouncing = filters.query.trim() !== debouncedQuery
   const loading = queryDebouncing || !listIsCurrent
   const listError = !loading ? listState.error : ''
   const users = loading || listError ? [] : listState.items
   const filtered = users
+  const linkedRowId = rowFocus.key === focusKey ? rowFocus.id : null
+  const focusedIndex = users.findIndex((account) => account.id === linkedRowId)
+  const focusedPage = focusedIndex >= 0 ? Math.floor(focusedIndex / pageSize) + 1 : null
+  const finishHighlight = useCallback(() => {
+    if (focusedPage != null) setPage(focusedPage)
+  }, [focusedPage, setPage])
+  const highlight = useLinkedHighlight(focusKey, {
+    enabled: focusedPage != null,
+    onExpire: finishHighlight,
+  })
+  const focusedUserId = highlight.active ? linkedRowId : null
+  const currentPage = highlight.active ? focusedPage : paginatedPage
+  const missing =
+    searchParams.get('missing') === '1' || (rowFocus.key === focusKey && rowFocus.missing)
   const visible = users.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   const profileId = modal?.id || null
   const profileKey = profileId ? JSON.stringify([profileId, profileVersion]) : null
@@ -591,7 +619,13 @@ export default function Users() {
     let active = true
     listAdminUsers(requestFilters)
       .then((data) => {
-        if (active) setListState({ key: requestKey, ...data, error: '' })
+        if (!active) return
+        setListState({ key: requestKey, ...data, error: '' })
+        if (focusKey && handledFocus.current !== focusKey) {
+          handledFocus.current = focusKey
+          const found = data.items.some((account) => account.id === linkedUserId)
+          setRowFocus({ key: focusKey, id: found ? linkedUserId : null, missing: !found })
+        }
       })
       .catch((error) => {
         if (active) {
@@ -606,7 +640,7 @@ export default function Users() {
     return () => {
       active = false
     }
-  }, [queryDebouncing, requestFilters, requestKey])
+  }, [queryDebouncing, requestFilters, requestKey, focusKey, linkedUserId])
 
   useEffect(() => {
     if (!profileId) return undefined
@@ -616,7 +650,14 @@ export default function Users() {
         if (active) setProfileState({ key: profileKey, account, error: '' })
       })
       .catch((error) => {
-        if (active) setProfileState({ key: profileKey, account: null, error: error.message })
+        if (active)
+          setProfileState({
+            key: profileKey,
+            account: null,
+            error: [404, 422].includes(error.status)
+              ? 'Đối tượng không còn tồn tại.'
+              : error.message,
+          })
       })
     return () => {
       active = false
@@ -630,11 +671,13 @@ export default function Users() {
   }, [notice])
 
   const changeFilter = (key, value) => {
+    setRowFocus({ key: focusKey, id: null, missing: false })
     setFilter(key, value)
     setNotice('')
   }
 
   const resetFiltersAndNotice = () => {
+    setRowFocus({ key: focusKey, id: null, missing: false })
     resetFilters()
     setRetryCount((previous) => previous + 1)
     setNotice('')
@@ -686,6 +729,14 @@ export default function Users() {
 
   return (
     <div className="px-6 py-5 text-small text-ink max-xl:px-5 max-sm:px-4 max-sm:py-4">
+      {missing && (
+        <p
+          role="alert"
+          className="mb-4 rounded-lg border border-danger-soft bg-danger-soft p-3 text-small text-danger-ink"
+        >
+          Đối tượng không còn tồn tại.
+        </p>
+      )}
       <section
         className="grid grid-cols-[minmax(240px,1.7fr)_minmax(140px,1fr)_minmax(150px,1fr)_minmax(165px,1fr)_auto] items-end gap-4 rounded-xl border border-[#b4c6db] bg-surface p-4 shadow-card max-xl:grid-cols-3 max-sm:grid-cols-2 max-sm:gap-x-2.5 max-sm:gap-y-3.5"
         aria-label="Bộ lọc người dùng"
@@ -852,7 +903,11 @@ export default function Users() {
         {visible.map((account) => (
           <tr
             key={account.id}
-            className={cx('hover:bg-[#f7fafd]', account.status === 'locked' && 'bg-[#fffbfc]')}
+            ref={account.id === focusedUserId ? highlight.targetRef : null}
+            className={cx(
+              account.id === focusedUserId ? linkedHighlight : 'hover:bg-[#f7fafd]',
+              account.id !== focusedUserId && account.status === 'locked' && 'bg-[#fffbfc]'
+            )}
           >
             <td className="border-b border-[#e2eaf3] px-4 py-[18px]">
               <div className="flex items-center gap-3">
@@ -918,7 +973,10 @@ export default function Users() {
           page={currentPage}
           total={filtered.length}
           pageSize={pageSize}
-          onChange={setPage}
+          onChange={(page) => {
+            setRowFocus({ key: focusKey, id: null, missing: false })
+            setPage(page)
+          }}
           noun="tài khoản"
           showSummary={false}
         />

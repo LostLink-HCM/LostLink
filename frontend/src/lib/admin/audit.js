@@ -1,3 +1,5 @@
+import { SETTINGS_KEYS_BY_TAB } from './settings'
+
 export const AUDIT_ACTIONS = {
   lock: 'Khóa tài khoản',
   unlock: 'Mở khóa tài khoản',
@@ -58,6 +60,111 @@ export const auditEntityLabel = (log) => AUDIT_ENTITY_TYPES[log.entityType] || l
 export const auditObjectCode = (log) => detailObject(log).displayCode || ''
 export const auditDetail = (log) => detailObject(log).summary || ''
 export const auditReason = (log) => detailObject(log).reason || ''
+const AUDIT_DESTINATIONS = {
+  User: { to: '/admin/users', label: 'Xem tài khoản' },
+  Post: { to: '/admin/posts', label: 'Xem bài đăng' },
+  Category: { to: '/admin/categories', label: 'Xem danh mục' },
+  SystemConfig: { to: '/admin/settings', label: 'Xem cấu hình' },
+  QuickReply: { to: '/admin/settings', label: 'Xem mẫu trả lời nhanh' },
+}
+const changedReplies = (detail) =>
+  ['user', 'internal'].flatMap((group) => {
+    const before = Array.isArray(detail.before?.[group]) ? detail.before[group] : []
+    const after = Array.isArray(detail.after?.[group]) ? detail.after[group] : []
+    const retained = new Set(
+      after.flatMap((item) => {
+        const index = before.findIndex(
+          (old) => (item.id && old.id === item.id) || old.text === item.text
+        )
+        return index >= 0 && before[index].text === item.text ? [index] : []
+      })
+    )
+    const used = new Set(retained)
+    const target = (item, old) => ({
+      group,
+      ...((item.id || old?.id) && { id: item.id || old.id }),
+      text: item.text,
+    })
+    const changed = after.flatMap((item, index) => {
+      if (before.some((old, oldIndex) => retained.has(oldIndex) && old.text === item.text))
+        return []
+      let oldIndex = item.id ? before.findIndex((old) => old.id === item.id) : -1
+      if (oldIndex < 0 && before[index] && !used.has(index)) oldIndex = index
+      if (oldIndex >= 0) used.add(oldIndex)
+      return [target(item, before[oldIndex])]
+    })
+    const removed = before.flatMap((item, index) => (used.has(index) ? [] : [target(item)]))
+    if (changed.length || removed.length) return [...changed, ...removed]
+    return after.flatMap((item, index) =>
+      before[index]?.text !== item.text
+        ? [
+            target(
+              item,
+              before.find((old) => old.text === item.text)
+            ),
+          ]
+        : []
+    )
+  })
+export const auditDestination = (log) => {
+  const detail = detailObject(log)
+  if (log.entityType === 'Report') {
+    if (detail.targetPost)
+      return auditDestination({ entityType: 'Post', entityId: detail.targetPost })
+    if (detail.targetUser)
+      return auditDestination({ entityType: 'User', entityId: detail.targetUser })
+    return null
+  }
+  const destination = AUDIT_DESTINATIONS[log.entityType]
+  if (!destination) return null
+  let query
+  let state
+  if (log.entityType === 'User' || log.entityType === 'Post') {
+    query = log.entityId
+      ? { [log.entityType === 'User' ? 'user' : 'post']: log.entityId }
+      : { missing: '1' }
+  } else if (log.entityType === 'Category') {
+    const tabs = {
+      general: 'general',
+      attributes: 'attributes',
+      contents: 'attributes',
+      relations: 'relations',
+      algorithm: 'algorithm',
+      questions: 'questions',
+    }
+    query =
+      log.entityId && log.entityExists !== false
+        ? {
+            category: detail.displayCode || log.entityId,
+            tab: tabs[detail.section] || 'general',
+            highlight: '1',
+          }
+        : { missing: '1' }
+  } else {
+    const tab =
+      log.entityType === 'QuickReply'
+        ? 'quickReplies'
+        : Object.keys(SETTINGS_KEYS_BY_TAB).find(
+            (key) =>
+              key === detail.section || SETTINGS_KEYS_BY_TAB[key].includes(detail.displayCode)
+          ) || 'matching'
+    const fields = (SETTINGS_KEYS_BY_TAB[tab] || []).filter(
+      (key) => JSON.stringify(detail.before?.[key]) !== JSON.stringify(detail.after?.[key])
+    )
+    if (!fields.length && (SETTINGS_KEYS_BY_TAB[tab] || []).includes(detail.displayCode))
+      fields.push(detail.displayCode)
+    query = { tab, highlight: '1', ...(fields.length && { fields: fields.join(',') }) }
+    if (log.entityType === 'QuickReply') {
+      const targets = changedReplies(detail)
+      if (targets.length) state = { auditReplyTargets: targets }
+    }
+  }
+  return {
+    ...destination,
+    to: `${destination.to}?${new URLSearchParams(query)}`,
+    ...(state && { state }),
+  }
+}
 export const auditActorName = (log) =>
   log.actorRole === 'system'
     ? 'Hệ thống'

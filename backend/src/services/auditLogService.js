@@ -154,6 +154,7 @@ const listAuditLogs = async ({ q = '', actorRole, action, entityType, from, to, 
       action: log.action,
       entityType: log.entityType,
       entityId: log.entityId ? String(log.entityId) : null,
+      ...(log.entityType === 'Category' && { entityExists: Boolean(target) }),
       detail: auditDetail(log, target),
       createdAt: log.createdAt,
     }

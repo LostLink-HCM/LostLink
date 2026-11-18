@@ -48,6 +48,9 @@ async function main() {
   const { connectDatabase } = require('../../src/config/database')
   const app = require('../../src/app')
   await connectDatabase()
+  const models = require('../../src/models')
+  // Seed ghép nối dùng truy vấn địa lý, cần chờ index trước khi tạo dữ liệu mẫu.
+  await Promise.all(Object.values(models).map((model) => model.init()))
 
   // Dữ liệu mẫu giống môi trường local (tài khoản, 8 danh mục, 47 bài) cho các test trang chủ
   const { seedUsers } = require('../../src/seeds/userSeed')

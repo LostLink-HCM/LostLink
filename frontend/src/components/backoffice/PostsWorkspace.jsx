@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import Badge from './Badge'
 import Button from './Button'
 import DataTable, { cell } from './DataTable'
@@ -28,6 +29,8 @@ import {
 import { downloadCsv } from '../../lib/csv'
 import usePaginatedFilter from '../../hooks/usePaginatedFilter'
 import useBackofficePageSize from '../../hooks/useBackofficePageSize'
+import useLinkedHighlight from '../../hooks/useLinkedHighlight'
+import { linkedHighlight } from './classes'
 
 const STATUS_TONES = {
   pending: 'warning',
@@ -230,6 +233,12 @@ function VisibilityDialog({ post, onSubmit, onClose, submitting, serverError }) 
 
 export default function PostsWorkspace() {
   const pageSize = useBackofficePageSize()
+  const [searchParams] = useSearchParams()
+  const location = useLocation()
+  const linkedPostId = searchParams.get('post')
+  const focusKey = linkedPostId ? `${location.key}:${linkedPostId}` : null
+  const handledFocus = useRef(null)
+  const [rowFocus, setRowFocus] = useState({ key: null, id: null, missing: false })
   const [modal, setModal] = useState(null)
   const [nextStatus, setNextStatus] = useState('')
   const [statusReason, setStatusReason] = useState('')
@@ -253,7 +262,7 @@ export default function PostsWorkspace() {
     setFilter,
     resetFilters: resetFilterState,
     setPage,
-    currentPage,
+    currentPage: paginatedPage,
   } = usePaginatedFilter({
     items: listState.items,
     initialFilters: EMPTY_FILTERS,
@@ -281,19 +290,39 @@ export default function PostsWorkspace() {
       debouncedQuery,
     ]
   )
-  const requestKey = JSON.stringify([requestFilters, retryCount])
+  const requestKey = JSON.stringify([requestFilters, retryCount, focusKey])
   const listIsCurrent = listState.key === requestKey
   const queryDebouncing = filters.query.trim() !== debouncedQuery
   const loading = !invalidRange && (queryDebouncing || !listIsCurrent)
   const posts = invalidRange || queryDebouncing || !listIsCurrent ? [] : listState.items
   const filtered = posts
+  const linkedRowId = rowFocus.key === focusKey ? rowFocus.id : null
+  const focusedIndex = posts.findIndex((post) => post.id === linkedRowId)
+  const focusedPage = focusedIndex >= 0 ? Math.floor(focusedIndex / pageSize) + 1 : null
+  const finishHighlight = useCallback(() => {
+    if (focusedPage != null) setPage(focusedPage)
+  }, [focusedPage, setPage])
+  const highlight = useLinkedHighlight(focusKey, {
+    enabled: focusedPage != null,
+    onExpire: finishHighlight,
+  })
+  const focusedPostId = highlight.active ? linkedRowId : null
+  const currentPage = highlight.active ? focusedPage : paginatedPage
+  const missing =
+    searchParams.get('missing') === '1' || (rowFocus.key === focusKey && rowFocus.missing)
   const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   const listError = !queryDebouncing && listIsCurrent ? listState.error : ''
   const detailId = modal?.kind === 'detail' ? modal.id : null
   const detailIsCurrent = detailState.id === detailId
+  const detailMissing = detailIsCurrent && detailState.missing
   const selectedDetail = detailIsCurrent ? detailState.post : null
   const selectedFromList = modal && posts.find((post) => post.id === modal.id)
-  const selected = modal?.kind === 'detail' ? selectedDetail || selectedFromList : selectedFromList
+  const selected =
+    modal?.kind === 'detail'
+      ? detailMissing
+        ? null
+        : selectedDetail || selectedFromList
+      : selectedFromList
   const detailPost = modal?.kind === 'detail' ? selected : null
   const detailLoading = Boolean(detailId && !detailIsCurrent)
   const detailError = detailIsCurrent ? detailState.error : ''
@@ -328,6 +357,11 @@ export default function PostsWorkspace() {
       .then((items) => {
         if (!active) return
         setListState({ key: requestKey, items, error: '' })
+        if (focusKey && handledFocus.current !== focusKey) {
+          handledFocus.current = focusKey
+          const found = items.some((post) => post.id === linkedPostId)
+          setRowFocus({ key: focusKey, id: found ? linkedPostId : null, missing: !found })
+        }
         setCategoryOptions((previous) => {
           const options = new Map(previous.map((item) => [item.slug, item]))
           items.forEach((post) => {
@@ -352,7 +386,7 @@ export default function PostsWorkspace() {
     return () => {
       active = false
     }
-  }, [invalidRange, queryDebouncing, requestFilters, requestKey])
+  }, [invalidRange, queryDebouncing, requestFilters, requestKey, focusKey, linkedPostId])
 
   useEffect(() => {
     if (!detailId) return undefined
@@ -363,7 +397,13 @@ export default function PostsWorkspace() {
       })
       .catch((error) => {
         if (requestId === detailRequest.current) {
-          setDetailState({ id: detailId, post: null, error: error.message })
+          const missing = [404, 422].includes(error.status)
+          setDetailState({
+            id: detailId,
+            post: null,
+            missing,
+            error: missing ? 'Đối tượng không còn tồn tại.' : error.message,
+          })
         }
       })
     return () => {
@@ -385,10 +425,12 @@ export default function PostsWorkspace() {
   }
 
   const changeFilter = (key, value) => {
+    setRowFocus({ key: focusKey, id: null, missing: false })
     setFilter(key, value)
     setNotice('')
   }
   const resetFilters = () => {
+    setRowFocus({ key: focusKey, id: null, missing: false })
     resetFilterState()
     setNotice('')
     setNoticeTone('info')
@@ -455,6 +497,14 @@ export default function PostsWorkspace() {
 
   return (
     <div className="px-6 py-5 text-small text-ink max-xl:px-5 max-sm:px-4 max-sm:py-4">
+      {missing && (
+        <p
+          role="alert"
+          className="mb-4 rounded-lg border border-danger-soft bg-danger-soft p-3 text-small text-danger-ink"
+        >
+          Đối tượng không còn tồn tại.
+        </p>
+      )}
       <section
         aria-label="Bộ lọc bài đăng"
         className="rounded-xl border border-line bg-surface p-4 shadow-card"
@@ -632,7 +682,11 @@ export default function PostsWorkspace() {
         }
       >
         {visible.map((post) => (
-          <tr key={post.id} className="hover:bg-surface-muted">
+          <tr
+            key={post.id}
+            ref={post.id === focusedPostId ? highlight.targetRef : null}
+            className={post.id === focusedPostId ? linkedHighlight : 'hover:bg-surface-muted'}
+          >
             <td className={cell}>
               <span className="whitespace-nowrap text-caption font-semibold text-primary">
                 {post.postCode}
@@ -729,7 +783,10 @@ export default function PostsWorkspace() {
         page={currentPage}
         total={filtered.length}
         pageSize={pageSize}
-        onChange={setPage}
+        onChange={(page) => {
+          setRowFocus({ key: focusKey, id: null, missing: false })
+          setPage(page)
+        }}
         noun="bài đăng"
         showSummary={false}
       />

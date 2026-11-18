@@ -2,7 +2,7 @@ const assert = require('node:assert/strict')
 const { beforeEach, describe, test } = require('node:test')
 const { Types } = require('mongoose')
 
-const { AuditLog, Post, SystemConfig, User } = require('../../src/models')
+const { AuditLog, Category, Post, SystemConfig, User } = require('../../src/models')
 const postService = require('../../src/services/backofficePostService')
 const { createUser, loginAs, newClient } = require('../helpers/auth')
 const { useTestDb } = require('../helpers/db')
@@ -174,6 +174,16 @@ describe('Nhật ký thao tác - API quản trị', () => {
       },
     })
     const automatic = await addLog({ actor: null, actorRole: 'system', action: 'restrict' })
+    const { category } = await createWalletCategory()
+    const categoryLog = await addLog({
+      entityType: 'Category',
+      entityId: category._id,
+      action: 'update',
+      detail: { displayCode: category.slug, entityName: category.name },
+    })
+    const beforeDeletion = await getLogs({ entityType: 'Category' })
+    assert.equal(beforeDeletion.body.data.items[0].entityExists, true)
+    await Category.deleteOne({ _id: category._id })
     await User.deleteMany({ _id: { $in: [actor._id, member._id] } })
     const response = await getLogs()
     assert.equal(response.status, 200)
@@ -187,6 +197,9 @@ describe('Nhật ký thao tác - API quản trị', () => {
     assert.deepEqual(log.detail.after, { role: 'user', status: 'locked' })
     assert.equal(response.body.data.items.find(({ id }) => id === automatic.id).actor, null)
     assert.equal(JSON.stringify(response.body).includes('must-not-leak'), false)
+    const deletedCategory = response.body.data.items.find(({ id }) => id === categoryLog.id)
+    assert.equal(deletedCategory.entityExists, false)
+    assert.equal(deletedCategory.detail.entityName, category.name)
   })
 
   test('duyệt/từ chối/đổi trạng thái/ẩn/hiện ghi đúng nhật ký; gửi lại hoặc dữ liệu sai không tạo thêm', async () => {

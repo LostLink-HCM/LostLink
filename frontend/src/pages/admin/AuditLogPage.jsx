@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { listAuditLogs } from '../../api/auditLogs'
-import Badge from '../../components/backoffice/Badge'
 import Button from '../../components/backoffice/Button'
 import DataTable, { cell } from '../../components/backoffice/DataTable'
 import DateRange from '../../components/backoffice/DateRange'
@@ -16,7 +16,7 @@ import {
   AUDIT_FILTERS,
   AUDIT_ROLES,
   auditActorName,
-  auditChanges,
+  auditDestination,
   auditDetail,
   auditEntityLabel,
   auditObjectCode,
@@ -40,10 +40,8 @@ const actionIcons = {
   delete: 'trash',
 }
 
-const roleTones = { admin: 'primary', moderator: 'info', system: 'neutral' }
-
 function AuditDetails({ log }) {
-  const changes = auditChanges(log)
+  const destination = auditDestination(log)
   return (
     <>
       <span className="text-small font-semibold leading-relaxed text-ink">{auditDetail(log)}</span>
@@ -52,27 +50,14 @@ function AuditDetails({ log }) {
           Lý do: {auditReason(log)}
         </span>
       )}
-      {changes.length > 0 && (
-        <details className="mt-2 text-caption text-ink-secondary">
-          <summary className="cursor-pointer rounded py-1 text-primary focus-visible:outline-2 focus-visible:outline-focus">
-            Xem thay đổi
-          </summary>
-          <dl className="mt-1 max-h-80 divide-y divide-line overflow-y-auto rounded-lg border border-line bg-surface-muted px-3">
-            {changes.map((change) => (
-              <div key={change.key} className="py-2">
-                <dt className="font-semibold">{change.label}</dt>
-                <dd className="mt-1 whitespace-pre-wrap leading-relaxed">
-                  <span className="text-ink-muted">Trước: </span>
-                  {change.before}
-                </dd>
-                <dd className="mt-1 whitespace-pre-wrap leading-relaxed">
-                  <span className="text-ink-muted">Sau: </span>
-                  {change.after}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </details>
+      {destination && (
+        <Link
+          to={destination.to}
+          state={destination.state}
+          className="mt-2 block w-fit rounded text-caption text-primary underline underline-offset-2 hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        >
+          {destination.label}
+        </Link>
       )}
     </>
   )
@@ -260,9 +245,9 @@ export default function AuditLog() {
         </div>
       )}
       {data && (
-        <p className="mt-4 mb-2.5 text-small text-ink-muted" aria-live="polite">
-          Hiển thị <strong className="px-1 text-lead text-primary">{data.total}</strong> bản ghi phù
-          hợp
+        <p className="mt-4 mb-2.5 text-small text-ink-subtle" aria-live="polite">
+          Hiển thị {data.total ? (currentPage - 1) * pageSize + 1 : 0}–
+          {Math.min(currentPage * pageSize, data.total)} trong số {data.total} bản ghi
         </p>
       )}
 
@@ -308,14 +293,7 @@ export default function AuditLog() {
                 </time>
               </td>
               <td className={cell}>
-                <span className="mb-1 block text-small font-semibold text-ink">
-                  {auditActorName(log)}
-                </span>
-                {log.actorRole !== 'system' && (
-                  <Badge tone={roleTones[log.actorRole] || 'neutral'}>
-                    {AUDIT_ROLES[log.actorRole] || 'Không xác định'}
-                  </Badge>
-                )}
+                <span className="text-small font-semibold text-ink">{auditActorName(log)}</span>
               </td>
               <td className={cell}>
                 <span className="inline-flex items-center gap-1.5 text-small text-ink-secondary">
@@ -326,13 +304,14 @@ export default function AuditLog() {
               <td className={cell}>
                 <div className="flex flex-col gap-1 text-small text-ink-secondary">
                   <span className="font-semibold text-ink">{auditEntityLabel(log)}</span>
-                  <span className="text-caption text-ink-muted">{auditObjectCode(log)}</span>
-                  {log.detail?.entityName &&
-                    log.detail.entityName !== auditObjectCode(log) &&
+                  {log.entityType === 'Category' &&
+                    log.detail?.entityName &&
                     log.detail.entityName !== auditEntityLabel(log) && (
-                      <span className="text-caption text-ink-secondary">
-                        {log.detail.entityName}
-                      </span>
+                      <span className="text-caption text-ink-muted">{log.detail.entityName}</span>
+                    )}
+                  {!['Category', 'SystemConfig', 'QuickReply'].includes(log.entityType) &&
+                    auditObjectCode(log) && (
+                      <span className="text-caption text-ink-muted">{auditObjectCode(log)}</span>
                     )}
                 </div>
               </td>
@@ -351,6 +330,7 @@ export default function AuditLog() {
           pageSize={pageSize}
           onChange={setPage}
           noun="bản ghi"
+          showSummary={false}
         />
       )}
     </div>

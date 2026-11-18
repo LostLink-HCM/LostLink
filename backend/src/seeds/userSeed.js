@@ -3,10 +3,12 @@ const bcrypt = require('bcryptjs')
 
 const { AuditLog, Badge, User } = require('../models')
 
-// Mỗi role một tài khoản để test đăng nhập và phân quyền
+// Tài khoản mẫu để test đăng nhập và phân quyền
 const SEED_USERS = [
   { username: 'admin', email: 'admin@lostlink.vn', password: 'Admin@123', role: 'admin' },
   { username: 'moderator', email: 'mod@lostlink.vn', password: 'Mod@1234', role: 'moderator' },
+  { username: 'moderator02', email: 'mod02@lostlink.vn', password: 'Mod@1234', role: 'moderator' },
+  { username: 'moderator03', email: 'mod03@lostlink.vn', password: 'Mod@1234', role: 'moderator' },
   { username: 'user01', email: 'user@lostlink.vn', password: 'User@1234', role: 'user' },
 ]
 

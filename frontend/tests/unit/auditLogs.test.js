@@ -7,6 +7,7 @@ import { listAuditLogs } from '../../src/api/auditLogs.js'
 import {
   auditActorName,
   auditChanges,
+  auditDestination,
   auditDetail,
   auditEntityLabel,
   auditObjectCode,
@@ -67,20 +68,93 @@ describe('Nhật ký thao tác - dữ liệu và API frontend', () => {
     expect(formatAuditDate('invalid-date')).toBe('—')
   })
 
-  it('chỉ hiển thị field thay đổi với nhãn vai trò, trạng thái và ẩn/hiện dễ đọc', () => {
-    expect(
-      auditChanges({
-        detail: {
-          before: { role: 'user', status: 'active', isHidden: false, name: 'Giữ nguyên' },
-          after: { role: 'moderator', status: 'locked', isHidden: true, name: 'Giữ nguyên' },
+  it('liên kết tới đúng đối tượng/tab, báo cáo tới đối tượng liên quan và nhận diện đối tượng đã xóa', () => {
+    const id = '507f1f77bcf86cd799439011'
+    for (const [log, to, label] of [
+      [{ entityType: 'User', entityId: id }, `/admin/users?user=${id}`, 'Xem tài khoản'],
+      [{ entityType: 'Post', entityId: id }, `/admin/posts?post=${id}`, 'Xem bài đăng'],
+      [
+        {
+          entityType: 'Category',
+          entityId: id,
+          detail: { displayCode: 'vi-tien', section: 'contents' },
         },
-      })
-    ).toEqual([
-      { key: 'role', label: 'Vai trò', before: 'Người dùng', after: 'Moderator' },
-      { key: 'status', label: 'Trạng thái', before: 'Hoạt động', after: 'Đã khóa' },
-      { key: 'isHidden', label: 'Hiển thị', before: 'Hiển thị', after: 'Đã ẩn' },
+        '/admin/categories?category=vi-tien&tab=attributes&highlight=1',
+        'Xem danh mục',
+      ],
+      [
+        { entityType: 'SystemConfig', detail: { section: 'matching' } },
+        '/admin/settings?tab=matching&highlight=1',
+        'Xem cấu hình',
+      ],
+      [
+        { entityType: 'SystemConfig', detail: { section: 'timeThresholds' } },
+        '/admin/settings?tab=timeThresholds&highlight=1',
+        'Xem cấu hình',
+      ],
+      [
+        { entityType: 'SystemConfig', detail: { displayCode: 'paginationPageSize' } },
+        '/admin/settings?tab=pagination&highlight=1&fields=paginationPageSize',
+        'Xem cấu hình',
+      ],
+      [
+        { entityType: 'SystemConfig', detail: { displayCode: 'reportDays' } },
+        '/admin/settings?tab=timeThresholds&highlight=1&fields=reportDays',
+        'Xem cấu hình',
+      ],
+      [
+        { entityType: 'QuickReply' },
+        '/admin/settings?tab=quickReplies&highlight=1',
+        'Xem mẫu trả lời nhanh',
+      ],
     ])
-    expect(auditChanges({})).toEqual([])
+      expect(auditDestination(log)).toEqual({ to, label })
+    expect(
+      auditDestination({
+        entityType: 'SystemConfig',
+        detail: {
+          section: 'matching',
+          before: { mTime: 0.8, mCategory: 0.95 },
+          after: { mTime: 0.9, mCategory: 0.95 },
+        },
+      })?.to
+    ).toBe('/admin/settings?tab=matching&highlight=1&fields=mTime')
+    expect(
+      auditDestination({
+        entityType: 'QuickReply',
+        detail: {
+          before: {
+            user: [
+              { id: 'reply-one', text: 'Nội dung cũ' },
+              { id: 'reply-two', text: 'Giữ nguyên' },
+            ],
+            internal: [],
+          },
+          after: { user: [{ text: 'Nội dung mới' }, { text: 'Giữ nguyên' }], internal: [] },
+        },
+      })?.state
+    ).toEqual({ auditReplyTargets: [{ group: 'user', id: 'reply-one', text: 'Nội dung mới' }] })
+    expect(auditDestination({ entityType: 'Report', detail: { targetPost: 'post-id' } })?.to).toBe(
+      '/admin/posts?post=post-id'
+    )
+    expect(auditDestination({ entityType: 'Report', detail: { targetUser: 'user-id' } })?.to).toBe(
+      '/admin/users?user=user-id'
+    )
+    expect(auditDestination({ entityType: 'User', entityId: null })?.to).toBe(
+      '/admin/users?missing=1'
+    )
+    expect(
+      auditDestination({ entityType: 'Category', entityId: id, entityExists: false })?.to
+    ).toBe('/admin/categories?missing=1')
+    expect(
+      auditDestination({
+        entityType: 'Category',
+        entityId: null,
+        detail: { displayCode: 'phu-kien-du-lich' },
+      })?.to
+    ).toBe('/admin/categories?missing=1')
+    expect(auditDestination({ entityType: 'Report' })).toBeNull()
+    expect(auditDestination({ entityType: 'Unknown' })).toBeNull()
   })
 
   it('bỏ qua ID mẫu trả lời, vẫn nhận diện thay đổi nội dung và giữ độ chính xác số thập phân', () => {

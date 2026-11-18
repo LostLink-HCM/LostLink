@@ -316,6 +316,7 @@ export function createAdminCategories() {
     return {
       id,
       name,
+      slug: CATEGORY_IMAGES[name],
       icon: `/images/categories/${CATEGORY_IMAGES[name]}.svg`,
       order: categoryIndex + 1,
       aliases: detail.aliases,

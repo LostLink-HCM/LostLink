@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import Icon from '../../components/common/Icon'
 import Button from '../../components/backoffice/Button'
 import AlgorithmTab from '../../components/admin/categories/AlgorithmTab'
@@ -13,6 +14,7 @@ import QuestionsTab from '../../components/admin/categories/QuestionsTab'
 import RelationsTab from '../../components/admin/categories/RelationsTab'
 import { createAdminCategories } from '../../data/adminCategories'
 import { EMPTY_CATEGORY, makeId, withoutCategory } from '../../lib/admin/categories'
+import useLinkedHighlight from '../../hooks/useLinkedHighlight'
 
 const byOrder = (a, b) => a.order - b.order || a.name.localeCompare(b.name, 'vi')
 
@@ -22,12 +24,44 @@ export default function Categories() {
     updatedAt: null,
   }))
   const categories = categoryState.items
-  const [selectedId, setSelectedId] = useState(categories[0]?.id)
-  const [tab, setTab] = useState('general')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
+  const selectedId = searchParams.get('category')
+  const requestedTab = searchParams.get('tab')
+  const tab = ['general', 'attributes', 'relations', 'algorithm', 'questions'].includes(
+    requestedTab
+  )
+    ? requestedTab
+    : 'general'
+  const selectCategory = (id, nextTab = tab) =>
+    setSearchParams(
+      (current) => {
+        const params = new URLSearchParams(current)
+        if (id) params.set('category', id)
+        else params.delete('category')
+        params.set('tab', nextTab)
+        params.delete('missing')
+        params.delete('highlight')
+        return params
+      },
+      { replace: true }
+    )
+  const setSelectedId = (id) => selectCategory(id)
+  const setTab = (nextTab) => selectCategory(selected?.slug || selected?.id, nextTab)
   const [modal, setModal] = useState(null)
   const [query, setQuery] = useState('')
   const listRef = useRef(null)
-  const selected = categories.find((category) => category.id === selectedId) || categories[0]
+  const missing = searchParams.get('missing') === '1'
+  const selected = missing
+    ? null
+    : selectedId
+      ? categories.find((category) => category.id === selectedId || category.slug === selectedId)
+      : categories[0]
+  const highlight = useLinkedHighlight(
+    searchParams.get('highlight') === '1' && selected
+      ? `${location.key}:${selected.id}:${tab}`
+      : null
+  )
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase('vi')
     return [...categories]
@@ -69,8 +103,7 @@ export default function Categories() {
         questions: [],
       },
     ])
-    setSelectedId(id)
-    setTab('general')
+    selectCategory(id, 'general')
     setQuery('')
     setModal(null)
     requestAnimationFrame(() => {
@@ -111,6 +144,14 @@ export default function Categories() {
 
   return (
     <div className="mx-auto max-w-[1640px] px-8 pt-7 pb-10 text-ink max-[1200px]:px-[22px] max-sm:px-4 max-sm:pt-[22px]">
+      {(missing || (selectedId && !selected)) && (
+        <p
+          role="alert"
+          className="mb-4 rounded-lg border border-danger-soft bg-danger-soft p-3 text-small text-danger-ink"
+        >
+          {missing ? 'Đối tượng không còn tồn tại.' : 'Không tìm thấy danh mục trên trang quản lý.'}
+        </p>
+      )}
       <div className="mb-4.5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 text-small text-ink-muted" role="status">
           <Icon name="history" size={18} className="shrink-0 text-ink-subtle" />
@@ -144,6 +185,8 @@ export default function Categories() {
           onQueryChange={setQuery}
           onSelect={setSelectedId}
           listRef={listRef}
+          highlightedId={highlight.active ? selected?.id : null}
+          highlightRef={highlight.targetRef}
         />
 
         {selected && (
