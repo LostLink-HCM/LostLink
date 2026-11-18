@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import BackofficeLayout from '../../components/backoffice/BackofficeLayout'
 import { createWorkspacePosts } from '../../data/workspacePosts'
-import { moderatorReports } from '../../data/moderatorReports'
 import { createModeratorMessages } from '../../data/moderatorMessages'
 import { createModeratorNotifications } from '../../data/moderatorNotifications'
 import useSystemSettings from '../../hooks/useSystemSettings'
@@ -21,7 +20,6 @@ export default function ModeratorLayout() {
   const [reviewPosts, setReviewPosts] = useState([])
   const [reviewLoading, setReviewLoading] = useState(true)
   const [reviewError, setReviewError] = useState('')
-  const [reports, setReports] = useState(moderatorReports)
   const [messageState, setMessageState] = useState(createModeratorMessages)
   const settings = useSystemSettings()
   const [notificationState, setNotificationState] = useState(createModeratorNotifications)
@@ -77,8 +75,6 @@ export default function ModeratorLayout() {
         reviewLoading,
         reviewError,
         reloadReviewPosts: loadReviewPosts,
-        reports,
-        setReports,
         messageState,
         setMessageState,
         ...settings,

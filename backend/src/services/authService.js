@@ -43,7 +43,11 @@ const publicUser = (user) => ({
   createdAt: user.createdAt,
 })
 
-const accountLocked = () => ApiError.forbidden(ACCOUNT_LOCKED, 'ACCOUNT_LOCKED')
+const accountLocked = (reason = '') =>
+  ApiError.forbidden(
+    reason ? `${ACCOUNT_LOCKED} Lý do: ${reason}` : ACCOUNT_LOCKED,
+    'ACCOUNT_LOCKED'
+  )
 
 const usernameTaken = (username, { exceptEmail } = {}) =>
   User.exists({ username, ...(exceptEmail && { email: { $ne: exceptEmail } }) }).collation(
@@ -183,7 +187,7 @@ const login = async ({ email, password }) => {
   const matched = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH)
   if (!user?.passwordHash || !matched) throw ApiError.unauthorized(INVALID_CREDENTIALS)
 
-  if (user.status === 'locked') throw accountLocked()
+  if (user.status === 'locked') throw accountLocked(user.lockReason)
 
   if (!user.emailVerifiedAt) {
     throw ApiError.forbidden('Email chưa được xác thực.', 'EMAIL_NOT_VERIFIED')
@@ -263,7 +267,7 @@ const googleLogin = async ({ idToken, acceptTerms = false, emailOptIn = true }) 
     }
   }
 
-  if (user.status === 'locked') throw accountLocked()
+  if (user.status === 'locked') throw accountLocked(user.lockReason)
 
   return startSession(user)
 }
@@ -339,7 +343,7 @@ const findSessionUser = async (payload) => {
     sessionService.isSessionActive(payload.sub, payload.sid),
   ])
   if (!user || !active) throw ApiError.unauthorized(SESSION_EXPIRED)
-  if (user.status === 'locked') throw accountLocked()
+  if (user.status === 'locked') throw accountLocked(user.lockReason)
   await touchActivity(user)
   return user
 }
@@ -363,7 +367,7 @@ const refreshSession = async (refreshToken) => {
   if (!user) throw ApiError.unauthorized(SESSION_EXPIRED)
   if (user.status === 'locked') {
     await sessionService.revokeSession(user._id, payload.sid)
-    throw accountLocked()
+    throw accountLocked(user.lockReason)
   }
 
   const tokens = await sessionService.rotateSession(user, payload)

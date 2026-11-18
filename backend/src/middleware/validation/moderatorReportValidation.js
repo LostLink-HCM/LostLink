@@ -4,6 +4,7 @@ const { isVnDate } = require('../../utils/vnTime')
 
 const REPORT_TYPES = ['post', 'user']
 const SEVERITIES = ['low', 'medium', 'high']
+const QUEUE_STATUSES = ['open', 'processed']
 const ACTIONS = ['warn', 'hide', 'lock', 'dismiss']
 const DATE_MESSAGE = 'Ngày không hợp lệ, định dạng đúng là YYYY-MM-DD.'
 
@@ -20,6 +21,9 @@ const listReportsRules = [
   optionalString('severity', 'Mức độ không hợp lệ.')
     .isIn(SEVERITIES)
     .withMessage('Mức độ không hợp lệ.'),
+  optionalString('queueStatus', 'Trạng thái xử lý không hợp lệ.')
+    .isIn(QUEUE_STATUSES)
+    .withMessage('Trạng thái xử lý không hợp lệ.'),
   ...['from', 'to'].map((field) =>
     optionalString(field, DATE_MESSAGE).custom(isVnDate).withMessage(DATE_MESSAGE)
   ),
@@ -47,6 +51,12 @@ const resolveReportRules = [
     .bail()
     .isIn(ACTIONS)
     .withMessage('Cách xử lý không hợp lệ.'),
+  body('action').custom((action, { req }) => {
+    if (action !== 'dismiss' && (typeof req.body?.reason !== 'string' || !req.body.reason.trim())) {
+      throw new Error('Vui lòng nhập lý do xử lý.')
+    }
+    return true
+  }),
   body('reason')
     .optional({ values: 'null' })
     .isString()

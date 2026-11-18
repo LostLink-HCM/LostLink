@@ -6,6 +6,7 @@ const { endOfVnDay, startOfVnDay } = require('../utils/vnTime')
 const { notify } = require('./notificationService')
 
 const OPEN_STATUSES = ['pending', 'reviewing']
+const PROCESSED_STATUSES = ['resolved', 'dismissed']
 const ACTIONS = ['warn', 'hide', 'lock', 'dismiss']
 const PROCESSING = new Map()
 
@@ -29,7 +30,7 @@ const populatedReports = (query) =>
     .populate({
       path: 'targetPost',
       select:
-        'code title type status isHidden hiddenReason description area placeName images owner category createdAt',
+        'code title type slug status isHidden hiddenReason description area placeName images owner category createdAt',
       populate: [
         { path: 'owner', select: 'username avatarUrl role status' },
         { path: 'category', select: 'name slug' },
@@ -57,6 +58,7 @@ const toPost = (post, includeDescription = false) => {
     code: post.code,
     title: post.title,
     type: post.type,
+    slug: post.slug,
     status: post.status,
     isHidden: Boolean(post.isHidden),
     hiddenReason: post.hiddenReason || '',
@@ -97,6 +99,46 @@ const toItem = (report) => ({
   createdAt: report.createdAt,
 })
 
+const historyFilterOf = (report) =>
+  report.targetType === 'post'
+    ? { targetPost: idOf(report.targetPost) }
+    : { targetUser: idOf(report.targetUser) }
+
+const groupKeyOf = (report) => {
+  const targetId = report.targetType === 'post' ? idOf(report.targetPost) : idOf(report.targetUser)
+  return `${report.targetType}:${targetId || 'missing'}`
+}
+
+const severityRank = { low: 1, medium: 2, high: 3 }
+
+const highestSeverity = (reports) =>
+  reports.reduce(
+    (highest, report) =>
+      severityRank[report.severity] > severityRank[highest] ? report.severity : highest,
+    'low'
+  )
+
+const distinctUsers = (reports, field) => {
+  const users = new Map()
+  for (const report of reports) {
+    const user = report[field]
+    if (user?._id) users.set(String(user._id), toUser(user))
+  }
+  return [...users.values()]
+}
+
+const toGroupItem = (reports, queueStatus) => {
+  const latest = reports[0]
+  return {
+    ...toItem(latest),
+    queueStatus: queueStatus || (OPEN_STATUSES.includes(latest.status) ? 'open' : 'processed'),
+    severity: highestSeverity(reports),
+    reportCount: reports.length,
+    reportIds: reports.map((report) => String(report._id)),
+    reporters: distinctUsers(reports, 'reporter'),
+  }
+}
+
 const addSearch = async (filter, q) => {
   if (!q) return
   const escaped = escapeRegex(q)
@@ -134,9 +176,17 @@ const pageSizeOf = async () => {
   return pageSize
 }
 
-const listReports = async ({ q = '', targetType, severity, from, to, page = 1 }) => {
+const listReports = async ({
+  q = '',
+  targetType,
+  severity,
+  from,
+  to,
+  queueStatus = 'open',
+  page = 1,
+}) => {
   const filter = {
-    status: { $in: OPEN_STATUSES },
+    status: { $in: queueStatus === 'processed' ? PROCESSED_STATUSES : OPEN_STATUSES },
     ...(targetType && { targetType }),
     ...(severity && { severity }),
     ...((from || to) && {
@@ -148,17 +198,61 @@ const listReports = async ({ q = '', targetType, severity, from, to, page = 1 })
   }
   await addSearch(filter, q)
   const pageSize = await pageSizeOf()
-  const total = await Report.countDocuments(filter)
+  // The queue is grouped by target. Keep individual Report documents so that
+  // moderators can still inspect every submission in the detail view.
+  const reports = await populatedReports(
+    Report.find(filter).sort({ createdAt: -1, _id: -1 })
+  ).lean()
+  const groups = []
+  const groupsByTarget = new Map()
+  for (const report of reports) {
+    const key = groupKeyOf(report)
+    if (!groupsByTarget.has(key)) {
+      const group = []
+      groupsByTarget.set(key, group)
+      groups.push(group)
+    }
+    groupsByTarget.get(key).push(report)
+  }
+  if (queueStatus === 'processed') {
+    const openReports = await Report.find({
+      ...(targetType && { targetType }),
+      status: { $in: OPEN_STATUSES },
+    })
+      .select('targetType targetPost targetUser')
+      .lean()
+    const openGroupKeys = new Set(openReports.map(groupKeyOf))
+    groups.splice(
+      0,
+      groups.length,
+      ...groups.filter((group) => !openGroupKeys.has(groupKeyOf(group[0])))
+    )
+  }
+  const total = groups.length
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const currentPage = Math.min(page, totalPages)
-  const reports = await populatedReports(
-    Report.find(filter)
-      .sort({ createdAt: -1, _id: -1 })
-      .skip((currentPage - 1) * pageSize)
-      .limit(pageSize)
-  ).lean()
+  const pageGroups = groups.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const warningRows = await Report.aggregate([
+    {
+      $match: {
+        targetUser: {
+          $in: pageGroups
+            .flat()
+            .map((report) => report.targetUser)
+            .filter(Boolean),
+        },
+        status: 'resolved',
+        action: 'warn',
+      },
+    },
+    { $group: { _id: '$targetUser', count: { $sum: 1 } } },
+  ])
+  const warningCounts = new Map(warningRows.map((row) => [String(row._id), row.count]))
   return {
-    items: reports.map(toItem),
+    items: pageGroups.map((group) => ({
+      ...toGroupItem(group, queueStatus),
+      warningCount: warningCounts.get(idOf(group[0].targetUser)) ?? 0,
+    })),
     total,
     page: currentPage,
     pageSize,
@@ -166,15 +260,11 @@ const listReports = async ({ q = '', targetType, severity, from, to, page = 1 })
   }
 }
 
-const historyFilterOf = (report) =>
-  report.targetType === 'post'
-    ? { targetPost: idOf(report.targetPost) }
-    : { targetUser: idOf(report.targetUser) }
-
 const toHistory = (report) => ({
   id: String(report._id),
   targetType: report.targetType,
   reason: report.reason,
+  description: report.description || '',
   severity: report.severity,
   status: report.status,
   action: report.action || null,
@@ -211,12 +301,18 @@ const getReport = async (id, moderator) => {
         })
       : 0,
   ])
+  const openReports = history.filter((entry) => OPEN_STATUSES.includes(entry.status))
   return {
-    ...toItem(report),
+    ...toGroupItem(openReports.length ? openReports : [report]),
+    id: String(report._id),
+    queueStatus: openReports.length ? 'open' : 'processed',
+    reportCount: history.length,
+    openReportCount: openReports.length,
     target: toTarget(report, true),
-    availableActions: actionsOf(report, moderator),
+    availableActions: actionsOf(openReports[0] || report, moderator),
     warningCount,
     relatedHistory: history.map(toHistory),
+    reports: history.map(toItem),
   }
 }
 
@@ -258,7 +354,7 @@ const auditFor = ({
     },
   })
 
-const rollback = async ({ report, actor, targetChange, logs }) => {
+const rollback = async ({ reports, actor, targetChange, logs }) => {
   if (targetChange?.type === 'user') {
     await User.updateOne(
       { _id: targetChange.id, status: 'locked', updatedAt: targetChange.changedAt },
@@ -285,18 +381,22 @@ const rollback = async ({ report, actor, targetChange, logs }) => {
       { timestamps: false }
     )
   }
-  await Report.updateOne(
-    { _id: report._id, handledBy: actor._id },
-    {
-      $set: {
-        status: report.status,
-        action: report.action,
-        handledBy: report.handledBy,
-        handledAt: report.handledAt,
-        updatedAt: report.updatedAt,
-      },
-    },
-    { timestamps: false }
+  await Promise.all(
+    reports.map((report) =>
+      Report.updateOne(
+        { _id: report._id, handledBy: actor._id },
+        {
+          $set: {
+            status: report.status,
+            action: report.action,
+            handledBy: report.handledBy,
+            handledAt: report.handledAt,
+            updatedAt: report.updatedAt,
+          },
+        },
+        { timestamps: false }
+      )
+    )
   )
   if (logs.length) await AuditLog.deleteMany({ _id: { $in: logs.map((log) => log._id) } })
 }
@@ -334,12 +434,24 @@ const resolveReportUnsafe = async (id, moderator, action, reason) => {
   }
 
   const changedAt = new Date()
-  const claimed = await Report.findOneAndUpdate(
-    { _id: id, status: { $in: OPEN_STATUSES }, handledBy: null, action: null },
-    { $set: { handledBy: moderator._id } },
-    { returnDocument: 'before', timestamps: false }
-  ).lean()
-  if (!claimed) throw reportProcessed()
+  const groupFilter = historyFilterOf(report)
+  const openFilter = {
+    ...groupFilter,
+    status: { $in: OPEN_STATUSES },
+    handledBy: null,
+    action: null,
+  }
+  const openReports = await Report.find(openFilter).sort({ createdAt: -1, _id: -1 }).lean()
+  if (!openReports.length) throw reportProcessed()
+  const claimedResult = await Report.updateMany(
+    openFilter,
+    { $set: { handledBy: moderator._id, updatedAt: changedAt } },
+    { timestamps: false }
+  )
+  if (claimedResult.modifiedCount !== openReports.length) {
+    await rollback({ reports: openReports, actor: moderator, targetChange: null, logs: [] })
+    throw reportProcessed()
+  }
 
   let targetChange = null
   const logs = []
@@ -424,11 +536,16 @@ const resolveReportUnsafe = async (id, moderator, action, reason) => {
       )
     }
     const status = action === 'dismiss' ? 'dismissed' : 'resolved'
-    const updatedReport = await Report.findOneAndUpdate(
-      { _id: id, handledBy: moderator._id, status: { $in: OPEN_STATUSES } },
+    const updatedResult = await Report.updateMany(
+      { _id: { $in: openReports.map((entry) => entry._id) }, handledBy: moderator._id },
       { $set: { status, action, handledAt: changedAt, updatedAt: changedAt } },
-      { returnDocument: 'after', timestamps: false }
-    ).lean()
+      { timestamps: false }
+    )
+    if (updatedResult.modifiedCount !== openReports.length) throw reportProcessed()
+    const updatedReports = await Report.find({
+      _id: { $in: openReports.map((entry) => entry._id) },
+    }).lean()
+    const updatedReport = updatedReports.find((entry) => String(entry._id) === String(id))
     if (!updatedReport) throw reportProcessed()
     logs.unshift(
       auditFor({
@@ -439,41 +556,57 @@ const resolveReportUnsafe = async (id, moderator, action, reason) => {
         displayCode: targetPost?.code || targetUser?.username || String(updatedReport._id),
         entityName: targetPost?.title || targetUser?.username || 'Báo cáo',
         reason,
-        before: { status: claimed.status, action: null },
-        after: { status, action },
+        before: { status: openReports[0].status, action: null, reportCount: openReports.length },
+        after: { status, action, reportCount: openReports.length },
       })
     )
     for (const log of logs) {
       log.createdAt = changedAt
       await log.save()
     }
-    return { updatedReport, targetUser, targetPost, changedAt, logs }
+    return {
+      updatedReport,
+      targetUser,
+      targetPost,
+      changedAt,
+      logs,
+      affectedCount: openReports.length,
+      reporterIds: openReports.map((entry) => entry.reporter).filter(Boolean),
+    }
   } catch (error) {
-    await rollback({ report: claimed, actor: moderator, targetChange, logs })
+    await rollback({ reports: openReports, actor: moderator, targetChange, logs })
     throw error
   }
 }
 
 const resolveReport = async (id, moderator, action, reason = '') => {
-  const previous = PROCESSING.get(String(id)) || Promise.resolve()
+  const report = await Report.findById(id).lean()
+  if (!report) throw reportNotFound()
+  const processingKey = groupKeyOf(report)
+  const previous = PROCESSING.get(processingKey) || Promise.resolve()
   const work = previous
     .catch(() => {})
     .then(() => resolveReportUnsafe(id, moderator, action, reason))
-  PROCESSING.set(String(id), work)
+  PROCESSING.set(processingKey, work)
   try {
     const result = await work
-    const { updatedReport, targetUser, targetPost, changedAt } = result
+    const { updatedReport, targetUser, targetPost, changedAt, reporterIds } = result
     try {
-      if (action === 'warn' || action === 'lock') {
+      if (action === 'warn' || action === 'lock' || action === 'hide') {
         await notify([targetUser._id], {
           type: 'warning',
           actor: moderator._id,
-          refType: 'User',
-          refId: targetUser._id,
-          text: action === 'lock' ? `Tài khoản của bạn đã bị khóa. Lý do: ${reason}` : reason,
+          refType: action === 'hide' ? 'Post' : 'User',
+          refId: action === 'hide' ? targetPost._id : targetUser._id,
+          text:
+            action === 'lock'
+              ? `Tài khoản của bạn đã bị khóa. Lý do: ${reason}`
+              : action === 'hide'
+                ? `Bài đăng ${targetPost.title} của bạn đã bị ẩn. Lý do: ${reason}`
+                : reason,
         })
       }
-      await notify([updatedReport.reporter], {
+      await notify(reporterIds, {
         type: 'report_result',
         actor: moderator._id,
         refType: 'Report',
@@ -492,7 +625,7 @@ const resolveReport = async (id, moderator, action, reason = '') => {
       changedAt,
     }
   } finally {
-    if (PROCESSING.get(String(id)) === work) PROCESSING.delete(String(id))
+    if (PROCESSING.get(processingKey) === work) PROCESSING.delete(processingKey)
   }
 }
 

@@ -57,12 +57,13 @@ describe('UC08 - Đăng nhập', () => {
     assert.equal(await Session.countDocuments(), 0)
   })
 
-  test('tài khoản bị khoá; nhập sai mật khẩu thì không lộ trạng thái khoá', async () => {
-    await createUser({ status: 'locked' })
+  test('tài khoản bị khoá; đúng mật khẩu hiển thị lý do, sai mật khẩu không lộ trạng thái khoá', async () => {
+    const lockReason = 'Tạm khóa để xác minh thông tin liên hệ'
+    await createUser({ status: 'locked', lockReason })
 
     const res = await login({ email: 'thib@example.com', password: PASSWORD })
     assert.equal(res.status, 403)
-    assert.equal(res.body.message, 'Tài khoản đã bị khoá.')
+    assert.equal(res.body.message, `Tài khoản đã bị khoá. Lý do: ${lockReason}`)
     assert.equal(res.body.code, 'ACCOUNT_LOCKED')
 
     const wrong = await login({ email: 'thib@example.com', password: 'Wrong@1234' })
