@@ -216,7 +216,7 @@ export default function CommentSection({ comments, user, now, onAdd, onEdit, onD
               )}
               <Button
                 type="submit"
-                variant="primary"
+                variant="cta"
                 size="sm"
                 disabled={sending}
                 aria-busy={sending || undefined}
