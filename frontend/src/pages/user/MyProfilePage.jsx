@@ -19,7 +19,7 @@ import {
 } from '../../components/user/profile/ProfileSections'
 import { useBack, useProfileData } from '../../hooks/useProfileData'
 import { toFeedPost } from '../../lib/user/homeFeed'
-import { PROFILE_TABS, toProfileView } from '../../lib/user/profiles'
+import { PROFILE_TABS, profileStats, toProfileView } from '../../lib/user/profiles'
 
 // Tất cả, Mất đồ, Nhặt được gồm cả bài chờ duyệt; Chờ duyệt gồm Chờ duyệt và Bị từ chối
 const REVIEWING_STATUSES = ['pending', 'rejected']
@@ -142,6 +142,7 @@ export default function MyProfilePage() {
 
       <ProfileHeader
         profile={profile}
+        stats={profileStats(profile, data.posts.length, data.rating.average)}
         actions={
           <Link to="/settings/profile" className={buttonClass()}>
             <Icon name="edit" size={15} />

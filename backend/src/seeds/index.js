@@ -8,6 +8,8 @@ const { seedCategories } = require('./categorySeed')
 const { seedConversations } = require('./conversationSeed')
 const { seedNotifications } = require('./notificationSeed')
 const { seedPosts } = require('./postSeed')
+const { seedMemberReputation, seedReputation } = require('./reputationSeed')
+const { seedReviews } = require('./reviewSeed')
 const { seedSystemSettings } = require('./systemSettingsSeed')
 const {
   seedMissingMembers,
@@ -31,7 +33,7 @@ const seeders = auditOnly
     : settingsOnly
       ? [seedSystemSettings]
       : demo
-        ? [seedMissingMembers, seedCategories, seedPosts, seedNotifications]
+        ? [seedMissingMembers, seedCategories, seedPosts, seedMemberReputation, seedNotifications]
         : [
             seedUsers,
             seedAvatars,
@@ -39,6 +41,8 @@ const seeders = auditOnly
             seedCategories,
             seedPosts,
             seedConversations,
+            seedReviews,
+            seedReputation,
             seedNotifications,
             seedUserActivityDates,
             seedUserUpdateDates,
