@@ -28,6 +28,72 @@ export function makeId(prefix) {
 }
 
 const keyOf = (text) => text.trim().normalize('NFC').toLocaleLowerCase('vi')
+export const aliasKeyOf = (text) =>
+  String(text ?? '')
+    .normalize('NFC')
+    .toLocaleLowerCase('vi')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+export function duplicateAliasKeys(groups, existingTerms = []) {
+  const existingKeys = new Set(existingTerms.map(aliasKeyOf).filter(Boolean))
+  const counts = new Map()
+  for (const alias of groups.flat()) {
+    const key = aliasKeyOf(alias)
+    if (key) counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  return new Set(
+    [...counts].filter(([key, count]) => count > 1 || existingKeys.has(key)).map(([key]) => key)
+  )
+}
+
+export const DUPLICATE_ALIAS_MESSAGE = 'Alias đã tồn tại, vui lòng nhập alias khác.'
+
+const storedAliasKey = (alias) =>
+  String(alias ?? '')
+    .normalize('NFC')
+    .trim()
+
+export function duplicateAliasErrors(groups, existingTerms = [], savedGroups = []) {
+  const duplicateKeys = duplicateAliasKeys(groups, existingTerms)
+  const savedCounts = new Map()
+  for (const alias of savedGroups.flat()) {
+    const key = storedAliasKey(alias)
+    if (key) savedCounts.set(key, (savedCounts.get(key) ?? 0) + 1)
+  }
+
+  const persisted = groups.map((group) => group.map(() => false))
+  const consumeSaved = (groupIndex, itemIndex) => {
+    const key = storedAliasKey(groups[groupIndex][itemIndex])
+    const remaining = savedCounts.get(key) ?? 0
+    if (!key || !remaining) return false
+    persisted[groupIndex][itemIndex] = true
+    if (remaining === 1) savedCounts.delete(key)
+    else savedCounts.set(key, remaining - 1)
+    return true
+  }
+
+  groups.forEach((group, groupIndex) => {
+    group.forEach((alias, itemIndex) => {
+      if (storedAliasKey(alias) === storedAliasKey(savedGroups[groupIndex]?.[itemIndex])) {
+        consumeSaved(groupIndex, itemIndex)
+      }
+    })
+  })
+  groups.forEach((group, groupIndex) => {
+    group.forEach((alias, itemIndex) => {
+      if (!persisted[groupIndex][itemIndex]) consumeSaved(groupIndex, itemIndex)
+    })
+  })
+
+  return groups.map((group, groupIndex) =>
+    group.map((alias, itemIndex) =>
+      duplicateKeys.has(aliasKeyOf(alias)) && !persisted[groupIndex][itemIndex]
+        ? DUPLICATE_ALIAS_MESSAGE
+        : ''
+    )
+  )
+}
 
 // Bỏ ô trống và mục trùng (không phân biệt hoa thường), giữ thứ tự nhập
 export function cleanList(items) {
@@ -77,8 +143,6 @@ export function validateAlgorithm(form) {
 }
 
 export function validateRelations(relations) {
-  if (relations.some((relation) => !relation.memberCategoryIds.length))
-    return 'Mỗi nhóm quan hệ phải có ít nhất một danh mục liên quan.'
   const members = relations.flatMap((relation) => relation.memberCategoryIds)
   if (new Set(members).size !== members.length)
     return 'Một danh mục không được nằm ở hai nhóm quan hệ.'

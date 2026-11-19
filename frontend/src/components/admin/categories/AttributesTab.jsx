@@ -9,6 +9,7 @@ import Switch from '../../backoffice/Switch'
 import {
   EMPTY_ATTRIBUTE,
   cleanList,
+  duplicateAliasErrors,
   isSame,
   makeId,
   validateAttribute,
@@ -23,8 +24,6 @@ import {
 import { inputClass, labelClass } from './styles'
 import { ConfirmDeleteDialog, FormError, Panel, SaveBar, Segmented, TextListField } from './ui'
 
-const VISIBLE_VALUES = 4
-
 const byFrequency = (values) =>
   [...values].sort((a, b) => (b.frequency ?? -1) - (a.frequency ?? -1))
 
@@ -38,30 +37,48 @@ function RoleBadge({ role }) {
 
 function ValueSummary({ values }) {
   const sorted = byFrequency(values)
-  const hidden = sorted.length - VISIBLE_VALUES
 
   return (
-    <span className="text-small leading-relaxed text-ink-secondary">
-      {sorted.slice(0, VISIBLE_VALUES).map((attributeValue, index) => (
-        <span key={attributeValue.id}>
-          {index > 0 && <span className="text-ink-subtle"> · </span>}
-          {attributeValue.value}{' '}
-          <span className="text-ink-muted tabular-nums">
-            {attributeValue.frequency == null ? '—' : formatPercent(attributeValue.frequency)}
+    <ul className="m-0 max-h-36 min-w-0 list-none space-y-1 overflow-y-auto p-0 pr-1 text-small">
+      {sorted.map((attributeValue) => (
+        <li
+          key={attributeValue.id}
+          className="flex min-w-0 items-center justify-between gap-2 rounded-md bg-primary-faint px-2 py-1.5"
+        >
+          <span className="min-w-0 truncate text-ink-secondary" title={attributeValue.value}>
+            {attributeValue.value}
           </span>
-        </span>
+          <span className="shrink-0 text-caption text-ink-muted tabular-nums">
+            u = {attributeValue.frequency == null ? '—' : formatPercent(attributeValue.frequency)}
+          </span>
+        </li>
       ))}
-      {hidden > 0 && <span className="text-ink-muted"> · +{hidden}</span>}
-    </span>
+    </ul>
   )
 }
 
-function AttributeForm({ value, attributes, editing, onSubmit, onClose }) {
+function AttributeForm({ value, category, editing, onSubmit, onClose }) {
   const [form, setForm] = useState(() => ({
     ...value,
     values: value.values.map((v) => ({ ...v })),
   }))
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const otherAttributeAliases = category.attributes
+    .filter((attribute) => attribute.id !== value.id)
+    .flatMap((attribute) => [
+      ...attribute.aliases,
+      ...attribute.values.flatMap((attributeValue) => attributeValue.aliases),
+    ])
+  const existingAliases = [...category.aliases, ...otherAttributeAliases]
+  const aliasGroups = [form.aliases, ...form.values.map((attributeValue) => attributeValue.aliases)]
+  const aliasErrors = duplicateAliasErrors(aliasGroups, existingAliases, [
+    value.aliases,
+    ...value.values.map((attributeValue) => attributeValue.aliases),
+  ])
+  const attributeAliasErrors = aliasErrors[0]
+  const valueAliasErrors = aliasErrors.slice(1)
+  const hasAliasDuplicates = aliasErrors.flat().some(Boolean)
   const change = (key, next) => {
     setError('')
     setForm((current) => ({ ...current, [key]: next }))
@@ -72,22 +89,32 @@ function AttributeForm({ value, attributes, editing, onSubmit, onClose }) {
       form.values.map((item, i) => (i === index ? next : item))
     )
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault()
-    const nextError = validateAttribute(form, attributes, value.id)
+    if (hasAliasDuplicates) return
+    const nextError = validateAttribute(form, category.attributes, value.id)
     if (nextError) return setError(nextError)
-    onSubmit({
-      name: form.name.trim(),
-      aliases: cleanList(form.aliases),
-      matchRole: form.matchRole,
-      mProb: Number(form.mProb),
-      isRequired: form.isRequired,
-      values: form.values.map((attributeValue) => ({
-        ...attributeValue,
-        value: attributeValue.value.trim().normalize('NFC'),
-        aliases: cleanList(attributeValue.aliases),
-      })),
-    })
+    setSaving(true)
+    setError('')
+    try {
+      await onSubmit({
+        name: form.name.trim(),
+        aliases: cleanList(form.aliases),
+        matchRole: form.matchRole,
+        mProb: Number(form.mProb),
+        isRequired: form.isRequired,
+        values: form.values.map((attributeValue) => ({
+          ...attributeValue,
+          value: attributeValue.value.trim().normalize('NFC'),
+          aliases: cleanList(attributeValue.aliases),
+        })),
+      })
+      setSaving(false)
+      onClose()
+    } catch (submitError) {
+      setError(submitError.message || 'Không lưu được thuộc tính. Vui lòng thử lại.')
+      setSaving(false)
+    }
   }
 
   return (
@@ -97,9 +124,17 @@ function AttributeForm({ value, attributes, editing, onSubmit, onClose }) {
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>Hủy</Button>
-          <Button type="submit" form="admin-attribute-form" variant="primary" icon="check">
-            Lưu thuộc tính
+          <Button onClick={onClose} disabled={saving}>
+            Hủy
+          </Button>
+          <Button
+            type="submit"
+            form="admin-attribute-form"
+            variant="primary"
+            icon="check"
+            disabled={saving || hasAliasDuplicates}
+          >
+            {saving ? 'Đang lưu…' : 'Lưu thuộc tính'}
           </Button>
         </>
       }
@@ -175,6 +210,7 @@ function AttributeForm({ value, attributes, editing, onSubmit, onClose }) {
           placeholder="Cách gọi khác"
           value={form.aliases}
           onChange={(aliases) => change('aliases', aliases)}
+          errors={attributeAliasErrors}
         />
 
         <div className={labelClass}>
@@ -231,10 +267,11 @@ function AttributeForm({ value, attributes, editing, onSubmit, onClose }) {
               </div>
               <div className="mt-3">
                 <TextListField
-                  label="Alias"
+                  label={`Alias của giá trị ${index + 1}`}
                   itemLabel={`alias của giá trị ${index + 1}`}
                   value={attributeValue.aliases}
                   onChange={(aliases) => updateValue(index, { ...attributeValue, aliases })}
+                  errors={valueAliasErrors[index]}
                 />
               </div>
             </article>
@@ -246,13 +283,20 @@ function AttributeForm({ value, attributes, editing, onSubmit, onClose }) {
   )
 }
 
-function AttributeDetailDialog({ attribute, onClose }) {
+function AttributeDetailDialog({ attribute, onClose, onEdit }) {
   return (
     <Dialog
       title={`Thuộc tính: ${attribute.name}`}
       size="lg"
       onClose={onClose}
-      footer={<Button onClick={onClose}>Đóng</Button>}
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button onClick={onClose}>Đóng</Button>
+          <Button variant="primary" onClick={onEdit}>
+            Sửa thuộc tính
+          </Button>
+        </div>
+      }
     >
       <div className="space-y-4">
         <dl className="m-0 grid grid-cols-3 gap-3 max-sm:grid-cols-1">
@@ -309,20 +353,34 @@ function ContentsPanel({ category, onSave }) {
   const [enabled, setEnabled] = useState(saved.length > 0)
   const [items, setItems] = useState(saved)
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
   const next = enabled ? cleanList(items) : []
   const dirty = !isSame(enabled ? items : [], saved)
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault()
     if (enabled && !next.length)
       return setError('Thêm ít nhất một mục, hoặc tắt danh mục vật chứa.')
-    onSave(
-      next.map(
-        (label) =>
-          category.contents.find((item) => item.label === label) || { id: makeId('content'), label }
+    setSaving(true)
+    setError('')
+    try {
+      const updated = await onSave(
+        next.map(
+          (label) =>
+            category.contents.find((item) => item.label === label) || {
+              id: makeId('content'),
+              label,
+            }
+        )
       )
-    )
-    setItems(next)
+      const savedContents = updated.contents.map((item) => item.label)
+      setItems(savedContents)
+      setEnabled(savedContents.length > 0)
+    } catch (saveError) {
+      setError(saveError.message || 'Không lưu được danh sách bên trong. Vui lòng thử lại.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -359,6 +417,7 @@ function ContentsPanel({ category, onSave }) {
           formId="category-contents-form"
           dirty={dirty}
           error={error}
+          saving={saving}
           onReset={() => {
             setError('')
             setEnabled(saved.length > 0)
@@ -399,7 +458,7 @@ export default function AttributesTab({
                 <tr>
                   {[
                     'Thuộc tính',
-                    'Giá trị · độ hiếm u',
+                    'Giá trị - Độ hiếm u',
                     'Vai trò ghép cặp',
                     'Độ tin cậy (m)',
                     'Bắt buộc',
@@ -482,27 +541,25 @@ export default function AttributesTab({
       {modal?.kind === 'form' && (
         <AttributeForm
           value={modal.value}
-          attributes={category.attributes}
+          category={category}
           editing={modal.editing}
           onClose={() => setModal(null)}
-          onSubmit={(value) => {
-            onSaveAttribute({ id: modal.value.id || makeId('attribute'), ...value })
-            setModal(null)
-          }}
+          onSubmit={(value) => onSaveAttribute({ id: modal.value.id, ...value })}
         />
       )}
       {modal?.kind === 'detail' && (
-        <AttributeDetailDialog attribute={modal.attribute} onClose={() => setModal(null)} />
+        <AttributeDetailDialog
+          attribute={modal.attribute}
+          onClose={() => setModal(null)}
+          onEdit={() => setModal({ kind: 'form', value: modal.attribute, editing: true })}
+        />
       )}
       {modal?.kind === 'delete' && (
         <ConfirmDeleteDialog
           title="Xóa thuộc tính"
           confirmLabel="Xóa thuộc tính"
           onClose={() => setModal(null)}
-          onConfirm={() => {
-            onRemoveAttribute(modal.attribute.id)
-            setModal(null)
-          }}
+          onConfirm={() => onRemoveAttribute(modal.attribute.id)}
         >
           <p className="m-0">
             Bạn có chắc muốn xóa thuộc tính{' '}

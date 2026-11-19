@@ -11,8 +11,9 @@ const MAX_LENGTH = 500
 function QuestionForm({ question, categoryName, onSubmit, onClose }) {
   const [text, setText] = useState(question?.text || '')
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
   const inputRef = useRef(null)
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault()
     const value = text.trim()
     if (!value || value.length > MAX_LENGTH) {
@@ -22,7 +23,16 @@ function QuestionForm({ question, categoryName, onSubmit, onClose }) {
       inputRef.current?.focus()
       return
     }
-    onSubmit(value)
+    setSaving(true)
+    setError('')
+    try {
+      await onSubmit(value)
+      setSaving(false)
+      onClose()
+    } catch (submitError) {
+      setError(submitError.message || 'Không lưu được câu hỏi. Vui lòng thử lại.')
+      setSaving(false)
+    }
   }
 
   return (
@@ -31,9 +41,17 @@ function QuestionForm({ question, categoryName, onSubmit, onClose }) {
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>Hủy</Button>
-          <Button type="submit" form="admin-question-form" variant="primary" icon="check">
-            Lưu câu hỏi
+          <Button onClick={onClose} disabled={saving}>
+            Hủy
+          </Button>
+          <Button
+            type="submit"
+            form="admin-question-form"
+            variant="primary"
+            icon="check"
+            disabled={saving}
+          >
+            {saving ? 'Đang lưu…' : 'Lưu câu hỏi'}
           </Button>
         </>
       }
@@ -126,10 +144,7 @@ export default function QuestionsTab({ category, onSaveQuestion, onRemoveQuestio
           question={modal.question}
           categoryName={category.name}
           onClose={() => setModal(null)}
-          onSubmit={(text) => {
-            onSaveQuestion(modal.question?.id, text)
-            setModal(null)
-          }}
+          onSubmit={(text) => onSaveQuestion(modal.question?.id, text)}
         />
       )}
       {modal?.kind === 'delete' && (
@@ -137,10 +152,7 @@ export default function QuestionsTab({ category, onSaveQuestion, onRemoveQuestio
           title="Xóa câu hỏi xác minh"
           confirmLabel="Xóa câu hỏi"
           onClose={() => setModal(null)}
-          onConfirm={() => {
-            onRemoveQuestion(modal.question.id)
-            setModal(null)
-          }}
+          onConfirm={() => onRemoveQuestion(modal.question.id)}
         >
           <p className="m-0">Bạn có chắc muốn xóa câu hỏi xác minh này?</p>
           <p className="m-0 rounded-xl bg-primary-faint px-3.5 py-2.5 break-words text-ink">

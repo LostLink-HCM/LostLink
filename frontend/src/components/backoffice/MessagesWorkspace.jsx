@@ -4,7 +4,7 @@ import Button from './Button'
 import Dialog from './Dialog'
 import IconButton from './IconButton'
 import { cx } from './classes'
-import { DEFAULT_QUICK_REPLIES } from '../../data/backofficeQuickReplies'
+import { EMPTY_QUICK_REPLIES } from '../../lib/backoffice/quickReplies'
 import {
   getBackofficeConversation,
   listBackofficeContacts,
@@ -203,7 +203,7 @@ export default function MessagesWorkspace({
   setMessageState,
   workspaceRole,
   user,
-  quickReplies = DEFAULT_QUICK_REPLIES,
+  quickReplies = EMPTY_QUICK_REPLIES,
 }) {
   const peerRoles =
     workspaceRole === 'admin'

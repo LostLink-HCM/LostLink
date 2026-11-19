@@ -1,6 +1,8 @@
-import { DEFAULT_QUICK_REPLIES } from '../../data/backofficeQuickReplies'
-
 export const QUICK_REPLY_TEXT_LIMIT = 500
+export const EMPTY_QUICK_REPLIES = Object.freeze({
+  user: Object.freeze([]),
+  internal: Object.freeze([]),
+})
 
 const QUICK_REPLY_GROUPS = ['user', 'internal']
 
@@ -23,7 +25,7 @@ function normalizeGroup(items, group) {
   }, [])
 }
 
-export function cloneQuickReplies(value = DEFAULT_QUICK_REPLIES) {
+export function cloneQuickReplies(value = EMPTY_QUICK_REPLIES) {
   return Object.fromEntries(
     QUICK_REPLY_GROUPS.map((group) => [group, normalizeGroup(value?.[group], group)])
   )

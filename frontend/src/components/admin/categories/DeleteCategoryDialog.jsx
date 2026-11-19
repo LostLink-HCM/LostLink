@@ -1,9 +1,6 @@
-import { incomingRelations } from '../../../lib/admin/categories'
 import { ConfirmDeleteDialog } from './ui'
 
-export default function DeleteCategoryDialog({ category, categories, onConfirm, onClose }) {
-  const incoming = incomingRelations(categories, category.id)
-
+export default function DeleteCategoryDialog({ category, onConfirm, onClose }) {
   return (
     <ConfirmDeleteDialog
       title="Xóa danh mục"
@@ -15,11 +12,8 @@ export default function DeleteCategoryDialog({ category, categories, onConfirm, 
         Bạn có chắc muốn xóa danh mục <strong className="text-ink">“{category.name}”</strong>?
       </p>
       <p className="m-0">
-        Thuộc tính, câu hỏi xác minh và cấu hình thuật toán của danh mục cũng sẽ bị xóa.
-        {incoming.length > 0 &&
-          ` Danh mục này cũng bị gỡ khỏi quan hệ của ${incoming
-            .map(({ source }) => source.name)
-            .join(', ')}.`}
+        Danh mục sẽ không còn xuất hiện trong các danh sách đang hoạt động. Bài đăng cũ vẫn giữ
+        nguyên liên kết với danh mục này.
       </p>
     </ConfirmDeleteDialog>
   )

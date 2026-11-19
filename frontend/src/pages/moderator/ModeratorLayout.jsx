@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import BackofficeLayout from '../../components/backoffice/BackofficeLayout'
-import { createWorkspacePosts } from '../../data/workspacePosts'
 import { createModeratorNotifications } from '../../data/moderatorNotifications'
 import { createEmptyMessageState } from '../../lib/backoffice/messages'
 import useSystemSettings from '../../hooks/useSystemSettings'
@@ -16,7 +15,6 @@ const navigation = [
 ]
 
 export default function ModeratorLayout() {
-  const [posts, setPosts] = useState(createWorkspacePosts)
   const [reviewPosts, setReviewPosts] = useState([])
   const [reviewLoading, setReviewLoading] = useState(true)
   const [reviewError, setReviewError] = useState('')
@@ -68,8 +66,6 @@ export default function ModeratorLayout() {
       pendingPath="/review"
       pendingCount={pendingCount}
       outletContext={{
-        posts,
-        setPosts,
         reviewPosts,
         setReviewPosts,
         reviewLoading,

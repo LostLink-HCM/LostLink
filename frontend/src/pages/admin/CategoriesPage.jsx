@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import Icon from '../../components/common/Icon'
 import Button from '../../components/backoffice/Button'
@@ -12,18 +12,50 @@ import DeleteCategoryDialog from '../../components/admin/categories/DeleteCatego
 import GeneralTab from '../../components/admin/categories/GeneralTab'
 import QuestionsTab from '../../components/admin/categories/QuestionsTab'
 import RelationsTab from '../../components/admin/categories/RelationsTab'
-import { createAdminCategories } from '../../data/adminCategories'
-import { EMPTY_CATEGORY, makeId, withoutCategory } from '../../lib/admin/categories'
 import useLinkedHighlight from '../../hooks/useLinkedHighlight'
+import {
+  archiveAdminCategory,
+  createAdminCategory,
+  deleteAdminCategoryAttribute,
+  deleteAdminCategoryQuestion,
+  listAdminCategories,
+  saveAdminCategoryAttribute,
+  saveAdminCategoryQuestion,
+  updateAdminCategoryAlgorithm,
+  updateAdminCategoryContents,
+  updateAdminCategoryGeneral,
+  updateAdminCategoryRelations,
+} from '../../lib/admin/categoriesApi'
 
 const byOrder = (a, b) => a.order - b.order || a.name.localeCompare(b.name, 'vi')
 
 export default function Categories() {
-  const [categoryState, setCategoryState] = useState(() => ({
-    items: createAdminCategories(),
+  const [categoryState, setCategoryState] = useState({
+    items: [],
     updatedAt: null,
-  }))
+    loading: true,
+    error: '',
+  })
   const categories = categoryState.items
+  useEffect(() => {
+    let active = true
+    listAdminCategories()
+      .then((result) => {
+        if (active) setCategoryState({ ...result, loading: false, error: '' })
+      })
+      .catch((error) => {
+        if (active) {
+          setCategoryState((current) => ({
+            ...current,
+            loading: false,
+            error: error.message || 'Không tải được danh sách danh mục. Vui lòng thử lại.',
+          }))
+        }
+      })
+    return () => {
+      active = false
+    }
+  }, [])
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
   const selectedId = searchParams.get('category')
@@ -49,8 +81,7 @@ export default function Categories() {
   const setSelectedId = (id) => selectCategory(id)
   const setTab = (nextTab) => selectCategory(selected?.slug || selected?.id, nextTab)
   const [modal, setModal] = useState(null)
-  const [query, setQuery] = useState('')
-  const listRef = useRef(null)
+  const [recentCategoryId, setRecentCategoryId] = useState(null)
   const missing = searchParams.get('missing') === '1'
   const selected = missing
     ? null
@@ -62,77 +93,85 @@ export default function Categories() {
       ? `${location.key}:${selected.id}:${tab}`
       : null
   )
-  const filtered = useMemo(() => {
-    const normalizedQuery = query.trim().toLocaleLowerCase('vi')
-    return [...categories]
-      .sort(byOrder)
-      .filter((category) =>
-        `${category.name} ${category.aliases.join(' ')}`
-          .toLocaleLowerCase('vi')
-          .includes(normalizedQuery)
-      )
-  }, [categories, query])
-
-  const updateCategories = (update) =>
+  const applyCategoryUpdate = (updated) =>
     setCategoryState((current) => ({
-      items: update(current.items),
-      updatedAt: new Date().toISOString(),
-    }))
-
-  const patchSelected = (patch) =>
-    updateCategories((current) =>
-      current.map((category) =>
-        category.id === selected.id
-          ? { ...category, ...(typeof patch === 'function' ? patch(category) : patch) }
-          : category
-      )
-    )
-
-  const createCategory = (value) => {
-    const id = makeId('CAT')
-    updateCategories((current) => [
       ...current,
-      {
-        ...EMPTY_CATEGORY,
-        ...value,
-        id,
-        order: Math.max(0, ...current.map((category) => category.order)) + 1,
-        attributes: [],
-        contents: [],
-        relations: [],
-        questions: [],
-      },
-    ])
-    selectCategory(id, 'general')
-    setQuery('')
-    setModal(null)
-    requestAnimationFrame(() => {
-      if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight
-    })
+      items: current.items.map((category) => (category.id === updated.id ? updated : category)),
+      updatedAt: updated.updatedAt || current.updatedAt,
+      error: '',
+    }))
+
+  const saveGeneral = async (value) => {
+    const updated = await updateAdminCategoryGeneral(selected.id, value)
+    applyCategoryUpdate(updated)
+    return updated
   }
 
-  const removeCategory = () => {
-    const next = withoutCategory(categories, selected.id)
-    updateCategories(() => next)
+  const saveAlgorithm = async (value) => {
+    const updated = await updateAdminCategoryAlgorithm(selected.id, value)
+    applyCategoryUpdate(updated)
+    return updated
+  }
+
+  const saveContents = async (value) => {
+    const updated = await updateAdminCategoryContents(selected.id, value)
+    applyCategoryUpdate(updated)
+    return updated
+  }
+
+  const saveRelations = async (value) => {
+    const updated = await updateAdminCategoryRelations(selected.id, value)
+    applyCategoryUpdate(updated)
+    return updated
+  }
+
+  const saveAttribute = async (value) => {
+    const updated = await saveAdminCategoryAttribute(selected.id, value)
+    applyCategoryUpdate(updated)
+    return updated
+  }
+
+  const removeAttribute = async (id) => {
+    const updated = await deleteAdminCategoryAttribute(selected.id, id)
+    applyCategoryUpdate(updated)
+    return updated
+  }
+
+  const saveQuestion = async (id, text) => {
+    const updated = await saveAdminCategoryQuestion(selected.id, id, text)
+    applyCategoryUpdate(updated)
+    return updated
+  }
+
+  const removeQuestion = async (id) => {
+    const updated = await deleteAdminCategoryQuestion(selected.id, id)
+    applyCategoryUpdate(updated)
+    return updated
+  }
+
+  const createCategory = async (value) => {
+    const created = await createAdminCategory(value)
+    setRecentCategoryId(created.id)
+    setCategoryState((current) => ({
+      ...current,
+      items: [...current.items, created],
+      updatedAt: created.updatedAt || current.updatedAt,
+      error: '',
+    }))
+    selectCategory(created.id, 'general')
+  }
+
+  const removeCategory = async () => {
+    const archived = await archiveAdminCategory(selected.id)
+    const next = categories.filter((category) => category.id !== archived.id)
+    setCategoryState((current) => ({
+      ...current,
+      items: current.items.filter((category) => category.id !== archived.id),
+      updatedAt: archived.updatedAt || current.updatedAt,
+      error: '',
+    }))
     setSelectedId([...next].sort(byOrder)[0]?.id)
-    setModal(null)
   }
-
-  const saveAttribute = (attribute) =>
-    patchSelected((category) => ({
-      attributes: category.attributes.some((item) => item.id === attribute.id)
-        ? category.attributes.map((item) => (item.id === attribute.id ? attribute : item))
-        : [...category.attributes, attribute],
-    }))
-
-  const saveQuestion = (id, text) =>
-    patchSelected((category) => ({
-      questions: id
-        ? category.questions.map((question) =>
-            question.id === id ? { ...question, text } : question
-          )
-        : [...category.questions, { id: makeId('question'), text }],
-    }))
 
   const panelProps = (key) => ({
     role: 'tabpanel',
@@ -144,7 +183,32 @@ export default function Categories() {
 
   return (
     <div className="mx-auto max-w-[1640px] px-8 pt-7 pb-10 text-ink max-[1200px]:px-[22px] max-sm:px-4 max-sm:pt-[22px]">
-      {(missing || (selectedId && !selected)) && (
+      {categoryState.error && (
+        <div
+          role="alert"
+          className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-danger-soft bg-danger-soft p-3 text-small text-danger-ink"
+        >
+          <span className="min-w-0 flex-1">{categoryState.error}</span>
+          <Button
+            size="sm"
+            onClick={() => {
+              setCategoryState((current) => ({ ...current, loading: true, error: '' }))
+              listAdminCategories()
+                .then((result) => setCategoryState({ ...result, loading: false, error: '' }))
+                .catch((error) =>
+                  setCategoryState((current) => ({
+                    ...current,
+                    loading: false,
+                    error: error.message || 'Không tải được danh sách danh mục. Vui lòng thử lại.',
+                  }))
+                )
+            }}
+          >
+            Thử lại
+          </Button>
+        </div>
+      )}
+      {(missing || (!categoryState.loading && selectedId && !selected)) && (
         <p
           role="alert"
           className="mb-4 rounded-lg border border-danger-soft bg-danger-soft p-3 text-small text-danger-ink"
@@ -152,43 +216,44 @@ export default function Categories() {
           {missing ? 'Đối tượng không còn tồn tại.' : 'Không tìm thấy danh mục trên trang quản lý.'}
         </p>
       )}
-      <div className="mb-4.5 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5 text-small text-ink-muted" role="status">
-          <Icon name="history" size={18} className="shrink-0 text-ink-subtle" />
-          <div>
-            <span className="block">Cập nhật lần gần nhất</span>
-            {categoryState.updatedAt ? (
-              <time
-                className="mt-1 block text-small font-semibold text-ink-secondary"
-                dateTime={categoryState.updatedAt}
-              >
-                {new Date(categoryState.updatedAt).toLocaleString('vi-VN')}
-              </time>
-            ) : (
-              <strong className="mt-1 block text-small font-semibold text-ink-secondary">
-                Chưa có cập nhật
-              </strong>
-            )}
-          </div>
-        </div>
-        <Button variant="primary" icon="compose" onClick={() => setModal('create')}>
-          Thêm danh mục
-        </Button>
-      </div>
-
-      <div className="grid items-start gap-5.5 [grid-template-columns:minmax(245px,.62fr)_minmax(0,2fr)] max-[1100px]:gap-4 max-[1100px]:[grid-template-columns:minmax(220px,.62fr)_minmax(0,1.6fr)] max-[800px]:grid-cols-1">
+      <div className="mb-4.5 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <CategoryList
-          categories={filtered}
+          categories={[...categories].sort((a, b) => {
+            if (a.id === recentCategoryId) return -1
+            if (b.id === recentCategoryId) return 1
+            return byOrder(a, b)
+          })}
           total={categories.length}
+          loading={categoryState.loading}
           selectedId={selected?.id}
-          query={query}
-          onQueryChange={setQuery}
           onSelect={setSelectedId}
-          listRef={listRef}
           highlightedId={highlight.active ? selected?.id : null}
           highlightRef={highlight.targetRef}
         />
+        <div className="flex min-w-[220px] flex-col items-end gap-2 max-[640px]:w-full max-[640px]:items-stretch">
+          <div className="flex items-center gap-2 text-small text-primary" role="status">
+            <Icon name="history" size={16} className="shrink-0 text-primary" />
+            <span>Cập nhật lần gần nhất</span>
+            {categoryState.updatedAt ? (
+              <time className="font-semibold text-primary" dateTime={categoryState.updatedAt}>
+                {new Date(categoryState.updatedAt).toLocaleString('vi-VN')}
+              </time>
+            ) : (
+              <strong className="font-semibold text-primary">Chưa có cập nhật</strong>
+            )}
+          </div>
+          <Button
+            className="max-[640px]:w-full"
+            variant="primary"
+            icon="compose"
+            onClick={() => setModal('create')}
+          >
+            Thêm danh mục
+          </Button>
+        </div>
+      </div>
 
+      <div className="min-w-0">
         {selected && (
           <section
             className="min-w-0 overflow-hidden rounded-2xl border border-line-soft bg-surface shadow-soft"
@@ -205,11 +270,6 @@ export default function Categories() {
                     <h2 className="m-0 text-2xl font-bold tracking-[-.4px] text-primary-hover">
                       {selected.name}
                     </h2>
-                    {selected.aliases.length > 0 && (
-                      <p className="mt-1 mb-0 text-small text-ink-muted">
-                        Alias: {selected.aliases.join(', ')}
-                      </p>
-                    )}
                   </div>
                 </div>
                 <Button
@@ -231,31 +291,23 @@ export default function Categories() {
               className="px-6 pb-6 max-[1100px]:px-4.5 max-[1100px]:pb-4.5 max-sm:px-4 max-sm:pb-4"
             >
               <div {...panelProps('general')}>
-                <GeneralTab category={selected} categories={categories} onSave={patchSelected} />
+                <GeneralTab category={selected} categories={categories} onSave={saveGeneral} />
               </div>
               <div {...panelProps('attributes')}>
                 <AttributesTab
                   category={selected}
                   onSaveAttribute={saveAttribute}
-                  onRemoveAttribute={(id) =>
-                    patchSelected((category) => ({
-                      attributes: category.attributes.filter((attribute) => attribute.id !== id),
-                    }))
-                  }
-                  onSaveContents={(contents) => patchSelected({ contents })}
+                  onRemoveAttribute={removeAttribute}
+                  onSaveContents={saveContents}
                 />
               </div>
               <div {...panelProps('relations')}>
-                <RelationsTab
-                  category={selected}
-                  categories={categories}
-                  onSave={(relations) => patchSelected({ relations })}
-                />
+                <RelationsTab category={selected} categories={categories} onSave={saveRelations} />
               </div>
               <div {...panelProps('algorithm')}>
                 <AlgorithmTab
                   category={selected}
-                  onSave={patchSelected}
+                  onSave={saveAlgorithm}
                   active={tab === 'algorithm'}
                 />
               </div>
@@ -263,11 +315,7 @@ export default function Categories() {
                 <QuestionsTab
                   category={selected}
                   onSaveQuestion={saveQuestion}
-                  onRemoveQuestion={(id) =>
-                    patchSelected((category) => ({
-                      questions: category.questions.filter((question) => question.id !== id),
-                    }))
-                  }
+                  onRemoveQuestion={removeQuestion}
                 />
               </div>
             </div>
@@ -285,7 +333,6 @@ export default function Categories() {
       {modal === 'delete' && selected && (
         <DeleteCategoryDialog
           category={selected}
-          categories={categories}
           onConfirm={removeCategory}
           onClose={() => setModal(null)}
         />

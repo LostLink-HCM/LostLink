@@ -11,7 +11,7 @@ const COLOR_ALIASES = {
   Hồng: ['hồng phấn'],
   'Xanh lá': ['xanh lá cây', 'xanh rêu'],
   'Xanh dương': ['xanh nước biển', 'xanh da trời', 'xanh navy', 'xanh than'],
-  'Nhiều màu': ['sặc sỡ', 'họa tiết', 'hoạ tiết'],
+  'Nhiều màu': ['sặc sỡ', 'họa tiết'],
 }
 
 const ITEM_COLORS = [
@@ -37,7 +37,7 @@ module.exports = [
   {
     name: 'Giấy tờ & thẻ',
     slug: 'giay-to-the',
-    aliases: ['giấy tờ', 'giấy tờ tùy thân', 'giấy tờ tuỳ thân', 'giấy tờ cá nhân'],
+    aliases: ['giấy tờ', 'giấy tờ tùy thân', 'giấy tờ cá nhân'],
     matchRadius: 400,
     timeShape: 1.5,
     timeMedianDays: 1.6,
@@ -71,18 +71,7 @@ module.exports = [
   {
     name: 'Ví & tiền',
     slug: 'vi-tien',
-    aliases: [
-      'ví',
-      'bóp',
-      'ví tiền',
-      'bóp tiền',
-      'ví da',
-      'bóp da',
-      'ví nam',
-      'ví nữ',
-      'tiền mặt',
-      'bop',
-    ],
+    aliases: ['ví', 'bóp', 'ví tiền', 'bóp tiền', 'ví da', 'bóp da', 'ví nam', 'ví nữ', 'tiền mặt'],
     matchRadius: 400,
     timeShape: 1.5,
     timeMedianDays: 1.6,
@@ -178,7 +167,7 @@ module.exports = [
         0.95,
         true,
         [
-          ['Điện thoại', ['smartphone', 'đt', 'dt', 'đth', 'dế']],
+          ['Điện thoại', ['smartphone', 'đt', 'đth', 'dế']],
           ['Máy tính bảng', ['iPad', 'tablet']],
           ['Laptop', ['máy tính xách tay', 'máy tính', 'macbook']],
           ['Tai nghe', ['AirPods', 'airpod', 'headphone']],
@@ -211,7 +200,7 @@ module.exports = [
   {
     name: 'Chìa khóa & xe cộ',
     slug: 'chia-khoa-xe-co',
-    aliases: ['chìa khóa', 'chìa khoá', 'chùm chìa', 'chùm chìa khóa', 'chùm chìa khoá'],
+    aliases: ['chìa khóa', 'chùm chìa', 'chùm chìa khóa'],
     matchRadius: 400,
     timeShape: 1,
     timeMedianDays: 3.5,
@@ -224,7 +213,7 @@ module.exports = [
         true,
         [
           ['Chìa khóa nhà', ['chìa nhà', 'chìa khoá nhà']],
-          ['Chìa khóa xe máy', ['chìa xe', 'khóa xe', 'khoá xe', 'chìa khoá xe máy']],
+          ['Chìa khóa xe máy', ['chìa xe', 'khóa xe', 'chìa khoá xe máy']],
           ['Chìa khóa ô tô', ['smartkey', 'smart key', 'chìa khoá ô tô', 'chìa khóa xe hơi']],
           ['Điều khiển xe', ['điều khiển xe máy', 'remote xe', 'khóa thông minh']],
           ['Biển số xe', ['biển số', 'bảng số', 'bảng số xe']],

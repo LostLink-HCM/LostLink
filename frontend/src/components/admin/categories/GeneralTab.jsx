@@ -1,5 +1,10 @@
 import { useState } from 'react'
-import { cleanList, isSame, validateGeneral } from '../../../lib/admin/categories'
+import {
+  cleanList,
+  duplicateAliasErrors,
+  isSame,
+  validateGeneral,
+} from '../../../lib/admin/categories'
 import ImageField from './ImageField'
 import { inputClass, labelClass } from './styles'
 import { FormError, NumberField, SaveBar, TextListField } from './ui'
@@ -15,24 +20,41 @@ export default function GeneralTab({ category, categories, onSave }) {
   const saved = pick(category)
   const [form, setForm] = useState(saved)
   const [errors, setErrors] = useState({})
+  const [saveError, setSaveError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [imageUploading, setImageUploading] = useState(false)
+  const attributeAliases = category.attributes.flatMap((attribute) => [
+    ...attribute.aliases,
+    ...attribute.values.flatMap((value) => value.aliases),
+  ])
+  const [aliasErrors] = duplicateAliasErrors([form.aliases], attributeAliases, [saved.aliases])
+  const hasAliasDuplicates = aliasErrors.some(Boolean)
   const dirty = !isSame({ ...form, order: Number(form.order) }, saved)
   const change = (key, value) => {
     setErrors({})
     setForm((current) => ({ ...current, [key]: value }))
   }
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault()
     const nextErrors = validateGeneral(form, categories, category.id)
-    if (Object.keys(nextErrors).length) return setErrors(nextErrors)
+    if (Object.keys(nextErrors).length || hasAliasDuplicates) return setErrors(nextErrors)
     const next = {
       name: form.name.trim(),
       icon: form.icon,
       order: Number(form.order),
       aliases: cleanList(form.aliases),
     }
-    onSave(next)
-    setForm(next)
+    setSaving(true)
+    setSaveError('')
+    try {
+      const updated = await onSave(next)
+      setForm(pick(updated))
+    } catch (error) {
+      setSaveError(error.message || 'Không lưu được danh mục. Vui lòng thử lại.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -63,6 +85,8 @@ export default function GeneralTab({ category, categories, onSave }) {
         label="Ảnh đại diện"
         value={form.icon}
         onChange={(icon) => change('icon', icon)}
+        onBusyChange={setImageUploading}
+        disabled={saving}
       />
 
       <TextListField
@@ -71,13 +95,19 @@ export default function GeneralTab({ category, categories, onSave }) {
         placeholder="Cách gọi khác"
         value={form.aliases}
         onChange={(aliases) => change('aliases', aliases)}
+        errors={aliasErrors}
       />
 
       <SaveBar
         formId="category-general-form"
         dirty={dirty}
+        error={saveError}
+        saving={saving}
+        busy={imageUploading}
+        blocked={hasAliasDuplicates}
         onReset={() => {
           setErrors({})
+          setSaveError('')
           setForm(saved)
         }}
       />

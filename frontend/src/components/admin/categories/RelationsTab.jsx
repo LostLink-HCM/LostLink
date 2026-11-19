@@ -25,13 +25,20 @@ const fromForm = (relations, sourceCategoryId) =>
 
 function RelationGroup({ relation, index, candidates, takenIds, onChange, onRemove }) {
   const members = candidates.filter((category) => relation.memberCategoryIds.includes(category.id))
-  const toggle = (categoryId) =>
+  const toggle = (categoryId) => {
+    const isSelected = relation.memberCategoryIds.includes(categoryId)
+    if (isSelected && relation.memberCategoryIds.length === 1) {
+      onRemove()
+      return
+    }
+
     onChange({
       ...relation,
-      memberCategoryIds: relation.memberCategoryIds.includes(categoryId)
+      memberCategoryIds: isSelected
         ? relation.memberCategoryIds.filter((id) => id !== categoryId)
         : [...relation.memberCategoryIds, categoryId],
     })
+  }
 
   return (
     <article className="rounded-xl border border-line-soft bg-primary-faint p-3.5">
@@ -125,6 +132,7 @@ export default function RelationsTab({ category, categories, onSave }) {
   const saved = toForm(category.relations)
   const [relations, setRelations] = useState(saved)
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
   const dirty = !isSame(fromForm(relations, category.id), category.relations)
   const candidates = categories.filter((item) => item.id !== category.id)
   const takenIds = new Set(relations.flatMap((relation) => relation.memberCategoryIds))
@@ -133,13 +141,21 @@ export default function RelationsTab({ category, categories, onSave }) {
     setRelations(next)
   }
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault()
     const nextError = validateRelations(relations)
     if (nextError) return setError(nextError)
     const next = fromForm(relations, category.id)
-    onSave(next)
-    setRelations(toForm(next))
+    setSaving(true)
+    setError('')
+    try {
+      const updated = await onSave(next)
+      setRelations(toForm(updated.relations))
+    } catch (saveError) {
+      setError(saveError.message || 'Không lưu được quan hệ danh mục. Vui lòng thử lại.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -206,6 +222,7 @@ export default function RelationsTab({ category, categories, onSave }) {
           formId="category-relations-form"
           dirty={dirty}
           error={error}
+          saving={saving}
           onReset={() => change(saved)}
         />
       </form>

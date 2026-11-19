@@ -7,25 +7,34 @@ import ImageField from './ImageField'
 import { inputClass, labelClass } from './styles'
 import { FormError, Hint } from './ui'
 
-const ALGORITHM_KEYS = ['matchRadius', 'timeShape', 'timeMedianDays', 'diffusion']
-
 export default function CreateCategoryDialog({ categories, onSubmit, onClose }) {
   const [form, setForm] = useState({ name: '', icon: EMPTY_CATEGORY.icon, templateId: '' })
   const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [imageUploading, setImageUploading] = useState(false)
   const template = categories.find((category) => category.id === form.templateId)
   const change = (key, value) => {
     setError('')
     setForm((current) => ({ ...current, [key]: value }))
   }
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault()
     const errors = validateGeneral({ name: form.name, order: 1 }, categories)
     if (errors.name) return setError(errors.name)
-    onSubmit({
-      name: form.name.trim(),
-      icon: form.icon,
-      ...(template && Object.fromEntries(ALGORITHM_KEYS.map((key) => [key, template[key]]))),
-    })
+    setSubmitting(true)
+    setError('')
+    try {
+      await onSubmit({
+        name: form.name.trim(),
+        icon: form.icon,
+        ...(template && { templateCategoryId: template.id }),
+      })
+      setSubmitting(false)
+      onClose()
+    } catch (submitError) {
+      setError(submitError.message || 'Không tạo được danh mục. Vui lòng thử lại.')
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -34,9 +43,17 @@ export default function CreateCategoryDialog({ categories, onSubmit, onClose }) 
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>Hủy</Button>
-          <Button type="submit" form="admin-create-category" variant="primary" icon="check">
-            Tạo danh mục
+          <Button onClick={onClose} disabled={submitting || imageUploading}>
+            Hủy
+          </Button>
+          <Button
+            type="submit"
+            form="admin-create-category"
+            variant="primary"
+            icon="check"
+            disabled={submitting || imageUploading}
+          >
+            {submitting ? 'Đang tạo…' : imageUploading ? 'Đang tải ảnh…' : 'Tạo danh mục'}
           </Button>
         </>
       }
@@ -60,6 +77,8 @@ export default function CreateCategoryDialog({ categories, onSubmit, onClose }) 
           label="Ảnh đại diện"
           value={form.icon}
           onChange={(icon) => change('icon', icon)}
+          onBusyChange={setImageUploading}
+          disabled={submitting || imageUploading}
         />
         <label className={labelClass}>
           Cấu hình thuật toán ban đầu

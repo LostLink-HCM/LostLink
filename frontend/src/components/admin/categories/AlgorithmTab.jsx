@@ -89,6 +89,8 @@ export default function AlgorithmTab({ category, onSave, active }) {
   const [form, setForm] = useState(saved)
   const [shape, setShape] = useState(() => timeShapeKey(saved.timeShape))
   const [errors, setErrors] = useState({})
+  const [saveError, setSaveError] = useState('')
+  const [saving, setSaving] = useState(false)
   const dirty = !isSame(toNumbers(form), saved)
   const valid = !Object.keys(validateAlgorithm(form)).length
   const change = (key, value) => {
@@ -106,12 +108,22 @@ export default function AlgorithmTab({ category, onSave, active }) {
     setShape(timeShapeKey(saved.timeShape))
   }
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault()
     const nextErrors = validateAlgorithm(form)
     if (Object.keys(nextErrors).length) return setErrors(nextErrors)
-    onSave(toNumbers(form))
-    setForm(toNumbers(form))
+    const next = toNumbers(form)
+    setSaving(true)
+    setSaveError('')
+    try {
+      const updated = await onSave(next)
+      setForm(pick(updated))
+      setShape(timeShapeKey(updated.timeShape))
+    } catch (error) {
+      setSaveError(error.message || 'Không lưu được cấu hình thuật toán. Vui lòng thử lại.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -200,7 +212,16 @@ export default function AlgorithmTab({ category, onSave, active }) {
         sMin={sMin}
       />
 
-      <SaveBar formId="category-algorithm-form" dirty={dirty} onReset={reset} />
+      <SaveBar
+        formId="category-algorithm-form"
+        dirty={dirty}
+        error={saveError}
+        saving={saving}
+        onReset={() => {
+          setSaveError('')
+          reset()
+        }}
+      />
     </form>
   )
 }

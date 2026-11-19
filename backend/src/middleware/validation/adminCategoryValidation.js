@@ -119,10 +119,9 @@ const relationRules = [
       if (!isNumber(relation.ratio, 0.01, 1)) return 'Tỷ lệ quan hệ phải từ 1% đến 100%.'
       if (
         !Array.isArray(relation.memberCategoryIds) ||
-        relation.memberCategoryIds.length === 0 ||
         relation.memberCategoryIds.some((id) => typeof id !== 'string' || !ID.test(id))
       ) {
-        return 'Mỗi nhóm phải có ít nhất một danh mục liên quan hợp lệ.'
+        return 'Danh mục liên quan trong nhóm không hợp lệ.'
       }
     }
     return ''

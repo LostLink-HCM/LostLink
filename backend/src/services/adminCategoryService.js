@@ -11,7 +11,7 @@ const {
   Post,
 } = require('../models')
 const ApiError = require('../utils/ApiError')
-const { slugify } = require('../utils/text')
+const { normalizeText, slugify } = require('../utils/text')
 const imageService = require('./imageService')
 
 const CATEGORY_ICON_PATH = /^\/images\/categories\/[a-z0-9-]+\.svg$/
@@ -266,18 +266,29 @@ const categoryKey = (value) =>
   String(value ?? '')
     .normalize('NFC')
     .toLocaleLowerCase('vi-VN')
+const aliasKey = (value) =>
+  String(value ?? '')
+    .normalize('NFC')
+    .toLocaleLowerCase('vi-VN')
+    .replace(/\s+/g, ' ')
+    .trim()
 const cleanTerms = (terms) => terms.map((term) => term.trim().normalize('NFC'))
 const assertDistinct = (items, message) => {
   const keys = items.map(categoryKey)
   if (new Set(keys).size !== keys.length) throw invalid(message)
 }
+const assertDistinctAliases = (items, message) => {
+  const keys = items.map(aliasKey)
+  if (new Set(keys).size !== keys.length) throw invalid(message)
+}
 
 const assertUniqueName = async (name, excludeId = null, session = null) => {
   const categories = await withSession(Category.find().select('_id name').lean(), session)
-  const key = categoryKey(name)
+  const key = normalizeText(name)
   if (
     categories.some(
-      (category) => String(category._id) !== String(excludeId) && categoryKey(category.name) === key
+      (category) =>
+        String(category._id) !== String(excludeId) && normalizeText(category.name) === key
     )
   ) {
     throw conflict('Đã có danh mục cùng tên.')
@@ -291,10 +302,10 @@ const assertUniqueAliases = async (categoryId, incomingTerms, excludedIds = [], 
   )
   const excluded = new Set(excludedIds.map(String))
   const seen = new Set(
-    existing.filter((item) => !excluded.has(String(item._id))).map((item) => categoryKey(item.term))
+    existing.filter((item) => !excluded.has(String(item._id))).map((item) => aliasKey(item.term))
   )
   for (const term of incomingTerms) {
-    const key = categoryKey(term)
+    const key = aliasKey(term)
     if (seen.has(key)) throw conflict(`Alias “${term}” đã được sử dụng trong danh mục.`)
     seen.add(key)
   }
@@ -387,7 +398,7 @@ const updateGeneral = async (id, input, actor) => {
   if (!allowedIcon(input.icon)) throw invalid('Ảnh danh mục không hợp lệ.', 'icon')
   const name = input.name.trim().normalize('NFC')
   const aliases = cleanTerms(input.aliases)
-  assertDistinct(aliases, 'Alias trong cùng danh mục không được trùng.')
+  assertDistinctAliases(aliases, 'Alias trong cùng danh mục không được trùng.')
   const oldIcon = await Category.findById(id).select('icon').lean()
   const result = await atomic(async (session) => {
     const category = await findActiveCategory(id, session)
@@ -452,7 +463,7 @@ const updateAttribute = async (categoryId, attributeId, input, actor) =>
       before.attributes.some(
         (item) =>
           item.id !== String(attribute?._id || '') &&
-          categoryKey(item.name) === categoryKey(input.name)
+          normalizeText(item.name) === normalizeText(input.name)
       )
     ) {
       throw conflict('Danh mục đã có thuộc tính cùng tên.')
@@ -461,7 +472,7 @@ const updateAttribute = async (categoryId, attributeId, input, actor) =>
       input.values.map((item) => item.value),
       'Các giá trị trong một thuộc tính không được trùng.'
     )
-    assertDistinct(
+    assertDistinctAliases(
       [...input.aliases, ...input.values.flatMap((item) => item.aliases)],
       'Alias trong cùng thuộc tính không được trùng.'
     )
@@ -640,15 +651,18 @@ const updateRelations = async (categoryId, input, actor) =>
     if (allMemberIds.includes(String(category._id)))
       throw invalid('Danh mục không thể liên quan đến chính nó.')
     const requestedIds = [...new Set(allMemberIds)]
-    const targetCategories = requestedIds.length
+    const previousMemberIds = [...membersByRelation.values()].flat()
+    const categoryIdsToCheck = [...new Set([...requestedIds, ...previousMemberIds])]
+    const targetCategories = categoryIdsToCheck.length
       ? await withSession(
-          Category.find({ _id: { $in: requestedIds } })
+          Category.find({ _id: { $in: categoryIdsToCheck } })
             .select('_id isActive')
             .lean(),
           session
         )
       : []
-    if (targetCategories.length !== requestedIds.length)
+    const targetCategoryIds = new Set(targetCategories.map((item) => String(item._id)))
+    if (requestedIds.some((id) => !targetCategoryIds.has(id)))
       throw invalid('Có danh mục liên quan không tồn tại.')
     const activeIds = new Set(
       targetCategories.filter((item) => item.isActive !== false).map((item) => String(item._id))
@@ -671,7 +685,8 @@ const updateRelations = async (categoryId, input, actor) =>
       ]
     }
 
-    const receivedSet = new Set(receivedIds)
+    const relationsToSave = input.relations.filter((relation) => relation.memberCategoryIds.length)
+    const receivedSet = new Set(relationsToSave.map((relation) => relation.id).filter(Boolean))
     const removedRelations = existingRelations.filter((item) => !receivedSet.has(String(item._id)))
     if (removedRelations.length) {
       const removedIds = removedRelations.map((item) => item._id)
@@ -684,7 +699,7 @@ const updateRelations = async (categoryId, input, actor) =>
         session ? { session } : undefined
       )
     }
-    for (const relationInput of input.relations) {
+    for (const relationInput of relationsToSave) {
       const relation = relationInput.id
         ? existingById.get(relationInput.id)
         : new CategoryMatchRelation({ sourceCategory: category._id })

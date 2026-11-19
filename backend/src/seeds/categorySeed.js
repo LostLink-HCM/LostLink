@@ -9,14 +9,15 @@ const {
   User,
 } = require('../models')
 const CATEGORIES = require('./data/categories')
+const { lowercaseText } = require('../utils/text')
 
 const seedAttributes = async (category, definition) => {
   // Alias không được trùng trong cùng danh mục, vd "ba lô" vừa là alias danh mục vừa là alias của giá trị Balo
-  const usedTerms = new Set()
+  const canonicalTerms = new Map()
   const addAlias = async (term, refs = {}) => {
-    const key = term.toLocaleLowerCase('vi-VN')
-    if (usedTerms.has(key)) return
-    usedTerms.add(key)
+    const key = lowercaseText(term)
+    if (canonicalTerms.has(key)) return
+    canonicalTerms.set(key, term)
     await Alias.findOneAndUpdate(
       { term, category: category._id },
       { $setOnInsert: { term, category: category._id, ...refs } },
@@ -49,6 +50,15 @@ const seedAttributes = async (category, definition) => {
       for (const term of aliases) await addAlias(term, { attributeValue: attributeValue._id })
     }
   }
+
+  const existingAliases = await Alias.find({ category: category._id }).select('_id term').lean()
+  const duplicateIds = existingAliases
+    .filter((alias) => {
+      const canonicalTerm = canonicalTerms.get(lowercaseText(alias.term))
+      return canonicalTerm && alias.term !== canonicalTerm
+    })
+    .map((alias) => alias._id)
+  if (duplicateIds.length) await Alias.deleteMany({ _id: { $in: duplicateIds } })
 }
 
 const seedRelations = async (categoriesByName) => {
