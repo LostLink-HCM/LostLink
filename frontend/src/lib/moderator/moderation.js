@@ -21,10 +21,10 @@ export const REPORT_ACTIONS = {
     description: 'Ẩn bài đăng bị báo cáo khỏi cộng đồng.',
   },
   lock: {
-    label: 'Khóa tạm tài khoản',
+    label: 'Khóa tài khoản',
     icon: 'lock',
     tone: 'danger',
-    description: 'Tạm khóa tài khoản bị báo cáo.',
+    description: 'Khóa tài khoản bị báo cáo.',
   },
   dismiss: {
     label: 'Bỏ qua',

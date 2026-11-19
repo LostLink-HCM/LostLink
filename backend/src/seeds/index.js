@@ -5,9 +5,11 @@ const { User } = require('../models')
 const { seedAuditLogs } = require('./auditLogSeed')
 const { seedAvatars } = require('./avatarSeed')
 const { seedCategories } = require('./categorySeed')
+const { seedBackofficeMessages } = require('./backofficeMessageSeed')
 const { seedConversations } = require('./conversationSeed')
 const { seedNotifications } = require('./notificationSeed')
 const { seedPosts } = require('./postSeed')
+const { seedReports } = require('./reportSeed')
 const { seedMemberReputation, seedReputation } = require('./reputationSeed')
 const { seedReviews } = require('./reviewSeed')
 const { seedSystemSettings } = require('./systemSettingsSeed')
@@ -24,30 +26,45 @@ const {
 const demo = process.argv.includes('--demo')
 const settingsOnly = process.argv.includes('--settings-only')
 const auditOnly = process.argv.includes('--audit-only')
+const reportsOnly = process.argv.includes('--reports-only')
+const messagesOnly = process.argv.includes('--messages-only')
 // Chỉ gán ảnh đại diện mẫu, chạy được trên production vì không đè ảnh người dùng tự tải lên
 const avatarsOnly = process.argv.includes('--avatars-only')
-const seeders = auditOnly
-  ? [seedAuditLogs]
-  : avatarsOnly
-    ? [seedAvatars]
-    : settingsOnly
-      ? [seedSystemSettings]
-      : demo
-        ? [seedMissingMembers, seedCategories, seedPosts, seedMemberReputation, seedNotifications]
-        : [
-            seedUsers,
-            seedAvatars,
-            seedSystemSettings,
-            seedCategories,
-            seedPosts,
-            seedConversations,
-            seedReviews,
-            seedReputation,
-            seedNotifications,
-            seedUserActivityDates,
-            seedUserUpdateDates,
-            seedAuditLogs,
-          ]
+const seeders = messagesOnly
+  ? [seedBackofficeMessages]
+  : reportsOnly
+    ? [seedReports]
+    : auditOnly
+      ? [seedAuditLogs]
+      : avatarsOnly
+        ? [seedAvatars]
+        : settingsOnly
+          ? [seedSystemSettings]
+          : demo
+            ? [
+                seedMissingMembers,
+                seedCategories,
+                seedPosts,
+                seedMemberReputation,
+                seedNotifications,
+              ]
+            : [
+                seedUsers,
+                seedAvatars,
+                seedSystemSettings,
+                seedCategories,
+                seedPosts,
+                seedReports,
+                seedConversations,
+                // Lời cảm ơn gắn với cuộc trao đổi đã seed, điểm uy tín tính sau khi có lời cảm ơn
+                seedReviews,
+                seedReputation,
+                seedBackofficeMessages,
+                seedNotifications,
+                seedUserActivityDates,
+                seedUserUpdateDates,
+                seedAuditLogs,
+              ]
 
 // Kiểm tra tài khoản không tự tạo được trước khi ghi, thiếu thì dừng khi chưa đổi gì trong DB.
 // Tác giả bài mẫu còn thiếu sẽ do seedMissingMembers tạo, findSeedAccounts kiểm lại trong seedPosts
@@ -57,9 +74,18 @@ const checkAccounts = async () => {
 }
 
 async function run() {
-  if (auditOnly && (demo || settingsOnly))
+  if (messagesOnly && (demo || settingsOnly || auditOnly || avatarsOnly || reportsOnly)) {
+    throw new Error('Không kết hợp --messages-only với chế độ seed khác')
+  }
+  if (messagesOnly && env.nodeEnv === 'production')
+    throw new Error('Không chạy seed tin nhắn trên production')
+  if (reportsOnly && (demo || settingsOnly || auditOnly || avatarsOnly))
+    throw new Error('Không kết hợp --reports-only với chế độ seed khác')
+  if (reportsOnly && env.nodeEnv === 'production')
+    throw new Error('Không chạy seed báo cáo trên production')
+  if (auditOnly && (demo || settingsOnly || avatarsOnly || reportsOnly))
     throw new Error('Không kết hợp --audit-only với chế độ seed khác')
-  if (avatarsOnly && (demo || settingsOnly || auditOnly))
+  if (avatarsOnly && (demo || settingsOnly || auditOnly || reportsOnly))
     throw new Error('Không kết hợp --avatars-only với chế độ seed khác')
   if (auditOnly && env.nodeEnv === 'production')
     throw new Error('Không chạy seed nhật ký trên production')
@@ -70,15 +96,19 @@ async function run() {
 
   await connectDatabase()
   const { host, name } = mongoose.connection
-  const mode = auditOnly
-    ? 'nhật ký thao tác'
-    : avatarsOnly
-      ? 'ảnh đại diện'
-      : settingsOnly
-        ? 'cấu hình hệ thống'
-        : demo
-          ? 'demo'
-          : 'đầy đủ'
+  const mode = reportsOnly
+    ? 'báo cáo'
+    : messagesOnly
+      ? 'tin nhắn backoffice'
+      : auditOnly
+        ? 'nhật ký thao tác'
+        : avatarsOnly
+          ? 'ảnh đại diện'
+          : settingsOnly
+            ? 'cấu hình hệ thống'
+            : demo
+              ? 'demo'
+              : 'đầy đủ'
   console.log(`Seed ${mode} vào ${host}/${name}`)
 
   if (demo) await checkAccounts()
