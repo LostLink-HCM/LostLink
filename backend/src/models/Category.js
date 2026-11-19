@@ -20,6 +20,8 @@ const categorySchema = new Schema(
     },
     icon: { type: String, trim: true, default: '' },
     order: { type: Number, default: 0 },
+    // Danh mục lưu trữ vẫn được giữ để các bài đăng cũ tiếp tục tham chiếu.
+    isActive: { type: Boolean, default: true, index: true },
 
     // Tham số ghép cặp theo docs/design/matching-algorithm.md (mục 5.1, 5.2, 8)
     // Bán kính ban đầu (mét), σ₀ = matchRadius / 3
