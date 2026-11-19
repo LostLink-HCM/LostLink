@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import BackofficeLayout from '../../components/backoffice/BackofficeLayout'
 import { createWorkspacePosts } from '../../data/workspacePosts'
-import { createModeratorMessages } from '../../data/moderatorMessages'
 import { createModeratorNotifications } from '../../data/moderatorNotifications'
+import { createEmptyMessageState } from '../../lib/backoffice/messages'
 import useSystemSettings from '../../hooks/useSystemSettings'
 import { listModeratorPendingPosts } from '../../lib/moderator/reviewPosts'
 
@@ -20,7 +20,7 @@ export default function ModeratorLayout() {
   const [reviewPosts, setReviewPosts] = useState([])
   const [reviewLoading, setReviewLoading] = useState(true)
   const [reviewError, setReviewError] = useState('')
-  const [messageState, setMessageState] = useState(createModeratorMessages)
+  const [messageState, setMessageState] = useState(createEmptyMessageState)
   const settings = useSystemSettings()
   const [notificationState, setNotificationState] = useState(createModeratorNotifications)
   const loadReviewPosts = useCallback(async () => {

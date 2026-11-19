@@ -9,6 +9,7 @@ const SOCKET_PATH = '/api/socket.io'
 let io = null
 
 const userRoom = (id) => `user:${id}`
+const roleRoom = (role) => `role:${role}`
 
 const attachSocket = (server) => {
   io = new Server(server, {
@@ -21,12 +22,16 @@ const attachSocket = (server) => {
       const user = await authService.findSessionUser(payload)
       if (user.deleteRequestedAt) throw new Error('ACCOUNT_PENDING_DELETION')
       socket.data.userId = String(user._id)
+      socket.data.role = user.role
       next()
     } catch {
       next(new Error('UNAUTHORIZED'))
     }
   })
-  io.on('connection', (socket) => socket.join(userRoom(socket.data.userId)))
+  io.on('connection', (socket) => {
+    socket.join(userRoom(socket.data.userId))
+    socket.join(roleRoom(socket.data.role))
+  })
   return io
 }
 
@@ -34,6 +39,17 @@ const emitToUsers = (userIds, event, payload = {}) => {
   if (!io) return
   const rooms = [...new Set(userIds.map(String))].map(userRoom)
   if (rooms.length) io.to(rooms).emit(event, payload)
+}
+
+const emitToRole = (role, event, payload = {}) => {
+  io?.to(roleRoom(role)).emit(event, payload)
+}
+
+const emitToUsersAndRole = (userIds, role, event, payload = {}) => {
+  if (!io) return
+  const rooms = [...new Set(userIds.map(String))].map(userRoom)
+  rooms.push(roleRoom(role))
+  io.to(rooms).emit(event, payload)
 }
 
 // Ngắt mọi kết nối của người dùng, vd khi thu hồi toàn bộ phiên
@@ -48,4 +64,12 @@ const closeSocket = () =>
     io = null
   })
 
-module.exports = { SOCKET_PATH, attachSocket, emitToUsers, disconnectUser, closeSocket }
+module.exports = {
+  SOCKET_PATH,
+  attachSocket,
+  emitToUsers,
+  emitToRole,
+  emitToUsersAndRole,
+  disconnectUser,
+  closeSocket,
+}

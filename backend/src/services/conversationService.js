@@ -1,6 +1,11 @@
 const { Claim, Conversation, Message, Post, Review, User } = require('../models')
-const { emitToUsers } = require('../socket')
-const imageService = require('./imageService')
+const { emitToUsers, emitToUsersAndRole } = require('../socket')
+const { createMessage } = require('./messageWriteService')
+const {
+  userSupportKey,
+  upsertSupportConversation,
+  attachSupportKey,
+} = require('./supportConversationService')
 const { notify } = require('./notificationService')
 const { afterPostEnded } = require('./postManageService')
 const { invalidField, toAuthor } = require('./postService')
@@ -264,19 +269,12 @@ const sendMessage = async (id, user, { body = '' }, file) => {
   const text = body.trim()
   if (!text && !file) throw invalidField('body', 'Vui lòng nhập nội dung tin nhắn.')
 
-  const uploaded = file ? await imageService.uploadMessageImage(file) : null
-  let message
-  try {
-    message = await Message.create({
-      conversation: conversation._id,
-      sender: user._id,
-      body: uploaded ? '' : text,
-      imageUrl: uploaded?.url ?? '',
-    })
-  } catch (error) {
-    if (uploaded) await imageService.deleteImages([uploaded.publicId])
-    throw error
-  }
+  const message = await createMessage({
+    conversationId: conversation._id,
+    senderId: user._id,
+    body: text,
+    file,
+  })
   await Conversation.updateOne(
     { _id: conversation._id, 'participants.user': user._id },
     {
@@ -288,7 +286,11 @@ const sendMessage = async (id, user, { body = '' }, file) => {
   )
 
   const data = toMessage(message, user)
-  emitToUsers(participantIds(conversation), 'message:new', data)
+  if (conversation.kind === 'support' && (conversation.supportType ?? 'user') === 'user') {
+    emitToUsersAndRole(participantIds(conversation), 'moderator', 'message:new', data)
+  } else {
+    emitToUsers(participantIds(conversation), 'message:new', data)
+  }
   return data
 }
 
@@ -508,11 +510,17 @@ const reviewConversation = async (id, user, input) => {
 
 // Mỗi người một hội thoại hỗ trợ, gán cho Moderator đang giữ ít hội thoại hỗ trợ nhất
 const openSupport = async (user) => {
-  const existing = await Conversation.findOne({
+  const supportKey = userSupportKey(user._id)
+  let existing = await Conversation.findOne({ supportKey })
+  existing ??= await Conversation.findOne({
     kind: 'support',
     'participants.0.user': user._id,
+    $or: [{ supportType: 'user' }, { supportType: { $exists: false } }],
   })
-  if (existing) return freshConversation(existing._id, user)
+  if (existing) {
+    existing = await attachSupportKey(existing, supportKey)
+    return freshConversation(existing._id, user)
+  }
 
   const moderators = await User.find({
     role: 'moderator',
@@ -530,7 +538,12 @@ const openSupport = async (user) => {
     )
   }
   const loads = await Conversation.aggregate([
-    { $match: { kind: 'support' } },
+    {
+      $match: {
+        kind: 'support',
+        $or: [{ supportType: 'user' }, { supportType: { $exists: false } }],
+      },
+    },
     { $group: { _id: { $arrayElemAt: ['$participants.user', 1] }, count: { $sum: 1 } } },
   ])
   const loadOf = new Map(loads.map((row) => [String(row._id), row.count]))
@@ -538,9 +551,16 @@ const openSupport = async (user) => {
     (a, b) => (loadOf.get(String(a._id)) ?? 0) - (loadOf.get(String(b._id)) ?? 0)
   )
 
-  const conversation = await Conversation.create({
+  const conversation = await upsertSupportConversation(supportKey, {
     kind: 'support',
+    supportType: 'user',
     participants: [{ user: user._id, lastReadAt: new Date() }, { user: moderator._id }],
+    moderatorStates: moderators.map((item) => ({
+      moderator: item._id,
+      lastReadAt: null,
+      markedUnread: false,
+      isFlagged: false,
+    })),
   })
   return freshConversation(conversation._id, user)
 }

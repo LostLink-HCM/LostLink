@@ -1,19 +1,30 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import Icon from '../common/Icon'
-import Badge from './Badge'
 import Button from './Button'
 import Dialog from './Dialog'
 import IconButton from './IconButton'
 import { cx } from './classes'
 import { DEFAULT_QUICK_REPLIES } from '../../data/backofficeQuickReplies'
 import {
+  getBackofficeConversation,
+  listBackofficeContacts,
+  listBackofficeConversations,
+  markBackofficeConversationUnread,
+  openBackofficeConversation,
+  sendBackofficeMessage,
+  setBackofficeConversationPriority,
+} from '../../api/backofficeMessages'
+import { onSocket } from '../../lib/socket'
+import {
   MESSAGE_LIMIT,
+  appendRemoteMessage,
   filterThreads,
   markThreadUnread,
   contactName,
+  mergeConversation,
+  normalizeInbox,
   openThread as openThreadState,
-  sendMessage,
-  startThread as startThreadState,
+  replaceThread,
 } from '../../lib/backoffice/messages'
 
 const avatarColors = {
@@ -44,28 +55,19 @@ function Avatar({ contact, small = false, moderator = false, label }) {
     <span
       aria-hidden="true"
       className={cx(
-        'inline-flex shrink-0 items-center justify-center rounded-[10px] text-caption font-bold',
+        'inline-flex shrink-0 items-center justify-center overflow-hidden rounded-[10px] text-caption font-bold',
         small ? 'size-7.5 rounded-lg text-[10px]' : 'size-10',
         moderator
           ? 'bg-primary text-white'
           : avatarColors[contact?.color] || 'bg-primary-soft text-primary'
       )}
     >
-      {initials}
-    </span>
-  )
-}
-
-function RoleBadge({ role }) {
-  return (
-    <Badge
-      className={cx(
-        'rounded px-1.5 py-0.5 text-[10px]',
-        role === 'admin' ? 'bg-info-soft text-info' : 'bg-neutral-soft text-neutral'
+      {contact?.avatarUrl && !moderator ? (
+        <img src={contact.avatarUrl} alt="" className="size-full object-cover" />
+      ) : (
+        initials
       )}
-    >
-      {role === 'admin' ? 'Admin' : role === 'moderator' ? 'Moderator' : 'Người dùng'}
-    </Badge>
+    </span>
   )
 }
 
@@ -91,16 +93,36 @@ function SearchField({ value, onChange, placeholder, label }) {
   )
 }
 
-function NewConversation({ contacts, peerRoles, onSelect, onClose }) {
+function NewConversation({ peerRoles, onSelect, onSearch, onClose }) {
   const [query, setQuery] = useState('')
   const [role, setRole] = useState(peerRoles[0]?.[0] || 'user')
-  const filtered = contacts.filter(
-    (contact) =>
-      contact.role === role &&
-      `${contactName(contact)} ${contact.email}`
-        .toLocaleLowerCase('vi')
-        .includes(query.trim().toLocaleLowerCase('vi'))
-  )
+  const [contacts, setContacts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [selectError, setSelectError] = useState('')
+  const [selectedId, setSelectedId] = useState('')
+  useEffect(() => {
+    let active = true
+    const timer = setTimeout(
+      async () => {
+        setLoading(true)
+        setError('')
+        try {
+          const result = await onSearch({ peerRole: role, q: query.trim() })
+          if (active) setContacts(result)
+        } catch (loadError) {
+          if (active) setError(loadError.message)
+        } finally {
+          if (active) setLoading(false)
+        }
+      },
+      query.trim() ? 250 : 0
+    )
+    return () => {
+      active = false
+      clearTimeout(timer)
+    }
+  }, [onSearch, query, role])
 
   return (
     <Dialog title="Cuộc trò chuyện mới" onClose={onClose} size="sm">
@@ -129,13 +151,24 @@ function NewConversation({ contacts, peerRoles, onSelect, onClose }) {
         onChange={(event) => setQuery(event.target.value)}
       />
       <div className="mt-3 max-h-85 overflow-y-auto">
-        {filtered.map((contact) => (
+        {contacts.map((contact) => (
           <button
             type="button"
             key={contact.id}
             className="flex w-full items-center gap-3 rounded-lg p-3 text-left
               transition-colors hover:bg-surface-muted"
-            onClick={() => onSelect(contact.id)}
+            disabled={Boolean(selectedId)}
+            onClick={async () => {
+              setSelectedId(contact.id)
+              setSelectError('')
+              try {
+                await onSelect(contact.id)
+              } catch (selectFailure) {
+                setSelectError(selectFailure.message)
+              } finally {
+                setSelectedId('')
+              }
+            }}
           >
             <Avatar contact={contact} />
             <span className="min-w-0 flex-1">
@@ -147,7 +180,15 @@ function NewConversation({ contacts, peerRoles, onSelect, onClose }) {
             <Icon name="next" size={16} />
           </button>
         ))}
-        {!filtered.length && (
+        {loading && (
+          <p className="px-2 py-5 text-center text-caption text-ink-subtle">Đang tải người nhận…</p>
+        )}
+        {(error || selectError) && (
+          <p role="alert" className="px-2 py-4 text-center text-caption text-red-700">
+            {error || selectError}
+          </p>
+        )}
+        {!loading && !error && !contacts.length && (
           <p className="px-2 py-6 text-center text-small text-ink-subtle">
             Không tìm thấy người nhận phù hợp.
           </p>
@@ -180,17 +221,144 @@ export default function MessagesWorkspace({
   const [showReplies, setShowReplies] = useState(false)
   const [mobileConversation, setMobileConversation] = useState(false)
   const [announcement, setAnnouncement] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  const [actionError, setActionError] = useState('')
+  const [sending, setSending] = useState(false)
+  const [selectedImage, setSelectedImage] = useState(null)
+  const [imagePreview, setImagePreview] = useState(null)
+  const [remoteInbox, setRemoteInbox] = useState(null)
   const scrollRef = useRef(null)
   const composeRef = useRef(null)
+  const imageInputRef = useRef(null)
+  const activeIdRef = useRef(messageState.activeId)
 
-  const visibleContacts = messageState.contacts.filter((contact) =>
+  useEffect(() => {
+    activeIdRef.current = messageState.activeId
+  }, [messageState.activeId])
+
+  const refreshInbox = useCallback(async () => {
+    try {
+      const data = await listBackofficeConversations({ page: 1, limit: 100 })
+      setMessageState((previous) => normalizeInbox(data, previous))
+      setLoadError('')
+    } catch (error) {
+      setLoadError(error.message)
+    }
+  }, [setMessageState])
+
+  const hasRemoteFilters = Boolean(query.trim() || role || unreadOnly)
+  const filterKey = JSON.stringify({ q: query.trim(), peerRole: role, unreadOnly })
+  const refreshFilteredInbox = useCallback(async () => {
+    if (!hasRemoteFilters) return
+    try {
+      const data = await listBackofficeConversations({
+        page: 1,
+        limit: 100,
+        ...(query.trim() && { q: query.trim() }),
+        ...(role && { peerRole: role }),
+        ...(unreadOnly && { unreadOnly: true }),
+      })
+      setRemoteInbox({ key: filterKey, data })
+    } catch (error) {
+      setActionError(error.message)
+    }
+  }, [filterKey, hasRemoteFilters, query, role, unreadOnly])
+
+  useEffect(() => {
+    if (!hasRemoteFilters) return undefined
+    const timer = setTimeout(() => void refreshFilteredInbox(), query.trim() ? 250 : 0)
+    return () => clearTimeout(timer)
+  }, [filterKey, hasRemoteFilters, query, refreshFilteredInbox])
+
+  const loadThread = useCallback(
+    async (id) => {
+      const data = await getBackofficeConversation(id)
+      setMessageState((previous) => mergeConversation(previous, data.thread))
+      void refreshFilteredInbox()
+      return data.thread
+    },
+    [refreshFilteredInbox, setMessageState]
+  )
+
+  useEffect(() => {
+    let activeEffect = true
+    listBackofficeConversations({ page: 1, limit: 100 })
+      .then((data) => {
+        if (activeEffect) setMessageState((previous) => normalizeInbox(data, previous))
+      })
+      .catch((error) => {
+        if (activeEffect) setLoadError(error.message)
+      })
+      .finally(() => {
+        if (activeEffect) setLoading(false)
+      })
+
+    const unsubscribeMessage = onSocket('message:new', (message) => {
+      if (!activeEffect) return
+      const incoming = {
+        ...message,
+        sender: message.senderId
+          ? String(message.senderId) === String(user?.id)
+            ? 'me'
+            : 'peer'
+          : message.sender === 'me'
+            ? 'me'
+            : 'peer',
+        text: message.text ?? message.body ?? '',
+        image: message.image ?? null,
+        createdAt: message.createdAt ?? message.sentAt,
+      }
+      setMessageState((previous) => appendRemoteMessage(previous, incoming))
+      void refreshInbox()
+      void refreshFilteredInbox()
+      if (activeIdRef.current === message.conversationId) {
+        void loadThread(message.conversationId).catch((error) => setActionError(error.message))
+      }
+    })
+    const unsubscribeUpdate = onSocket('conversation:updated', () => {
+      if (activeEffect) {
+        void refreshInbox()
+        void refreshFilteredInbox()
+      }
+    })
+    return () => {
+      activeEffect = false
+      unsubscribeMessage()
+      unsubscribeUpdate()
+    }
+  }, [loadThread, refreshInbox, refreshFilteredInbox, setMessageState, user?.id])
+
+  const retryInbox = async () => {
+    setLoading(true)
+    setLoadError('')
+    try {
+      const data = await listBackofficeConversations({ page: 1, limit: 100 })
+      setMessageState((previous) => normalizeInbox(data, previous))
+    } catch (error) {
+      setLoadError(error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const searchContacts = useCallback(async (filters) => {
+    const data = await listBackofficeContacts(filters)
+    return data.items
+  }, [])
+
+  const sourceState =
+    hasRemoteFilters && remoteInbox?.key === filterKey
+      ? normalizeInbox(remoteInbox.data, messageState)
+      : messageState
+  const visibleContacts = sourceState.contacts.filter((contact) =>
     allowedRoles.includes(contact.role)
   )
   const visibleContactIds = new Set(visibleContacts.map((contact) => contact.id))
-  const visibleThreads = messageState.threads.filter((thread) =>
+  const visibleThreads = sourceState.threads.filter((thread) =>
     visibleContactIds.has(thread.contactId)
   )
-  const visibleState = { ...messageState, threads: visibleThreads, contacts: visibleContacts }
+  const visibleState = { ...sourceState, threads: visibleThreads, contacts: visibleContacts }
   const filtered = filterThreads(visibleState, { role, query, unreadOnly })
   const active = visibleThreads.find((thread) => thread.id === messageState.activeId)
   const contact = active && visibleContacts.find((entry) => entry.id === active.contactId)
@@ -207,17 +375,28 @@ export default function MessagesWorkspace({
     setShowInfo(false)
     setMobileConversation(true)
     setAnnouncement('')
+    setActionError('')
+    void loadThread(id).catch((error) => setActionError(error.message))
   }
 
-  const startThread = (contactId) => {
-    setMessageState((previous) => startThreadState(previous, contactId))
-    setNewConversation(false)
-    setRole(workspaceRole === 'admin' ? 'moderator' : '')
-    setQuery('')
-    setUnreadOnly(false)
-    setShowInfo(false)
-    setShowReplies(false)
-    setMobileConversation(true)
+  const startThread = async (contactId) => {
+    setActionError('')
+    try {
+      const data = await openBackofficeConversation(contactId)
+      setMessageState((previous) => mergeConversation(previous, data.thread))
+      setRemoteInbox(null)
+      setNewConversation(false)
+      setRole(workspaceRole === 'admin' ? 'moderator' : '')
+      setQuery('')
+      setUnreadOnly(false)
+      setShowInfo(false)
+      setShowReplies(false)
+      setMobileConversation(true)
+      void refreshFilteredInbox()
+    } catch (error) {
+      setActionError(error.message)
+      throw error
+    }
   }
 
   const updateDraft = (text) => {
@@ -228,30 +407,82 @@ export default function MessagesWorkspace({
     }))
   }
 
-  const send = (event) => {
+  const send = async (event) => {
     event.preventDefault()
-    if (!active || !contact || !draft.trim() || draft.trim().length > MESSAGE_LIMIT) return
-    setMessageState((previous) => sendMessage(previous, active.id))
-    setAnnouncement(`Đã lưu tin nhắn gửi tới ${contactName(contact)} trong phiên xem thử.`)
-    setShowReplies(false)
-    composeRef.current?.focus()
+    const text = draft.trim()
+    if (!active || !contact || (!text && !selectedImage) || text.length > MESSAGE_LIMIT || sending)
+      return
+    setActionError('')
+    setSending(true)
+    try {
+      const message = await sendBackofficeMessage(active.id, { body: text, image: selectedImage })
+      setMessageState((previous) => {
+        const appended = appendRemoteMessage(previous, message)
+        return {
+          ...appended,
+          drafts: { ...appended.drafts, [active.id]: '' },
+          threads: appended.threads.map((thread) =>
+            thread.id === active.id ? { ...thread, unread: 0 } : thread
+          ),
+        }
+      })
+      setSelectedImage(null)
+      if (imageInputRef.current) imageInputRef.current.value = ''
+      setAnnouncement(`Đã gửi tin nhắn tới ${contactName(contact)}.`)
+      setShowReplies(false)
+      void refreshInbox()
+      void refreshFilteredInbox()
+      composeRef.current?.focus()
+    } catch (error) {
+      setActionError(error.message)
+    } finally {
+      setSending(false)
+    }
   }
 
-  const toggleThread = (field) => {
+  const togglePriority = async () => {
     if (!active) return
-    setMessageState((previous) => ({
-      ...previous,
-      threads: previous.threads.map((thread) =>
-        thread.id === active.id ? { ...thread, [field]: !thread[field] } : thread
-      ),
-    }))
+    const value = !active.priority
+    setActionError('')
+    try {
+      await setBackofficeConversationPriority(active.id, value)
+      setMessageState((previous) => replaceThread(previous, active.id, { priority: value }))
+      setAnnouncement(
+        '\u0110\u00e3 c\u1eadp nh\u1eadt m\u1ee9c \u01b0u ti\u00ean h\u1ed9i tho\u1ea1i.'
+      )
+      void refreshFilteredInbox()
+    } catch (error) {
+      setActionError(error.message)
+    }
   }
 
-  const markUnread = () => {
+  const markUnread = async () => {
     if (!active || !contact) return
-    setMessageState((previous) => markThreadUnread(previous, active.id))
-    setAnnouncement(`Đã đánh dấu hội thoại với ${contactName(contact)} là chưa đọc.`)
-    setMobileConversation(false)
+    try {
+      await markBackofficeConversationUnread(active.id)
+      setMessageState((previous) => markThreadUnread(previous, active.id))
+      setAnnouncement(`Đã đánh dấu hội thoại với ${contactName(contact)} là chưa đọc.`)
+      setMobileConversation(false)
+      void refreshFilteredInbox()
+    } catch (error) {
+      setActionError(error.message)
+    }
+  }
+
+  const chooseImage = (file) => {
+    if (!file) return
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setActionError('Ảnh phải có định dạng JPG, PNG hoặc WEBP.')
+      if (imageInputRef.current) imageInputRef.current.value = ''
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setActionError('Ảnh không được lớn hơn 5 MB.')
+      if (imageInputRef.current) imageInputRef.current.value = ''
+      return
+    }
+    setActionError('')
+    setSelectedImage(file)
   }
 
   const insertReply = (text) => {
@@ -262,6 +493,25 @@ export default function MessagesWorkspace({
 
   return (
     <div className="px-6 py-5 text-small text-ink max-xl:px-5 max-sm:px-3 max-sm:py-4">
+      {loadError && (
+        <div
+          role="alert"
+          className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-small text-red-800"
+        >
+          <span>{loadError}</span>
+          <Button type="button" variant="secondary" size="sm" onClick={retryInbox}>
+            Thử lại
+          </Button>
+        </div>
+      )}
+      {actionError && (
+        <div
+          role="alert"
+          className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-small text-red-800"
+        >
+          {actionError}
+        </div>
+      )}
       <div
         className={cx(
           'grid h-[calc(100dvh-9rem)] min-h-150 grid-cols-[minmax(265px,300px)_minmax(0,1fr)]',
@@ -336,9 +586,14 @@ export default function MessagesWorkspace({
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+            {loading && !filtered.length && (
+              <p role="status" className="px-4 py-8 text-center text-caption text-ink-subtle">
+                Đang tải hội thoại…
+              </p>
+            )}
             {filtered.map((thread) => {
               const peer = visibleContacts.find((entry) => entry.id === thread.contactId)
-              const last = thread.messages.at(-1)
+              const last = thread.messages.at(-1) || thread.lastMessage
               const isActive = messageState.activeId === thread.id
               return (
                 <button
@@ -372,11 +627,7 @@ export default function MessagesWorkspace({
                       </time>
                     </span>
                     <span className="mt-1.5 flex items-center gap-1.5">
-                      <RoleBadge role={peer.role} />
                       {thread.priority && <Icon name="flag" size={12} />}
-                      {thread.resolved && (
-                        <span className="text-[10px] font-medium text-success">Đã xử lý</span>
-                      )}
                     </span>
                     <span
                       className={cx(
@@ -387,7 +638,9 @@ export default function MessagesWorkspace({
                       {messageState.drafts[thread.id]
                         ? `Bản nháp: ${messageState.drafts[thread.id]}`
                         : last
-                          ? last.text
+                          ? last.image && !last.text
+                            ? 'Đã gửi một ảnh'
+                            : last.text
                           : 'Bắt đầu cuộc trò chuyện'}
                     </span>
                   </span>
@@ -402,7 +655,7 @@ export default function MessagesWorkspace({
                 </button>
               )
             })}
-            {!filtered.length && (
+            {!loading && !filtered.length && (
               <div className="flex flex-col items-center gap-3 px-4 py-10 text-center text-ink-subtle">
                 <Icon name="chat" size={30} />
                 <strong className="text-small text-ink-secondary">
@@ -448,12 +701,9 @@ export default function MessagesWorkspace({
               />
               <Avatar contact={contact} />
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <strong className="min-w-0 truncate text-lead font-semibold text-ink">
-                    {contactName(contact)}
-                  </strong>
-                  <RoleBadge role={contact.role} />
-                </div>
+                <strong className="block min-w-0 truncate text-lead font-semibold text-ink">
+                  {contactName(contact)}
+                </strong>
               </div>
               <div className="flex shrink-0 gap-1">
                 <IconButton
@@ -461,7 +711,7 @@ export default function MessagesWorkspace({
                   label={active.priority ? 'Bỏ ưu tiên' : 'Đánh dấu ưu tiên'}
                   className={active.priority ? 'bg-warning-soft text-warning' : ''}
                   aria-pressed={active.priority}
-                  onClick={() => toggleThread('priority')}
+                  onClick={togglePriority}
                 />
                 <IconButton
                   icon="info"
@@ -496,9 +746,6 @@ export default function MessagesWorkspace({
                 </div>
                 <div>
                   <span className="block text-caption text-ink-subtle">Cuộc trò chuyện</span>
-                  <strong className="mt-1 block text-small font-medium text-ink-secondary">
-                    {active.resolved ? 'Đã xử lý' : 'Đang trao đổi'}
-                  </strong>
                   <small className="mt-1 block text-caption text-ink-subtle">
                     Bắt đầu {dayLabel(active.createdAt)}
                   </small>
@@ -551,7 +798,7 @@ export default function MessagesWorkspace({
                           {timeLabel(message.createdAt)}
                         </time>
                       </div>
-                      <p
+                      <div
                         className={cx(
                           'whitespace-pre-wrap break-words rounded-lg border px-3 py-2.5',
                           'text-body leading-relaxed',
@@ -563,8 +810,22 @@ export default function MessagesWorkspace({
                               : 'rounded-tl-none border-[#ccd8e5] bg-[#f1f5fa] text-ink'
                         )}
                       >
-                        {message.text}
-                      </p>
+                        {message.image && (
+                          <button
+                            type="button"
+                            aria-label="Xem ảnh tin nhắn"
+                            className="mb-2 block overflow-hidden rounded-md"
+                            onClick={() => setImagePreview(message.image)}
+                          >
+                            <img
+                              src={message.image}
+                              alt="Ảnh đính kèm trong tin nhắn"
+                              className="max-h-64 max-w-full object-contain"
+                            />
+                          </button>
+                        )}
+                        {message.text && <p>{message.text}</p>}
+                      </div>
                     </div>
                   </article>
                 </Fragment>
@@ -608,18 +869,6 @@ export default function MessagesWorkspace({
                   <Icon name="mail" size={15} />
                   {active.unread > 0 ? 'Đã đánh dấu chưa đọc' : 'Đánh dấu chưa đọc'}
                 </button>
-                <button
-                  type="button"
-                  className={cx(
-                    'inline-flex items-center gap-1.5 text-caption font-semibold',
-                    'text-ink-muted hover:text-success',
-                    active.resolved && 'text-success'
-                  )}
-                  onClick={() => toggleThread('resolved')}
-                >
-                  <Icon name={active.resolved ? 'reset' : 'check'} size={15} />
-                  {active.resolved ? 'Mở lại hội thoại' : 'Đánh dấu đã xử lý'}
-                </button>
               </div>
 
               {showReplies && (
@@ -651,6 +900,14 @@ export default function MessagesWorkspace({
                   focus-within:border-primary focus-within:shadow-[0_0_0_2px_#e0ebf8]"
                 onSubmit={send}
               >
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  aria-label="Chọn ảnh đính kèm"
+                  onChange={(event) => chooseImage(event.target.files?.[0])}
+                />
                 <label className="sr-only" htmlFor="message-draft">
                   Tin nhắn cho {contactName(contact)}
                 </label>
@@ -658,11 +915,12 @@ export default function MessagesWorkspace({
                   id="message-draft"
                   ref={composeRef}
                   rows={3}
+                  wrap="soft"
                   maxLength={MESSAGE_LIMIT}
                   value={draft}
                   onChange={(event) => updateDraft(event.target.value)}
                   placeholder="Viết tin nhắn"
-                  className="block max-h-35 min-h-14 w-full resize-none bg-transparent text-small
+                  className="block max-h-35 min-h-14 w-full resize-none break-words bg-transparent text-small
                     leading-relaxed text-ink outline-none placeholder:text-ink-subtle"
                   onKeyDown={(event) => {
                     if (
@@ -676,6 +934,23 @@ export default function MessagesWorkspace({
                     }
                   }}
                 />
+                {selectedImage && (
+                  <div className="mb-2 flex items-center gap-2 rounded-md bg-surface-muted px-2.5 py-2 text-caption">
+                    <Icon name="image" size={15} />
+                    <span className="min-w-0 flex-1 truncate">{selectedImage.name}</span>
+                    <button
+                      type="button"
+                      className="text-ink-muted hover:text-danger"
+                      aria-label="Bỏ ảnh đính kèm"
+                      onClick={() => {
+                        setSelectedImage(null)
+                        if (imageInputRef.current) imageInputRef.current.value = ''
+                      }}
+                    >
+                      <Icon name="close" size={15} />
+                    </button>
+                  </div>
+                )}
                 <div className="flex items-center gap-2.5 pt-2">
                   <span className="min-w-0 flex-1 text-[10px] text-ink-subtle max-xl:hidden">
                     Enter để gửi · Shift + Enter xuống dòng
@@ -683,9 +958,20 @@ export default function MessagesWorkspace({
                   <small className="text-[10px] text-ink-subtle">
                     {draft.length}/{MESSAGE_LIMIT}
                   </small>
-                  <Button type="submit" variant="primary" size="sm" disabled={!draft.trim()}>
+                  <IconButton
+                    icon="image"
+                    label="Đính kèm ảnh"
+                    disabled={sending}
+                    onClick={() => imageInputRef.current?.click()}
+                  />
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="sm"
+                    disabled={(!draft.trim() && !selectedImage) || sending}
+                  >
                     <Icon name="send" size={16} />
-                    Gửi
+                    {sending ? 'Đang gửi…' : 'Gửi'}
                   </Button>
                 </div>
               </form>
@@ -709,11 +995,20 @@ export default function MessagesWorkspace({
 
       {newConversation && (
         <NewConversation
-          contacts={visibleContacts}
           peerRoles={peerRoles}
           onSelect={startThread}
+          onSearch={searchContacts}
           onClose={() => setNewConversation(false)}
         />
+      )}
+      {imagePreview && (
+        <Dialog title="Ảnh trong tin nhắn" onClose={() => setImagePreview(null)} size="lg">
+          <img
+            src={imagePreview}
+            alt="Ảnh đính kèm trong tin nhắn"
+            className="mx-auto max-h-[75vh] max-w-full rounded-lg object-contain"
+          />
+        </Dialog>
       )}
     </div>
   )

@@ -120,6 +120,21 @@ describe('UC41 - danh sách hội thoại', () => {
     expect(applyIncoming([conversation()], message, 'user01', true)[0].unread).toBe(0)
     const own = applyIncoming([conversation()], { ...message, sender: 'user01' }, 'user01', false)
     expect(own[0]).toMatchObject({ unread: 0, lastMessage: { mine: true } })
+
+    const moderatorReply = {
+      ...message,
+      sender: 'me',
+      senderName: 'moderator01',
+      body: undefined,
+      text: 'Mình sẽ hỗ trợ bạn.',
+      sentAt: undefined,
+      createdAt: '2026-11-19T13:20:00.000Z',
+    }
+    expect(applyIncoming([conversation()], moderatorReply, 'user01', false)[0]).toMatchObject({
+      lastMessageAt: moderatorReply.createdAt,
+      lastMessage: { body: moderatorReply.text, mine: false, sentAt: moderatorReply.createdAt },
+      unread: 3,
+    })
   })
 
   it('tin mình gửi về cả qua API và socket chỉ hiện một lần', () => {
@@ -129,6 +144,24 @@ describe('UC41 - danh sách hội thoại', () => {
     )
     expect(message.sender).toBe('me')
     expect(appendMessage(appendMessage([], message), message)).toHaveLength(1)
+
+    const moderatorReply = toMessage(
+      {
+        id: 'm2',
+        sender: 'me',
+        senderName: 'moderator01',
+        text: 'Mình sẽ hỗ trợ bạn.',
+        image: null,
+        createdAt: '2026-11-19T13:20:00.000Z',
+      },
+      'user01'
+    )
+    expect(moderatorReply).toMatchObject({
+      id: 'm2',
+      sender: 'peer',
+      text: 'Mình sẽ hỗ trợ bạn.',
+      createdAt: '2026-11-19T13:20:00.000Z',
+    })
   })
 
   it('tin nhắn trống hoặc quá 2.000 ký tự bị chặn', () => {
