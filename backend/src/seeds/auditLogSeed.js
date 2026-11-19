@@ -330,6 +330,15 @@ const seedAuditLogs = async () => {
   })
     .select('username')
     .lean()
+  const reportAuditLogs = await AuditLog.find({
+    _id: { $in: reports.map((report) => logId(`report-${idOf(report)}`)) },
+    entityType: 'Report',
+  })
+    .select('entityId detail.reason')
+    .lean()
+  const reportReasons = new Map(
+    reportAuditLogs.map((log) => [String(log.entityId), log.detail?.reason])
+  )
   for (const report of reports) {
     const actor = report.handledBy
     if (!['admin', 'moderator'].includes(actor?.role)) continue
@@ -359,6 +368,7 @@ const seedAuditLogs = async () => {
         targetUser: report.targetUser ? String(report.targetUser) : null,
         before: { status: 'pending' },
         after: { status: report.status, action: report.action },
+        ...(reportReasons.get(idOf(report)) && { reason: reportReasons.get(idOf(report)) }),
       },
       report.handledAt || report.updatedAt
     )

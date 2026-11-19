@@ -1,82 +1,92 @@
-import { useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
-import Badge from '../../components/backoffice/Badge'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import Button from '../../components/backoffice/Button'
 import DataTable, { cell } from '../../components/backoffice/DataTable'
 import DateRange from '../../components/backoffice/DateRange'
 import DetailList from '../../components/backoffice/DetailList'
 import Dialog from '../../components/backoffice/Dialog'
 import EmptyState from '../../components/backoffice/EmptyState'
-import Field, { Input, Select } from '../../components/backoffice/Field'
+import Field, { Input, Select, Textarea } from '../../components/backoffice/Field'
 import Icon from '../../components/common/Icon'
 import IconButton from '../../components/backoffice/IconButton'
 import Notice from '../../components/backoffice/Notice'
 import Pagination from '../../components/backoffice/Pagination'
+import { REPORT_ACTIONS, SEVERITY_LABELS } from '../../lib/moderator/moderation'
 import {
-  REPORT_ACTIONS,
-  SEVERITY_LABELS,
-  violationHistory,
-  resolveReport,
-  filterModeratorReports,
-} from '../../lib/moderator/moderation'
+  getModeratorReport,
+  listModeratorReports,
+  REPORT_REASON_LABELS,
+  resolveModeratorReport,
+} from '../../lib/moderator/reportQueue'
 import { downloadCsv } from '../../lib/csv'
-import usePaginatedFilter from '../../hooks/usePaginatedFilter'
-import useBackofficePageSize from '../../hooks/useBackofficePageSize'
+import { postPath } from '../../lib/user/homeFeed'
+import { profilePath } from '../../lib/user/profiles'
 
-const EMPTY_FILTERS = { targetType: 'account', severity: '', from: '', to: '', query: '' }
-
-const SEVERITY_TONES = { high: 'danger', medium: 'warning', low: 'success' }
+const EMPTY_FILTERS = {
+  targetType: 'user',
+  severity: '',
+  queueStatus: 'open',
+  from: '',
+  to: '',
+  query: '',
+}
+const QUEUE_STATUS_LABELS = { open: 'Chưa xử lý', processed: 'Đã xử lý' }
+const SEVERITY_TEXT_CLASSES = {
+  high: 'text-danger-ink',
+  medium: 'text-warning',
+  low: 'text-success',
+}
 
 function Severity({ value }) {
-  return <Badge tone={SEVERITY_TONES[value]}>{SEVERITY_LABELS[value]}</Badge>
-}
-
-function getDisplayCode(report, posts) {
-  if (report.targetType === 'post') {
-    const post = posts.find(
-      (entry) => entry.id === report.targetPostId || entry.title === report.targetTitle
-    )
-    return post?.postCode || post?.id || report.id
-  }
-  return `#${report.id}`
-}
-
-// Ẩn bài chỉ áp dụng cho report bài đăng
-const canApply = (report, action) => action !== 'hide' || report.targetType === 'post'
-const actionLabel = (report, settings, code) =>
-  `${settings.label} · ${report.targetType === 'post' ? 'bài' : 'report'} ${code || `#${report.id}`}`
-
-function ReportActions({ report, onAction, code }) {
-  return Object.entries(REPORT_ACTIONS).map(([action, settings]) => (
-    <Button
-      key={action}
-      variant={settings.tone}
-      aria-label={actionLabel(report, settings, code)}
-      title={canApply(report, action) ? settings.label : 'Chỉ áp dụng cho report bài đăng'}
-      disabled={!canApply(report, action)}
-      onClick={() => onAction(action)}
-    >
-      <Icon name={settings.icon} />
-      {settings.label}
-    </Button>
-  ))
-}
-
-function History({ report }) {
-  const count = violationHistory(report).length
   return (
-    <span
-      className={`mt-1.5 flex items-center gap-1 text-caption font-medium ${count ? 'text-danger-ink' : 'text-success'}`}
-    >
-      <Icon name={count ? 'warning' : 'check'} size={14} />
-      {count ? `${count} cảnh báo cũ` : 'Chưa có vi phạm'}
+    <span className={`font-semibold ${SEVERITY_TEXT_CLASSES[value] || 'text-ink-muted'}`}>
+      {SEVERITY_LABELS[value] || value}
     </span>
   )
 }
 
-function RelatedReportHistory({ reports }) {
+const actionAllowed = (report, action) => {
+  if (action === 'hide') return report.targetType === 'post' && !report.target?.isHidden
+  if (action === 'warn' || action === 'lock') {
+    const target = report.targetType === 'post' ? report.target?.owner : report.target
+    return target?.role === 'user'
+  }
+  return true
+}
+
+const actionLabel = (report, settings) => `${settings.label} · ${report.displayCode}`
+
+const targetPath = (report) => {
+  if (!report.target) return ''
+  return report.targetType === 'post'
+    ? postPath(report.target)
+    : report.target.username
+      ? profilePath(report.target.username)
+      : ''
+}
+
+function ReportActions({ report, onAction, disabled = false }) {
+  const available = report.availableActions
+  return Object.entries(REPORT_ACTIONS).map(([action, settings]) => {
+    const allowed = available ? available.includes(action) : actionAllowed(report, action)
+    return (
+      <Button
+        key={action}
+        variant={settings.tone}
+        aria-label={actionLabel(report, settings)}
+        title={allowed ? settings.label : 'Thao tác không áp dụng cho đối tượng này'}
+        disabled={disabled || !allowed}
+        onClick={() => onAction(action)}
+      >
+        {settings.label}
+      </Button>
+    )
+  })
+}
+
+function ReportEntries({ reports, onPreview }) {
   if (!reports.length)
-    return <p className="text-small text-ink-muted">Chưa có report nào trước đó.</p>
+    return <p className="text-small text-ink-muted">Chưa có report trong nhóm này.</p>
   return (
     <div className="grid gap-2">
       {reports.map((entry) => (
@@ -85,19 +95,47 @@ function RelatedReportHistory({ reports }) {
           className="rounded-lg border border-line bg-surface-muted px-3 py-2.5"
         >
           <div className="flex flex-wrap items-center gap-2">
-            <strong className="text-caption font-semibold text-primary">
-              #{entry.displayId || entry.id}
-            </strong>
             <span className="text-caption text-ink-muted">{entry.time}</span>
-            <Severity value={entry.severity} />
           </div>
-          <p className="my-1.5 text-small leading-relaxed text-ink-secondary">{entry.reason}</p>
-          <small className="text-caption text-ink-subtle">
-            Người gửi: @{entry.reporter}
-            {entry.resolution
-              ? ` · Đã xử lý: ${REPORT_ACTIONS[entry.resolution]?.label || entry.resolution}`
-              : ' · Đang mở'}
-          </small>
+          <div className="mt-2 grid gap-1 text-small leading-relaxed text-ink-secondary">
+            <p>
+              <span className="font-medium">Người gửi:</span> {entry.reporter || 'Tài khoản đã xóa'}
+            </p>
+            <p>
+              <span className="font-medium">Lý do:</span>{' '}
+              {entry.reasonLabel || REPORT_REASON_LABELS[entry.reason] || entry.reason}
+            </p>
+            {entry.content && entry.reason !== 'other' && (
+              <p>
+                <span className="font-medium">Nội dung:</span> {entry.content}
+              </p>
+            )}
+            <small className="text-caption text-ink-subtle">
+              {['resolved', 'dismissed'].includes(entry.status)
+                ? `Đã xử lý${entry.action ? `: ${REPORT_ACTIONS[entry.action]?.label || entry.action}` : ''}`
+                : 'Chưa xử lý'}
+            </small>
+          </div>
+          {entry.screenshots?.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {entry.screenshots.map((url, index) => (
+                <button
+                  key={url}
+                  type="button"
+                  aria-label={`Phóng to ảnh ${index + 1}`}
+                  onClick={() => onPreview(entry.screenshots, index)}
+                  className="cursor-zoom-in rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                >
+                  <img
+                    src={url}
+                    alt="Bằng chứng report"
+                    loading="lazy"
+                    className="size-20 rounded-lg object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
         </article>
       ))}
     </div>
@@ -105,53 +143,137 @@ function RelatedReportHistory({ reports }) {
 }
 
 export default function Reports() {
-  const pageSize = useBackofficePageSize()
-  const { reports, setReports, posts } = useOutletContext()
-  const [modal, setModal] = useState(null)
-  const [notice, setNotice] = useState('')
-  const {
-    filters,
-    setFilter,
-    resetFilters,
-    setPage,
-    currentPage,
-    filteredItems: filtered,
-    visibleItems: visible,
-  } = usePaginatedFilter({
-    items: reports,
-    initialFilters: EMPTY_FILTERS,
-    filterFn: filterModeratorReports,
-    pageSize,
+  const [filters, setFilters] = useState(EMPTY_FILTERS)
+  const [page, setPage] = useState(1)
+  const [result, setResult] = useState({
+    items: [],
+    total: 0,
+    page: 1,
+    pageSize: 10,
+    totalPages: 1,
   })
-  const selected = modal && reports.find((report) => report.id === modal.id && !report.resolution)
-  const selectedCode = selected ? getDisplayCode(selected, posts) : ''
-  const action = modal?.action && REPORT_ACTIONS[modal.action]
-  const oldWarnings = selected ? violationHistory(selected) : []
-  const oldWarningIds = new Set(oldWarnings.map((entry) => String(entry.id)))
-  const oldWarningsWithoutReport = oldWarnings.filter(
-    (entry) => !reports.some((report) => String(report.id) === String(entry.id))
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [modal, setModal] = useState(null)
+  const [previewImage, setPreviewImage] = useState(null)
+  const [detail, setDetail] = useState(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState('')
+  const [reason, setReason] = useState('')
+  const [actionError, setActionError] = useState('')
+  const [actionLoading, setActionLoading] = useState(false)
+
+  const requestReports = useCallback(
+    () => listModeratorReports({ ...filters, page }),
+    [filters, page]
   )
-  const historyReports = selected
-    ? reports.filter(
-        (report) =>
-          report.id !== selected.id &&
-          (oldWarningIds.has(String(report.id)) ||
-            (report.reportedUser === selected.reportedUser &&
-              (selected.targetType === 'account' || report.targetTitle === selected.targetTitle)))
-      )
-    : []
+
+  useEffect(() => {
+    let active = true
+    requestReports()
+      .then((nextResult) => {
+        if (active) setResult(nextResult)
+      })
+      .catch((requestError) => {
+        if (active) setError(requestError.message)
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [requestReports])
+
+  const loadReports = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      setResult(await requestReports())
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!notice) return undefined
+    const timeout = window.setTimeout(() => setNotice(''), 3000)
+    return () => window.clearTimeout(timeout)
+  }, [notice])
+
+  const items = result.items
+  const selected = useMemo(() => {
+    if (!modal) return null
+    if (detail?.id === modal.id) return detail
+    return items.find((report) => report.id === modal.id) || null
+  }, [detail, items, modal])
+  const action = modal?.action ? REPORT_ACTIONS[modal.action] : null
+
   const changeFilter = (key, value) => {
-    setFilter(key, value)
+    setLoading(true)
+    setFilters((previous) => ({ ...previous, [key]: value }))
+    setPage(1)
   }
-  const confirmAction = (id, nextAction) => setModal({ id, kind: 'confirm', action: nextAction })
-  const executeAction = () => {
-    if (!selected || !action || (modal.action === 'hide' && selected.targetType !== 'post')) return
-    setReports((previous) => resolveReport(previous, selected.id, modal.action))
-    setNotice(
-      `Đã ghi nhận “${action.label}” cho ${selected.targetType === 'post' ? `bài ${selectedCode}` : `report ${selectedCode}`} và đưa report khỏi hàng đợi.`
-    )
-    setModal(null)
+
+  const resetFilters = () => {
+    setLoading(true)
+    setFilters(EMPTY_FILTERS)
+    setPage(1)
   }
+
+  const changePage = (nextPage) => {
+    setLoading(true)
+    setPage(nextPage)
+  }
+
+  const openDetail = async (id) => {
+    setModal({ id, kind: 'detail' })
+    setPreviewImage(null)
+    setDetail(null)
+    setDetailError('')
+    setDetailLoading(true)
+    try {
+      setDetail(await getModeratorReport(id))
+    } catch (requestError) {
+      setDetailError(requestError.message)
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
+  const confirmAction = (id, nextAction) => {
+    setReason('')
+    setActionError('')
+    setModal({ id, kind: 'confirm', action: nextAction })
+  }
+
+  const executeAction = async (event) => {
+    event?.preventDefault()
+    if (!selected || !action || actionLoading) return
+    const trimmedReason = reason.trim()
+    if (modal.action !== 'dismiss' && !trimmedReason) {
+      setActionError('Vui lòng nhập lý do xử lý.')
+      return
+    }
+    setActionLoading(true)
+    setActionError('')
+    try {
+      await resolveModeratorReport(selected.id, modal.action, trimmedReason)
+      setPreviewImage(null)
+      setModal(null)
+      setDetail(null)
+      setNotice(`Đã ${action.label.toLowerCase()} ${selected.displayCode}.`)
+      await loadReports()
+    } catch (requestError) {
+      setActionError(requestError.message)
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   const exportCsv = () => {
     downloadCsv('LostLink_Hang_doi_report.csv', [
       [
@@ -164,19 +286,21 @@ export default function Reports() {
         'Lý do',
         'Người gửi',
       ],
-      ...filtered.map((report) => [
-        getDisplayCode(report, posts),
+      ...items.map((report) => [
+        report.displayCode,
         report.time,
         report.targetType === 'post' ? 'Bài đăng' : 'Tài khoản',
         report.targetTitle,
         report.reportedUser,
         SEVERITY_LABELS[report.severity],
-        report.reason,
+        report.reasonLabel,
         report.reporter,
       ]),
     ])
-    setNotice(`Đã xuất ${filtered.length} report ra CSV.`)
+    setNotice(`Đã xuất ${items.length} report đang hiển thị ra CSV.`)
   }
+
+  const showEmpty = !loading && !error && !items.length
 
   return (
     <div className="px-6 py-5 text-small text-ink max-xl:px-5 max-sm:px-4 max-sm:py-4">
@@ -184,37 +308,37 @@ export default function Reports() {
         aria-label="Bộ lọc hàng đợi"
         className="rounded-xl border border-line bg-surface p-4 shadow-card"
       >
-        <div className="grid grid-cols-[minmax(205px,1.4fr)_repeat(2,minmax(0,1fr))] gap-3 max-sm:grid-cols-2">
+        <div className="grid grid-cols-[minmax(205px,1.4fr)_repeat(3,minmax(0,1fr))] gap-3 max-lg:grid-cols-2">
           <Field label="Tìm kiếm">
-            {(a) => (
+            {(props) => (
               <Input
-                {...a}
+                {...props}
                 type="search"
                 value={filters.query}
-                onChange={(e) => changeFilter('query', e.target.value)}
-                placeholder="Report, bài đăng, tài khoản…"
+                onChange={(event) => changeFilter('query', event.target.value)}
+                placeholder="Mã bài, tiêu đề, username, lý do…"
               />
             )}
           </Field>
           <Field label="Loại Report">
-            {(a) => (
+            {(props) => (
               <Select
-                {...a}
+                {...props}
                 value={filters.targetType}
-                onChange={(e) => changeFilter('targetType', e.target.value)}
+                onChange={(event) => changeFilter('targetType', event.target.value)}
               >
                 <option value="">Tất cả đối tượng</option>
-                <option value="post">Bài viết</option>
-                <option value="account">Tài khoản</option>
+                <option value="post">Bài đăng</option>
+                <option value="user">Tài khoản</option>
               </Select>
             )}
           </Field>
           <Field label="Mức độ nghiêm trọng">
-            {(a) => (
+            {(props) => (
               <Select
-                {...a}
+                {...props}
                 value={filters.severity}
-                onChange={(e) => changeFilter('severity', e.target.value)}
+                onChange={(event) => changeFilter('severity', event.target.value)}
               >
                 <option value="">Tất cả mức độ</option>
                 {Object.entries(SEVERITY_LABELS).map(([value, label]) => (
@@ -222,6 +346,18 @@ export default function Reports() {
                     {label}
                   </option>
                 ))}
+              </Select>
+            )}
+          </Field>
+          <Field label="Trạng thái xử lý">
+            {(props) => (
+              <Select
+                {...props}
+                value={filters.queueStatus}
+                onChange={(event) => changeFilter('queueStatus', event.target.value)}
+              >
+                <option value="open">Chưa xử lý</option>
+                <option value="processed">Đã xử lý</option>
               </Select>
             )}
           </Field>
@@ -233,11 +369,9 @@ export default function Reports() {
               label="Đặt lại bộ lọc"
               bordered
               size={36}
-              onClick={() => {
-                resetFilters()
-              }}
+              onClick={resetFilters}
             />
-            <Button variant="primary" onClick={exportCsv} disabled={!filtered.length}>
+            <Button variant="primary" onClick={exportCsv} disabled={!items.length}>
               <Icon name="download" />
               Xuất CSV
             </Button>
@@ -245,59 +379,94 @@ export default function Reports() {
         </DateRange>
       </section>
 
-      <p className="mt-4 mb-2.5 text-small text-ink-muted">
-        Số lượng: <strong className="px-1 text-lead text-primary">{filtered.length}</strong> report
+      <p className="mt-4 mb-2.5 text-small text-ink-subtle" aria-live="polite">
+        {loading ? (
+          'Đang tải danh sách report…'
+        ) : (
+          <>
+            Hiển thị {result.total ? (result.page - 1) * result.pageSize + 1 : 0}–
+            {Math.min(result.page * result.pageSize, result.total)} trong số {result.total} report
+          </>
+        )}
       </p>
       {notice && <Notice>{notice}</Notice>}
+      {error && (
+        <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger-soft bg-danger-soft px-4 py-3 text-small text-danger-ink">
+          <span role="alert">{error}</span>
+          <Button variant="danger-subtle" size="sm" onClick={loadReports}>
+            Thử lại
+          </Button>
+        </div>
+      )}
 
       <DataTable
         caption="Hàng đợi report cần xử lý"
         minWidth="min-w-[900px]"
         columns={[
-          ['Thời gian', 'w-[16%]'],
-          ['Đối tượng', 'w-[23%]'],
-          ['Tài khoản', 'w-[20%]'],
-          ['Lý do & Mức độ', 'w-[24%]'],
-          ['Thao tác', 'w-[17%]'],
+          ['Thời gian', 'w-1/6'],
+          ['Đối tượng', 'w-1/6'],
+          ['Số lượng', 'w-1/6', 'text-center'],
+          ['Người báo cáo', 'w-1/6'],
+          ['Mức độ', 'w-1/6'],
+          ['Thao tác', 'w-1/6'],
         ]}
         empty={
-          !visible.length && (
+          showEmpty && (
             <EmptyState
-              title="Không có report nào cần xử lý trong danh sách này."
+              title={
+                filters.queueStatus === 'processed'
+                  ? 'Chưa có report nào đã xử lý trong danh sách này.'
+                  : 'Không có report nào chưa xử lý trong danh sách này.'
+              }
               description="Thử thay đổi bộ lọc để xem các kết quả khác."
             />
           )
         }
       >
-        {visible.map((report) => {
-          const code = getDisplayCode(report, posts)
-          return (
+        {loading ? (
+          <tr>
+            <td colSpan={6} className="px-5 py-14 text-center text-ink-muted">
+              Đang tải hàng đợi report…
+            </td>
+          </tr>
+        ) : (
+          items.map((report) => (
             <tr key={report.id} className="hover:bg-surface-muted">
               <td className={cell}>
-                <strong className="text-caption font-semibold text-primary">{code}</strong>
+                {report.targetType === 'post' && (
+                  <strong className="text-caption font-semibold text-primary">
+                    {report.displayCode}
+                  </strong>
+                )}
                 <div className="mt-1.5 flex items-center gap-1 text-caption text-ink-muted">
                   <Icon name="calendar" size={13} />
                   {report.time}
                 </div>
               </td>
               <td className={cell}>
-                <button
-                  type="button"
-                  className="mb-1.5 block cursor-pointer text-left text-small font-semibold leading-relaxed text-ink hover:text-primary"
-                  onClick={() => setModal({ id: report.id, kind: 'detail' })}
-                >
-                  {report.targetTitle}
-                </button>
-                <Badge tone={report.targetType === 'post' ? 'primary' : 'info'}>
-                  {report.targetType === 'post' ? 'Bài đăng' : 'Tài khoản'}
-                </Badge>
+                {targetPath(report) ? (
+                  <Link
+                    to={targetPath(report)}
+                    className="mb-1.5 block text-small font-semibold leading-relaxed text-ink hover:text-primary hover:underline"
+                  >
+                    {report.targetTitle}
+                  </Link>
+                ) : (
+                  <span className="mb-1.5 block text-small font-semibold leading-relaxed text-ink">
+                    {report.targetTitle}
+                  </span>
+                )}
+              </td>
+              <td className={`${cell} text-center`}>
+                <span className="text-small font-semibold text-ink">{report.reportCount || 1}</span>
+                <span className="ml-1 text-small font-semibold text-ink">report</span>
               </td>
               <td className={cell}>
-                <strong className="block text-small font-semibold">@{report.reportedUser}</strong>
-                <History report={report} />
+                <strong className="block text-small font-semibold">
+                  {report.reporter || 'Tài khoản đã xóa'}
+                </strong>
               </td>
               <td className={cell}>
-                <p className="mb-1.5 text-small font-medium leading-relaxed">{report.reason}</p>
                 <Severity value={report.severity} />
               </td>
               <td className={cell}>
@@ -305,108 +474,228 @@ export default function Reports() {
                   <IconButton
                     icon="eye"
                     tone="view"
-                    label={`Xem ${report.targetType === 'post' ? 'bài' : 'report'} ${code}`}
-                    onClick={() => setModal({ id: report.id, kind: 'detail' })}
+                    label={`Xem report ${report.displayCode}`}
+                    onClick={() => openDetail(report.id)}
                   />
                   {Object.entries(REPORT_ACTIONS).map(([key, settings]) => (
                     <IconButton
                       key={key}
                       icon={settings.icon}
                       tone={settings.tone}
-                      label={actionLabel(report, settings, code)}
-                      disabled={!canApply(report, key)}
+                      label={actionLabel(report, settings)}
+                      disabled={report.queueStatus === 'processed' || !actionAllowed(report, key)}
                       onClick={() => confirmAction(report.id, key)}
                     />
                   ))}
                 </div>
               </td>
             </tr>
-          )
-        })}
+          ))
+        )}
       </DataTable>
       <Pagination
-        page={currentPage}
-        total={filtered.length}
-        pageSize={pageSize}
-        onChange={setPage}
+        page={result.page}
+        total={result.total}
+        pageSize={result.pageSize}
+        onChange={changePage}
         noun="report"
+        showSummary={false}
       />
 
-      {selected && modal.kind === 'detail' && (
+      {modal?.kind === 'detail' && (
         <Dialog
           key="detail"
           size="lg"
           title="Chi tiết Report"
+          scrollableContent
           onClose={() => setModal(null)}
           footer={
-            <>
-              <Button onClick={() => setModal(null)}>Đóng</Button>
-              <ReportActions
-                report={selected}
-                code={selectedCode}
-                onAction={(nextAction) => confirmAction(selected.id, nextAction)}
-              />
-            </>
+            selected && (
+              <>
+                <Button onClick={() => setModal(null)}>Đóng</Button>
+                {selected.queueStatus !== 'processed' && (
+                  <ReportActions
+                    report={selected}
+                    onAction={(nextAction) => confirmAction(selected.id, nextAction)}
+                  />
+                )}
+              </>
+            )
           }
         >
-          <DetailList
-            rows={[
-              [selected.targetType === 'post' ? 'Mã bài đăng' : 'Mã Report', selectedCode],
-              ['Thời gian', selected.time],
-              ['Đối tượng', selected.targetTitle],
-              ['Người bị Report', `@${selected.reportedUser}`],
-              ['Lý do Report', selected.reason],
-              ['Mức độ', <Severity key="severity" value={selected.severity} />],
-              ['Người gửi', `@${selected.reporter}`],
-            ]}
-          />
-          <h4 className="mt-3.5 mb-2 text-small font-semibold">
-            Nội dung giải trình / bằng chứng từ người Report
-          </h4>
-          <p className="rounded-lg border border-danger-soft bg-danger-soft/50 px-3.5 py-3 text-small leading-relaxed text-danger-ink [overflow-wrap:anywhere]">
-            {selected.content}
-          </p>
-          {(oldWarningsWithoutReport.length > 0 || historyReports.length > 0) && (
+          {detailLoading && (
+            <p className="py-8 text-center text-ink-muted">Đang tải chi tiết report…</p>
+          )}
+          {detailError && (
+            <div className="flex items-center justify-between gap-3 py-5 text-danger-ink">
+              <span role="alert">{detailError}</span>
+              <Button variant="danger-subtle" size="sm" onClick={() => openDetail(modal.id)}>
+                Thử lại
+              </Button>
+            </div>
+          )}
+          {selected && !detailLoading && !detailError && (
             <>
-              <h4 className="mt-3.5 mb-2 text-small font-semibold">Lịch sử</h4>
-              <div className="grid gap-2">
-                {oldWarningsWithoutReport.length > 0 && (
-                  <RelatedReportHistory reports={oldWarningsWithoutReport} />
-                )}
-                {historyReports.length > 0 && <RelatedReportHistory reports={historyReports} />}
-              </div>
+              <DetailList
+                rows={[
+                  ['Số report', selected.reportCount || 1],
+                  ['Trạng thái', QUEUE_STATUS_LABELS[selected.queueStatus] || 'Chưa xử lý'],
+                  ['Đối tượng', selected.targetTitle],
+                  ['Người bị report', selected.reportedUser || 'Không xác định'],
+                  ['Mức độ cao nhất', <Severity key="severity" value={selected.severity} />],
+                ]}
+              />
+              <h4 className="mt-3.5 mb-2 text-small font-semibold">Danh sách report</h4>
+              <ReportEntries
+                onPreview={(images, index) => setPreviewImage({ images, index })}
+                reports={
+                  selected.reports?.length
+                    ? selected.reports
+                    : [selected, ...(selected.history || [])]
+                }
+              />
             </>
           )}
         </Dialog>
       )}
 
-      {selected && modal.kind === 'confirm' && (
+      {modal?.kind === 'detail' && previewImage?.images?.[previewImage.index] && (
+        <Dialog
+          key="report-image-preview"
+          size="lg"
+          title="Hình ảnh"
+          onClose={() => setPreviewImage(null)}
+        >
+          <div className="flex items-center justify-center gap-3">
+            <IconButton
+              icon="back"
+              label="Xem ảnh trước"
+              bordered
+              size={36}
+              disabled={previewImage.index === 0}
+              onClick={() =>
+                setPreviewImage((current) => ({ ...current, index: current.index - 1 }))
+              }
+            />
+            <div className="flex min-w-0 flex-1 justify-center">
+              <img
+                src={previewImage.images[previewImage.index]}
+                alt={`Ảnh ${previewImage.index + 1}`}
+                className="max-h-[calc(100dvh-180px)] max-w-full rounded-lg object-contain"
+              />
+            </div>
+            <IconButton
+              icon="next"
+              label="Xem ảnh tiếp theo"
+              bordered
+              size={36}
+              disabled={previewImage.index === previewImage.images.length - 1}
+              onClick={() =>
+                setPreviewImage((current) => ({ ...current, index: current.index + 1 }))
+              }
+            />
+          </div>
+          <p className="mt-3 text-center text-caption text-ink-muted">
+            {previewImage.index + 1}/{previewImage.images.length}
+          </p>
+        </Dialog>
+      )}
+
+      {modal?.kind === 'confirm' && selected && action && (
         <Dialog
           key="confirm"
           size="sm"
-          title="Xác nhận thao tác"
-          onClose={() => setModal(null)}
+          title={
+            modal.action === 'warn'
+              ? 'Gửi cảnh cáo'
+              : modal.action === 'hide'
+                ? 'Ẩn bài đăng'
+                : modal.action === 'lock'
+                  ? 'Xác nhận khóa tài khoản'
+                  : modal.action === 'dismiss'
+                    ? 'Xác nhận bỏ qua report'
+                    : 'Xác nhận thao tác'
+          }
+          onClose={() => !actionLoading && setModal(null)}
           footer={
             <>
-              <Button onClick={() => setModal(null)}>Hủy</Button>
-              <Button variant={action.tone} onClick={executeAction}>
-                Xác nhận {action.label.toLowerCase()}
+              <Button onClick={() => setModal(null)} disabled={actionLoading}>
+                Hủy
+              </Button>
+              <Button variant={action.tone} onClick={executeAction} disabled={actionLoading}>
+                {actionLoading
+                  ? 'Đang xử lý…'
+                  : modal.action === 'warn'
+                    ? 'Gửi'
+                    : modal.action === 'hide'
+                      ? 'Xác nhận'
+                      : modal.action === 'lock'
+                        ? 'Xác nhận'
+                        : modal.action === 'dismiss'
+                          ? 'Xác nhận'
+                          : `Xác nhận ${action.label.toLowerCase()}`}
               </Button>
             </>
           }
         >
-          <p className="mb-2 text-lead font-semibold leading-relaxed">{action.description}</p>
+          {!['warn', 'hide', 'lock', 'dismiss'].includes(modal.action) && (
+            <p className="mb-2 text-lead font-semibold leading-relaxed">{action.description}</p>
+          )}
           <DetailList
             rows={[
-              [
-                selected.targetType === 'post' ? 'Bài đăng' : 'Report',
-                `${selectedCode} · ${selected.targetTitle}`,
-              ],
-              ['Tài khoản', `@${selected.reportedUser}`],
+              ['Số report chưa xử lý', selected.openReportCount || selected.reportCount || 1],
+              ['Đối tượng', selected.targetTitle],
+              ['Tài khoản', selected.reportedUser || 'Không xác định'],
             ]}
           />
-          <p className="text-caption leading-relaxed text-ink-muted">
-            Thao tác sẽ được ghi nhận và report sẽ rời hàng đợi sau khi xác nhận.
+          {modal.action !== 'dismiss' && (
+            <Field
+              label={
+                modal.action === 'warn'
+                  ? 'Nội dung'
+                  : modal.action === 'hide'
+                    ? 'Lý do'
+                    : modal.action === 'lock'
+                      ? 'Lý do'
+                      : 'Lý do xử lý'
+              }
+              required={!['warn', 'hide', 'lock'].includes(modal.action)}
+              error={actionError}
+            >
+              {(props) => (
+                <Textarea
+                  {...props}
+                  value={reason}
+                  onChange={(event) => setReason(event.target.value)}
+                  placeholder={
+                    modal.action === 'warn'
+                      ? 'Nhập nội dung'
+                      : modal.action === 'hide'
+                        ? 'Nhập lý do xử lý'
+                        : modal.action === 'lock'
+                          ? 'Nhập lý do khóa tài khoản'
+                          : 'Nhập lý do xử lý report'
+                  }
+                  maxLength={500}
+                />
+              )}
+            </Field>
+          )}
+          {modal.action === 'dismiss' && actionError && (
+            <p role="alert" className="text-danger-ink">
+              {actionError}
+            </p>
+          )}
+          <p className="mt-3 text-caption leading-relaxed text-ink-muted">
+            {modal.action === 'warn'
+              ? 'Nội dung cảnh cáo sẽ được gửi cho Người dùng'
+              : modal.action === 'hide'
+                ? 'Bài đăng sẽ được ẩn sau khi thực hiện thao tác này'
+                : modal.action === 'lock'
+                  ? 'Tài khoản sẽ bị khóa sau khi thực hiện thao tác này'
+                  : modal.action === 'dismiss'
+                    ? 'Report sẽ được bỏ qua vì không phát hiện vi phạm.'
+                    : 'Thao tác sẽ được ghi nhận cho tất cả report đang mở của đối tượng này.'}
           </p>
         </Dialog>
       )}

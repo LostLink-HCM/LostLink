@@ -42,8 +42,12 @@ export default function DataTable({
         </colgroup>
         <thead>
           <tr>
-            {columns.map(([label]) => (
-              <th key={label} scope="col" className={cx('border-b font-semibold', styles.heading)}>
+            {columns.map(([label, , headingClass]) => (
+              <th
+                key={label}
+                scope="col"
+                className={cx('border-b font-semibold', styles.heading, headingClass)}
+              >
                 {label}
               </th>
             ))}
