@@ -7,6 +7,81 @@ export const createEmptyMessageState = () => ({
   activeId: null,
 })
 
+export function normalizeInbox(data, previous = createEmptyMessageState()) {
+  const contacts = Array.isArray(data?.contacts) ? data.contacts : []
+  const threads = (data?.threads || []).map((thread) => {
+    const existing = previous.threads.find((item) => item.id === thread.id)
+    const lastMessage = thread.lastMessage
+    const alreadyLoaded =
+      lastMessage && existing?.messages?.some((item) => item.id === lastMessage.id)
+    const messages = lastMessage
+      ? alreadyLoaded
+        ? existing.messages
+        : existing?.messages?.length
+          ? [...existing.messages, lastMessage]
+          : [lastMessage]
+      : (existing?.messages ?? thread.messages ?? [])
+    return {
+      ...thread,
+      messages,
+      lastMessage: lastMessage ?? existing?.lastMessage ?? null,
+      context: thread.context ?? null,
+    }
+  })
+  return {
+    ...previous,
+    contacts,
+    threads,
+    activeId: threads.some((thread) => thread.id === previous.activeId) ? previous.activeId : null,
+  }
+}
+
+export function mergeConversation(state, thread) {
+  const contact = thread.contact
+  const contacts = contact
+    ? [...state.contacts.filter((item) => item.id !== contact.id), contact]
+    : state.contacts
+  const existing = state.threads.find((item) => item.id === thread.id)
+  const mergedThread = {
+    ...existing,
+    ...thread,
+    contactId: thread.contactId ?? contact?.id ?? existing?.contactId,
+    messages: thread.messages ?? existing?.messages ?? [],
+  }
+  return {
+    ...state,
+    contacts,
+    threads: [mergedThread, ...state.threads.filter((item) => item.id !== thread.id)],
+    activeId: thread.id,
+  }
+}
+
+export function appendRemoteMessage(state, message) {
+  if (!message?.conversationId) return state
+  return {
+    ...state,
+    threads: state.threads.map((thread) => {
+      if (thread.id !== message.conversationId) return thread
+      if (thread.messages.some((item) => item.id === message.id)) return thread
+      return {
+        ...thread,
+        lastMessage: message,
+        unread: message.sender === 'me' || state.activeId === thread.id ? 0 : thread.unread + 1,
+        messages: [...thread.messages, message],
+      }
+    }),
+  }
+}
+
+export function replaceThread(state, threadId, updates) {
+  return {
+    ...state,
+    threads: state.threads.map((thread) =>
+      thread.id === threadId ? { ...thread, ...updates } : thread
+    ),
+  }
+}
+
 export function contactName(contact) {
   return contact?.role === 'admin' ? 'Admin' : contact?.name || 'Người dùng'
 }
@@ -44,7 +119,6 @@ export function startThread(state, contactId, now = Date.now()) {
     contactId,
     unread: 0,
     priority: false,
-    resolved: false,
     createdAt: new Date(now).toISOString(),
     context: null,
     messages: [],
@@ -66,7 +140,6 @@ export function sendMessage(state, threadId, now = Date.now()) {
         ? {
             ...entry,
             unread: 0,
-            resolved: false,
             messages: [
               ...entry.messages,
               {

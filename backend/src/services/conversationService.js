@@ -281,7 +281,6 @@ const sendMessage = async (id, user, { body = '' }, file) => {
       $set: {
         lastMessageAt: message.sentAt,
         'participants.$.lastReadAt': message.sentAt,
-        ...(conversation.kind === 'support' && { resolvedAt: null, resolvedBy: null }),
       },
     }
   )

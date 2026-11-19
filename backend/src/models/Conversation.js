@@ -72,9 +72,6 @@ const conversationSchema = new Schema(
     moderatorStates: { type: [moderatorStateSchema], default: [] },
 
     // Trạng thái xử lý chung của hội thoại hỗ trợ; tin nhắn mới sẽ mở lại hội thoại.
-    resolvedAt: { type: Date, default: null },
-    resolvedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
-
     meetingPoint: { type: String, default: '' },
 
     confirmedLost: { type: Boolean, default: false },

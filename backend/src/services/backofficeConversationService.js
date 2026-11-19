@@ -193,9 +193,6 @@ const listConversations = async (user, filters = {}) => {
 
   if (filters.peerRole) pipeline.push({ $match: { '_peer.role': filters.peerRole } })
   if (filters.unreadOnly) pipeline.push({ $match: { unread: { $gt: 0 } } })
-  if (filters.resolved !== undefined) {
-    pipeline.push({ $match: { resolvedAt: filters.resolved ? { $ne: null } : null } })
-  }
   if (filters.q) {
     const regex = safeRegex(filters.q.trim())
     pipeline.push({ $match: { $or: [{ '_peer.username': regex }, { '_peer.email': regex }] } })
@@ -223,8 +220,6 @@ const listConversations = async (user, filters = {}) => {
       contactId: peer.id,
       unread: conversation.unread,
       priority: conversation.priority,
-      resolved: Boolean(conversation.resolvedAt),
-      resolvedAt: conversation.resolvedAt,
       createdAt: conversation.createdAt,
       lastMessage: last
         ? {
@@ -252,10 +247,16 @@ const listConversations = async (user, filters = {}) => {
   }
 }
 
-const listContacts = async (user, { q = '' } = {}) => {
+const listContacts = async (user, { q = '', peerRole } = {}) => {
   const roles = user.role === 'admin' ? ['moderator'] : ['user', 'admin']
+  if (peerRole && !roles.includes(peerRole)) {
+    throw ApiError.forbidden(
+      'Bạn không có quyền nhắn tin với vai trò này.',
+      'MESSAGE_ROLE_FORBIDDEN'
+    )
+  }
   const filter = {
-    role: { $in: roles },
+    role: peerRole ?? { $in: roles },
     status: 'active',
     deleteRequestedAt: null,
     _id: { $ne: user._id },
@@ -309,9 +310,6 @@ const threadDetails = (conversation, user, peer, messages, hasMore) => ({
       : conversation.participants.find((state) => idOf(state.user) === idOf(user))
     )?.isFlagged
   ),
-  resolved: Boolean(conversation.resolvedAt),
-  resolvedAt: conversation.resolvedAt,
-  resolvedBy: conversation.resolvedBy,
   createdAt: conversation.createdAt,
   lastMessageAt: conversation.lastMessageAt,
   context: null,
@@ -432,36 +430,6 @@ const markUnread = (id, user) => markConversation(id, user, 'markedUnread', true
 const setPriority = async (id, user, isFlagged) =>
   markConversation(id, user, 'isFlagged', isFlagged)
 
-const setResolved = async (id, user, resolved) => {
-  const conversation = await findConversation(id, user)
-  await Conversation.updateOne(
-    { _id: conversation._id },
-    {
-      $set: {
-        resolvedAt: resolved ? new Date() : null,
-        resolvedBy: resolved ? user._id : null,
-      },
-    }
-  )
-  if (isSharedUserSupport(conversation)) {
-    emitToUsersAndRole(
-      conversation.participants.map((item) => item.user),
-      'moderator',
-      'conversation:updated',
-      { conversationId: conversation._id }
-    )
-  } else {
-    emitToUsers(
-      conversation.participants.map((item) => item.user),
-      'conversation:updated',
-      {
-        conversationId: conversation._id,
-      }
-    )
-  }
-  return { resolved }
-}
-
 const sendMessage = async (id, user, { body = '' }, file) => {
   const conversation = await findConversation(id, user)
   if (conversation.status === 'locked') {
@@ -482,8 +450,6 @@ const sendMessage = async (id, user, { body = '' }, file) => {
           lastMessageAt: message.sentAt,
           'moderatorStates.$.lastReadAt': message.sentAt,
           'moderatorStates.$.markedUnread': false,
-          resolvedAt: null,
-          resolvedBy: null,
         },
       }
     )
@@ -495,8 +461,6 @@ const sendMessage = async (id, user, { body = '' }, file) => {
           lastMessageAt: message.sentAt,
           'participants.$.lastReadAt': message.sentAt,
           'participants.$.markedUnread': false,
-          resolvedAt: null,
-          resolvedBy: null,
         },
       }
     )
@@ -614,6 +578,5 @@ module.exports = {
   markRead,
   markUnread,
   setPriority,
-  setResolved,
   sendMessage,
 }

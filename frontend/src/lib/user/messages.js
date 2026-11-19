@@ -147,13 +147,17 @@ export const inboxUnread = (threads) =>
   threads.reduce((count, thread) => count + (isClosedByMe(thread) ? 0 : thread.unread), 0)
 
 // Tin nhắn từ API → dữ liệu hiển thị, me: tên người đang đăng nhập
-export const toMessage = (message, me) => ({
-  id: message.id,
-  sender: message.sender === me ? 'me' : 'peer',
-  text: message.body,
-  image: message.image,
-  createdAt: message.sentAt,
-})
+// Normalize messages from regular API responses and backoffice socket events.
+export const toMessage = (message, me) => {
+  const senderName = message.senderName ?? message.sender
+  return {
+    id: message.id ?? message._id,
+    sender: senderName === me ? 'me' : 'peer',
+    text: message.body ?? message.text ?? '',
+    image: message.image ?? message.imageUrl ?? null,
+    createdAt: message.sentAt ?? message.createdAt,
+  }
+}
 
 // Thêm tin vào cuối, bỏ tin trùng (tin mình gửi về cả qua API và qua socket)
 export const appendMessage = (messages, message) =>
@@ -161,18 +165,22 @@ export const appendMessage = (messages, message) =>
 
 // Cập nhật dòng hội thoại khi có tin mới qua socket. active: mình đang xem hội thoại đó
 export function applyIncoming(conversations, message, me, active) {
+  const sentAt = message.sentAt ?? message.createdAt
+  const body = message.body ?? message.text ?? ''
+  const image = message.image ?? message.imageUrl ?? null
+  const mine = (message.senderName ?? message.sender) === me
   return conversations.map((item) =>
     item.id === message.conversationId
       ? {
           ...item,
-          lastMessageAt: message.sentAt,
+          lastMessageAt: sentAt,
           lastMessage: {
-            body: message.body,
-            image: Boolean(message.image),
-            mine: message.sender === me,
-            sentAt: message.sentAt,
+            body,
+            image: Boolean(image),
+            mine,
+            sentAt,
           },
-          unread: message.sender === me || active ? 0 : (item.unread ?? 0) + 1,
+          unread: mine || active ? 0 : (item.unread ?? 0) + 1,
         }
       : item
   )

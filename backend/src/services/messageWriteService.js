@@ -16,7 +16,7 @@ const createMessage = async ({ conversationId, senderId, body = '', file }) => {
     return await Message.create({
       conversation: conversationId,
       sender: senderId,
-      body: uploaded ? '' : text,
+      body: text,
       imageUrl: uploaded?.url ?? '',
     })
   } catch (error) {

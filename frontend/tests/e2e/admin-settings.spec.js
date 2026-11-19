@@ -261,6 +261,52 @@ test.describe('Cấu hình hệ thống của admin', () => {
     await page.getByRole('button', { name: 'Lưu', exact: true }).last().click()
     expect(settings.writes()).toHaveLength(0)
     await confirmSave(page, 'quick-replies')
+    await page.route(/\/api\/backoffice\/conversations(?:\/[^?]*)?(?:\?.*)?$/, async (route) => {
+      const path = new URL(route.request().url()).pathname
+      const contact = {
+        id: '507f1f77bcf86cd799439021',
+        username: 'moderator.quick-replies',
+        name: 'moderator.quick-replies',
+        email: 'moderator.quick-replies@lostlink.vn',
+        avatarUrl: '',
+        role: 'moderator',
+        description: 'Moderator',
+      }
+      const thread = {
+        id: '671126000000000000000099',
+        contactId: contact.id,
+        unread: 0,
+        priority: false,
+        createdAt: '2026-11-19T08:00:00.000Z',
+        lastMessage: {
+          id: '671126000000000000000098',
+          sender: 'peer',
+          text: 'Open a conversation to check quick replies.',
+          image: null,
+          createdAt: '2026-11-19T08:10:00.000Z',
+        },
+        messages: [],
+        context: null,
+      }
+      const data = path.endsWith('/' + thread.id)
+        ? {
+            thread: {
+              ...thread,
+              contact,
+              kind: 'support',
+              supportType: 'internal',
+              status: 'open',
+              messages: [],
+              hasMore: false,
+            },
+          }
+        : {
+            contacts: [contact],
+            threads: [thread],
+            pagination: { page: 1, limit: 100, total: 1, pages: 1 },
+          }
+      await route.fulfill({ status: 200, headers: CORS, json: { success: true, data } })
+    })
     const body = settings.writes()[0].body
     expect(body.user).toEqual([
       { id: '507f1f77bcf86cd799439011', text: 'Mẫu đầu tiên đã sửa' },
@@ -268,6 +314,7 @@ test.describe('Cấu hình hệ thống của admin', () => {
     ])
     expect(body.internal).toEqual([{ id: '507f1f77bcf86cd799439013', text: 'Mẫu nội bộ đã sửa' }])
     await sidebar(page, 'Tin nhắn').click()
+    await page.getByRole('button', { name: /moderator\.quick-replies/ }).click()
     await page.getByRole('button', { name: 'Trả lời nhanh', exact: true }).click()
     await expect(
       page.locator('#quick-replies').getByRole('button', { name: 'Mẫu nội bộ đã sửa', exact: true })

@@ -27,7 +27,6 @@ router.get('/:id', ...byId, historyRules, validate, ctrl.get)
 router.patch('/:id/read', ...byId, ctrl.read)
 router.patch('/:id/unread', ...byId, ctrl.unread)
 router.patch('/:id/priority', ...byId, stateRules, validate, ctrl.priority)
-router.patch('/:id/resolution', ...byId, stateRules, validate, ctrl.resolution)
 router.post(
   '/:id/messages',
   messageLimiter,

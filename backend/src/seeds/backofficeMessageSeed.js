@@ -31,7 +31,6 @@ const SUPPORT_THREADS = [
     moderator: 'moderator03',
     unreadBy: [],
     flaggedBy: [],
-    resolvedMinutesAgo: 28,
     messages: [
       {
         sender: 'user',
@@ -115,10 +114,6 @@ const createSupportThread = async ({ definition, users, moderators, now, existin
       { user: assignedModerator._id, lastReadAt: moderatorReadAt },
     ],
     moderatorStates: moderatorStatesFor(moderators, lastMessageAt, definition),
-    ...(definition.resolvedMinutesAgo && {
-      resolvedAt: ago(now, definition.resolvedMinutesAgo),
-      resolvedBy: assignedModerator._id,
-    }),
     createdAt,
     lastMessageAt,
   })

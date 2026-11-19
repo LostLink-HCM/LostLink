@@ -7,12 +7,14 @@ const listRules = [
   query('q').optional().isString().trim().isLength({ max: 100 }),
   query('peerRole').optional().isIn(['user', 'admin', 'moderator']),
   query('unreadOnly').optional().isIn(['true', 'false']).toBoolean(),
-  query('resolved').optional().isIn(['true', 'false']).toBoolean(),
   query('page').optional().isInt({ min: 1 }).toInt(),
   query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
 ]
 
-const contactsRules = [query('q').optional().isString().trim().isLength({ max: 100 })]
+const contactsRules = [
+  query('q').optional().isString().trim().isLength({ max: 100 }),
+  query('peerRole').optional().isIn(['user', 'admin', 'moderator']),
+]
 
 const stateRules = [body('value').isBoolean().withMessage('Trạng thái không hợp lệ.').toBoolean()]
 

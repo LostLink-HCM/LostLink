@@ -27,9 +27,6 @@ module.exports = {
   priority: send((req) =>
     service.setPriority(idOf(req), req.user, matchedData(req, { locations: ['body'] }).value)
   ),
-  resolution: send((req) =>
-    service.setResolved(idOf(req), req.user, matchedData(req, { locations: ['body'] }).value)
-  ),
   message: send(
     (req) =>
       service.sendMessage(
