@@ -9,6 +9,7 @@
     "dev": "nodemon server.js",
     "seed": "node src/seeds/index.js",
     "seed:settings": "node src/seeds/index.js --settings-only",
+    "seed:messages": "node src/seeds/index.js --messages-only",
     "seed:audit": "node src/seeds/index.js --audit-only",
     "seed:reports": "node src/seeds/index.js --reports-only",
     "seed:demo": "node src/seeds/index.js --demo",

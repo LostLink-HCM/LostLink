@@ -1,5 +1,12 @@
 export const MESSAGE_LIMIT = 2000
 
+export const createEmptyMessageState = () => ({
+  contacts: [],
+  threads: [],
+  drafts: {},
+  activeId: null,
+})
+
 export function contactName(contact) {
   return contact?.role === 'admin' ? 'Admin' : contact?.name || 'Người dùng'
 }

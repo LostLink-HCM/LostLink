@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import BackofficeLayout from '../../components/backoffice/BackofficeLayout'
-import { createAdminMessages } from '../../data/adminMessages'
 import { createAdminNotifications } from '../../data/adminNotifications'
+import { createEmptyMessageState } from '../../lib/backoffice/messages'
 import useSystemSettings from '../../hooks/useSystemSettings'
 
 const navigation = [
@@ -27,7 +27,7 @@ export default function AdminLayout() {
     (proceed) => settingsNavigationGuard.current?.(proceed) ?? true,
     []
   )
-  const [messageState, setMessageState] = useState(createAdminMessages)
+  const [messageState, setMessageState] = useState(createEmptyMessageState)
   const settings = useSystemSettings()
   const [notificationState, setNotificationState] = useState(createAdminNotifications)
   const unreadMessages = messageState.threads.reduce((total, thread) => total + thread.unread, 0)
