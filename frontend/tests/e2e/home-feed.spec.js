@@ -72,8 +72,8 @@ test.describe('UC02 - Lọc và tìm kiếm bài đăng', () => {
       panel.getByRole('button', { name: 'Quận Bình Thạnh', exact: true })
     ).toHaveAttribute('aria-pressed', 'true')
     await expect(panel.getByRole('button', { name: 'Quận 1', exact: true })).toHaveCount(0)
+    // Chọn chip là lọc ngay, không cần bấm Áp dụng
     await panel.getByRole('button', { name: '30 ngày qua' }).click()
-    await panel.getByRole('button', { name: 'Áp dụng bộ lọc' }).click()
 
     // Kết quả lọc có thể dài hơn một trang, cuộn hết rồi mới so với API
     await expect(page.getByRole('button', { name: /Xóa lọc/ })).toBeVisible()
@@ -125,7 +125,6 @@ test.describe('UC02 - Lọc và tìm kiếm bài đăng', () => {
     const panel = filters(page)
     await panel.getByRole('button', { name: 'Xem tất cả 8 danh mục' }).click()
     await panel.getByRole('button', { name: 'Thú cưng', exact: true }).click()
-    await panel.getByRole('button', { name: 'Áp dụng bộ lọc' }).click()
 
     await expect(feed(page).getByText('Danh mục này không còn tồn tại.')).toBeVisible()
     await feed(page).getByRole('button', { name: 'Xem tất cả danh mục' }).click()
