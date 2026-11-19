@@ -1,12 +1,12 @@
 import { useId } from 'react'
 import { CHEEK, INK, LINE, OUTLINE, PINK } from '../../auth/scene/theme'
 
-export function PeekCat({ className = 'h-full w-auto' }) {
+export function PeekCat({ className = 'h-full w-auto', full = false, ...svg }) {
   const FUR = '#fbf8f4'
   const TAIL = 'M40 -60 C70 -62 80 -96 62 -114'
 
   return (
-    <svg viewBox="-62 -152 148 92" className={className}>
+    <svg viewBox={full ? '-62 -152 148 152' : '-62 -152 148 92'} className={className} {...svg}>
       <g className="origin-[40px_-60px] animate-auth-cat-tail">
         <path d={TAIL} fill="none" stroke={LINE} strokeWidth="14.4" strokeLinecap="round" />
         <path d={TAIL} fill="none" stroke={FUR} strokeWidth="10" strokeLinecap="round" />
@@ -43,19 +43,23 @@ export function PeekCat({ className = 'h-full w-auto' }) {
         strokeLinecap="round"
       />
       {/* Hai chân bám lên mép */}
-      <ellipse cx="-24" cy="-62" rx="12" ry="8" fill={FUR} {...OUTLINE} />
-      <ellipse cx="24" cy="-62" rx="12" ry="8" fill={FUR} {...OUTLINE} />
-      <path
-        d="M-28 -66 v4 M-20 -66 v4 M20 -66 v4 M28 -66 v4"
-        stroke="#c9c0d2"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
+      {!full && (
+        <>
+          <ellipse cx="-24" cy="-62" rx="12" ry="8" fill={FUR} {...OUTLINE} />
+          <ellipse cx="24" cy="-62" rx="12" ry="8" fill={FUR} {...OUTLINE} />
+          <path
+            d="M-28 -66 v4 M-20 -66 v4 M20 -66 v4 M28 -66 v4"
+            stroke="#c9c0d2"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+        </>
+      )}
     </svg>
   )
 }
 
-export function PeekDog({ className = 'h-full w-auto' }) {
+export function PeekDog({ className = 'h-full w-auto', full = false, ...svg }) {
   const clipId = useId()
   const FUR = '#fff7ec'
   const PATCH = '#f0913a'
@@ -63,7 +67,7 @@ export function PeekDog({ className = 'h-full w-auto' }) {
   const BODY = 'M-40 -20 C-50 -72 -42 -134 0 -136 C42 -134 50 -72 40 -20 C26 -10 -26 -10 -40 -20 Z'
 
   return (
-    <svg viewBox="-66 -160 146 100" className={className}>
+    <svg viewBox={full ? '-66 -160 146 150' : '-66 -160 146 100'} className={className} {...svg}>
       <defs>
         <clipPath id={clipId}>
           <path d={BODY} />
@@ -98,8 +102,12 @@ export function PeekDog({ className = 'h-full w-auto' }) {
       <ellipse cx="-28" cy="-82" rx="6.5" ry="4" fill={CHEEK} opacity="0.7" />
       <ellipse cx="28" cy="-86" rx="6" ry="3.6" fill={CHEEK} opacity="0.7" />
       {/* Hai chân bám lên mép */}
-      <ellipse cx="-22" cy="-62" rx="11" ry="8" fill={FUR} {...OUTLINE} />
-      <ellipse cx="22" cy="-62" rx="11" ry="8" fill={FUR} {...OUTLINE} />
+      {!full && (
+        <>
+          <ellipse cx="-22" cy="-62" rx="11" ry="8" fill={FUR} {...OUTLINE} />
+          <ellipse cx="22" cy="-62" rx="11" ry="8" fill={FUR} {...OUTLINE} />
+        </>
+      )}
     </svg>
   )
 }
