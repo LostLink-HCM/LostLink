@@ -24,6 +24,9 @@ const NOTIFICATION_TYPES = [
   'area_post',
   // Người mình theo dõi có bài mới được duyệt
   'following_post',
+  'post_pending',
+  'report_queue',
+  'backoffice_message',
   'report_result',
   // Gửi Moderator khi một tài khoản bị nhiều người báo cáo
   'report_flagged',

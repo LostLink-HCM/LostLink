@@ -9,10 +9,6 @@ import {
   NOTIFICATION_FILTER_TYPES,
   NOTIFICATION_TYPES,
   filterNotifications,
-  markAllNotificationsRead,
-  markNotificationRead,
-  toggleNotificationPin,
-  toggleNotificationRead,
   unreadNotificationCount,
 } from '../../lib/backoffice/notifications'
 
@@ -57,7 +53,13 @@ function groupNotifications(notifications) {
   }, {})
 }
 
-export default function NotificationsWorkspace({ notificationState, setNotificationState }) {
+export default function NotificationsWorkspace({
+  notificationState,
+  onMarkAllRead,
+  onMarkRead,
+  onToggleRead,
+  onTogglePin,
+}) {
   const [filter, setFilter] = useState('all')
   const [type, setType] = useState('all')
   const [query, setQuery] = useState('')
@@ -96,7 +98,6 @@ export default function NotificationsWorkspace({ notificationState, setNotificat
     return () => observer.disconnect()
   }, [filtered.length, visibleCount])
 
-  const update = (updater) => setNotificationState((state) => updater(state))
   const resetFilters = () => {
     setFilter('all')
     setType('all')
@@ -182,12 +183,7 @@ export default function NotificationsWorkspace({ notificationState, setNotificat
           />
         </label>
 
-        <Button
-          size="sm"
-          disabled={!unreadCount}
-          onClick={() => update(markAllNotificationsRead)}
-          className="max-sm:flex-1"
-        >
+        <Button size="sm" disabled={!unreadCount} onClick={onMarkAllRead} className="max-sm:flex-1">
           <Icon name="check" size={15} />
           Đánh dấu tất cả đã đọc
         </Button>
@@ -270,9 +266,7 @@ export default function NotificationsWorkspace({ notificationState, setNotificat
                       <Link
                         className="mt-2 inline-flex items-center gap-1 text-caption font-bold text-primary hover:underline"
                         to={notification.href}
-                        onClick={() =>
-                          update((state) => markNotificationRead(state, notification.id))
-                        }
+                        onClick={() => onMarkRead(notification.id)}
                       >
                         {notification.actionLabel}
                         <Icon name="next" size={14} />
@@ -289,17 +283,13 @@ export default function NotificationsWorkspace({ notificationState, setNotificat
                         notification.pinned &&
                           'border-warning/30 bg-warning-soft text-warning hover:bg-warning-soft'
                       )}
-                      onClick={() =>
-                        update((state) => toggleNotificationPin(state, notification.id))
-                      }
+                      onClick={() => onTogglePin(notification.id)}
                     />
                     <IconButton
                       icon={notification.unread ? 'check' : 'mail'}
                       label={notification.unread ? 'Đánh dấu đã đọc' : 'Đánh dấu chưa đọc'}
                       size={30}
-                      onClick={() =>
-                        update((state) => toggleNotificationRead(state, notification.id))
-                      }
+                      onClick={() => onToggleRead(notification.id)}
                     />
                   </div>
                 </article>
