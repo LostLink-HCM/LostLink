@@ -24,8 +24,6 @@ export const M_LEVELS = [
   { value: 0.8, label: 'Thấp' },
 ]
 
-export const mLevelLabel = (m) => M_LEVELS.find((level) => level.value === m)?.label || 'Vừa'
-
 // Admin nhập trung vị, hệ thống đổi sang λ (mục 5.1)
 export const weibullScale = (medianDays, k) => medianDays / Math.LN2 ** (1 / k)
 
@@ -47,5 +45,12 @@ export const formatDays = (days) => `${formatNumber(days, days < 10 ? 1 : 0)} ng
 export const formatDistance = (meters) =>
   meters < 1000 ? `${formatNumber(meters)} m` : `${formatNumber(meters / 1000, 1)} km`
 
-export const formatPercent = (ratio) =>
-  ratio > 0 && ratio < 0.01 ? '<1%' : `${formatNumber(ratio * 100)}%`
+export const formatPercent = (ratio, digits = 0) => {
+  if (digits === 0 && ratio > 0 && ratio < 0.01) return '<1%'
+
+  const formatted = new Intl.NumberFormat('vi-VN', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(ratio * 100)
+  return `${formatted}%`
+}

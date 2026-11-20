@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useLocation, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import Icon from '../../components/common/Icon'
 import Button from '../../components/backoffice/Button'
 import AlgorithmTab from '../../components/admin/categories/AlgorithmTab'
@@ -12,7 +12,6 @@ import DeleteCategoryDialog from '../../components/admin/categories/DeleteCatego
 import GeneralTab from '../../components/admin/categories/GeneralTab'
 import QuestionsTab from '../../components/admin/categories/QuestionsTab'
 import RelationsTab from '../../components/admin/categories/RelationsTab'
-import useLinkedHighlight from '../../hooks/useLinkedHighlight'
 import {
   archiveAdminCategory,
   createAdminCategory,
@@ -57,7 +56,6 @@ export default function Categories() {
     }
   }, [])
   const [searchParams, setSearchParams] = useSearchParams()
-  const location = useLocation()
   const selectedId = searchParams.get('category')
   const requestedTab = searchParams.get('tab')
   const tab = ['general', 'attributes', 'relations', 'algorithm', 'questions'].includes(
@@ -88,18 +86,27 @@ export default function Categories() {
     : selectedId
       ? categories.find((category) => category.id === selectedId || category.slug === selectedId)
       : categories[0]
-  const highlight = useLinkedHighlight(
-    searchParams.get('highlight') === '1' && selected
-      ? `${location.key}:${selected.id}:${tab}`
-      : null
-  )
   const applyCategoryUpdate = (updated) =>
-    setCategoryState((current) => ({
-      ...current,
-      items: current.items.map((category) => (category.id === updated.id ? updated : category)),
-      updatedAt: updated.updatedAt || current.updatedAt,
-      error: '',
-    }))
+    setCategoryState((current) => {
+      const previous = current.items.find((category) => category.id === updated.id)
+      const previousRecommendations = new Map(
+        (previous?.attributes ?? []).map((attribute) => [attribute.id, attribute.mRecommendation])
+      )
+      const next = {
+        ...updated,
+        attributes: updated.attributes.map((attribute) => ({
+          ...attribute,
+          mRecommendation:
+            attribute.mRecommendation ?? previousRecommendations.get(attribute.id) ?? null,
+        })),
+      }
+      return {
+        ...current,
+        items: current.items.map((category) => (category.id === updated.id ? next : category)),
+        updatedAt: updated.updatedAt || current.updatedAt,
+        error: '',
+      }
+    })
 
   const saveGeneral = async (value) => {
     const updated = await updateAdminCategoryGeneral(selected.id, value)
@@ -227,8 +234,6 @@ export default function Categories() {
           loading={categoryState.loading}
           selectedId={selected?.id}
           onSelect={setSelectedId}
-          highlightedId={highlight.active ? selected?.id : null}
-          highlightRef={highlight.targetRef}
         />
         <div className="flex min-w-[220px] flex-col items-end gap-2 max-[640px]:w-full max-[640px]:items-stretch">
           <div className="flex items-center gap-2 text-small text-primary" role="status">

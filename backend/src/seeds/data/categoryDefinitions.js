@@ -1,7 +1,6 @@
 // Định nghĩa danh mục mẫu cho seed.
 // Tham số ghép cặp (bán kính, k, trung vị, D, m) là số kinh nghiệm của docs/design/matching-algorithm.md.
-// Alias lấy theo cách người dùng thật gọi món đồ trong bộ khảo sát bài Facebook.
-// Độ hiếm u không viết ở đây mà ghép vào trong categories.js (xem file đó)
+// Alias lấy theo cách người dùng gọi món đồ. Độ hiếm u được job tính từ bài đăng trong database.
 
 const COLOR_ALIASES = {
   Đen: ['đen nhám'],

@@ -1,16 +1,8 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import Icon from '../../common/Icon'
-import { cx, focusRing, linkedHighlight } from '../../backoffice/classes'
+import { cx, focusRing } from '../../backoffice/classes'
 
-export default function CategoryList({
-  categories,
-  total,
-  loading = false,
-  selectedId,
-  onSelect,
-  highlightedId,
-  highlightRef,
-}) {
+export default function CategoryList({ categories, total, loading = false, selectedId, onSelect }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
@@ -91,13 +83,7 @@ export default function CategoryList({
           </label>
         </div>
         <div ref={rootRef} className="relative z-30">
-          <div
-            ref={highlightedId === selectedId ? highlightRef : null}
-            className={cx(
-              'flex min-h-12 items-center gap-3 rounded-xl border border-line bg-surface px-3 transition focus-within:border-primary-muted focus-within:ring-4 focus-within:ring-primary/10',
-              highlightedId === selectedId && linkedHighlight
-            )}
-          >
+          <div className="flex min-h-12 items-center gap-3 rounded-xl border border-line bg-surface px-3 transition focus-within:border-primary-muted focus-within:ring-4 focus-within:ring-primary/10">
             <Icon name="search" size={18} className="shrink-0 text-ink-subtle" />
             <input
               ref={inputRef}

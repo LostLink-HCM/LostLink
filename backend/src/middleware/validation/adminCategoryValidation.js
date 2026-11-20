@@ -84,7 +84,9 @@ const attributeRules = [
     if (!isString(payload.name, 1, 100)) return 'Tên thuộc tính phải có từ 1 đến 100 ký tự.'
     if (!stringList(payload.aliases, 100)) return 'Danh sách alias thuộc tính không hợp lệ.'
     if (!['exclude', 'score'].includes(payload.matchRole)) return 'Vai trò ghép cặp không hợp lệ.'
-    if (![0.95, 0.9, 0.8].includes(payload.mProb)) return 'Độ tin cậy không hợp lệ.'
+    if (!isNumber(payload.mProb, 0, 1) || payload.mProb === 0 || payload.mProb === 1) {
+      return 'Độ tin cậy m phải lớn hơn 0 và nhỏ hơn 1.'
+    }
     if (typeof payload.isRequired !== 'boolean') return 'Trạng thái bắt buộc không hợp lệ.'
     if (!Array.isArray(payload.values) || payload.values.length === 0) {
       return 'Thuộc tính phải có ít nhất một giá trị.'

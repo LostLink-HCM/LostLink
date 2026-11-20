@@ -1,6 +1,7 @@
 const mongoose = require('mongoose')
 
 const { Schema } = mongoose
+const { notifyFrequencyInputsChanged } = require('../utils/frequencyEvents')
 
 // Danh mục đồ vật
 const categorySchema = new Schema(
@@ -39,5 +40,25 @@ const categorySchema = new Schema(
   },
   { timestamps: true, collection: 'categories' }
 )
+
+categorySchema.pre('save', function trackNewCategory() {
+  this.$locals.frequencyRelevant = this.isNew
+})
+
+categorySchema.post('save', function notifyNewCategory() {
+  if (this.$locals.frequencyRelevant) notifyFrequencyInputsChanged()
+})
+
+categorySchema.post('findOneAndUpdate', function notifySeededCategory() {
+  const update = this.getUpdate() ?? {}
+  const isCategoryUpsert =
+    this.getOptions().upsert &&
+    Object.values(update).some((fields) => fields && typeof fields === 'object' && 'name' in fields)
+  if (isCategoryUpsert) notifyFrequencyInputsChanged()
+})
+
+for (const operation of ['deleteOne', 'deleteMany', 'findOneAndDelete']) {
+  categorySchema.post(operation, notifyFrequencyInputsChanged)
+}
 
 module.exports = mongoose.model('Category', categorySchema)

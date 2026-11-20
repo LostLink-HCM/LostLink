@@ -8,7 +8,7 @@ const {
   CategoryVerificationQuestion,
   User,
 } = require('../models')
-const CATEGORIES = require('./data/categories')
+const CATEGORIES = require('./data/categoryDefinitions')
 const { lowercaseText } = require('../utils/text')
 
 const seedAttributes = async (category, definition) => {
@@ -41,10 +41,10 @@ const seedAttributes = async (category, definition) => {
       },
       { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
     )
-    for (const [value, frequency, aliases = []] of values) {
+    for (const [value, aliases = []] of values) {
       const attributeValue = await AttributeValue.findOneAndUpdate(
         { attribute: attribute._id, value },
-        { $setOnInsert: { attribute: attribute._id, value, frequency } },
+        { $setOnInsert: { attribute: attribute._id, value } },
         { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
       )
       for (const term of aliases) await addAlias(term, { attributeValue: attributeValue._id })
@@ -105,7 +105,6 @@ const seedCategories = async () => {
           timeShape: definition.timeShape,
           timeMedianDays: definition.timeMedianDays,
           diffusion: definition.diffusion,
-          frequency: definition.frequency,
           contentItems: definition.contents ?? [],
           isActive: true,
         },

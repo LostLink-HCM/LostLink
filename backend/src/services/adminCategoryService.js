@@ -8,6 +8,7 @@ const {
   CategoryMatchRelation,
   CategoryMatchRelationMember,
   CategoryVerificationQuestion,
+  MatchSuggestion,
   Post,
 } = require('../models')
 const ApiError = require('../utils/ApiError')
@@ -21,6 +22,8 @@ const DEFAULT_ALGORITHM = {
   timeMedianDays: 3.5,
   diffusion: 0,
 }
+const DUPLICATE_QUESTION_MESSAGE =
+  'Câu hỏi xác minh này đã tồn tại trong danh mục, vui lòng nhập lại giá trị khác.'
 
 const invalid = (message, field) =>
   new ApiError(422, message, field ? [{ field, message }] : undefined)
@@ -252,15 +255,106 @@ const latestUpdatedAt = (items) =>
     return !latest || item.updatedAt > latest ? item.updatedAt : latest
   }, null)
 
+const estimateAttributeReliability = async (items) => {
+  const attributeIds = items.flatMap((category) => category.attributes.map((item) => item.id))
+  if (!attributeIds.length) return items
+
+  const objectIds = attributeIds.map((id) => new mongoose.Types.ObjectId(id))
+  const estimates = await MatchSuggestion.aggregate([
+    { $match: { state: 'confirmed_both' } },
+    {
+      $lookup: {
+        from: 'posts',
+        localField: 'postLost',
+        foreignField: '_id',
+        as: 'lostPost',
+      },
+    },
+    { $unwind: '$lostPost' },
+    {
+      $lookup: {
+        from: 'posts',
+        localField: 'postFound',
+        foreignField: '_id',
+        as: 'foundPost',
+      },
+    },
+    { $unwind: '$foundPost' },
+    { $unwind: '$lostPost.attributes' },
+    { $match: { 'lostPost.attributes.attribute': { $in: objectIds } } },
+    { $unwind: '$foundPost.attributes' },
+    {
+      $match: {
+        $expr: { $eq: ['$lostPost.attributes.attribute', '$foundPost.attributes.attribute'] },
+      },
+    },
+    {
+      $group: {
+        _id: '$lostPost.attributes.attribute',
+        totalPairs: { $sum: 1 },
+        matchingPairs: {
+          $sum: {
+            $cond: [
+              {
+                $eq: [
+                  '$lostPost.attributes.attributeValue',
+                  '$foundPost.attributes.attributeValue',
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        totalPairs: 1,
+        matchingPairs: 1,
+        value: {
+          $divide: [{ $add: ['$matchingPairs', 1] }, { $add: ['$totalPairs', 2] }],
+        },
+      },
+    },
+  ])
+
+  const calculatedAt = new Date().toISOString()
+  const byAttribute = new Map(
+    estimates.map((item) => [
+      String(item._id),
+      {
+        value: item.value,
+        matchingPairs: item.matchingPairs,
+        totalPairs: item.totalPairs,
+        calculatedAt,
+      },
+    ])
+  )
+
+  return items.map((category) => ({
+    ...category,
+    attributes: category.attributes.map((attribute) => ({
+      ...attribute,
+      mRecommendation: byAttribute.get(attribute.id) ?? null,
+    })),
+  }))
+}
+
 const listCategories = async () => {
   const categories = await Category.find({ isActive: { $ne: false } })
     .sort({ order: 1, name: 1, _id: 1 })
     .lean()
-  const items = await Promise.all(categories.map((category) => findCategoryDetails(category)))
+  const details = await Promise.all(categories.map((category) => findCategoryDetails(category)))
+  const items = await estimateAttributeReliability(details)
   return { items, updatedAt: latestUpdatedAt(items) }
 }
 
-const getCategory = async (id) => findCategoryDetails(await findActiveCategory(id))
+const getCategory = async (id) => {
+  const category = await findCategoryDetails(await findActiveCategory(id))
+  const [estimatedCategory] = await estimateAttributeReliability([category])
+  return estimatedCategory
+}
 
 const categoryKey = (value) =>
   String(value ?? '')
@@ -732,16 +826,40 @@ const updateRelations = async (categoryId, input, actor) =>
     return after
   })
 
+const assertUniqueVerificationQuestion = async (categoryId, text, excludeId, session) => {
+  const duplicate = await withSession(
+    CategoryVerificationQuestion.exists({
+      category: categoryId,
+      question: text,
+      ...(excludeId && { _id: { $ne: excludeId } }),
+    }),
+    session
+  )
+  if (duplicate) throw conflict(DUPLICATE_QUESTION_MESSAGE)
+}
+
+const saveVerificationQuestion = async (question, session) => {
+  try {
+    await question.save(session ? { session } : undefined)
+  } catch (error) {
+    if (error.code === 11000 && error.keyPattern?.category && error.keyPattern?.question)
+      throw conflict(DUPLICATE_QUESTION_MESSAGE)
+    throw error
+  }
+}
+
 const addQuestion = async (categoryId, input, actor) =>
   atomic(async (session) => {
     const category = await findActiveCategory(categoryId, session)
     const before = await findCategoryDetails(category, session)
+    const text = input.text.trim().normalize('NFC')
+    await assertUniqueVerificationQuestion(category._id, text, null, session)
     const question = new CategoryVerificationQuestion({
       category: category._id,
-      question: input.text.trim().normalize('NFC'),
+      question: text,
       createdBy: actor._id,
     })
-    await question.save(session ? { session } : undefined)
+    await saveVerificationQuestion(question, session)
     category.updatedAt = new Date()
     await category.save(session ? { session } : undefined)
     const after = await findCategoryDetails(category, session)
@@ -758,8 +876,10 @@ const updateQuestion = async (categoryId, questionId, input, actor) =>
       session
     )
     if (!question) throw questionNotFound()
-    question.question = input.text.trim().normalize('NFC')
-    await question.save(session ? { session } : undefined)
+    const text = input.text.trim().normalize('NFC')
+    await assertUniqueVerificationQuestion(category._id, text, question._id, session)
+    question.question = text
+    await saveVerificationQuestion(question, session)
     category.updatedAt = new Date()
     await category.save(session ? { session } : undefined)
     const after = await findCategoryDetails(category, session)

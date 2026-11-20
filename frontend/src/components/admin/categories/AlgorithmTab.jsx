@@ -62,7 +62,7 @@ function Preview({ form, valid, frequency, sMin }) {
         />
         <Stat
           label="Tần suất danh mục u"
-          value={frequency == null ? 'Tự tính từ bài đăng' : formatPercent(frequency)}
+          value={frequency == null ? 'Tự tính từ bài đăng' : formatPercent(frequency, 2)}
         />
         <Stat
           label="Bán kính lọc lúc mất"

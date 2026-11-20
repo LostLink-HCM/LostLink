@@ -1,5 +1,3 @@
-import { M_LEVELS } from './matching'
-
 export const DEFAULT_RELATION_RATIO = 0.6
 
 export const EMPTY_CATEGORY = Object.freeze({
@@ -27,7 +25,11 @@ export function makeId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
-const keyOf = (text) => text.trim().normalize('NFC').toLocaleLowerCase('vi')
+const keyOf = (text) =>
+  String(text ?? '')
+    .trim()
+    .normalize('NFC')
+    .toLocaleLowerCase('vi')
 export const aliasKeyOf = (text) =>
   String(text ?? '')
     .normalize('NFC')
@@ -95,6 +97,42 @@ export function duplicateAliasErrors(groups, existingTerms = [], savedGroups = [
   )
 }
 
+export function duplicateTermErrors(items, savedItems = [], message) {
+  const keys = items.map(keyOf)
+  const counts = new Map()
+  for (const key of keys) {
+    if (key) counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  const duplicateKeys = new Set([...counts].filter(([, count]) => count > 1).map(([key]) => key))
+  const savedCounts = new Map()
+  for (const item of savedItems) {
+    const key = keyOf(item)
+    if (key) savedCounts.set(key, (savedCounts.get(key) ?? 0) + 1)
+  }
+
+  const persisted = items.map(() => false)
+  const consumeSaved = (index) => {
+    const key = keys[index]
+    const remaining = savedCounts.get(key) ?? 0
+    if (!key || !remaining) return false
+    persisted[index] = true
+    if (remaining === 1) savedCounts.delete(key)
+    else savedCounts.set(key, remaining - 1)
+    return true
+  }
+
+  items.forEach((_, index) => {
+    if (keys[index] === keyOf(savedItems[index])) consumeSaved(index)
+  })
+  items.forEach((_, index) => {
+    if (!persisted[index]) consumeSaved(index)
+  })
+
+  return items.map((_, index) =>
+    duplicateKeys.has(keys[index]) && !persisted[index] ? message : ''
+  )
+}
+
 // Bỏ ô trống và mục trùng (không phân biệt hoa thường), giữ thứ tự nhập
 export function cleanList(items) {
   const seen = new Set()
@@ -158,7 +196,9 @@ export function validateAttribute(form, attributes, selfId) {
     attributes.some((attribute) => attribute.id !== selfId && keyOf(attribute.name) === keyOf(name))
   )
     return 'Danh mục đã có thuộc tính cùng tên.'
-  if (!M_LEVELS.some((level) => level.value === Number(form.mProb))) return 'Chọn độ tin cậy.'
+  const mProb = Number(form.mProb)
+  if (!String(form.mProb ?? '').trim() || !Number.isFinite(mProb) || mProb <= 0 || mProb >= 1)
+    return 'Độ tin cậy m phải lớn hơn 0 và nhỏ hơn 1.'
   if (!form.values.length) return 'Thêm ít nhất một giá trị để người đăng chọn.'
   if (form.values.some((attributeValue) => !attributeValue.value.trim()))
     return 'Nhập tên cho tất cả giá trị.'

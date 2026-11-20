@@ -212,14 +212,6 @@ test.describe('Nhật ký thao tác của admin', () => {
     const internalReply = settingsData.quickReplies.internal[0]
     for (const item of [
       {
-        entityType: 'Category',
-        entityId: '507f1f77bcf86cd799439011',
-        entityExists: true,
-        detail: { displayCode: 'vi-tien', section: 'attributes', summary: 'Cập nhật danh mục' },
-        label: 'Xem danh mục',
-        category: true,
-      },
-      {
         entityType: 'SystemConfig',
         detail: {
           section: 'matching',
@@ -348,27 +340,7 @@ test.describe('Nhật ký thao tác của admin', () => {
       await expect(page.getByRole('dialog')).toHaveCount(0)
       if (item.missing)
         await expect(page.getByRole('alert')).toContainText('Đối tượng không còn tồn tại.')
-      else if (item.category) {
-        await expect(
-          page.getByRole('region', { name: 'Chi tiết danh mục Ví & tiền', exact: true })
-        ).toBeVisible()
-        await expect(page.locator('#category-tab-attributes')).toHaveAttribute(
-          'aria-selected',
-          'true'
-        )
-        const categoryButton = page.getByRole('button', { name: 'Ví & tiền', exact: true })
-        await page.mouse.move(0, 0)
-        await expect(categoryButton).toHaveCSS('background-color', 'rgb(255, 249, 219)')
-        await expect(
-          page
-            .getByRole('region', { name: 'Chi tiết danh mục Ví & tiền', exact: true })
-            .locator('header')
-            .first()
-        ).not.toHaveCSS('background-color', 'rgb(255, 249, 219)')
-        await expect(categoryButton).toHaveCSS('background-color', 'rgb(230, 240, 250)', {
-          timeout: 5000,
-        })
-      } else {
+      else {
         await expect(
           page
             .getByRole('tablist', { name: 'Nhóm cấu hình hệ thống' })
