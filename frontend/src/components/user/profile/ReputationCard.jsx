@@ -1,7 +1,6 @@
 import { formatRating } from '../../../lib/user/profiles'
 import Card from '../Card'
 
-// Điểm uy tín cộng đồng và số liệu đi kèm
 export default function ReputationCard({ profile, rating }) {
   const stats = [
     ['Món đã trao trả', profile.returned],
@@ -10,7 +9,7 @@ export default function ReputationCard({ profile, rating }) {
 
   return (
     <Card as="section" padding="md">
-      <h2 className="m-0 mb-3 text-body font-bold text-ink">Uy tín cộng đồng</h2>
+      <h2 className="m-0 mb-3 text-body font-bold text-ink">Tổng điểm uy tín</h2>
       <p className="m-0 mb-4 flex items-baseline gap-2">
         <span className="text-[34px] leading-none font-bold tracking-tight text-primary">
           {profile.reputation}

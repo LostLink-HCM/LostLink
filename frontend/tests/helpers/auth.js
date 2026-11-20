@@ -16,6 +16,9 @@ const ipFor = (testInfo) => {
 export const test = base.extend({
   context: async ({ context }, provide, testInfo) => {
     await context.setExtraHTTPHeaders({ 'X-Forwarded-For': ipFor(testInfo) })
+    await context.addInitScript(() =>
+      localStorage.setItem('ll-feedback-hidden-at', String(Date.now()))
+    )
     await provide(context)
   },
   // Gọi thẳng API để chuẩn bị dữ liệu nhanh, không phải đi qua giao diện

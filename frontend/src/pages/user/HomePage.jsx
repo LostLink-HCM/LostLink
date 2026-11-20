@@ -66,8 +66,12 @@ export default function HomePage({ hot = false }) {
     error: filterError,
     onChange: (patch) => {
       setDraft((prev) => ({ ...prev, ...patch }))
+      if (patch.range !== 'custom') setApplied((prev) => ({ ...prev, ...patch }))
       setFilterError('')
     },
+    pendingDates:
+      draft.range === 'custom' &&
+      (applied.range !== 'custom' || draft.from !== applied.from || draft.to !== applied.to),
     onApply: () => {
       const error = validateFilters(draft)
       setFilterError(error)
@@ -136,8 +140,13 @@ export default function HomePage({ hot = false }) {
             />
           </section>
 
-          <StickyPanel aria-label="Cộng đồng" className="hidden xl:block">
-            <RightRail isGuest={!user} />
+          {/* Cột phải cao đúng một màn hình (trừ header và khoảng hở dưới); phóng to trình duyệt
+              làm nội dung dài hơn thì cuộn bên trong cột */}
+          <StickyPanel
+            aria-label="Cộng đồng"
+            className="-mx-1 hidden h-[calc(100dvh-100px)] overflow-y-auto overscroll-contain px-1 [scrollbar-width:thin] xl:block"
+          >
+            <RightRail isGuest={!user} fill />
           </StickyPanel>
         </main>
       </div>

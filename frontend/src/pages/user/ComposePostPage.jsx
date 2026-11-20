@@ -577,7 +577,7 @@ export default function ComposePostPage({ mode = 'create', postId = null }) {
                     {savingDraft ? 'Đang lưu…' : 'Lưu nháp'}
                   </Button>
                 )}
-                <Button type="submit" variant="primary" size="lg" className="flex-1 sm:flex-none">
+                <Button type="submit" variant="cta" size="lg" className="flex-1 sm:flex-none">
                   {isLast ? (editing ? 'Xem lại & lưu' : 'Xem lại & đăng bài') : 'Tiếp tục'}
                   <Icon name="next" size={16} />
                 </Button>

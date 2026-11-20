@@ -8,6 +8,7 @@ const sizes = {
   lg: 'size-10.5 text-caption',
   xl: 'size-11 text-small',
   '2xl': 'size-20 text-heading sm:size-24',
+  fluid: '',
 }
 
 const tones = {

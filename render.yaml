@@ -58,3 +58,5 @@ projects:
                 value: /api
               - key: VITE_GOOGLE_CLIENT_ID
                 sync: false
+              - key: VITE_FEEDBACK_FORM_URL
+                sync: false

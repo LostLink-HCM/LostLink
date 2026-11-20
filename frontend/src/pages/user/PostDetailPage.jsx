@@ -16,6 +16,7 @@ import TypeTag from '../../components/user/home/TypeTag'
 import CommentSection from '../../components/user/post/CommentSection'
 import PostActionSheet from '../../components/user/post/PostActionSheet'
 import PostGallery from '../../components/user/post/PostGallery'
+import PostMenu from '../../components/user/post/PostMenu'
 import { ClosePostDialog, DeletePostDialog } from '../../components/user/post/PostManageDialogs'
 import PostStatusTag from '../../components/user/post/PostStatusTag'
 import { useMatchCount } from '../../hooks/useMatchCount'
@@ -128,6 +129,16 @@ export default function PostDetailPage({ type }) {
   return <PostDetail key={post.id} post={post} onChanged={reload} />
 }
 
+// Nút trong hàng tương tác ở chi tiết bài: không viền, bật thì có nền màu chủ đề
+const actionClass = (on) =>
+  cx(
+    'inline-flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border-0 px-3 text-caption font-semibold transition-colors',
+    on
+      ? 'bg-primary-soft text-primary'
+      : 'bg-transparent text-ink-secondary hover:bg-surface-muted hover:text-ink',
+    focusRing
+  )
+
 function PostDetail({ post, onChanged }) {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -164,6 +175,39 @@ function PostDetail({ post, onChanged }) {
     if (requireMember()) navigate(`/posts/${post.id}/report`, { state: { post } })
   }
   const claim = () => ctx.claimPost(post)
+  // Sao chép xong thì icon đổi sang dấu tích 2 giây thay cho thông báo
+  const [copied, setCopied] = useState(false)
+  useEffect(() => {
+    if (!copied) return undefined
+    const timer = setTimeout(() => setCopied(false), 2000)
+    return () => clearTimeout(timer)
+  }, [copied])
+  // Chia sẻ: máy có bảng chia sẻ của hệ thống (điện thoại, Windows...) thì mở bảng đó,
+  // không có thì sao chép liên kết
+  const share = async () => {
+    const url = window.location.href
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: post.title, url })
+      } catch (error) {
+        // Người dùng tự đóng bảng chia sẻ thì thôi, lỗi khác mới chuyển sang sao chép
+        if (error?.name === 'AbortError') return
+      }
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+    } catch {
+      notify('Không sao chép được liên kết, hãy sao chép từ thanh địa chỉ.')
+    }
+  }
+  const toComments = () => {
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    document
+      .getElementById('comments')
+      ?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' })
+  }
 
   // Bài của chính mình: không nhận đồ hay báo cáo, thay bằng lối vào gợi ý ghép cặp
   const showMatches = isMine && isMatchable(post)
@@ -247,7 +291,22 @@ function PostDetail({ post, onChanged }) {
     navigate(profilePath(user.username))
   }
 
-  // Trên mobile các hành động gom vào nút ⋯ thay cho hai khối ở cột phải
+  // Lưu, Theo dõi, Báo cáo bài của người khác nằm trong menu ⋯ (desktop) và bảng ⋯ (mobile)
+  const viewerActions = [
+    {
+      label: isSaved ? 'Bỏ lưu bài' : 'Lưu bài',
+      icon: 'bookmark',
+      onClick: () => interactions.toggleSaved(post),
+    },
+    {
+      label: isFollowed ? 'Bỏ theo dõi' : 'Theo dõi bài',
+      icon: 'bell',
+      onClick: () => interactions.toggleFollowed(post),
+    },
+    { label: 'Báo cáo bài đăng này', icon: 'flag', tone: 'danger', onClick: report },
+  ]
+
+  // Trên mobile hành động chính cũng gom vào nút ⋯
   const sheetActions = isMine
     ? [
         matchCount > 0 && {
@@ -258,20 +317,7 @@ function PostDetail({ post, onChanged }) {
         },
         ...ownerActions,
       ].filter(Boolean)
-    : [
-        { label: claimLabel, icon: 'check', tone: 'primary', onClick: claim },
-        {
-          label: isSaved ? 'Bỏ lưu bài' : 'Lưu bài',
-          icon: 'bookmark',
-          onClick: () => interactions.toggleSaved(post),
-        },
-        {
-          label: isFollowed ? 'Bỏ theo dõi' : 'Theo dõi bài',
-          icon: 'bell',
-          onClick: () => interactions.toggleFollowed(post),
-        },
-        { label: 'Báo cáo bài đăng này', icon: 'flag', tone: 'danger', onClick: report },
-      ]
+    : [{ label: claimLabel, icon: 'check', tone: 'primary', onClick: claim }, ...viewerActions]
 
   return (
     <div className={pageClass}>
@@ -299,12 +345,18 @@ function PostDetail({ post, onChanged }) {
                 <Icon name="more" size={20} />
               </button>
             )}
+            {/* Desktop: Sửa, Đóng, Xóa của chủ bài; Lưu, Theo dõi, Báo cáo của người khác */}
+            <div className="absolute top-3.5 right-3.5 hidden lg:block">
+              <PostMenu title={post.title} actions={isMine ? ownerActions : viewerActions} />
+            </div>
             {notice && (
               <Note icon={notice[0]} tone={notice[1]} className="mb-4">
                 {notice[2]}
               </Note>
             )}
-            <div className="mb-3 flex flex-wrap items-center gap-2 pr-10 lg:pr-0">
+            <div
+              className={cx('mb-3 flex flex-wrap items-center gap-2 pr-10', isMine && 'lg:pr-0')}
+            >
               <TypeTag type={post.type} className="py-1" />
               <PostStatusTag status={post.status} className="py-1" />
               <span className="rounded-full bg-line-subtle px-2.5 py-1 text-tiny text-ink-secondary">
@@ -314,6 +366,10 @@ function PostDetail({ post, onChanged }) {
                 Đăng {timeAgo(post.createdAt, now).toLowerCase()} ·{' '}
                 {formatDate(post.createdAt, { day: '2-digit', month: '2-digit', year: 'numeric' })}
               </time>
+              {/* Kéo sát vào ngày đăng như cùng một dòng meta (hàng có gap-2) */}
+              <span className="-ml-1 text-tiny text-ink-subtle">
+                · {formatCount(post.views)} lượt xem
+              </span>
             </div>
 
             {/* Mobile không có thẻ người đăng nên hiện tên ngay trên tiêu đề, bấm để xem trang cá nhân */}
@@ -385,15 +441,30 @@ function PostDetail({ post, onChanged }) {
               <span className="sr-only">(mở bản đồ trong tab mới)</span>
             </a>
 
-            <div className="flex flex-wrap items-center gap-3 border-t border-line-subtle pt-4">
+            {/* Hàng nút tương tác: Thích, số bình luận, chia sẻ. Lưu và Theo dõi ở menu ⋯ */}
+            <div className="flex flex-wrap items-center gap-1 border-t border-line-subtle pt-3">
               <LikeButton
                 liked={isLiked}
                 count={likeCount}
                 onClick={() => interactions.toggleLike(post)}
-                withLabel
+                variant="ghost"
               />
-              <span className="ml-auto text-tiny text-ink-subtle">
-                {formatCount(commentCount)} bình luận · {formatCount(post.views)} lượt xem
+              <button
+                type="button"
+                onClick={toComments}
+                className={cx(
+                  'ml-auto cursor-pointer rounded-full border-0 bg-transparent px-2 py-1 text-tiny text-ink-subtle hover:text-primary hover:underline',
+                  focusRing
+                )}
+              >
+                {formatCount(commentCount)} bình luận
+              </button>
+              <button type="button" onClick={share} className={actionClass(copied)}>
+                <Icon name={copied ? 'check' : 'share'} size={18} />
+                <span className="max-sm:sr-only">{copied ? 'Đã sao chép' : 'Chia sẻ'}</span>
+              </button>
+              <span aria-live="polite" className="sr-only">
+                {copied ? 'Đã sao chép liên kết bài đăng' : ''}
               </span>
             </div>
           </Card>
@@ -403,6 +474,43 @@ function PostDetail({ post, onChanged }) {
           aria-label="Người đăng và hành động"
           className="hidden flex-col gap-4 lg:sticky lg:top-25 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:flex"
         >
+          {showMatches && (
+            <Card as="section" padding="md">
+              <h2 className="m-0 mb-1.5 text-body font-bold text-ink">Manh mối</h2>
+              <p
+                className={cx(
+                  'm-0 text-caption leading-relaxed text-ink-muted',
+                  matchCount > 0 && 'mb-4'
+                )}
+              >
+                {matchCount > 0
+                  ? `LostLink tìm thấy ${matchCount} bài ${lost ? 'Nhặt được' : 'Mất đồ'} có thể khớp với bài của bạn.`
+                  : 'Chưa có bài nào khớp. LostLink sẽ báo cho bạn ngay khi có bài phù hợp.'}
+              </p>
+              {matchCount > 0 && (
+                <Link
+                  to={matchesPath}
+                  className={buttonClass({ variant: 'primary', size: 'xl', block: true })}
+                >
+                  Xem {matchCount} manh mối
+                </Link>
+              )}
+            </Card>
+          )}
+
+          {/* Bài của chính mình thì không có khối nhận đồ; báo cáo nằm trong menu ⋯ của bài */}
+          {!isMine && (
+            <Card as="section" padding="md">
+              <h2 className="m-0 mb-4 text-body font-bold text-ink">
+                {lost ? 'Bạn nhặt được món này?' : 'Đây là đồ của bạn?'}
+              </h2>
+              <Button variant="primary" size="xl" block onClick={claim}>
+                {claimLabel}
+              </Button>
+            </Card>
+          )}
+
+          {/* Người đăng xếp sau hành động chính để nút nhận đồ luôn ở đầu cột */}
           <Card as="section" padding="md">
             <div className="mb-4 flex items-center gap-3">
               <Avatar name={post.author} src={post.authorAvatar} size="xl" />
@@ -432,107 +540,10 @@ function PostDetail({ post, onChanged }) {
               Xem trang cá nhân
             </Button>
           </Card>
-
-          {showMatches && (
-            <Card as="section" padding="md">
-              <h2 className="m-0 mb-1.5 text-body font-bold text-ink">Manh mối</h2>
-              <p
-                className={cx(
-                  'm-0 text-caption leading-relaxed text-ink-muted',
-                  matchCount > 0 && 'mb-4'
-                )}
-              >
-                {matchCount > 0
-                  ? `LostLink tìm thấy ${matchCount} bài ${lost ? 'Nhặt được' : 'Mất đồ'} có thể khớp với bài của bạn.`
-                  : 'Chưa có bài nào khớp. LostLink sẽ báo cho bạn ngay khi có bài phù hợp.'}
-              </p>
-              {matchCount > 0 && (
-                <Link
-                  to={matchesPath}
-                  className={buttonClass({ variant: 'primary', size: 'xl', block: true })}
-                >
-                  Xem {matchCount} manh mối
-                </Link>
-              )}
-            </Card>
-          )}
-
-          {isMine && (
-            <Card as="section" padding="md" aria-labelledby="manage-heading">
-              <h2 id="manage-heading" className="m-0 mb-1.5 text-body font-bold text-ink">
-                Quản lý bài đăng
-              </h2>
-              <p className="m-0 mb-4 text-caption leading-relaxed text-ink-muted">
-                {manage.canEdit
-                  ? 'Sửa bài thì bài được LostLink duyệt lại trước khi hiện công khai.'
-                  : 'Bài đã có người liên hệ hoặc đã kết thúc nên không sửa được nội dung.'}
-              </p>
-              <div className="flex flex-col gap-2">
-                {ownerActions.map((action) => (
-                  <Button
-                    key={action.label}
-                    block
-                    variant={action.tone === 'danger' ? 'dangerSoft' : 'secondary'}
-                    onClick={action.onClick}
-                  >
-                    <Icon name={action.icon} size={14} />
-                    {action.label}
-                  </Button>
-                ))}
-              </div>
-            </Card>
-          )}
-
-          {/* Bài của chính mình thì không có khối nhận đồ và báo cáo */}
-          {!isMine && (
-            <Card as="section" padding="md">
-              <h2 className="m-0 mb-1.5 text-body font-bold text-ink">
-                {lost ? 'Bạn nhặt được món này?' : 'Đây là đồ của bạn?'}
-              </h2>
-              <p className="m-0 mb-4 text-caption leading-relaxed text-ink-muted">
-                {lost
-                  ? 'Gửi một lời nhắn cho người mất. Khi họ đồng ý, hai bên nhắn tin để hẹn trao trả.'
-                  : 'Người đăng sẽ hỏi vài chi tiết về món đồ. Trả lời đúng là hai bên nhắn tin được ngay.'}
-              </p>
-              <Button variant="primary" size="xl" block onClick={claim}>
-                {claimLabel}
-              </Button>
-              <div className="mt-2.5 flex gap-2">
-                <Button
-                  pressed={isSaved}
-                  onClick={() => interactions.toggleSaved(post)}
-                  className="flex-1"
-                >
-                  {isSaved ? 'Đã lưu' : 'Lưu bài'}
-                </Button>
-                <Button
-                  pressed={isFollowed}
-                  onClick={() => interactions.toggleFollowed(post)}
-                  className="flex-1"
-                >
-                  <Icon name="bell" size={14} />
-                  {isFollowed ? 'Đang theo dõi' : 'Theo dõi'}
-                </Button>
-              </div>
-            </Card>
-          )}
-
-          {!isMine && (
-            <Card as="section" padding="md">
-              <h2 className="m-0 mb-1 text-small font-bold text-ink">Thấy tin này có vấn đề?</h2>
-              <p className="m-0 mb-3.5 text-tiny leading-relaxed text-ink-muted">
-                Tin rác, đòi tiền mới trả đồ, hay ảnh không phải của người đăng, hãy báo cho
-                LostLink.
-              </p>
-              <Button variant="dangerSoft" block onClick={report}>
-                <Icon name="flag" size={14} />
-                Báo cáo bài đăng này
-              </Button>
-            </Card>
-          )}
         </aside>
 
-        <div className="min-w-0 lg:col-start-1">
+        {/* id comments: nút "x bình luận" cuộn tới đây */}
+        <div id="comments" className="min-w-0 scroll-mt-24 lg:col-start-1">
           {/* 6.a Chưa có bình luận thì CommentSection hiện "Chưa có bình luận nào" */}
           <CommentSection
             comments={comments}

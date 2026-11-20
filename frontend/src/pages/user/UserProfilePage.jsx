@@ -22,7 +22,7 @@ import {
 } from '../../components/user/profile/ProfileSections'
 import { useBack, useProfileData } from '../../hooks/useProfileData'
 import { toFeedPost } from '../../lib/user/homeFeed'
-import { PROFILE_TABS, profilePath, toProfileView } from '../../lib/user/profiles'
+import { PROFILE_TABS, profilePath, profileStats, toProfileView } from '../../lib/user/profiles'
 
 const inTab = (post, tab) => !tab || post.type === tab
 // Chỉ liên hệ được khi bài chưa trao trả
@@ -190,7 +190,11 @@ export default function UserProfilePage({ username }) {
     <div className={profilePageClass}>
       <BackLink onClick={back}>Quay lại</BackLink>
 
-      <ProfileHeader profile={profile} actions={actions}>
+      <ProfileHeader
+        profile={profile}
+        stats={profileStats(profile, posts.length, data.rating.average)}
+        actions={actions}
+      >
         {blocked && (
           <Note icon="lock" tone="warning" className="mt-5">
             Bạn đã chặn {name}.

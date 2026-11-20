@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AREAS } from '../../../data/homeFeed'
 import { useFeedCategories } from '../../../hooks/useFeedCategories'
 import { TIME_RANGES, TYPE_LABELS } from '../../../lib/user/homeFeed'
@@ -7,6 +7,9 @@ import Button from '../Button'
 import { cx, focusRing } from '../classes'
 import CategoryIcon from './CategoryIcon'
 import DateField from './DateField'
+import MiniCalendar from './MiniCalendar'
+
+const DATE_LABELS = { from: 'Từ ngày', to: 'Đến ngày' }
 
 const typeButtonTones = {
   all: {
@@ -41,10 +44,12 @@ const chipClass = (active) =>
 const dateClass =
   'h-8 rounded-lg border border-line bg-surface px-2 text-caption outline-none focus-visible:border-primary aria-invalid:border-danger'
 
-// Chỉnh trên bản nháp, bấm "Áp dụng bộ lọc" mới lọc danh sách
+// Chọn chip (loại tin, danh mục, khu vực, khoảng thời gian) là lọc ngay. Riêng khoảng ngày tự chọn
+// nằm ở bản nháp, pendingDates bật nút "Áp dụng khoảng ngày" để xác nhận rồi mới lọc
 export default function FeedFilters({
   draft,
   activeCount = 0,
+  pendingDates = false,
   onChange,
   onApply,
   onReset,
@@ -52,7 +57,30 @@ export default function FeedFilters({
   idPrefix,
   scrollBody = false,
 }) {
-  const setDate = (key) => (e) => onChange({ [key]: e.target.value, range: 'custom' })
+  // Ô ngày đang mở lịch ('from' | 'to' | null), lịch hiện ngay dưới hai ô
+  const [picking, setPicking] = useState(null)
+  const dateBoxRef = useRef(null)
+  const calendarId = `${idPrefix}-calendar`
+
+  const closeCalendar = () => {
+    document.getElementById(`${idPrefix}-${picking}`)?.focus()
+    setPicking(null)
+  }
+  const pickDate = (value) => {
+    onChange({ [picking]: value, range: 'custom' })
+    closeCalendar()
+  }
+
+  // Bấm ra ngoài khu chọn ngày thì đóng lịch
+  useEffect(() => {
+    if (!picking) return
+    const onPointerDown = (e) => {
+      if (!dateBoxRef.current?.contains(e.target)) setPicking(null)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [picking])
+
   const categories = useFeedCategories()
   const categoryName = (slug) => categories.find((item) => item.slug === slug)?.name ?? ''
 
@@ -75,7 +103,7 @@ export default function FeedFilters({
             onClick={onReset}
             aria-label={`Xóa lọc, đang chọn ${activeCount} tiêu chí`}
             className={cx(
-              'group inline-flex cursor-pointer items-center gap-1 rounded-full border border-primary/30 bg-primary-soft py-1 pr-1 pl-2.5 text-caption font-semibold text-primary shadow-[0_2px_8px_-2px_rgb(46_109_180/0.35)] transition-colors hover:bg-primary hover:text-white motion-safe:animate-ll-fade',
+              'group inline-flex cursor-pointer items-center gap-1 rounded-full border border-primary/30 bg-primary-soft py-1 pr-1 pl-2.5 text-caption font-semibold text-primary shadow-[0_2px_8px_-2px_color-mix(in_srgb,var(--color-primary)_35%,transparent)] transition-colors hover:bg-primary hover:text-white motion-safe:animate-ll-fade',
               focusRing
             )}
           >
@@ -109,7 +137,8 @@ export default function FeedFilters({
                   aria-pressed={active}
                   onClick={() => onChange({ type: value })}
                   className={cx(
-                    'h-8 cursor-pointer rounded-lg border-[1.5px] px-1 text-caption whitespace-nowrap transition',
+                    // Cùng khuôn với các chip khác trong bộ lọc, giữ màu riêng của từng loại tin
+                    'h-7.5 cursor-pointer rounded-xl border px-1 text-caption whitespace-nowrap transition',
                     tone.base,
                     active ? cx('font-semibold', tone.active) : cx('font-medium', tone.idle),
                     focusRing
@@ -158,29 +187,44 @@ export default function FeedFilters({
               </button>
             ))}
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              ['from', 'Từ ngày', { max: draft.to || undefined }],
-              ['to', 'Đến ngày', { min: draft.from || undefined }],
-            ].map(([key, label, limits]) => (
-              <div key={key}>
-                <label
-                  htmlFor={`${idPrefix}-${key}`}
-                  className="mb-0.5 block text-[9px] font-medium text-ink-secondary"
-                >
-                  {label}
-                </label>
-                <DateField
-                  id={`${idPrefix}-${key}`}
-                  value={draft[key]}
-                  onChange={setDate(key)}
-                  invalid={Boolean(error)}
-                  describedBy={error ? `${idPrefix}-error` : undefined}
-                  className={dateClass}
-                  {...limits}
-                />
-              </div>
-            ))}
+          <div ref={dateBoxRef}>
+            <div className="grid grid-cols-2 gap-2">
+              {['from', 'to'].map((key) => (
+                <div key={key}>
+                  <label
+                    htmlFor={`${idPrefix}-${key}`}
+                    className="mb-0.5 block text-[9px] font-medium text-ink-secondary"
+                  >
+                    {DATE_LABELS[key]}
+                  </label>
+                  <DateField
+                    id={`${idPrefix}-${key}`}
+                    value={draft[key]}
+                    open={picking === key}
+                    controls={calendarId}
+                    onToggle={() => setPicking((current) => (current === key ? null : key))}
+                    invalid={Boolean(error)}
+                    describedBy={error ? `${idPrefix}-error` : undefined}
+                    className={dateClass}
+                  />
+                </div>
+              ))}
+            </div>
+            {picking && (
+              <MiniCalendar
+                // Đổi ô thì dựng lại lịch để mở đúng tháng của ô đó
+                key={picking}
+                id={calendarId}
+                label={`Chọn ${DATE_LABELS[picking].toLowerCase()}`}
+                value={draft[picking]}
+                min={picking === 'to' ? draft.from || undefined : undefined}
+                max={picking === 'from' ? draft.to || undefined : undefined}
+                rangeFrom={draft.from}
+                rangeTo={draft.to}
+                onPick={pickDate}
+                onClose={closeCalendar}
+              />
+            )}
           </div>
           {error && (
             <p
@@ -191,11 +235,12 @@ export default function FeedFilters({
               {error}
             </p>
           )}
+          {pendingDates && (
+            <Button type="submit" variant="cta" size="md" block className="mt-2.5">
+              Áp dụng khoảng ngày
+            </Button>
+          )}
         </fieldset>
-
-        <Button type="submit" variant="primary" size="lg" block>
-          Áp dụng bộ lọc
-        </Button>
       </div>
     </form>
   )

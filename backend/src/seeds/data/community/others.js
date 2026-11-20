@@ -273,6 +273,8 @@ const jewelry = [
     attributes: { Loại: 'Đồng hồ', 'Màu chủ đạo': 'Vàng' },
     views: 210,
     likes: 18,
+    status: 'returned',
+    returnedHoursAgo: 10,
   },
   {
     image: 'watch-montinari',

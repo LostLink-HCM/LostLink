@@ -1,7 +1,11 @@
 import { cx, focusRing } from './classes'
 
+const primary =
+  'border-transparent bg-linear-to-b from-au-primary-light to-au-primary-dark text-au-on-primary shadow-au-button hover:brightness-110'
+
 const variants = {
-  primary: 'border-transparent bg-primary text-white hover:bg-primary-hover',
+  primary,
+  cta: primary,
   secondary: 'border-line bg-surface text-ink-secondary hover:bg-surface-muted',
   soft: 'border-primary/25 bg-primary-soft text-primary hover:bg-primary-subtle',
   outline: 'border-primary/25 bg-surface text-primary hover:bg-primary-subtle',
@@ -18,9 +22,6 @@ const sizes = {
   xl: 'h-11 px-5 text-small',
 }
 
-// Nút chính cỡ lớn có bóng để nổi bật là hành động chính của trang
-const raised = 'shadow-[0_6px_16px_-6px_rgb(46_109_180/0.7)]'
-
 // Dùng cho thẻ không phải <button>, ví dụ <Link> trông như nút
 export function buttonClass({
   variant = 'secondary',
@@ -33,7 +34,6 @@ export function buttonClass({
     'inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full border font-semibold whitespace-nowrap no-underline transition-colors disabled:cursor-not-allowed disabled:opacity-45',
     pressed ? 'border-primary/40 bg-primary-soft text-primary' : variants[variant],
     sizes[size],
-    variant === 'primary' && size === 'xl' && raised,
     block && 'w-full',
     focusRing,
     className

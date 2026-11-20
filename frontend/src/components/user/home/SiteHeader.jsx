@@ -6,22 +6,9 @@ import Icon from '../../common/Icon'
 import { cx, focusRing } from '../classes'
 import HeaderPets from './HeaderPets'
 import SearchBox from './SearchBox'
+import { SKY_STARS } from './skyStars'
 import SlidingTabs from './SlidingTabs'
 import UserMenu from './UserMenu'
-
-// Sao chỉ hiện chiều và đêm, độ đậm lấy từ --au-star-opacity theo data-auth-time
-const STARS = [
-  [8, 28],
-  [21, 66],
-  [34, 18],
-  [47, 52],
-  [58, 24],
-  [69, 70],
-  [81, 30],
-  [92, 58],
-]
-  .map(([x, y]) => `radial-gradient(1.2px 1.2px at ${x}% ${y}%, #fff 50%, transparent 51%)`)
-  .join(', ')
 
 // Nút chính trên header dùng cùng màu nút của khu auth, đổi theo giờ
 const ctaClass =
@@ -51,6 +38,7 @@ export default function SiteHeader({
   unreadMessages = 0,
   unreadNotifications = 0,
   pendingMatches = 0,
+  onFeedback,
 }) {
   const { user } = useAuth()
   const unread = user ? unreadMessages : 0
@@ -95,7 +83,7 @@ export default function SiteHeader({
       <span
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 rounded-[inherit] opacity-(--au-star-opacity)"
-        style={{ backgroundImage: STARS }}
+        style={{ backgroundImage: SKY_STARS }}
       />
       <div className="relative mx-auto flex h-16 max-w-360 items-center gap-3 px-4 sm:gap-4 sm:px-6 lg:gap-4 lg:px-8 xl:gap-5">
         <Link
@@ -148,7 +136,7 @@ export default function SiteHeader({
                 <Icon name="compose" size={16} />
                 <span className="hidden sm:inline">Đăng bài</span>
               </Link>
-              <UserMenu />
+              <UserMenu onFeedback={onFeedback} />
             </>
           ) : (
             <>
