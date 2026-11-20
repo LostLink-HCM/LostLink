@@ -28,6 +28,14 @@ async function openOthersPost(page, api, title) {
   return { owner, ownerToken, viewer, post }
 }
 
+// Lưu, Theo dõi, Báo cáo nằm trong menu ⋯ ở góc thẻ bài
+async function openPostMenu(page, title) {
+  await page.getByRole('button', { name: `Tuỳ chọn bài ${title}` }).click()
+  const menu = page.getByRole('menu', { name: `Thao tác với bài ${title}` })
+  await expect(menu).toBeVisible()
+  return menu
+}
+
 test.describe('UC31, UC32, UC34 - Thích, lưu, theo dõi bài', () => {
   test('thích, lưu, theo dõi được lưu trên server, tải lại trang vẫn giữ', async ({
     page,
@@ -35,23 +43,17 @@ test.describe('UC31, UC32, UC34 - Thích, lưu, theo dõi bài', () => {
   }) => {
     const title = 'Mất ví da nâu ở công viên Tao Đàn'
     await openOthersPost(page, api, title)
-    const aside = page.getByRole('complementary', { name: 'Người đăng và hành động' })
-
     await page.getByRole('button', { name: /Thích/ }).first().click()
-    await aside.getByRole('button', { name: 'Lưu bài' }).click()
+    await (await openPostMenu(page, title)).getByRole('menuitem', { name: 'Lưu bài' }).click()
     await expect(page.getByText('Đã lưu bài.')).toBeVisible()
-    await aside.getByRole('button', { name: 'Theo dõi' }).click()
+    await (await openPostMenu(page, title)).getByRole('menuitem', { name: 'Theo dõi bài' }).click()
     await expect(page.getByText('Đã theo dõi bài đăng.')).toBeVisible()
 
     await page.reload()
-    await expect(aside.getByRole('button', { name: 'Đã lưu' })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    )
-    await expect(aside.getByRole('button', { name: 'Đang theo dõi' })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    )
+    const menu = await openPostMenu(page, title)
+    await expect(menu.getByRole('menuitem', { name: 'Bỏ lưu bài' })).toBeVisible()
+    await expect(menu.getByRole('menuitem', { name: 'Bỏ theo dõi' })).toBeVisible()
+    await page.keyboard.press('Escape')
     await expect(page.getByRole('button', { name: /Bỏ thích|Đã thích/ }).first()).toBeVisible()
   })
 })
@@ -63,8 +65,7 @@ test.describe('UC33 - Bài đã lưu', () => {
   }) => {
     const title = 'Mất ví vải xanh ở nhà sách Nguyễn Văn Cừ'
     await openOthersPost(page, api, title)
-    const aside = page.getByRole('complementary', { name: 'Người đăng và hành động' })
-    await aside.getByRole('button', { name: 'Lưu bài' }).click()
+    await (await openPostMenu(page, title)).getByRole('menuitem', { name: 'Lưu bài' }).click()
     await expect(page.getByText('Đã lưu bài.')).toBeVisible()
 
     await page.getByRole('button', { name: 'Menu tài khoản' }).click()

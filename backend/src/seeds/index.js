@@ -10,6 +10,8 @@ const { seedConversations } = require('./conversationSeed')
 const { seedNotifications } = require('./notificationSeed')
 const { seedPosts } = require('./postSeed')
 const { seedReports } = require('./reportSeed')
+const { seedMemberReputation, seedReputation } = require('./reputationSeed')
+const { seedReviews } = require('./reviewSeed')
 const { seedSystemSettings } = require('./systemSettingsSeed')
 const {
   seedMissingMembers,
@@ -39,7 +41,13 @@ const seeders = messagesOnly
         : settingsOnly
           ? [seedSystemSettings]
           : demo
-            ? [seedMissingMembers, seedCategories, seedPosts, seedNotifications]
+            ? [
+                seedMissingMembers,
+                seedCategories,
+                seedPosts,
+                seedMemberReputation,
+                seedNotifications,
+              ]
             : [
                 seedUsers,
                 seedAvatars,
@@ -48,6 +56,9 @@ const seeders = messagesOnly
                 seedPosts,
                 seedReports,
                 seedConversations,
+                // Lời cảm ơn gắn với cuộc trao đổi đã seed, điểm uy tín tính sau khi có lời cảm ơn
+                seedReviews,
+                seedReputation,
                 seedBackofficeMessages,
                 seedNotifications,
                 seedUserActivityDates,

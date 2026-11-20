@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { getClaimState } from '../../api/claims'
 import { useAuth } from '../../auth/AuthContext'
 import { cx } from '../../components/user/classes'
+import FeedbackPets from '../../components/user/feedback/FeedbackPets'
 import MobileTabBar from '../../components/user/home/MobileTabBar'
 import SiteHeader from '../../components/user/home/SiteHeader'
+import { FORM_PENDING, openFeedbackForm } from '../../lib/user/feedback'
 import { DEFAULT_FILTERS } from '../../lib/user/homeFeed'
 import { inboxUnread } from '../../lib/user/messages'
 import { hidesTabBar } from '../../lib/user/navigation'
@@ -15,9 +17,10 @@ import { usePostInteractions } from '../../hooks/usePostInteractions'
 import useTimeOfDay from '../../hooks/useTimeOfDay'
 import { useUnreadNotifications } from '../../hooks/useUnreadNotifications'
 
-// Khu người dùng dùng xanh thương hiệu thay cho xanh đậm của khu quản trị
+// Ban ngày khu người dùng dùng xanh da trời, cùng họ với nút chính trên header (au-primary);
+// chiều và đêm do .user-tone trong tailwind.css đổi tông
 const userTheme = [
-  '[--color-primary:#2e6db4] [--color-primary-hover:#1e4e86] [--color-primary-soft:#e7f0fb] [--color-primary-subtle:#f1f6fc]',
+  '[--color-primary:#0369a1] [--color-primary-hover:#075985] [--color-primary-soft:#e0f2fe] [--color-primary-subtle:#f0f9ff] [--color-primary-faint:#f7fbff] [--color-primary-muted:#7cc4ea] [--color-focus:#0ea5e9]',
   // Khoảng 80% cỡ chữ cũ cho thoáng; cỡ nhỏ nhất giữ từ 8.5px trở lên để chữ có dấu còn đọc được
   '[--text-caption:9.5px] [--text-small:9.8px] [--text-body:10.2px] [--text-lead:10.8px] [--text-title:13px] [--text-heading:17.3px] [--text-display:22.4px] [--text-tiny:9px] [--text-micro:8.5px]',
 ].join(' ')
@@ -35,6 +38,9 @@ export default function UserLayout() {
   const [draft, setDraft] = useState(DEFAULT_FILTERS)
   const [applied, setApplied] = useState(DEFAULT_FILTERS)
   const [toast, setToast] = useState('')
+  const openFeedback = useCallback(() => {
+    if (!openFeedbackForm()) setToast(FORM_PENDING)
+  }, [])
 
   useEffect(() => {
     if (!toast) return
@@ -102,7 +108,8 @@ export default function UserLayout() {
     <div
       data-auth-time={time}
       className={cx(
-        'relative isolate min-h-dvh bg-canvas font-sans text-ink',
+        // user-tone: nút và chip cả khu người dùng đổi tông theo giờ như header (xem tailwind.css)
+        'user-tone relative isolate min-h-dvh bg-canvas font-sans text-ink',
         // Chừa chỗ cho thanh tab dưới đáy, trang không có thanh thì thôi
         !hidesTabBar(location.pathname) && 'max-lg:pb-[calc(4.5rem+env(safe-area-inset-bottom))]',
         userTheme
@@ -119,6 +126,7 @@ export default function UserLayout() {
         unreadMessages={unreadMessages}
         unreadNotifications={unreadNotifications}
         pendingMatches={matchBadge.pending}
+        onFeedback={openFeedback}
       />
 
       <Outlet
@@ -144,6 +152,9 @@ export default function UserLayout() {
         unreadNotifications={unreadNotifications}
         pendingMatches={matchBadge.pending}
       />
+
+      {/* Khách cũng góp ý được vì biểu mẫu không cần tài khoản */}
+      <FeedbackPets notify={setToast} />
 
       {toast && (
         <div

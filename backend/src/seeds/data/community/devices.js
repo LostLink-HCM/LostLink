@@ -374,6 +374,8 @@ const keys = [
     attributes: { Loại: 'Chìa khóa nhà' },
     views: 140,
     likes: 8,
+    status: 'returned',
+    returnedHoursAgo: 30,
   },
   {
     image: 'chia-dau-nhua-xam',

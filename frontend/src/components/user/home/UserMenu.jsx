@@ -15,7 +15,7 @@ const WORKSPACES = {
 const rowClass =
   'flex w-full cursor-pointer items-center gap-3 rounded-lg border-0 bg-transparent px-3 py-2.5 text-left text-small font-medium no-underline transition-colors'
 
-export default function UserMenu() {
+export default function UserMenu({ onFeedback }) {
   const { user, signOut } = useAuth()
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
@@ -46,7 +46,7 @@ export default function UserMenu() {
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         className={cx(
-          'grid size-9 cursor-pointer place-items-center overflow-hidden rounded-full border border-primary/25 bg-primary-soft p-0 text-caption font-bold text-primary transition-shadow hover:shadow-[0_2px_10px_rgb(46_109_180/0.22)]',
+          'grid size-9 cursor-pointer place-items-center overflow-hidden rounded-full border border-primary/25 bg-primary-soft p-0 text-caption font-bold text-primary transition-shadow hover:shadow-[0_2px_10px_color-mix(in_srgb,var(--color-primary)_22%,transparent)]',
           focusRing
         )}
       >
@@ -112,6 +112,18 @@ export default function UserMenu() {
             <Icon name="settings" size={16} />
             Cài đặt
           </Link>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false)
+              onFeedback?.()
+            }}
+            className={cx(rowClass, 'text-ink-secondary hover:bg-primary-subtle', focusRing)}
+          >
+            <Icon name="comment" size={16} />
+            Góp ý cho LostLink
+          </button>
           {WORKSPACES[user.role] && (
             <Link
               to={WORKSPACES[user.role].to}

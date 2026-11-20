@@ -194,7 +194,7 @@ export default function Composer({
           disabled={pending || busy || !draft.trim()}
           className={cx(
             iconButton,
-            'bg-primary text-white hover:bg-primary-hover disabled:bg-line-strong'
+            'bg-linear-to-b from-au-primary-light to-au-primary-dark text-au-on-primary shadow-au-button hover:brightness-110 disabled:from-line-strong disabled:to-line-strong disabled:text-white disabled:shadow-none'
           )}
         >
           <Icon name="send" size={16} />

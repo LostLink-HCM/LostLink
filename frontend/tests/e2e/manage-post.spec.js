@@ -120,14 +120,17 @@ test.describe('UC27 - Đóng bài / đánh dấu đã trao trả', () => {
     await openMyProfile(page, account)
     await page.goto(`/mat-do/${post.slug}`)
 
-    const manage = page.getByRole('region', { name: 'Quản lý bài đăng' })
-    await manage.getByRole('button', { name: 'Đóng bài' }).click()
+    // Sửa, Đóng, Xóa nằm trong menu ⋯ ở góc thẻ bài
+    const title = 'Mất ví da đen ở công viên'
+    await (await openPostMenu(page, title)).getByRole('menuitem', { name: 'Đóng bài' }).click()
     const dialog = page.getByRole('dialog', { name: 'Cập nhật trạng thái bài' })
     await dialog.getByRole('button', { name: 'Xác nhận' }).click()
 
     await expect(page.getByText('Cập nhật trạng thái bài thành công.')).toBeVisible()
     await expect(page.getByText('Đã đóng', { exact: true })).toBeVisible()
-    await expect(manage.getByRole('button', { name: 'Đóng bài' })).toHaveCount(0)
+    await expect(
+      (await openPostMenu(page, title)).getByRole('menuitem', { name: 'Đóng bài' })
+    ).toHaveCount(0)
   })
 })
 
@@ -143,9 +146,10 @@ test.describe('UC25 - Sửa bài', () => {
 
     await openMyProfile(page, account)
     await page.getByRole('link', { name: 'Mất ví da nâu gần Hồ Con Rùa' }).click()
-    await page
-      .getByRole('region', { name: 'Quản lý bài đăng' })
-      .getByRole('button', { name: 'Sửa bài' })
+    await (
+      await openPostMenu(page, 'Mất ví da nâu gần Hồ Con Rùa')
+    )
+      .getByRole('menuitem', { name: 'Sửa bài' })
       .click()
 
     await expect(page).toHaveURL(new RegExp(`/posts/${post.id}/edit$`))

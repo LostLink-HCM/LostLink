@@ -154,7 +154,7 @@ describe('UC05 - Thống kê cộng đồng', () => {
         matchRate: 0.3233,
         avgReturnDays: 2.1,
       }).map((item) => item.value)
-    ).toEqual(['12.480', '4.037', '32,3%', '2,1 ngày'])
+    ).toEqual(['12.480', '32,3%', '4.037', '2,1 ngày'])
     expect(
       communityStatItems({ posted: 0, returned: 0, matchRate: 0, avgReturnDays: null })[3].value
     ).toBe('–')
