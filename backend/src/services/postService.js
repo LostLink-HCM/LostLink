@@ -9,6 +9,7 @@ const {
   PostFollow,
   PostDraft,
   PostLike,
+  PostView,
   SavedPost,
   User,
   UserBlock,
@@ -29,6 +30,8 @@ const RETURNED_LISTED_MS = 7 * 24 * HOUR
 const EXCERPT_MAX = 160
 const MAX_KEYWORDS = 8
 const DETAIL_COMMENTS_MAX = 50
+// Một người mở lại cùng bài trong 24 giờ chỉ tính một lượt xem
+const VIEW_COUNT_GAP_MS = 24 * HOUR
 const POST_NOT_FOUND = 'Bài đăng không tồn tại hoặc đã bị ẩn.'
 // Gợi ý ghép cặp còn chờ người dùng phản hồi
 const ACTIVE_MATCH_STATES = ['pending', 'confirmed_one']
@@ -176,6 +179,22 @@ const withViewerState = async (cards, viewer) => {
   })
 }
 
+// Lần đổi trạng thái gần nhất. Sửa nội dung cũng phải duyệt lại nên cũng ghi vào statusHistory
+const lastChangedAt = (post) => post.statusHistory?.at(-1)?.changedAt ?? post.createdAt
+
+const seenPostIds = async (posts, viewer) => {
+  if (!viewer || !posts.length) return new Set()
+  const views = await PostView.find({ viewer: viewer._id, post: { $in: posts.map((p) => p._id) } })
+    .select('post viewedAt')
+    .lean()
+  const viewedAt = new Map(views.map((view) => [String(view.post), view.viewedAt]))
+  return new Set(
+    posts
+      .filter((post) => viewedAt.get(String(post._id)) >= lastChangedAt(post))
+      .map((post) => String(post._id))
+  )
+}
+
 // Xem danh sách tin mới, Lọc và tìm kiếm, Xem tin hot
 const listPublicPosts = async (params, viewer = null) => {
   const now = Date.now()
@@ -205,8 +224,18 @@ const listPublicPosts = async (params, viewer = null) => {
       .lean(),
   ])
 
+  const [cards, seen] = await Promise.all([
+    withViewerState(posts.map(toPostCard), viewer),
+    seenPostIds(posts, viewer),
+  ])
+
   return {
-    items: await withViewerState(posts.map(toPostCard), viewer),
+    items: viewer
+      ? cards.map((card) => ({
+          ...card,
+          viewer: { ...card.viewer, seen: seen.has(String(card.id)) },
+        }))
+      : cards,
     page,
     limit,
     total,
@@ -322,6 +351,24 @@ const viewerState = async (post, viewer, isOwner) => {
   }
 }
 
+const recordView = async (postId, viewer) => {
+  if (!viewer) return true
+  const now = new Date()
+  const key = { viewer: viewer._id, post: postId }
+  try {
+    await PostView.updateOne(
+      { ...key, countedAt: { $lte: new Date(now - VIEW_COUNT_GAP_MS) } },
+      { $set: { viewedAt: now, countedAt: now } },
+      { upsert: true }
+    )
+    return true
+  } catch (error) {
+    if (error.code !== 11000) throw error
+    await PostView.updateOne(key, { $set: { viewedAt: now } })
+    return false
+  }
+}
+
 // Chi tiết bài theo loại tin và slug (/mat-do/<slug>). Người khác chỉ xem bài công khai,
 // chủ bài xem được bài của mình ở mọi trạng thái (vd quay lại bài sau khi sửa)
 const getPostDetail = async ({ type, slug }, viewer = null) => {
@@ -339,8 +386,8 @@ const getPostDetail = async ({ type, slug }, viewer = null) => {
   const blocked = viewer ? await UserBlock.find({ blocker: viewer._id }).distinct('blocked') : []
   if (post.owner && blocked.some((id) => id.equals(post.owner._id))) throw postNotFound()
 
-  // Mỗi lần mở bài tính một lượt xem, trừ chủ bài tự xem bài của mình
-  if (!isOwner) {
+  // Chủ bài tự xem bài của mình không tính lượt xem
+  if (!isOwner && (await recordView(post._id, viewer))) {
     await Post.updateOne(
       { _id: post._id },
       { $inc: { viewCount: 1, hotScore: Post.hotScoreDelta({ views: 1 }) } }

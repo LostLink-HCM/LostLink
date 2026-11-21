@@ -49,6 +49,7 @@ describe('UC31 - Thích / bỏ thích bài đăng', () => {
       liked: true,
       saved: false,
       following: false,
+      seen: false,
     })
     const detail = await api.get(`/api/posts/lost/${post.slug}`)
     assert.equal(detail.body.data.viewer.liked, true)
