@@ -7,6 +7,7 @@ const {
   Category,
   Post,
   PostFollow,
+  PostView,
   PostLike,
   SavedPost,
   User,
@@ -54,6 +55,7 @@ describe('UC21, UC22, UC31, UC32, UC34 - Thích, lưu, theo dõi, chặn', () =>
       [PostLike, { user, post }],
       [SavedPost, { user, post }],
       [PostFollow, { user, post }],
+      [PostView, { viewer: user, post, viewedAt: new Date(), countedAt: new Date() }],
       [UserFollow, { follower: user, following: other }],
       [UserBlock, { blocker: user, blocked: other }],
     ]

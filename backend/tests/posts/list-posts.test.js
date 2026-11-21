@@ -2,7 +2,7 @@ const assert = require('node:assert/strict')
 const { beforeEach, describe, test } = require('node:test')
 const bcrypt = require('bcryptjs')
 
-const { Category, Post, User, UserBlock } = require('../../src/models')
+const { Category, Post, PostView, User, UserBlock } = require('../../src/models')
 const { PASSWORD, loginAs, newClient } = require('../helpers/auth')
 const { useTestDb } = require('../helpers/db')
 
@@ -148,6 +148,36 @@ describe('UC01 - Xem danh sách tin mới', () => {
 
     assert.deepEqual(titles(asViewer), ['Bài của người khác'])
     assert.equal(asGuest.body.data.total, 2)
+  })
+
+  test('đánh dấu bài đã mở xem; bài đổi trạng thái sau lần xem thì coi như chưa xem', async () => {
+    const viewer = await User.create({
+      username: 'nguoixem',
+      email: 'viewer@example.com',
+      passwordHash: await bcrypt.hash(PASSWORD, 4),
+      emailVerifiedAt: new Date(),
+    })
+    const changedAt = (hoursAgo) => [
+      { status: 'searching', changedAt: new Date(Date.now() - hoursAgo * HOUR) },
+    ]
+    const seen = await makePost({ title: 'Đã xem', statusHistory: changedAt(5) })
+    const updated = await makePost({ title: 'Có cập nhật', statusHistory: changedAt(1) })
+    await makePost({ title: 'Chưa xem', statusHistory: changedAt(5) })
+    const viewedAt = new Date(Date.now() - 2 * HOUR)
+    await PostView.create([
+      { viewer: viewer._id, post: seen._id, viewedAt, countedAt: viewedAt },
+      { viewer: viewer._id, post: updated._id, viewedAt, countedAt: viewedAt },
+    ])
+    const { client, accessToken } = await loginAs('viewer@example.com')
+
+    const res = await client.get('/api/posts').set('Authorization', `Bearer ${accessToken}`)
+    const seenOf = Object.fromEntries(
+      res.body.data.items.map((item) => [item.title, item.viewer.seen])
+    )
+
+    assert.deepEqual(seenOf, { 'Đã xem': true, 'Có cập nhật': false, 'Chưa xem': false })
+    // Guest không có trạng thái người xem
+    assert.equal((await list()).body.data.items[0].viewer, undefined)
   })
 
   test('gửi token sai thì trả 401 để frontend làm mới phiên', async () => {

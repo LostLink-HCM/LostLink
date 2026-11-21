@@ -11,6 +11,7 @@ const {
   Post,
   PostFollow,
   PostLike,
+  PostView,
   SavedPost,
   User,
   UserBlock,
@@ -250,6 +251,32 @@ describe('UC04 - Xem chi tiết bài đăng', () => {
     })
     assert.equal(viewerView.counts.views, 6)
     assert.equal((await Post.findById(post._id)).viewCount, 6)
+  })
+
+  test('người dùng mở lại bài trong 24 giờ chỉ tính một lượt xem, Guest lần nào cũng tính', async () => {
+    const post = await makePost({ viewCount: 0 })
+    const viewer = await createMember('nguoixem')
+    const asViewer = await asUser('nguoixem@example.com')
+    const views = async () => (await Post.findById(post._id)).viewCount
+
+    await asViewer(`/api/posts/lost/${post.slug}`)
+    await asViewer(`/api/posts/lost/${post.slug}`)
+    assert.equal(await views(), 1)
+    // Lần mở sau vẫn cập nhật viewedAt để đánh dấu Đã xem
+    const record = await PostView.findOne({ viewer: viewer._id, post: post._id })
+    assert.ok(record.viewedAt > record.countedAt)
+
+    // Lần tính trước đã quá 24 giờ thì tính thêm
+    await PostView.updateOne(
+      { _id: record._id },
+      { $set: { countedAt: new Date(Date.now() - 25 * HOUR) } }
+    )
+    await asViewer(`/api/posts/lost/${post.slug}`)
+    assert.equal(await views(), 2)
+
+    await detail(post)
+    await detail(post)
+    assert.equal(await views(), 4)
   })
 
   test('bình luận cũ trước; người đã chặn người đăng thì không xem được bài', async () => {

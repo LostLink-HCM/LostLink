@@ -261,6 +261,7 @@ function FeedList({ hot, feed, now, interactions, defaultView, onShowAllCategori
             key={post.id}
             post={post}
             rank={hot ? index + 1 : undefined}
+            seen={post.viewer?.seen ?? false}
             now={now}
             commentCount={post.commentCount}
             liked={state.liked}
