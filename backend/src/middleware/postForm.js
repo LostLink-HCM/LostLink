@@ -109,8 +109,20 @@ const parseAvatarForm = createImageForm({
   },
 })
 
+const parseCategoryIconForm = createImageForm({
+  field: 'icon',
+  maxImages: 1,
+  messages: {
+    type: () => SINGLE_IMAGE_ERROR,
+    LIMIT_FILE_SIZE: SINGLE_IMAGE_ERROR,
+    LIMIT_FILE_COUNT: 'Chỉ chọn một ảnh danh mục.',
+    LIMIT_UNEXPECTED_FILE: 'Chỉ chọn một ảnh danh mục.',
+  },
+})
+
 module.exports = {
   parseAvatarForm,
+  parseCategoryIconForm,
   parsePostForm,
   parseReportForm,
   parseMessageForm,

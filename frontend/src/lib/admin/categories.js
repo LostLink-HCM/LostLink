@@ -1,5 +1,3 @@
-import { M_LEVELS } from './matching'
-
 export const DEFAULT_RELATION_RATIO = 0.6
 
 export const EMPTY_CATEGORY = Object.freeze({
@@ -27,7 +25,113 @@ export function makeId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
-const keyOf = (text) => text.trim().normalize('NFC').toLocaleLowerCase('vi')
+const keyOf = (text) =>
+  String(text ?? '')
+    .trim()
+    .normalize('NFC')
+    .toLocaleLowerCase('vi')
+export const aliasKeyOf = (text) =>
+  String(text ?? '')
+    .normalize('NFC')
+    .toLocaleLowerCase('vi')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+export function duplicateAliasKeys(groups, existingTerms = []) {
+  const existingKeys = new Set(existingTerms.map(aliasKeyOf).filter(Boolean))
+  const counts = new Map()
+  for (const alias of groups.flat()) {
+    const key = aliasKeyOf(alias)
+    if (key) counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  return new Set(
+    [...counts].filter(([key, count]) => count > 1 || existingKeys.has(key)).map(([key]) => key)
+  )
+}
+
+export const DUPLICATE_ALIAS_MESSAGE = 'Alias đã tồn tại, vui lòng nhập alias khác.'
+
+const storedAliasKey = (alias) =>
+  String(alias ?? '')
+    .normalize('NFC')
+    .trim()
+
+export function duplicateAliasErrors(groups, existingTerms = [], savedGroups = []) {
+  const duplicateKeys = duplicateAliasKeys(groups, existingTerms)
+  const savedCounts = new Map()
+  for (const alias of savedGroups.flat()) {
+    const key = storedAliasKey(alias)
+    if (key) savedCounts.set(key, (savedCounts.get(key) ?? 0) + 1)
+  }
+
+  const persisted = groups.map((group) => group.map(() => false))
+  const consumeSaved = (groupIndex, itemIndex) => {
+    const key = storedAliasKey(groups[groupIndex][itemIndex])
+    const remaining = savedCounts.get(key) ?? 0
+    if (!key || !remaining) return false
+    persisted[groupIndex][itemIndex] = true
+    if (remaining === 1) savedCounts.delete(key)
+    else savedCounts.set(key, remaining - 1)
+    return true
+  }
+
+  groups.forEach((group, groupIndex) => {
+    group.forEach((alias, itemIndex) => {
+      if (storedAliasKey(alias) === storedAliasKey(savedGroups[groupIndex]?.[itemIndex])) {
+        consumeSaved(groupIndex, itemIndex)
+      }
+    })
+  })
+  groups.forEach((group, groupIndex) => {
+    group.forEach((alias, itemIndex) => {
+      if (!persisted[groupIndex][itemIndex]) consumeSaved(groupIndex, itemIndex)
+    })
+  })
+
+  return groups.map((group, groupIndex) =>
+    group.map((alias, itemIndex) =>
+      duplicateKeys.has(aliasKeyOf(alias)) && !persisted[groupIndex][itemIndex]
+        ? DUPLICATE_ALIAS_MESSAGE
+        : ''
+    )
+  )
+}
+
+export function duplicateTermErrors(items, savedItems = [], message) {
+  const keys = items.map(keyOf)
+  const counts = new Map()
+  for (const key of keys) {
+    if (key) counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  const duplicateKeys = new Set([...counts].filter(([, count]) => count > 1).map(([key]) => key))
+  const savedCounts = new Map()
+  for (const item of savedItems) {
+    const key = keyOf(item)
+    if (key) savedCounts.set(key, (savedCounts.get(key) ?? 0) + 1)
+  }
+
+  const persisted = items.map(() => false)
+  const consumeSaved = (index) => {
+    const key = keys[index]
+    const remaining = savedCounts.get(key) ?? 0
+    if (!key || !remaining) return false
+    persisted[index] = true
+    if (remaining === 1) savedCounts.delete(key)
+    else savedCounts.set(key, remaining - 1)
+    return true
+  }
+
+  items.forEach((_, index) => {
+    if (keys[index] === keyOf(savedItems[index])) consumeSaved(index)
+  })
+  items.forEach((_, index) => {
+    if (!persisted[index]) consumeSaved(index)
+  })
+
+  return items.map((_, index) =>
+    duplicateKeys.has(keys[index]) && !persisted[index] ? message : ''
+  )
+}
 
 // Bỏ ô trống và mục trùng (không phân biệt hoa thường), giữ thứ tự nhập
 export function cleanList(items) {
@@ -77,8 +181,6 @@ export function validateAlgorithm(form) {
 }
 
 export function validateRelations(relations) {
-  if (relations.some((relation) => !relation.memberCategoryIds.length))
-    return 'Mỗi nhóm quan hệ phải có ít nhất một danh mục liên quan.'
   const members = relations.flatMap((relation) => relation.memberCategoryIds)
   if (new Set(members).size !== members.length)
     return 'Một danh mục không được nằm ở hai nhóm quan hệ.'
@@ -94,7 +196,9 @@ export function validateAttribute(form, attributes, selfId) {
     attributes.some((attribute) => attribute.id !== selfId && keyOf(attribute.name) === keyOf(name))
   )
     return 'Danh mục đã có thuộc tính cùng tên.'
-  if (!M_LEVELS.some((level) => level.value === Number(form.mProb))) return 'Chọn độ tin cậy.'
+  const mProb = Number(form.mProb)
+  if (!String(form.mProb ?? '').trim() || !Number.isFinite(mProb) || mProb <= 0 || mProb > 0.95)
+    return 'Độ tin cậy m phải lớn hơn 0 và không vượt quá 0,95.'
   if (!form.values.length) return 'Thêm ít nhất một giá trị để người đăng chọn.'
   if (form.values.some((attributeValue) => !attributeValue.value.trim()))
     return 'Nhập tên cho tất cả giá trị.'

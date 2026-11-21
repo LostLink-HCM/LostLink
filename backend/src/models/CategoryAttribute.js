@@ -21,11 +21,14 @@ const categoryAttributeSchema = new Schema(
       default: 'score',
     },
 
-    // m: xác suất hai bài của cùng một món ghi trùng giá trị (Cao, Vừa, Thấp)
+    // m: xác suất hai bài của cùng một món ghi trùng giá trị
     mProb: {
       type: Number,
-      enum: [0.95, 0.9, 0.8],
       default: 0.9,
+      validate: {
+        validator: (value) => Number.isFinite(value) && value > 0 && value <= 0.95,
+        message: 'Độ tin cậy m phải lớn hơn 0 và không vượt quá 0,95.',
+      },
     },
 
     isRequired: { type: Boolean, default: false },

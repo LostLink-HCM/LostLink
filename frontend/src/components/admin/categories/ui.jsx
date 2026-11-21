@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useId, useState } from 'react'
 import Button from '../../backoffice/Button'
 import Dialog from '../../backoffice/Dialog'
 import IconButton from '../../backoffice/IconButton'
@@ -6,9 +6,13 @@ import { cx, focusRing } from '../../backoffice/classes'
 
 import { inputClass, labelClass } from './styles'
 
-export function FormError({ children, id }) {
+export function FormError({ children, id, subtle = false }) {
   return (
-    <p id={id} className="m-0 text-small text-danger-ink" role="alert">
+    <p
+      id={id}
+      className={cx('m-0 text-small', subtle ? 'text-danger/80' : 'text-danger-ink')}
+      role="alert"
+    >
       {children}
     </p>
   )
@@ -46,7 +50,16 @@ export function Panel({ title, description, action, className, children }) {
 }
 
 // Danh sách ô nhập một dòng (alias, mục "Bên trong có"), nút + để thêm ô
-export function TextListField({ label, itemLabel, value, onChange, hint, placeholder }) {
+export function TextListField({
+  label,
+  itemLabel,
+  value,
+  onChange,
+  hint,
+  placeholder,
+  errors = [],
+}) {
+  const listId = useId()
   const update = (index, next) => onChange(value.map((item, i) => (i === index ? next : item)))
 
   return (
@@ -63,23 +76,39 @@ export function TextListField({ label, itemLabel, value, onChange, hint, placeho
       {hint && <Hint>{hint}</Hint>}
       {value.length > 0 && (
         <div className="grid gap-2 sm:grid-cols-2">
-          {value.map((item, index) => (
-            <div key={index} className="flex items-center gap-2">
-              <input
-                className={inputClass}
-                value={item}
-                onChange={(event) => update(index, event.target.value)}
-                placeholder={placeholder}
-                aria-label={`${itemLabel} ${index + 1}`}
-              />
-              <IconButton
-                label={`Xóa ${itemLabel} ${index + 1}`}
-                icon="close"
-                danger
-                onClick={() => onChange(value.filter((_, i) => i !== index))}
-              />
-            </div>
-          ))}
+          {value.map((item, index) => {
+            const error = errors[index]
+            const errorId = `${listId}-error-${index}`
+            return (
+              <div key={index} className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <input
+                    className={cx(
+                      inputClass,
+                      error && 'border-danger/35 focus:border-danger/50 focus:ring-danger/10'
+                    )}
+                    value={item}
+                    onChange={(event) => update(index, event.target.value)}
+                    placeholder={placeholder}
+                    aria-label={`${itemLabel} ${index + 1}`}
+                    aria-invalid={error ? true : undefined}
+                    aria-describedby={error ? errorId : undefined}
+                  />
+                  <IconButton
+                    label={`Xóa ${itemLabel} ${index + 1}`}
+                    icon="close"
+                    danger
+                    onClick={() => onChange(value.filter((_, i) => i !== index))}
+                  />
+                </div>
+                {error && (
+                  <FormError id={errorId} subtle>
+                    {error}
+                  </FormError>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
@@ -157,28 +186,57 @@ export function Segmented({ label, options, value, onChange }) {
 
 // Hộp thoại xác nhận xóa, nút Hủy được focus sẵn để Enter không xóa nhầm
 export function ConfirmDeleteDialog({ title, confirmLabel, onConfirm, onClose, children }) {
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const close = () => {
+    if (!saving) onClose()
+  }
+  const confirm = async () => {
+    setSaving(true)
+    setError('')
+    try {
+      await onConfirm()
+      setSaving(false)
+      onClose()
+    } catch (confirmError) {
+      setError(confirmError.message || 'Không thực hiện được thao tác. Vui lòng thử lại.')
+      setSaving(false)
+    }
+  }
+
   return (
     <Dialog
       title={title}
-      onClose={onClose}
+      onClose={close}
       footer={
         <>
-          <Button data-autofocus onClick={onClose}>
+          <Button data-autofocus onClick={close} disabled={saving}>
             Hủy
           </Button>
-          <Button variant="danger-subtle" onClick={onConfirm}>
-            {confirmLabel}
+          <Button variant="danger-subtle" onClick={confirm} disabled={saving}>
+            {saving ? 'Đang xử lý…' : confirmLabel}
           </Button>
         </>
       }
     >
-      <div className="space-y-3 text-body leading-relaxed text-ink-secondary">{children}</div>
+      <div className="space-y-3 text-body leading-relaxed text-ink-secondary">
+        {children}
+        {error && <FormError>{error}</FormError>}
+      </div>
     </Dialog>
   )
 }
 
 // Thanh Hủy / Lưu ở cuối mỗi tab có form
-export function SaveBar({ formId, dirty, error, onReset }) {
+export function SaveBar({
+  formId,
+  dirty,
+  error,
+  saving = false,
+  busy = false,
+  blocked = false,
+  onReset,
+}) {
   return (
     <div className="flex flex-wrap items-center justify-end gap-2.5 border-t border-line-soft pt-4">
       <div className="mr-auto min-w-0" aria-live="polite">
@@ -188,11 +246,17 @@ export function SaveBar({ formId, dirty, error, onReset }) {
           dirty && <span className="text-small text-warning">Có thay đổi chưa lưu</span>
         )}
       </div>
-      <Button disabled={!dirty} onClick={onReset}>
+      <Button disabled={!dirty || saving || busy} onClick={onReset}>
         Hủy
       </Button>
-      <Button type="submit" form={formId} variant="primary" icon="check" disabled={!dirty}>
-        Lưu thay đổi
+      <Button
+        type="submit"
+        form={formId}
+        variant="primary"
+        icon="check"
+        disabled={!dirty || saving || busy || blocked}
+      >
+        {saving ? 'Đang lưu…' : busy ? 'Đang tải ảnh…' : 'Lưu thay đổi'}
       </Button>
     </div>
   )

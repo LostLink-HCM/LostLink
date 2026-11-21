@@ -21,7 +21,7 @@ const BY_CREATION = { createdAt: 1, _id: 1 }
 // Danh mục cho form Đăng bài: thuộc tính và giá trị để chọn, checklist "Bên trong có",
 // câu hỏi xác minh gợi ý. Không trả tham số ghép cặp, độ hiếm hay vai trò thuộc tính
 const listCategories = async () => {
-  const categories = await Category.find()
+  const categories = await Category.find({ isActive: { $ne: false } })
     .sort({ order: 1, name: 1 })
     .select('slug name icon contentItems')
     .lean()

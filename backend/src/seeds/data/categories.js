@@ -1,6 +1,5 @@
-// Danh mục mẫu cho seed: định nghĩa trong categoryDefinitions.js, độ hiếm u lấy từ
-// categoryFrequencies.json do src/scripts/estimateFrequencies.js tính trên bộ khảo sát bài Facebook
-// (docs/design/matching-algorithm.md mục 9)
+// Ước lượng offline cho script và unit test; seed chạy thật chỉ dùng categoryDefinitions.js.
+// Giá trị u trong database được job tính lại từ các bài đăng đủ điều kiện ghép cặp.
 const DEFINITIONS = require('./categoryDefinitions')
 const FREQUENCIES = require('./categoryFrequencies.json')
 

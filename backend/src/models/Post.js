@@ -7,11 +7,13 @@ const {
   sequenceOf,
 } = require('../utils/postCode')
 const { lowercaseText, normalizeText, slugify } = require('../utils/text')
+const { notifyFrequencyInputsChanged } = require('../utils/frequencyEvents')
 
 const { Schema } = mongoose
 
 // 6 trạng thái bài đăng: chờ duyệt, bị từ chối, đang tìm, đã liên hệ, đã trao trả, đã đóng
 const POST_STATUSES = ['pending', 'rejected', 'searching', 'contacted', 'returned', 'closed']
+const FREQUENCY_STATUSES = ['searching', 'contacted']
 
 const MAX_IMAGES = 9
 const HOT_LIKE_WEIGHT = 20
@@ -171,6 +173,35 @@ const postSchema = new Schema(
   },
   { timestamps: true, collection: 'posts' }
 )
+
+const FREQUENCY_FIELDS = new Set(['category', 'attributes', 'status', 'isHidden'])
+
+const updateAffectsFrequencies = (update = {}) => {
+  const fields = Object.entries(update).flatMap(([key, value]) =>
+    key.startsWith('$') && value && typeof value === 'object' ? Object.keys(value) : [key]
+  )
+  return fields.some((field) => FREQUENCY_FIELDS.has(field.split('.')[0]))
+}
+
+postSchema.pre('save', function trackFrequencyChanges() {
+  this.$locals.frequencyRelevant = this.isNew
+    ? FREQUENCY_STATUSES.includes(this.status) && !this.isHidden
+    : [...FREQUENCY_FIELDS].some((field) => this.isModified(field))
+})
+
+postSchema.post('save', function notifyFrequencyChanges() {
+  if (this.$locals.frequencyRelevant) notifyFrequencyInputsChanged()
+})
+
+for (const operation of ['findOneAndUpdate', 'updateOne', 'updateMany']) {
+  postSchema.post(operation, function notifyQueryFrequencyChanges() {
+    if (updateAffectsFrequencies(this.getUpdate())) notifyFrequencyInputsChanged()
+  })
+}
+
+for (const operation of ['deleteOne', 'deleteMany', 'findOneAndDelete']) {
+  postSchema.post(operation, notifyFrequencyInputsChanged)
+}
 
 // Tạo slug cho bài mới từ tiêu đề, trùng thì thêm số. Loại tin đã có trên URL nên bỏ phần
 // lặp ở đầu: "Nhặt được chìa khóa" ở /nhat-duoc/chia-khoa, không phải /nhat-duoc/nhat-duoc-chia-khoa.

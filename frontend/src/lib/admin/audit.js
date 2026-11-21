@@ -137,7 +137,6 @@ export const auditDestination = (log) => {
         ? {
             category: detail.displayCode || log.entityId,
             tab: tabs[detail.section] || 'general',
-            highlight: '1',
           }
         : { missing: '1' }
   } else {

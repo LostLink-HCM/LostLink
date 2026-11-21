@@ -9,24 +9,26 @@ import Switch from '../../backoffice/Switch'
 import {
   EMPTY_ATTRIBUTE,
   cleanList,
+  duplicateAliasErrors,
+  duplicateTermErrors,
   isSame,
   makeId,
   validateAttribute,
 } from '../../../lib/admin/categories'
-import {
-  M_LEVELS,
-  MATCH_ROLES,
-  formatNumber,
-  formatPercent,
-  mLevelLabel,
-} from '../../../lib/admin/matching'
+import { M_LEVELS, MATCH_ROLES, formatNumber, formatPercent } from '../../../lib/admin/matching'
 import { inputClass, labelClass } from './styles'
 import { ConfirmDeleteDialog, FormError, Panel, SaveBar, Segmented, TextListField } from './ui'
 
-const VISIBLE_VALUES = 4
-
 const byFrequency = (values) =>
   [...values].sort((a, b) => (b.frequency ?? -1) - (a.frequency ?? -1))
+const DUPLICATE_ATTRIBUTE_VALUE_MESSAGE = 'Giá trị đã tồn tại, vui lòng nhập giá trị khác.'
+const DUPLICATE_CONTENT_ITEM_MESSAGE = 'Mục đã tồn tại, vui lòng nhập mục khác.'
+const M_PROB_ERROR = 'Giá trị không hợp lệ, hãy nhập lại theo điều kiện: 0 < m ≤ 0,95'
+
+const isValidMProb = (value) => {
+  const mProb = Number(value)
+  return String(value ?? '').trim() !== '' && Number.isFinite(mProb) && mProb > 0 && mProb <= 0.95
+}
 
 function RoleBadge({ role }) {
   return (
@@ -38,33 +40,83 @@ function RoleBadge({ role }) {
 
 function ValueSummary({ values }) {
   const sorted = byFrequency(values)
-  const hidden = sorted.length - VISIBLE_VALUES
 
   return (
-    <span className="text-small leading-relaxed text-ink-secondary">
-      {sorted.slice(0, VISIBLE_VALUES).map((attributeValue, index) => (
-        <span key={attributeValue.id}>
-          {index > 0 && <span className="text-ink-subtle"> · </span>}
-          {attributeValue.value}{' '}
-          <span className="text-ink-muted tabular-nums">
-            {attributeValue.frequency == null ? '—' : formatPercent(attributeValue.frequency)}
+    <ul className="m-0 max-h-36 min-w-0 list-none space-y-1 overflow-y-auto p-0 pr-1 text-small">
+      {sorted.map((attributeValue) => (
+        <li
+          key={attributeValue.id}
+          className="flex min-w-0 items-center justify-between gap-2 rounded-md bg-primary-faint px-2 py-1.5"
+        >
+          <span className="min-w-0 truncate text-ink-secondary" title={attributeValue.value}>
+            {attributeValue.value}
           </span>
-        </span>
+          <span className="shrink-0 text-caption text-ink-muted tabular-nums">
+            u ={' '}
+            {attributeValue.frequency == null ? '—' : formatPercent(attributeValue.frequency, 2)}
+          </span>
+        </li>
       ))}
-      {hidden > 0 && <span className="text-ink-muted"> · +{hidden}</span>}
-    </span>
+    </ul>
   )
 }
 
-function AttributeForm({ value, attributes, editing, onSubmit, onClose }) {
+function AttributeForm({ value, category, editing, uFloor, uFloorReady, onSubmit, onClose }) {
   const [form, setForm] = useState(() => ({
     ...value,
     values: value.values.map((v) => ({ ...v })),
   }))
   const [error, setError] = useState('')
+  const [mError, setMError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const otherAttributeAliases = category.attributes
+    .filter((attribute) => attribute.id !== value.id)
+    .flatMap((attribute) => [
+      ...attribute.aliases,
+      ...attribute.values.flatMap((attributeValue) => attributeValue.aliases),
+    ])
+  const existingAliases = [...category.aliases, ...otherAttributeAliases]
+  const aliasGroups = [form.aliases, ...form.values.map((attributeValue) => attributeValue.aliases)]
+  const aliasErrors = duplicateAliasErrors(aliasGroups, existingAliases, [
+    value.aliases,
+    ...value.values.map((attributeValue) => attributeValue.aliases),
+  ])
+  const attributeAliasErrors = aliasErrors[0]
+  const valueAliasErrors = aliasErrors.slice(1)
+  const hasAliasDuplicates = aliasErrors.flat().some(Boolean)
+  const attributeValueErrors = duplicateTermErrors(
+    form.values.map((attributeValue) => attributeValue.value),
+    value.values.map((attributeValue) => attributeValue.value),
+    DUPLICATE_ATTRIBUTE_VALUE_MESSAGE
+  )
+  const hasDuplicateAttributeValues = attributeValueErrors.some(Boolean)
+  const valuesNotContributing =
+    uFloorReady && isValidMProb(form.mProb) && form.matchRole === 'score'
+      ? form.values
+          .filter((attributeValue) => attributeValue.value.trim())
+          .map((attributeValue) => {
+            const storedFrequency = Number(attributeValue.frequency)
+            const hasStoredFrequency =
+              attributeValue.frequency != null && Number.isFinite(storedFrequency)
+            const fallbackFrequency = 1 / (form.values.length || 5)
+            const frequency = Math.max(
+              uFloor,
+              hasStoredFrequency ? storedFrequency : fallbackFrequency
+            )
+
+            return frequency >= Number(form.mProb)
+              ? { value: attributeValue.value.trim(), frequency }
+              : null
+          })
+          .filter(Boolean)
+      : []
   const change = (key, next) => {
     setError('')
     setForm((current) => ({ ...current, [key]: next }))
+  }
+  const changeMProb = (next) => {
+    change('mProb', next)
+    if (mError) setMError(isValidMProb(next) ? '' : M_PROB_ERROR)
   }
   const updateValue = (index, next) =>
     change(
@@ -72,22 +124,41 @@ function AttributeForm({ value, attributes, editing, onSubmit, onClose }) {
       form.values.map((item, i) => (i === index ? next : item))
     )
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault()
-    const nextError = validateAttribute(form, attributes, value.id)
+    if (!isValidMProb(form.mProb)) {
+      setMError(M_PROB_ERROR)
+      return
+    }
+    setMError('')
+    if (hasAliasDuplicates || hasDuplicateAttributeValues) return
+    const nextError = validateAttribute(form, category.attributes, value.id)
     if (nextError) return setError(nextError)
-    onSubmit({
-      name: form.name.trim(),
-      aliases: cleanList(form.aliases),
-      matchRole: form.matchRole,
-      mProb: Number(form.mProb),
-      isRequired: form.isRequired,
-      values: form.values.map((attributeValue) => ({
-        ...attributeValue,
-        value: attributeValue.value.trim().normalize('NFC'),
-        aliases: cleanList(attributeValue.aliases),
-      })),
-    })
+    setSaving(true)
+    setError('')
+    try {
+      await onSubmit({
+        name: form.name.trim(),
+        aliases: cleanList(form.aliases),
+        matchRole: form.matchRole,
+        mProb: Number(form.mProb),
+        isRequired: form.isRequired,
+        values: form.values.map((attributeValue) => ({
+          ...attributeValue,
+          value: attributeValue.value.trim().normalize('NFC'),
+          aliases: cleanList(attributeValue.aliases),
+        })),
+      })
+      setSaving(false)
+      onClose()
+    } catch (submitError) {
+      if (submitError.message?.toLowerCase().includes('độ tin cậy m')) {
+        setMError(M_PROB_ERROR)
+      } else {
+        setError(submitError.message || 'Không lưu được thuộc tính. Vui lòng thử lại.')
+      }
+      setSaving(false)
+    }
   }
 
   return (
@@ -97,9 +168,17 @@ function AttributeForm({ value, attributes, editing, onSubmit, onClose }) {
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>Hủy</Button>
-          <Button type="submit" form="admin-attribute-form" variant="primary" icon="check">
-            Lưu thuộc tính
+          <Button onClick={onClose} disabled={saving}>
+            Hủy
+          </Button>
+          <Button
+            type="submit"
+            form="admin-attribute-form"
+            variant="primary"
+            icon="check"
+            disabled={saving || hasAliasDuplicates || hasDuplicateAttributeValues}
+          >
+            {saving ? 'Đang lưu…' : 'Lưu thuộc tính'}
           </Button>
         </>
       }
@@ -145,18 +224,36 @@ function AttributeForm({ value, attributes, editing, onSubmit, onClose }) {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <label className={labelClass}>
-            Độ tin cậy khai báo (m)
-            <select
-              className={cx(inputClass, 'cursor-pointer')}
-              value={form.mProb}
-              onChange={(event) => change('mProb', Number(event.target.value))}
-            >
-              {M_LEVELS.map((level) => (
-                <option key={level.value} value={level.value}>
-                  {level.label} ({formatNumber(level.value, 2)})
-                </option>
-              ))}
-            </select>
+            {editing ? 'Giá trị m' : 'Độ tin cậy khởi tạo (m)'}
+            {editing ? (
+              <input
+                type="number"
+                min="0"
+                max="0.95"
+                step="any"
+                className={inputClass}
+                value={form.mProb ?? ''}
+                onChange={(event) => changeMProb(event.target.value)}
+                aria-invalid={mError ? true : undefined}
+                aria-describedby={mError ? 'admin-attribute-m-error' : undefined}
+              />
+            ) : (
+              <select
+                className={cx(inputClass, 'cursor-pointer')}
+                value={form.mProb}
+                onChange={(event) => change('mProb', Number(event.target.value))}
+              >
+                {M_LEVELS.map((level) => (
+                  <option key={level.value} value={level.value}>
+                    {level.label} ({formatNumber(level.value, 2)})
+                  </option>
+                ))}
+              </select>
+            )}
+            {mError && <FormError id="admin-attribute-m-error">{M_PROB_ERROR}</FormError>}
+            {editing && (
+              <span className="text-caption font-normal text-ink-muted">0 &lt; m ≤ 0,95</span>
+            )}
           </label>
           <label className="flex cursor-pointer items-center gap-2.5 self-start pt-8 text-small font-semibold text-ink-secondary max-sm:pt-0">
             <input
@@ -169,12 +266,60 @@ function AttributeForm({ value, attributes, editing, onSubmit, onClose }) {
           </label>
         </div>
 
+        {valuesNotContributing.length > 0 && (
+          <p
+            role="note"
+            className="m-0 flex items-start gap-2 rounded-xl bg-warning-soft px-3.5 py-2.5 text-small leading-relaxed text-warning"
+          >
+            <Icon name="warning" size={16} className="mt-0.5 shrink-0" />
+            <span>
+              Các giá trị sau có u ≥ m nên hiện không đóng góp điểm ghép cặp:{' '}
+              {valuesNotContributing
+                .map(
+                  ({ value: itemValue, frequency }) =>
+                    `${itemValue} (u = ${formatPercent(frequency, 2)})`
+                )
+                .join(', ')}
+              . u có thể thay đổi khi hệ thống tính lại từ bài đăng. Bạn vẫn có thể lưu cấu hình.
+            </span>
+          </p>
+        )}
+
+        {editing && (
+          <div className="rounded-xl border border-line-soft bg-primary-faint px-3.5 py-3 text-small">
+            {value.mRecommendation ? (
+              <>
+                <p className="m-0 font-semibold text-ink-secondary">
+                  Hệ thống đề xuất m = {formatNumber(value.mRecommendation.value, 4)}
+                </p>
+                <p className="m-0 mt-1 text-caption leading-relaxed text-ink-muted">
+                  Đề xuất được tính từ {value.mRecommendation.totalPairs} cặp mà cả hai bên đã xác
+                  nhận trao trả. Ở {value.mRecommendation.matchingPairs} cặp trong số đó, hai bài
+                  ghi cùng giá trị cho thuộc tính này.
+                  {value.mRecommendation.calculatedAt && (
+                    <>
+                      {' '}
+                      Cập nhật lúc{' '}
+                      {new Date(value.mRecommendation.calculatedAt).toLocaleString('vi-VN')}.
+                    </>
+                  )}
+                </p>
+              </>
+            ) : (
+              <p className="m-0 text-caption leading-relaxed text-ink-muted">
+                Chưa có cặp bài đăng được xác nhận để tính giá trị m đề xuất.
+              </p>
+            )}
+          </div>
+        )}
+
         <TextListField
           label="Alias của thuộc tính"
           itemLabel="alias thuộc tính"
           placeholder="Cách gọi khác"
           value={form.aliases}
           onChange={(aliases) => change('aliases', aliases)}
+          errors={attributeAliasErrors}
         />
 
         <div className={labelClass}>
@@ -198,24 +343,40 @@ function AttributeForm({ value, attributes, editing, onSubmit, onClose }) {
               className="rounded-xl border border-line-soft bg-primary-faint p-3"
             >
               <div className="flex items-start gap-2">
-                <label className={cx(labelClass, 'min-w-0 flex-1')}>
-                  <span className="flex items-baseline justify-between gap-2">
-                    Giá trị {index + 1}
-                    <span className="text-caption font-normal text-ink-muted tabular-nums">
-                      u ={' '}
-                      {attributeValue.frequency == null
-                        ? '—'
-                        : formatPercent(attributeValue.frequency)}
+                <div className={cx(labelClass, 'min-w-0 flex-1')}>
+                  <label htmlFor={`attribute-value-input-${index}`} className="flex flex-col gap-2">
+                    <span className="flex items-baseline justify-between gap-2">
+                      Giá trị {index + 1}
+                      <span className="text-caption font-normal text-ink-muted tabular-nums">
+                        u ={' '}
+                        {attributeValue.frequency == null
+                          ? '—'
+                          : formatPercent(attributeValue.frequency, 2)}
+                      </span>
                     </span>
-                  </span>
-                  <input
-                    className={inputClass}
-                    value={attributeValue.value}
-                    onChange={(event) =>
-                      updateValue(index, { ...attributeValue, value: event.target.value })
-                    }
-                  />
-                </label>
+                    <input
+                      id={`attribute-value-input-${index}`}
+                      className={cx(
+                        inputClass,
+                        attributeValueErrors[index] &&
+                          'border-danger/35 focus:border-danger/50 focus:ring-danger/10'
+                      )}
+                      value={attributeValue.value}
+                      aria-invalid={attributeValueErrors[index] ? true : undefined}
+                      aria-describedby={
+                        attributeValueErrors[index] ? `attribute-value-error-${index}` : undefined
+                      }
+                      onChange={(event) =>
+                        updateValue(index, { ...attributeValue, value: event.target.value })
+                      }
+                    />
+                  </label>
+                  {attributeValueErrors[index] && (
+                    <FormError id={`attribute-value-error-${index}`} subtle>
+                      {attributeValueErrors[index]}
+                    </FormError>
+                  )}
+                </div>
                 <IconButton
                   label={`Xóa giá trị ${index + 1}`}
                   icon="close"
@@ -231,10 +392,11 @@ function AttributeForm({ value, attributes, editing, onSubmit, onClose }) {
               </div>
               <div className="mt-3">
                 <TextListField
-                  label="Alias"
+                  label={`Alias của giá trị ${index + 1}`}
                   itemLabel={`alias của giá trị ${index + 1}`}
                   value={attributeValue.aliases}
                   onChange={(aliases) => updateValue(index, { ...attributeValue, aliases })}
+                  errors={valueAliasErrors[index]}
                 />
               </div>
             </article>
@@ -246,22 +408,26 @@ function AttributeForm({ value, attributes, editing, onSubmit, onClose }) {
   )
 }
 
-function AttributeDetailDialog({ attribute, onClose }) {
+function AttributeDetailDialog({ attribute, onClose, onEdit }) {
   return (
     <Dialog
       title={`Thuộc tính: ${attribute.name}`}
       size="lg"
       onClose={onClose}
-      footer={<Button onClick={onClose}>Đóng</Button>}
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button onClick={onClose}>Đóng</Button>
+          <Button variant="primary" onClick={onEdit}>
+            Sửa thuộc tính
+          </Button>
+        </div>
+      }
     >
       <div className="space-y-4">
         <dl className="m-0 grid grid-cols-3 gap-3 max-sm:grid-cols-1">
           {[
             ['Vai trò ghép cặp', <RoleBadge key="role" role={attribute.matchRole} />],
-            [
-              'Độ tin cậy (m)',
-              `${mLevelLabel(attribute.mProb)} (${formatNumber(attribute.mProb, 2)})`,
-            ],
+            ['Độ tin cậy', `m = ${formatNumber(attribute.mProb, 4)}`],
             ['Bắt buộc khi đăng', attribute.isRequired ? 'Có' : 'Không'],
           ].map(([label, value]) => (
             <div key={label} className="rounded-xl bg-primary-faint p-3">
@@ -292,7 +458,7 @@ function AttributeDetailDialog({ attribute, onClose }) {
                   <td className="px-3 py-2.5 text-right tabular-nums">
                     {attributeValue.frequency == null
                       ? '—'
-                      : formatPercent(attributeValue.frequency)}
+                      : formatPercent(attributeValue.frequency, 2)}
                   </td>
                 </tr>
               ))}
@@ -309,20 +475,39 @@ function ContentsPanel({ category, onSave }) {
   const [enabled, setEnabled] = useState(saved.length > 0)
   const [items, setItems] = useState(saved)
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
   const next = enabled ? cleanList(items) : []
   const dirty = !isSame(enabled ? items : [], saved)
+  const itemErrors = enabled
+    ? duplicateTermErrors(items, saved, DUPLICATE_CONTENT_ITEM_MESSAGE)
+    : []
+  const hasDuplicateItems = itemErrors.some(Boolean)
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault()
+    if (hasDuplicateItems) return
     if (enabled && !next.length)
       return setError('Thêm ít nhất một mục, hoặc tắt danh mục vật chứa.')
-    onSave(
-      next.map(
-        (label) =>
-          category.contents.find((item) => item.label === label) || { id: makeId('content'), label }
+    setSaving(true)
+    setError('')
+    try {
+      const updated = await onSave(
+        next.map(
+          (label) =>
+            category.contents.find((item) => item.label === label) || {
+              id: makeId('content'),
+              label,
+            }
+        )
       )
-    )
-    setItems(next)
+      const savedContents = updated.contents.map((item) => item.label)
+      setItems(savedContents)
+      setEnabled(savedContents.length > 0)
+    } catch (saveError) {
+      setError(saveError.message || 'Không lưu được danh sách bên trong. Vui lòng thử lại.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -349,6 +534,7 @@ function ContentsPanel({ category, onSave }) {
             itemLabel="mục"
             placeholder="Ví dụ: Tiền mặt"
             value={items}
+            errors={itemErrors}
             onChange={(value) => {
               setError('')
               setItems(value)
@@ -359,6 +545,8 @@ function ContentsPanel({ category, onSave }) {
           formId="category-contents-form"
           dirty={dirty}
           error={error}
+          saving={saving}
+          blocked={hasDuplicateItems}
           onReset={() => {
             setError('')
             setEnabled(saved.length > 0)
@@ -372,6 +560,8 @@ function ContentsPanel({ category, onSave }) {
 
 export default function AttributesTab({
   category,
+  uFloor = 0.01,
+  uFloorReady = true,
   onSaveAttribute,
   onRemoveAttribute,
   onSaveContents,
@@ -399,9 +589,9 @@ export default function AttributesTab({
                 <tr>
                   {[
                     'Thuộc tính',
-                    'Giá trị · độ hiếm u',
+                    'Giá trị - Độ hiếm u',
                     'Vai trò ghép cặp',
-                    'Độ tin cậy (m)',
+                    'Độ tin cậy',
                     'Bắt buộc',
                   ].map((heading) => (
                     <th
@@ -434,7 +624,7 @@ export default function AttributesTab({
                       <RoleBadge role={attribute.matchRole} />
                     </td>
                     <td className="w-[15%] px-3.5 py-3.5 align-top text-small whitespace-nowrap text-ink-secondary tabular-nums">
-                      {mLevelLabel(attribute.mProb)} ({formatNumber(attribute.mProb, 2)})
+                      m = {formatNumber(attribute.mProb, 4)}
                     </td>
                     <td className="w-[9%] px-3.5 py-3.5 align-top text-small text-ink-secondary">
                       {attribute.isRequired ? 'Có' : 'Không'}
@@ -482,27 +672,27 @@ export default function AttributesTab({
       {modal?.kind === 'form' && (
         <AttributeForm
           value={modal.value}
-          attributes={category.attributes}
+          category={category}
           editing={modal.editing}
+          uFloor={uFloor}
+          uFloorReady={uFloorReady}
           onClose={() => setModal(null)}
-          onSubmit={(value) => {
-            onSaveAttribute({ id: modal.value.id || makeId('attribute'), ...value })
-            setModal(null)
-          }}
+          onSubmit={(value) => onSaveAttribute({ id: modal.value.id, ...value })}
         />
       )}
       {modal?.kind === 'detail' && (
-        <AttributeDetailDialog attribute={modal.attribute} onClose={() => setModal(null)} />
+        <AttributeDetailDialog
+          attribute={modal.attribute}
+          onClose={() => setModal(null)}
+          onEdit={() => setModal({ kind: 'form', value: modal.attribute, editing: true })}
+        />
       )}
       {modal?.kind === 'delete' && (
         <ConfirmDeleteDialog
           title="Xóa thuộc tính"
           confirmLabel="Xóa thuộc tính"
           onClose={() => setModal(null)}
-          onConfirm={() => {
-            onRemoveAttribute(modal.attribute.id)
-            setModal(null)
-          }}
+          onConfirm={() => onRemoveAttribute(modal.attribute.id)}
         >
           <p className="m-0">
             Bạn có chắc muốn xóa thuộc tính{' '}
