@@ -36,6 +36,7 @@ const DEFAULT_CONFIG = {
   priorOdds: 200,
   timeTolerance: 1,
   sMin: 0.05,
+  uFloor: 0.01,
 }
 // u của tiêu chí liên tục, giá trị minh hoạ của mục 7 cho tới khi ước lượng từ dữ liệu
 const U_TIME = 0.3
@@ -64,7 +65,9 @@ const loadConfig = async () => {
   const config = { ...DEFAULT_CONFIG }
   for (const { key, value } of rows) {
     const number = Number(value)
-    if (Number.isFinite(number)) config[key] = number
+    if (!Number.isFinite(number)) continue
+    if (key === 'uFloor' && (number < 0.001 || number > 0.1)) continue
+    config[key] = number
   }
   return {
     ...config,
@@ -105,7 +108,7 @@ const lostCategoriesFor = async (foundCategoryId) => {
 
 // ----- Ngữ cảnh chấm điểm: thuộc tính, độ hiếm giá trị, vectơ TF-IDF
 
-const attributeContext = async (posts) => {
+const attributeContext = async (posts, uFloor) => {
   const attributeIds = posts.flatMap((post) => (post.attributes ?? []).map((a) => a.attribute))
   const valueIds = posts.flatMap((post) => (post.attributes ?? []).map((a) => a.attributeValue))
   const [attributes, values, valueCounts] = await Promise.all([
@@ -121,9 +124,12 @@ const attributeContext = async (posts) => {
   return {
     attributes: new Map(attributes.map((attribute) => [String(attribute._id), attribute])),
     valueName: (id) => valueById.get(String(id))?.value ?? '',
-    // Chưa có độ hiếm thì coi các giá trị của thuộc tính phổ biến như nhau
+    // Áp dụng mức sàn cả với tần suất đã lưu và giá trị fallback.
     valueU: (id, attributeId) =>
-      valueById.get(String(id))?.frequency ?? 1 / (countOf.get(String(attributeId)) ?? 5),
+      Math.max(
+        uFloor,
+        valueById.get(String(id))?.frequency ?? 1 / (countOf.get(String(attributeId)) ?? 5)
+      ),
   }
 }
 
@@ -142,12 +148,13 @@ const textContext = async (categoryIds, posts) => {
   return (a, b) => scoring.cosineSimilarity(vectors.get(String(a._id)), vectors.get(String(b._id)))
 }
 
-const feature = (key, s, m, u, detail = {}) => ({
-  key,
-  s,
-  w: scoring.evidenceWeight(s, m, u),
-  detail,
-})
+const hasInformativeEvidence = (m, u) =>
+  Number.isFinite(m) && m > 0 && m < 1 && Number.isFinite(u) && u > 0 && u < 1 && u < m
+
+const feature = (key, s, m, u, detail = {}) => {
+  if (!hasInformativeEvidence(m, u)) return null
+  return { key, s, w: scoring.evidenceWeight(s, m, u), detail }
+}
 
 const attributeFeatures = (lost, found, ctx) => {
   const foundValues = new Map(
@@ -159,10 +166,13 @@ const attributeFeatures = (lost, found, ctx) => {
     const meta = ctx.attributes.get(String(attribute))
     // Một bên không điền thì bỏ qua
     if (!other || !meta) continue
+    const m = meta.mProb
+    const u = ctx.valueU(attributeValue, attribute)
+    if (!Number.isFinite(m) || m <= 0 || m > 0.95 || !hasInformativeEvidence(m, u)) continue
     const same = other === String(attributeValue)
     if (!same && meta.matchRole === 'exclude') return null
     features.push(
-      feature('attribute', same ? 1 : 0, meta.mProb, ctx.valueU(attributeValue, attribute), {
+      feature('attribute', same ? 1 : 0, m, u, {
         name: meta.name,
         value: ctx.valueName(attributeValue),
         ...(!same && { other: ctx.valueName(other) }),
@@ -198,10 +208,16 @@ const evaluatePair = (lost, found, ctx) => {
     : null
 
   const evidence = [
-    feature('category', categoryRatio, config.mCategory, category.frequency ?? DEFAULT_CATEGORY_U, {
-      name: ctx.categories.get(String(found.category))?.name ?? '',
-      related: categoryRatio < 1,
-    }),
+    feature(
+      'category',
+      categoryRatio,
+      config.mCategory,
+      Math.max(config.uFloor, category.frequency ?? DEFAULT_CATEGORY_U),
+      {
+        name: ctx.categories.get(String(found.category))?.name ?? '',
+        related: categoryRatio < 1,
+      }
+    ),
     feature('time', sTime, config.mTime, U_TIME, { gapDays: Math.round(gapDays * 10) / 10 }),
     feature('location', sLocation, config.mLocation, U_LOCATION, {
       within: distanceBand(distance),
@@ -216,7 +232,7 @@ const evaluatePair = (lost, found, ctx) => {
           }),
         ]
       : []),
-  ]
+  ].filter(Boolean)
   const weight = evidence.reduce((sum, item) => sum + item.w, 0)
   return {
     score: scoring.matchProbability(weight, config.prior),
@@ -345,9 +361,13 @@ const runMatching = async (postId, { silent = false } = {}) => {
     ? await foundCategoriesFor(post.category)
     : await lostCategoriesFor(post.category)
   ratios.set(String(post.category), 1)
-  const categoryList = await Category.find({ _id: { $in: [...ratios.keys()] } }).lean()
+  const categoryList = await Category.find({
+    _id: { $in: [...ratios.keys()] },
+    isActive: { $ne: false },
+  }).lean()
   const categories = new Map(categoryList.map((category) => [String(category._id), category]))
   if (!categories.has(String(post.category))) return { created: 0 }
+  const activeCategoryIds = categoryList.map((category) => category._id)
 
   // Truy vấn sơ bộ bằng bán kính lớn nhất R_c(T_max), kiểm tra chính xác từng cặp sau
   const lostCategories = isLost ? [categories.get(String(post.category))] : categoryList
@@ -362,7 +382,7 @@ const runMatching = async (postId, { silent = false } = {}) => {
     type: isLost ? 'found' : 'lost',
     status: { $in: MATCHABLE_STATUSES },
     isHidden: false,
-    category: { $in: [...ratios.keys()] },
+    category: { $in: activeCategoryIds },
     locExact: {
       $nearSphere: {
         $geometry: { type: 'Point', coordinates: center },
@@ -380,8 +400,8 @@ const runMatching = async (postId, { silent = false } = {}) => {
     categories,
     // Bài mới là bài mất: r tra theo danh mục bài nhặt; ngược lại tra theo danh mục bài mất
     ratioOf: (lost, found) => ratios.get(String(isLost ? found.category : lost.category)) ?? 0,
-    ...(await attributeContext(posts)),
-    textSimilarity: await textContext([...ratios.keys()], posts),
+    ...(await attributeContext(posts, config.uFloor)),
+    textSimilarity: await textContext(activeCategoryIds, posts),
   }
 
   let created = 0

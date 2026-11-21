@@ -186,6 +186,17 @@ test.describe('Cấu hình hệ thống của admin', () => {
         () => settings.requests.filter(({ path }) => path === '/api/admin/settings/matching').length
       )
       .toBe(1)
+    await page.getByRole('tab', { name: 'Thuộc tính', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Thêm thuộc tính', exact: true })).toBeVisible()
+    await page.getByRole('tab', { name: 'Thông tin chung', exact: true }).click()
+    await expect(page.getByLabel('Tên danh mục')).toBeVisible()
+    await page.getByRole('tab', { name: 'Cấu hình thuật toán', exact: true }).click()
+    await expect(
+      page.getByRole('region', { name: 'Xem trước', exact: true }).locator('dd').first()
+    ).toContainText('≈')
+    expect(
+      settings.requests.filter(({ path }) => path === '/api/admin/settings/matching')
+    ).toHaveLength(1)
     await sidebar(page, 'Cấu hình hệ thống').click()
     await expect(field(page, 'mTime')).toHaveValue('0.88')
     expect(settings.requests.filter(({ path }) => path === '/api/admin/settings')).toHaveLength(1)
@@ -205,6 +216,31 @@ test.describe('Cấu hình hệ thống của admin', () => {
     await sidebar(page, 'Người dùng & quyền').click()
     await expect(page.getByRole('button', { name: 'Hồ sơ', exact: true })).toHaveCount(3)
     expect(settings.requests.filter(({ path }) => path === '/api/admin/settings')).toHaveLength(1)
+  })
+
+  test('mở Thuộc tính trước vẫn dùng chung cấu hình với tab thuật toán', async ({
+    page,
+    settings,
+  }) => {
+    await page.goto('/admin/categories')
+    await loginThroughUi(page, ADMIN)
+    await expect(page.getByRole('tab', { name: 'Thông tin chung', exact: true })).toBeVisible()
+    expect(
+      settings.requests.filter(({ path }) => path === '/api/admin/settings/matching')
+    ).toHaveLength(0)
+    await page.getByRole('tab', { name: 'Thuộc tính', exact: true }).click()
+    await expect
+      .poll(
+        () => settings.requests.filter(({ path }) => path === '/api/admin/settings/matching').length
+      )
+      .toBe(1)
+    await page.getByRole('tab', { name: 'Cấu hình thuật toán', exact: true }).click()
+    await expect(
+      page.getByRole('region', { name: 'Xem trước', exact: true }).locator('dd').first()
+    ).toContainText('≈')
+    expect(
+      settings.requests.filter(({ path }) => path === '/api/admin/settings/matching')
+    ).toHaveLength(1)
   })
 
   test('chuẩn hóa .12, chờ xác nhận mới lưu đúng nhóm và giữ giá trị sau tải lại', async ({

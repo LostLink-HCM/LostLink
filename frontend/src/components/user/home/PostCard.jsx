@@ -3,7 +3,7 @@ import { formatCount, placeLines, postPath, timeAgo } from '../../../lib/user/ho
 import { profilePath } from '../../../lib/user/profiles'
 import Icon from '../../common/Icon'
 import { cardClass } from '../Card'
-import { cx, focusRing } from '../classes'
+import { cx, focusRing, tagClass } from '../classes'
 import LikeButton from './LikeButton'
 import TypeTag from './TypeTag'
 
@@ -36,6 +36,7 @@ export default function PostCard({
   onToggleLike,
   now,
   rank,
+  seen,
   tags,
   menu,
   footer,
@@ -50,7 +51,13 @@ export default function PostCard({
         'relative flex gap-3.5 p-3.5 transition hover:border-line-strong hover:shadow-[0_10px_28px_-14px_rgb(22_35_58/0.25)] sm:gap-4.5 sm:p-4'
       )}
     >
-      <div className="relative min-h-28 w-24 shrink-0 self-stretch sm:min-h-30 sm:w-40">
+      {/* Bài đã xem làm mờ ảnh để cuộn nhanh vẫn phân biệt được */}
+      <div
+        className={cx(
+          'relative min-h-28 w-24 shrink-0 self-stretch sm:min-h-30 sm:w-40',
+          seen && 'opacity-75'
+        )}
+      >
         {post.images[0] ? (
           <img
             src={post.images[0]}
@@ -99,13 +106,30 @@ export default function PostCard({
             )}
           </div>
           <span className="flex shrink-0 items-center gap-1.5">
-            <TypeTag type={post.type} />
+            {/* Điện thoại hẹp chỉ hiện biểu tượng để tên người đăng và thời gian nằm gọn một dòng */}
+            {seen && (
+              <span
+                title="Đã xem"
+                className={cx(tagClass, 'gap-1 bg-line-subtle text-ink-secondary max-sm:px-1.5')}
+              >
+                <Icon name="eyeCheck" size={11} />
+                <span className="max-sm:sr-only">Đã xem</span>
+              </span>
+            )}
+            {/* Cùng chiều rộng với "Nhặt được" để nhãn Đã xem thẳng cột giữa các card */}
+            <TypeTag type={post.type} className="min-w-19 justify-center" />
             {tags}
             {menu}
           </span>
         </div>
 
-        <h3 className="m-0 mb-1 text-lead leading-snug font-bold tracking-tight text-ink sm:text-title">
+        {/* Bài đã xem: tiêu đề nhạt hơn, giống link đã bấm */}
+        <h3
+          className={cx(
+            'm-0 mb-1 text-lead leading-snug font-bold tracking-tight sm:text-title',
+            seen ? 'text-ink-muted' : 'text-ink'
+          )}
+        >
           <Link
             to={postPath(post)}
             // Trang chi tiết dùng để quay lại đúng danh sách đang xem (Trang chủ, Tin hot, hồ sơ...)
@@ -139,7 +163,8 @@ export default function PostCard({
             <Icon name="pin" size={12} className="shrink-0" />
             <span className="truncate">{placeLines(post).join(' → ')}</span>
           </span>
-          <span className="shrink-0 whitespace-nowrap max-lg:hidden">
+          {/* Luôn sát góc phải, thẳng hàng với nhãn loại tin dù địa điểm dài hay ngắn */}
+          <span className="ml-auto shrink-0 whitespace-nowrap max-lg:hidden">
             {comments > 0 && `${formatCount(comments)} bình luận · `}
             {formatCount(post.views)} lượt xem
           </span>

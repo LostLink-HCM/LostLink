@@ -19,6 +19,7 @@ module.exports = {
   PostLike: require('./PostLike'),
   SavedPost: require('./SavedPost'),
   PostFollow: require('./PostFollow'),
+  PostView: require('./PostView'),
   VerificationChallenge: require('./VerificationChallenge'),
 
   MatchSuggestion: require('./MatchSuggestion'),

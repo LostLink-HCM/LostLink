@@ -18,6 +18,7 @@ const NOTIFICATION_TYPES = [
   'comment',
   'post_approved',
   'post_rejected',
+  'category_archived',
   // Đóng bài (gửi người theo dõi), xoá bài (gửi người đang trao đổi)
   'post_closed',
   'post_deleted',
@@ -52,6 +53,7 @@ const notificationSchema = new Schema(
     refId: { type: Schema.Types.ObjectId, default: null },
 
     preview: { type: String, default: '' },
+    body: { type: String, default: null },
 
     match: { type: Schema.Types.ObjectId, ref: 'MatchSuggestion', default: null, index: true },
     isSuppressed: { type: Boolean, default: false },

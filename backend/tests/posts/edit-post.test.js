@@ -1,7 +1,16 @@
 const assert = require('node:assert/strict')
 const { afterEach, beforeEach, describe, mock, test } = require('node:test')
 
-const { MatchSuggestion, Post, VerificationChallenge } = require('../../src/models')
+const {
+  Category,
+  CategoryMatchRelation,
+  CategoryMatchRelationMember,
+  MatchSuggestion,
+  Notification,
+  Post,
+  VerificationChallenge,
+} = require('../../src/models')
+const { runMatching } = require('../../src/services/matchingService')
 const imageService = require('../../src/services/imageService')
 const vietmapService = require('../../src/services/vietmapService')
 const { matchesAnswer } = require('../../src/utils/crypto')
@@ -145,6 +154,63 @@ describe('UC25 - Sửa bài: nạp dữ liệu hiện tại', () => {
 })
 
 describe('UC25 - Sửa bài thành công', () => {
+  test('đổi danh mục lưu trữ: chờ duyệt lại, ẩn gợi ý rồi khôi phục cặp còn phù hợp', async () => {
+    const active = await Category.create({
+      name: 'Ví đang hoạt động',
+      slug: 'vi-dang-hoat-dong',
+      frequency: 0.01,
+    })
+    wallet.category.frequency = 0.01
+    await wallet.category.save()
+    const relation = await CategoryMatchRelation.create({
+      sourceCategory: wallet.category._id,
+      ratio: 1,
+    })
+    await CategoryMatchRelationMember.create({ relation: relation._id, category: active._id })
+    const peer = await createUser({ username: 'editpeer', email: 'editpeer@example.com' })
+    const lost = await makePost(owner, wallet.category)
+    const found = await makePost(peer, active, { type: 'found' })
+    await runMatching(lost._id)
+    const match = await MatchSuggestion.findOne({ postLost: lost._id, postFound: found._id })
+    assert.ok(match)
+    await MatchSuggestion.updateOne(
+      { _id: match._id },
+      { state: 'confirmed_one', confirmedLost: true }
+    )
+    wallet.category.isActive = false
+    await wallet.category.save()
+
+    const form = await editForm(lost)
+    assert.equal(form.category, '')
+    const edited = await edit(
+      lost,
+      toPayload(form, { category: active.slug, attributes: [], contents: [] })
+    )
+    assert.equal(edited.status, 200, JSON.stringify(edited.body))
+    assert.equal(edited.body.data.status, 'pending')
+    assert.equal((await MatchSuggestion.findById(match._id)).state, 'stale')
+    assert.equal(await Notification.countDocuments({ match: match._id, isSuppressed: true }), 2)
+
+    const moderator = await createUser({
+      username: 'editmoderator',
+      email: 'editmod@example.com',
+      role: 'moderator',
+    })
+    const session = await loginAs(moderator.email)
+    const modApi = authed(session.client, session.accessToken)
+    const approved = await modApi.post(`/api/moderator/posts/${lost.id}/approve`)
+    assert.equal(approved.status, 200, JSON.stringify(approved.body))
+    const revived = await MatchSuggestion.findById(match._id)
+    assert.equal(revived.state, 'pending')
+    assert.equal(revived.confirmedLost, false)
+    assert.equal(revived.confirmedFound, false)
+    assert.equal(
+      await MatchSuggestion.countDocuments({ postLost: lost._id, postFound: found._id }),
+      1
+    )
+    assert.equal(await Notification.countDocuments({ match: match._id, isSuppressed: false }), 2)
+  })
+
   test('bài Đang tìm: lưu nội dung mới, giữ slug và mã, về Chờ duyệt, ẩn khỏi danh sách công khai', async () => {
     const post = await makePost(owner, wallet.category, { title: 'Mất ví da' })
     const match = await MatchSuggestion.create({

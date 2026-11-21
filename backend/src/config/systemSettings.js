@@ -12,6 +12,7 @@ const SETTING_DEFINITIONS = Object.freeze({
   priorOdds: { default: 200, min: 2, max: 100000, integer: true },
   timeTolerance: { default: 1, min: 0, max: 30, integer: true },
   sMin: { default: 0.05, min: 0.01, max: 0.5 },
+  uFloor: { default: 0.01, min: 0.001, max: 0.1 },
   paginationPageSize: { default: 10, min: 1, max: 100, integer: true },
 })
 
@@ -31,6 +32,7 @@ const SETTING_GROUPS = Object.freeze({
     'priorOdds',
     'timeTolerance',
     'sMin',
+    'uFloor',
   ],
   timeThresholds: ['reportDays', 'contactHours', 'returnReminderDays'],
   pagination: ['paginationPageSize'],

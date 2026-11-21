@@ -964,6 +964,13 @@ function SettingsEditor({ initialSettings, onSaved, registerNavigationGuard, rea
                           step: 0.01,
                         })}
                       </div>
+                      {field(
+                        'uFloor',
+                        'Mức sàn độ hiếm u',
+                        'Áp dụng cho độ hiếm của danh mục và giá trị thuộc tính.',
+                        '',
+                        { min: 0.001, max: 0.1, step: 0.001 }
+                      )}
                     </div>
                   </details>
                 </SettingsCard>

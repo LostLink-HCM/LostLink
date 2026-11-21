@@ -73,6 +73,67 @@ test('tạo danh mục từ giao diện và hiển thị ngay sau khi API xác n
   await expect(categorySearch(page)).toHaveValue(name)
 })
 
+test('lưu trữ báo quan hệ bị ảnh hưởng và cập nhật nhóm còn lại trên giao diện', async ({
+  page,
+  api,
+}) => {
+  const target = await createCategory(api, uniqueName('Danh mục lưu trữ'))
+  const mixedSource = await createCategory(api, uniqueName('Nguồn nhóm còn'))
+  const emptySource = await createCategory(api, uniqueName('Nguồn nhóm rỗng'))
+  const remaining = await createCategory(api, uniqueName('Thành viên giữ lại'))
+  for (const [source, memberCategoryIds] of [
+    [mixedSource, [target.id, remaining.id]],
+    [emptySource, [target.id]],
+  ]) {
+    const response = await api.put(`admin/categories/${source.id}/relations`, {
+      headers: bearer(source.token),
+      data: { relations: [{ ratio: 0.6, memberCategoryIds }] },
+    })
+    expect(response.status()).toBe(200)
+  }
+
+  await openCategories(page)
+  await selectCategory(page, target.name)
+  await page.getByRole('button', { name: 'Xóa danh mục', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Xóa danh mục' })
+  await expect(dialog.getByText('sẽ bị gỡ khỏi quan hệ của', { exact: false })).toBeVisible()
+  await expect(dialog.getByText(mixedSource.name, { exact: false })).toBeVisible()
+  await expect(dialog.getByText(emptySource.name, { exact: false })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Hủy', exact: true }).click()
+  expect(
+    (await api.get(`admin/categories/${target.id}`, { headers: bearer(target.token) })).status()
+  ).toBe(200)
+
+  await page.getByRole('button', { name: 'Xóa danh mục', exact: true }).click()
+  const archivedResponse = page.waitForResponse(
+    (response) =>
+      response.url().endsWith(`/api/admin/categories/${target.id}`) &&
+      response.request().method() === 'DELETE'
+  )
+  await dialog.getByRole('button', { name: 'Xóa danh mục', exact: true }).click()
+  expect((await archivedResponse).status()).toBe(200)
+  await expect(dialog).toHaveCount(0)
+
+  await selectCategory(page, mixedSource.name)
+  await categoryTabs(page).getByRole('tab', { name: 'Quan hệ', exact: true }).click()
+  await expect(page.getByRole('button', { name: `Bỏ ${remaining.name} khỏi nhóm 1` })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Lưu thay đổi', exact: true })).toBeDisabled()
+  await selectCategory(page, emptySource.name)
+  await expect(page.getByText('Nhóm 1', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Lưu thay đổi', exact: true })).toBeDisabled()
+
+  const saved = await api.get(`admin/categories/${mixedSource.id}`, {
+    headers: bearer(mixedSource.token),
+  })
+  expect((await saved.json()).data.relations).toEqual([
+    expect.objectContaining({ ratio: 0.6, memberCategoryIds: [remaining.id] }),
+  ])
+  const emptied = await api.get(`admin/categories/${emptySource.id}`, {
+    headers: bearer(emptySource.token),
+  })
+  expect((await emptied.json()).data.relations).toEqual([])
+})
+
 test('lưu tên, thứ tự và alias; dữ liệu được ghi vào API', async ({ page, api }) => {
   const category = await createCategory(api, uniqueName('Danh mục chỉnh sửa'))
   await openCategories(page)

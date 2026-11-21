@@ -16,11 +16,12 @@
 //    K là số danh mục; với giá trị, N là số bài trong danh mục có điền thuộc tính, K là số giá trị.
 const fs = require('node:fs')
 const path = require('node:path')
+const { DEFAULT_SETTINGS } = require('../config/systemSettings')
 const DEFINITIONS = require('../seeds/data/categoryDefinitions')
 
 const ROOT = path.resolve(__dirname, '../../..')
 const OUTPUT = path.join(ROOT, 'backend/src/seeds/data/categoryFrequencies.json')
-const FLOOR = 0.01
+const FLOOR = DEFAULT_SETTINGS.uFloor
 const OTHER = 'Khác'
 
 // Thuộc tính dùng để nhận ra món đồ; màu, chất liệu không nói lên đó là món gì

@@ -197,8 +197,8 @@ export function validateAttribute(form, attributes, selfId) {
   )
     return 'Danh mục đã có thuộc tính cùng tên.'
   const mProb = Number(form.mProb)
-  if (!String(form.mProb ?? '').trim() || !Number.isFinite(mProb) || mProb <= 0 || mProb >= 1)
-    return 'Độ tin cậy m phải lớn hơn 0 và nhỏ hơn 1.'
+  if (!String(form.mProb ?? '').trim() || !Number.isFinite(mProb) || mProb <= 0 || mProb > 0.95)
+    return 'Độ tin cậy m phải lớn hơn 0 và không vượt quá 0,95.'
   if (!form.values.length) return 'Thêm ít nhất một giá trị để người đăng chọn.'
   if (form.values.some((attributeValue) => !attributeValue.value.trim()))
     return 'Nhập tên cho tất cả giá trị.'

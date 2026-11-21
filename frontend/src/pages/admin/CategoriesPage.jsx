@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import useSystemSettings from '../../hooks/useSystemSettings'
 import Icon from '../../components/common/Icon'
 import Button from '../../components/backoffice/Button'
 import AlgorithmTab from '../../components/admin/categories/AlgorithmTab'
@@ -25,6 +26,8 @@ import {
   updateAdminCategoryGeneral,
   updateAdminCategoryRelations,
 } from '../../lib/admin/categoriesApi'
+import { DEFAULT_SETTINGS } from '../../lib/admin/settings'
+import { withoutCategory } from '../../lib/admin/categories'
 
 const byOrder = (a, b) => a.order - b.order || a.name.localeCompare(b.name, 'vi')
 
@@ -63,6 +66,12 @@ export default function Categories() {
   )
     ? requestedTab
     : 'general'
+  const matchingConfig = useSystemSettings({
+    scope: 'matching',
+    enabled: tab === 'attributes' || tab === 'algorithm',
+  })
+  const { systemSettings: matchingSettings } = matchingConfig
+  const uFloor = matchingSettings?.values?.uFloor ?? DEFAULT_SETTINGS.uFloor
   const selectCategory = (id, nextTab = tab) =>
     setSearchParams(
       (current) => {
@@ -170,10 +179,10 @@ export default function Categories() {
 
   const removeCategory = async () => {
     const archived = await archiveAdminCategory(selected.id)
-    const next = categories.filter((category) => category.id !== archived.id)
+    const next = withoutCategory(categories, archived.id)
     setCategoryState((current) => ({
       ...current,
-      items: current.items.filter((category) => category.id !== archived.id),
+      items: withoutCategory(current.items, archived.id),
       updatedAt: archived.updatedAt || current.updatedAt,
       error: '',
     }))
@@ -301,6 +310,8 @@ export default function Categories() {
               <div {...panelProps('attributes')}>
                 <AttributesTab
                   category={selected}
+                  uFloor={uFloor}
+                  uFloorReady={Boolean(matchingSettings)}
                   onSaveAttribute={saveAttribute}
                   onRemoveAttribute={removeAttribute}
                   onSaveContents={saveContents}
@@ -313,7 +324,7 @@ export default function Categories() {
                 <AlgorithmTab
                   category={selected}
                   onSave={saveAlgorithm}
-                  active={tab === 'algorithm'}
+                  matchingConfig={matchingConfig}
                 />
               </div>
               <div {...panelProps('questions')}>
@@ -338,6 +349,7 @@ export default function Categories() {
       {modal === 'delete' && selected && (
         <DeleteCategoryDialog
           category={selected}
+          categories={categories}
           onConfirm={removeCategory}
           onClose={() => setModal(null)}
         />

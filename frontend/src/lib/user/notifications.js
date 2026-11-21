@@ -31,6 +31,11 @@ const DESCRIBE = {
     title: 'Bài của bạn bị từ chối',
     body: item.text ? `Lý do: ${item.text}` : (item.post?.title ?? ''),
   }),
+  category_archived: (item) => ({
+    kind: 'post',
+    title: 'Danh mục bài đăng đã ngừng sử dụng',
+    body: item.text,
+  }),
   post_closed: (item) => ({ kind: 'post', title: 'Bài bạn theo dõi đã đóng', body: item.text }),
   returned: (item) => ({
     kind: 'post',
@@ -134,6 +139,7 @@ const VISUALS = {
   like: { icon: 'heart', tone: 'from-[#ffa3b8] to-[#ff5c82] shadow-[#ff5c82]/30' },
   post_approved: { icon: 'check', tone: 'from-[#6ee7b4] to-[#22c784] shadow-[#22c784]/30' },
   post_rejected: { icon: 'warning', tone: 'from-[#ffb199] to-[#ff6f4e] shadow-[#ff6f4e]/30' },
+  category_archived: { icon: 'warning', tone: 'from-[#ffb199] to-[#ff6f4e] shadow-[#ff6f4e]/30' },
   post_closed: { icon: 'lock', tone: 'from-[#c3cbd8] to-[#8e9bb0] shadow-[#8e9bb0]/30' },
   returned: { icon: 'gift', tone: 'from-[#b9adff] to-[#8572ff] shadow-[#8572ff]/30' },
   post_deleted: { icon: 'trash', tone: 'from-[#c3cbd8] to-[#8e9bb0] shadow-[#8e9bb0]/30' },
@@ -159,6 +165,11 @@ export function describeNotification(item) {
   const toMessages = MESSAGE_TYPES.includes(item.type)
   // Thông báo manh mối mở trang Manh mối của bài đó
   const toMatches = item.type === 'match' && post?.available
+  const toEdit =
+    item.type === 'category_archived' &&
+    post?.available &&
+    post.id &&
+    ['searching', 'pending', 'rejected'].includes(post.status)
   return {
     ...described,
     visual: VISUALS[item.type] ?? GROUP_VISUALS[GROUP_OF[item.type] ?? 'post'],
@@ -167,16 +178,26 @@ export function describeNotification(item) {
     id: item.id,
     unread: !item.isRead,
     createdAt: item.createdAt,
-    action: toMessages ? 'Mở tin nhắn' : toMatches ? 'Xem manh mối' : post ? 'Xem bài' : null,
+    action: toMessages
+      ? 'Mở tin nhắn'
+      : toMatches
+        ? 'Xem manh mối'
+        : toEdit
+          ? 'Chỉnh sửa bài đăng'
+          : post
+            ? 'Xem bài'
+            : null,
     link: toMessages
       ? { to: '/messages' }
       : toMatches
         ? { to: `/matches?post=${encodeURIComponent(post.slug)}` }
-        : post
-          ? post.available
-            ? { to: postPath(post) }
-            : { unavailable: true }
-          : null,
+        : toEdit
+          ? { to: `/posts/${encodeURIComponent(post.id)}/edit` }
+          : post
+            ? post.available
+              ? { to: postPath(post) }
+              : { unavailable: true }
+            : null,
   }
 }
 

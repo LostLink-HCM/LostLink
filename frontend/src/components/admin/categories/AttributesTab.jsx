@@ -23,6 +23,12 @@ const byFrequency = (values) =>
   [...values].sort((a, b) => (b.frequency ?? -1) - (a.frequency ?? -1))
 const DUPLICATE_ATTRIBUTE_VALUE_MESSAGE = 'Giá trị đã tồn tại, vui lòng nhập giá trị khác.'
 const DUPLICATE_CONTENT_ITEM_MESSAGE = 'Mục đã tồn tại, vui lòng nhập mục khác.'
+const M_PROB_ERROR = 'Giá trị không hợp lệ, hãy nhập lại theo điều kiện: 0 < m ≤ 0,95'
+
+const isValidMProb = (value) => {
+  const mProb = Number(value)
+  return String(value ?? '').trim() !== '' && Number.isFinite(mProb) && mProb > 0 && mProb <= 0.95
+}
 
 function RoleBadge({ role }) {
   return (
@@ -55,12 +61,13 @@ function ValueSummary({ values }) {
   )
 }
 
-function AttributeForm({ value, category, editing, onSubmit, onClose }) {
+function AttributeForm({ value, category, editing, uFloor, uFloorReady, onSubmit, onClose }) {
   const [form, setForm] = useState(() => ({
     ...value,
     values: value.values.map((v) => ({ ...v })),
   }))
   const [error, setError] = useState('')
+  const [mError, setMError] = useState('')
   const [saving, setSaving] = useState(false)
   const otherAttributeAliases = category.attributes
     .filter((attribute) => attribute.id !== value.id)
@@ -83,9 +90,33 @@ function AttributeForm({ value, category, editing, onSubmit, onClose }) {
     DUPLICATE_ATTRIBUTE_VALUE_MESSAGE
   )
   const hasDuplicateAttributeValues = attributeValueErrors.some(Boolean)
+  const valuesNotContributing =
+    uFloorReady && isValidMProb(form.mProb) && form.matchRole === 'score'
+      ? form.values
+          .filter((attributeValue) => attributeValue.value.trim())
+          .map((attributeValue) => {
+            const storedFrequency = Number(attributeValue.frequency)
+            const hasStoredFrequency =
+              attributeValue.frequency != null && Number.isFinite(storedFrequency)
+            const fallbackFrequency = 1 / (form.values.length || 5)
+            const frequency = Math.max(
+              uFloor,
+              hasStoredFrequency ? storedFrequency : fallbackFrequency
+            )
+
+            return frequency >= Number(form.mProb)
+              ? { value: attributeValue.value.trim(), frequency }
+              : null
+          })
+          .filter(Boolean)
+      : []
   const change = (key, next) => {
     setError('')
     setForm((current) => ({ ...current, [key]: next }))
+  }
+  const changeMProb = (next) => {
+    change('mProb', next)
+    if (mError) setMError(isValidMProb(next) ? '' : M_PROB_ERROR)
   }
   const updateValue = (index, next) =>
     change(
@@ -95,6 +126,11 @@ function AttributeForm({ value, category, editing, onSubmit, onClose }) {
 
   const submit = async (event) => {
     event.preventDefault()
+    if (!isValidMProb(form.mProb)) {
+      setMError(M_PROB_ERROR)
+      return
+    }
+    setMError('')
     if (hasAliasDuplicates || hasDuplicateAttributeValues) return
     const nextError = validateAttribute(form, category.attributes, value.id)
     if (nextError) return setError(nextError)
@@ -116,7 +152,11 @@ function AttributeForm({ value, category, editing, onSubmit, onClose }) {
       setSaving(false)
       onClose()
     } catch (submitError) {
-      setError(submitError.message || 'Không lưu được thuộc tính. Vui lòng thử lại.')
+      if (submitError.message?.toLowerCase().includes('độ tin cậy m')) {
+        setMError(M_PROB_ERROR)
+      } else {
+        setError(submitError.message || 'Không lưu được thuộc tính. Vui lòng thử lại.')
+      }
       setSaving(false)
     }
   }
@@ -189,11 +229,13 @@ function AttributeForm({ value, category, editing, onSubmit, onClose }) {
               <input
                 type="number"
                 min="0"
-                max="1"
+                max="0.95"
                 step="any"
                 className={inputClass}
                 value={form.mProb ?? ''}
-                onChange={(event) => change('mProb', event.target.value)}
+                onChange={(event) => changeMProb(event.target.value)}
+                aria-invalid={mError ? true : undefined}
+                aria-describedby={mError ? 'admin-attribute-m-error' : undefined}
               />
             ) : (
               <select
@@ -208,6 +250,10 @@ function AttributeForm({ value, category, editing, onSubmit, onClose }) {
                 ))}
               </select>
             )}
+            {mError && <FormError id="admin-attribute-m-error">{M_PROB_ERROR}</FormError>}
+            {editing && (
+              <span className="text-caption font-normal text-ink-muted">0 &lt; m ≤ 0,95</span>
+            )}
           </label>
           <label className="flex cursor-pointer items-center gap-2.5 self-start pt-8 text-small font-semibold text-ink-secondary max-sm:pt-0">
             <input
@@ -219,6 +265,25 @@ function AttributeForm({ value, category, editing, onSubmit, onClose }) {
             Bắt buộc khi đăng bài
           </label>
         </div>
+
+        {valuesNotContributing.length > 0 && (
+          <p
+            role="note"
+            className="m-0 flex items-start gap-2 rounded-xl bg-warning-soft px-3.5 py-2.5 text-small leading-relaxed text-warning"
+          >
+            <Icon name="warning" size={16} className="mt-0.5 shrink-0" />
+            <span>
+              Các giá trị sau có u ≥ m nên hiện không đóng góp điểm ghép cặp:{' '}
+              {valuesNotContributing
+                .map(
+                  ({ value: itemValue, frequency }) =>
+                    `${itemValue} (u = ${formatPercent(frequency, 2)})`
+                )
+                .join(', ')}
+              . u có thể thay đổi khi hệ thống tính lại từ bài đăng. Bạn vẫn có thể lưu cấu hình.
+            </span>
+          </p>
+        )}
 
         {editing && (
           <div className="rounded-xl border border-line-soft bg-primary-faint px-3.5 py-3 text-small">
@@ -495,6 +560,8 @@ function ContentsPanel({ category, onSave }) {
 
 export default function AttributesTab({
   category,
+  uFloor = 0.01,
+  uFloorReady = true,
   onSaveAttribute,
   onRemoveAttribute,
   onSaveContents,
@@ -607,6 +674,8 @@ export default function AttributesTab({
           value={modal.value}
           category={category}
           editing={modal.editing}
+          uFloor={uFloor}
+          uFloorReady={uFloorReady}
           onClose={() => setModal(null)}
           onSubmit={(value) => onSaveAttribute({ id: modal.value.id, ...value })}
         />

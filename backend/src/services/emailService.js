@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer')
 const env = require('../config/env')
+const { categoryArchiveMessage } = require('../utils/categoryArchiveNotice')
 
 let transporter
 
@@ -123,10 +124,43 @@ const sendAccountDeletionNotice = ({ to, username, deleteAt }) => {
   })
 }
 
+// Gộp các bài cùng chủ vào một email khi danh mục ngừng sử dụng.
+const sendCategoryArchivedNotice = ({ to, categoryName, posts }) => {
+  const entries = posts.map((post) => {
+    const canEdit = ['searching', 'pending'].includes(post.status)
+    return {
+      message: categoryArchiveMessage(post, categoryName),
+      action: canEdit ? 'Chỉnh sửa bài đăng' : 'Xem bài đăng',
+      url: canEdit
+        ? `${env.clientUrl}/posts/${post._id}/edit`
+        : `${env.clientUrl}/${post.type === 'lost' ? 'mat-do' : 'nhat-duoc'}/${post.slug}`,
+    }
+  })
+  return sendMail({
+    to,
+    subject: 'Danh mục bài đăng của bạn đã ngừng sử dụng trên LostLink',
+    text: entries.map(({ message, action, url }) => `${message}\n${action}: ${url}`).join('\n\n'),
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto">
+        <h2>Danh mục bài đăng đã ngừng sử dụng</h2>
+        ${entries
+          .map(
+            ({ message, action, url }) => `
+          <p>${escapeHtml(message)}</p>
+          <p><a href="${escapeHtml(url)}">${action}</a></p>
+        `
+          )
+          .join('')}
+        <p style="color:#666">Bạn nhận email này vì đã bật nhận email về bài đăng từ LostLink.</p>
+      </div>`,
+  })
+}
+
 module.exports = {
   sendVerificationCode,
   sendResetLink,
   sendContactReminder,
   sendEmailChangeCode,
   sendAccountDeletionNotice,
+  sendCategoryArchivedNotice,
 }
