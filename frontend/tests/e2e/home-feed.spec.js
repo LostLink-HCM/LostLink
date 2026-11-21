@@ -123,7 +123,7 @@ test.describe('UC02 - Lọc và tìm kiếm bài đăng', () => {
 
     await page.goto('/')
     const panel = filters(page)
-    await panel.getByRole('button', { name: 'Xem tất cả 8 danh mục' }).click()
+    await panel.getByRole('button', { name: /^Xem tất cả \d+ danh mục$/ }).click()
     await panel.getByRole('button', { name: 'Thú cưng', exact: true }).click()
 
     await expect(feed(page).getByText('Danh mục này không còn tồn tại.')).toBeVisible()

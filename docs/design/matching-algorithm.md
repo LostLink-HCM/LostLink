@@ -353,7 +353,7 @@ Không chấm điểm ảnh cũng không làm hỏng mô hình. Fellegi-Sunter l
 | $m_i$   | P(tiêu chí i khớp \| hai bài đúng là cùng một món) | Màu: 0.9, vì người dùng đôi khi ghi "xám" thay cho "bạc" |
 | $u_i$   | P(tiêu chí i khớp \| hai bài không liên quan)      | Danh mục Giấy tờ: 0.37. Danh mục Thú cưng: 0.03          |
 
-m thường từ 0.8 đến 0.95, không bằng 1 vì người dùng có thể ghi sai. u tính được trực tiếp từ dữ liệu: u của một giá trị v xấp xỉ tỉ lệ bài có giá trị v.
+m của thuộc tính thường từ 0.8 đến 0.95, không bằng 1 vì người dùng có thể ghi sai. Trong LostLink, m được giới hạn trong khoảng $0 < m \le 0.95$; giá trị đề xuất cao hơn giới hạn này không thể áp dụng nguyên vẹn. u tính được trực tiếp từ dữ liệu: u của một giá trị v xấp xỉ tỉ lệ bài có giá trị v.
 
 - **u của danh mục** là tỉ lệ bài thuộc danh mục đó trên toàn bộ bài.
 - **u của giá trị thuộc tính** là tỉ lệ bài có giá trị đó **trong cùng danh mục**. Ví dụ u của "Poodle" là tỉ lệ Poodle trong các bài Thú cưng, không phải trong mọi bài. Tính có điều kiện như vậy tránh việc đếm hai lần cùng một bằng chứng (Poodle vốn đã kéo theo Thú cưng).
@@ -365,6 +365,8 @@ Bộ dữ liệu khảo sát 2 353 bài từ các nhóm Facebook [11] được d
 $$
 a_i = \log_2\frac{m_i}{u_i} > 0 \ \text{(cộng điểm)}, \qquad b_i = \log_2\frac{1-m_i}{1-u_i} < 0 \ \text{(trừ điểm)}
 $$
+
+Hai dấu trên đúng khi $0 < u_i < m_i < 1$. Nếu $u_i \ge m_i$, LostLink bỏ qua toàn bộ tiêu chí tại thời điểm chấm điểm: tiêu chí không cộng cũng không trừ điểm, dù hai bài trùng hay khác giá trị. Khi đó $a_i \le 0$ và $b_i \ge 0$; nếu vẫn chấm trường hợp khác giá trị, một bất đồng có thể bị cộng điểm. Kiểm tra được thực hiện mỗi lần matching vì u của danh mục và giá trị thuộc tính được job cập nhật theo dữ liệu bài đăng. Với thuộc tính vai trò loại trừ, điều kiện này được kiểm tra trước; chỉ khi $u_i < m_i$ thì hai giá trị khác nhau mới kích hoạt loại trừ cứng.
 
 m/u là **tỉ số hợp lý** (likelihood ratio): trùng khớp này dễ xảy ra ở cặp đúng gấp bao nhiêu lần so với cặp ngẫu nhiên. Lấy log cơ số 2 thì đơn vị là **bit bằng chứng**: mỗi +1 bit làm tỉ lệ cược "là cùng một món" tăng gấp đôi, mỗi −1 bit làm nó giảm một nửa.
 
@@ -537,15 +539,15 @@ Bài B được điểm vị trí rất cao (+3.94) vì 200 m nằm sát tâm v�
 
 **Theo danh mục**, admin cấu hình trong trang Quản lý danh mục:
 
-| Tham số                  | Ký hiệu                             | Đơn vị, minh họa                           | Dùng ở |
-| ------------------------ | ----------------------------------- | ------------------------------------------ | ------ |
-| Bán kính ban đầu         | `matchRadius`, σ₀ = matchRadius / 3 | m, 400 đồ vật, 2 400 thú cưng              | 5.2    |
-| Kiểu suy giảm thời gian  | k                                   | 1.5 đồ vật rơi, 1 trung tính, 0.7 thú cưng | 5.1    |
-| Trung vị thời gian chờ   | $\Delta t_{median}$, suy ra λ       | ngày                                       | 5.1    |
-| Hệ số khuếch tán         | D                                   | m²/ngày, 0 cho đồ vật                      | 5.2    |
-| Tỷ lệ danh mục liên quan | r                                   | 0 đến 1, 0.6                               | 5.3    |
-| Vai trò thuộc tính       |                                     | Loại trừ hoặc Tính điểm                    | 4, 5.4 |
-| Độ tin cậy thuộc tính    | m                                   | Cao 0.95, Vừa 0.9, Thấp 0.8                | 6.1    |
+| Tham số                  | Ký hiệu                             | Đơn vị, minh họa                                       | Dùng ở |
+| ------------------------ | ----------------------------------- | ------------------------------------------------------ | ------ |
+| Bán kính ban đầu         | `matchRadius`, σ₀ = matchRadius / 3 | m, 400 đồ vật, 2 400 thú cưng                          | 5.2    |
+| Kiểu suy giảm thời gian  | k                                   | 1.5 đồ vật rơi, 1 trung tính, 0.7 thú cưng             | 5.1    |
+| Trung vị thời gian chờ   | $\Delta t_{median}$, suy ra λ       | ngày                                                   | 5.1    |
+| Hệ số khuếch tán         | D                                   | m²/ngày, 0 cho đồ vật                                  | 5.2    |
+| Tỷ lệ danh mục liên quan | r                                   | 0 đến 1, 0.6                                           | 5.3    |
+| Vai trò thuộc tính       |                                     | Loại trừ hoặc Tính điểm                                | 4, 5.4 |
+| Độ tin cậy thuộc tính    | m                                   | Khi tạo: 0.95, 0.9 hoặc 0.8; khi sửa: $0 < m \le 0.95$ | 6.1    |
 
 **Dùng chung**, admin cấu hình một lần trong Cấu hình hệ thống:
 

@@ -101,7 +101,7 @@ const getPostForEdit = async (id, user) => {
   if (!EDITABLE_STATUSES.includes(post.status)) throw notEditable()
 
   const [category, challenge] = await Promise.all([
-    post.populate('category', 'slug').then((doc) => doc.category),
+    post.populate('category', 'slug isActive').then((doc) => doc.category),
     post.type === 'found' ? findChallenge(post._id).lean() : null,
   ])
   return {
@@ -111,8 +111,8 @@ const getPostForEdit = async (id, user) => {
     type: post.type,
     status: post.status,
     rejectReason: rejectReasonOf(post),
-    // Danh mục đã bị xoá thì để trống cho chọn lại
-    category: category?.slug ?? '',
+    // Danh mục đã lưu trữ thì để trống cho chủ bài chọn lại.
+    category: category?.isActive === false ? '' : (category?.slug ?? ''),
     attributes: post.attributes.map((item) => ({
       attribute: String(item.attribute),
       value: String(item.attributeValue),

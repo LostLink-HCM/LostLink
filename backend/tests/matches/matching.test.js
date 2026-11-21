@@ -2,6 +2,7 @@ const assert = require('node:assert/strict')
 const { beforeEach, describe, test } = require('node:test')
 
 const {
+  AttributeValue,
   Category,
   CategoryAttribute,
   CategoryMatchRelation,
@@ -137,6 +138,70 @@ describe('UC36 - Chạy thuật toán ghép cặp khi bài được duyệt', ()
     const attribute = match.evidence.find((item) => item.key === 'attribute')
     assert.ok(attribute.w < 0)
     assert.deepEqual(attribute.detail, { name: 'Chất liệu', value: 'Da', other: 'Nhựa' })
+  })
+
+  test('u bằng m bỏ qua thuộc tính loại trừ trước khi xét khác giá trị', async () => {
+    await CategoryAttribute.updateOne(
+      { _id: wallet.material._id },
+      { matchRole: 'exclude', mProb: 0.5 }
+    )
+    await AttributeValue.updateOne({ _id: wallet.leather._id }, { frequency: 0.5 })
+    const lost = await lostWallet()
+    const found = await foundWallet({
+      attributes: [{ attribute: wallet.material._id, attributeValue: wallet.plastic._id }],
+    })
+
+    await runMatching(lost._id)
+
+    const match = await MatchSuggestion.findOne({ postLost: lost._id, postFound: found._id })
+    assert.ok(match)
+    assert.equal(
+      match.evidence.some((item) => item.key === 'attribute'),
+      false
+    )
+  })
+
+  test('u lớn hơn m bỏ qua thuộc tính tính điểm kể cả khi hai bài khác giá trị', async () => {
+    await CategoryAttribute.updateOne(
+      { _id: wallet.material._id },
+      { matchRole: 'score', mProb: 0.5 }
+    )
+    await AttributeValue.updateOne({ _id: wallet.leather._id }, { frequency: 0.6 })
+    const lost = await lostWallet()
+    const found = await foundWallet({
+      attributes: [{ attribute: wallet.material._id, attributeValue: wallet.plastic._id }],
+    })
+
+    await runMatching(lost._id)
+
+    const match = await MatchSuggestion.findOne({ postLost: lost._id, postFound: found._id })
+    assert.ok(match)
+    assert.equal(
+      match.evidence.some((item) => item.key === 'attribute'),
+      false
+    )
+  })
+
+  test('u danh mục bằng m danh mục thì bỏ qua tiêu chí danh mục', async () => {
+    await Category.updateOne({ _id: wallet.category._id }, { frequency: 0.95 })
+    await SystemConfig.updateOne(
+      { key: 'mCategory' },
+      { $set: { value: '0.95' } },
+      { upsert: true }
+    )
+    // Hạ ngưỡng lưu để kiểm tra bằng chứng còn lại sau khi bỏ tiêu chí danh mục.
+    await SystemConfig.create({ key: 'weakThreshold', value: '1' })
+    const lost = await lostWallet()
+    const found = await foundWallet()
+
+    await runMatching(lost._id)
+
+    const match = await MatchSuggestion.findOne({ postLost: lost._id, postFound: found._id })
+    assert.ok(match)
+    assert.equal(
+      match.evidence.some((item) => item.key === 'category'),
+      false
+    )
   })
 
   test('danh mục liên quan tra theo danh mục bài mất, được tính r lần trùng hẳn', async () => {

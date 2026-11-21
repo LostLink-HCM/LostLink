@@ -5,6 +5,7 @@ const POST_FOLDER = 'lostlink/posts'
 const REPORT_FOLDER = 'lostlink/reports'
 const MESSAGE_FOLDER = 'lostlink/messages'
 const AVATAR_FOLDER = 'lostlink/avatars'
+const CATEGORY_FOLDER = 'lostlink/categories'
 const ALLOWED_FORMATS = ['jpg', 'jpeg', 'png', 'webp']
 
 const uploadOne = (file, folder, options = {}) =>
@@ -48,6 +49,7 @@ const uploadImages = async (files, folder) => {
 const uploadPostImages = (files) => uploadImages(files, POST_FOLDER)
 const uploadReportImages = (files) => uploadImages(files, REPORT_FOLDER)
 const uploadMessageImage = async (file) => (await uploadImages([file], MESSAGE_FOLDER))[0]
+const uploadCategoryIcon = async (file) => (await uploadImages([file], CATEGORY_FOLDER))[0]
 
 // Ảnh đại diện cắt vuông 512px ngay khi tải lên để không lưu ảnh gốc quá lớn
 const uploadAvatar = async (file) => {
@@ -66,17 +68,21 @@ const folderImageUrl = (folder) =>
 const POST_IMAGE_URL = folderImageUrl(POST_FOLDER)
 const AVATAR_URL = folderImageUrl(AVATAR_FOLDER)
 const MESSAGE_URL = folderImageUrl(MESSAGE_FOLDER)
+const CATEGORY_ICON_URL = folderImageUrl(CATEGORY_FOLDER)
 const publicIdFromUrl = (url) => POST_IMAGE_URL.exec(url)?.[1] ?? null
 const avatarPublicIdFromUrl = (url) => AVATAR_URL.exec(url)?.[1] ?? null
 const messagePublicIdFromUrl = (url) => MESSAGE_URL.exec(url)?.[1] ?? null
+const categoryIconPublicIdFromUrl = (url) => CATEGORY_ICON_URL.exec(url)?.[1] ?? null
 
 module.exports = {
   uploadPostImages,
   uploadReportImages,
   uploadMessageImage,
+  uploadCategoryIcon,
   uploadAvatar,
   deleteImages,
   publicIdFromUrl,
   avatarPublicIdFromUrl,
   messagePublicIdFromUrl,
+  categoryIconPublicIdFromUrl,
 }

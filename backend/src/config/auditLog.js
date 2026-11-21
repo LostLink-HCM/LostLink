@@ -63,6 +63,8 @@ const AUDIT_STATE_FIELDS = Object.freeze({
     'slug',
     'icon',
     'order',
+    'isActive',
+    'aliases',
     'attributes',
     'values',
     'contentItems',

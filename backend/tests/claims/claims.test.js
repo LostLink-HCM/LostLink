@@ -60,6 +60,27 @@ const expectError = (res, status, code) => {
 }
 
 describe('UC37 - Nhận đồ từ bài đăng', () => {
+  test('danh mục lưu trữ không chặn xác minh hoặc liên hệ từ bài cũ', async () => {
+    const { post, challenge } = await foundWithQuestion()
+    const lost = await makePost(owner, wallet.category)
+    wallet.category.isActive = false
+    await wallet.category.save()
+
+    const state = await api.get(`/api/posts/${post.id}/claim`)
+    assert.equal(state.status, 200)
+    assert.equal(state.body.data.step, 'verify')
+    const verified = await api.post(`/api/posts/${post.id}/claim/answer`, {
+      optionId: optionId(challenge, 'Nâu'),
+    })
+    assert.equal(verified.status, 200, JSON.stringify(verified.body))
+    assert.equal(verified.body.data.correct, true)
+    const requested = await api.post(`/api/posts/${lost.id}/claim/request`, {
+      message: 'Tôi đang giữ món đồ này',
+    })
+    assert.equal(requested.status, 201, JSON.stringify(requested.body))
+    assert.equal(requested.body.data.status, 'pending')
+  })
+
   test('bài Nhặt được có câu hỏi: chuyển sang xác minh, không lộ đáp án', async () => {
     const { post } = await foundWithQuestion()
     const res = await api.get(`/api/posts/${post._id}/claim`)

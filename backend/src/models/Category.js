@@ -1,6 +1,7 @@
 const mongoose = require('mongoose')
 
 const { Schema } = mongoose
+const { notifyFrequencyInputsChanged } = require('../utils/frequencyEvents')
 
 // Danh mục đồ vật
 const categorySchema = new Schema(
@@ -20,6 +21,8 @@ const categorySchema = new Schema(
     },
     icon: { type: String, trim: true, default: '' },
     order: { type: Number, default: 0 },
+    // Danh mục lưu trữ vẫn được giữ để các bài đăng cũ tiếp tục tham chiếu.
+    isActive: { type: Boolean, default: true, index: true },
 
     // Tham số ghép cặp theo docs/design/matching-algorithm.md (mục 5.1, 5.2, 8)
     // Bán kính ban đầu (mét), σ₀ = matchRadius / 3
@@ -37,5 +40,25 @@ const categorySchema = new Schema(
   },
   { timestamps: true, collection: 'categories' }
 )
+
+categorySchema.pre('save', function trackNewCategory() {
+  this.$locals.frequencyRelevant = this.isNew
+})
+
+categorySchema.post('save', function notifyNewCategory() {
+  if (this.$locals.frequencyRelevant) notifyFrequencyInputsChanged()
+})
+
+categorySchema.post('findOneAndUpdate', function notifySeededCategory() {
+  const update = this.getUpdate() ?? {}
+  const isCategoryUpsert =
+    this.getOptions().upsert &&
+    Object.values(update).some((fields) => fields && typeof fields === 'object' && 'name' in fields)
+  if (isCategoryUpsert) notifyFrequencyInputsChanged()
+})
+
+for (const operation of ['deleteOne', 'deleteMany', 'findOneAndDelete']) {
+  categorySchema.post(operation, notifyFrequencyInputsChanged)
+}
 
 module.exports = mongoose.model('Category', categorySchema)

@@ -112,7 +112,7 @@ const searchCondition = async (q) => {
 }
 
 const findCategoryId = async (slug) => {
-  const category = await Category.findOne({ slug }).select('_id')
+  const category = await Category.findOne({ slug, isActive: { $ne: false } }).select('_id')
   // Đúng định dạng nhưng không có trong CSDL, thường do Admin vừa xoá danh mục khi người dùng
   // đang lọc theo nó. Mã riêng để frontend giữ danh sách đang xem và gợi ý bỏ bộ lọc này
   if (!category) {
@@ -373,7 +373,9 @@ const invalidField = (field, message, code) =>
 // Danh mục còn tồn tại, mỗi thuộc tính thuộc đúng danh mục và chỉ chọn một giá trị của chính nó,
 // đủ thuộc tính bắt buộc, đồ bên trong nằm trong checklist của danh mục
 const resolveClassification = async ({ category: slug, attributes = [], contents = [] }) => {
-  const category = await Category.findOne({ slug }).select('_id contentItems').lean()
+  const category = await Category.findOne({ slug, isActive: { $ne: false } })
+    .select('_id contentItems')
+    .lean()
   if (!category) {
     throw invalidField('category', 'Danh mục này không còn tồn tại.', 'CATEGORY_NOT_FOUND')
   }

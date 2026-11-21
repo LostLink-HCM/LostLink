@@ -44,6 +44,9 @@ async function main() {
   emailService.sendResetLink = async ({ to, resetUrl }) => {
     outbox.push({ type: 'reset', to, resetUrl })
   }
+  emailService.sendCategoryArchivedNotice = async ({ to, categoryName, posts }) => {
+    outbox.push({ type: 'category_archived', to, categoryName, posts })
+  }
 
   const { connectDatabase } = require('../../src/config/database')
   const app = require('../../src/app')

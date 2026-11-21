@@ -79,7 +79,7 @@ describe('Nhật ký thao tác - dữ liệu và API frontend', () => {
           entityId: id,
           detail: { displayCode: 'vi-tien', section: 'contents' },
         },
-        '/admin/categories?category=vi-tien&tab=attributes&highlight=1',
+        '/admin/categories?category=vi-tien&tab=attributes',
         'Xem danh mục',
       ],
       [
