@@ -6,7 +6,7 @@ export const RELIABILITY_FIELDS = [
   { key: 'mContents', label: 'Đồ bên trong' },
 ]
 
-export const ADVANCED_FIELDS = ['priorOdds', 'timeTolerance', 'sMin']
+export const ADVANCED_FIELDS = ['priorOdds', 'timeTolerance', 'sMin', 'uFloor']
 
 export const SETTINGS_KEYS_BY_TAB = Object.freeze({
   matching: [
@@ -33,6 +33,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   priorOdds: 200, // p₀ = 1 / priorOdds
   timeTolerance: 1,
   sMin: 0.05,
+  uFloor: 0.01,
   paginationPageSize: 10,
 })
 
@@ -76,6 +77,9 @@ export function validateSettings(values) {
   integer('priorOdds', 2, 100000, '')
   integer('timeTolerance', 0, 30, 'ngày')
   if (!(parsed.sMin >= 0.01 && parsed.sMin <= 0.5)) errors.sMin = 'Nhập số từ 0,01 đến 0,5.'
+  if (!(parsed.uFloor >= 0.001 && parsed.uFloor <= 0.1)) {
+    errors.uFloor = 'Nhập mức sàn u từ 0,001 đến 0,1 (0,1% đến 10%).'
+  }
   integer('paginationPageSize', 1, 100, 'mục')
 
   return errors

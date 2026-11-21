@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict')
-const { beforeEach, describe, test } = require('node:test')
+const { beforeEach, describe, mock, test } = require('node:test')
 
 const {
   Alias,
@@ -15,8 +15,14 @@ const {
 const { createUser, loginAs, newClient } = require('../helpers/auth')
 const { useTestDb } = require('../helpers/db')
 const { authed, createWalletCategory, makePost } = require('../helpers/posts')
+const emailService = require('../../src/services/emailService')
+const {
+  onFrequencyInputsChanged,
+  offFrequencyInputsChanged,
+} = require('../../src/utils/frequencyEvents')
 
 useTestDb()
+const archiveEmail = mock.method(emailService, 'sendCategoryArchivedNotice', async () => {})
 
 const path = '/api/admin/categories'
 let admin
@@ -25,6 +31,7 @@ let category
 let categorySlugCounter = 0
 
 beforeEach(async () => {
+  archiveEmail.mock.resetCalls()
   admin = await createUser({
     username: 'categoryadmin',
     email: 'categoryadmin@example.com',
@@ -296,6 +303,35 @@ describe('Quản lý danh mục - API admin', () => {
     assert.equal(await CategoryAttribute.countDocuments({ category: category._id }), 2)
   })
 
+  test('mProb accepts 0.95 and rejects 0.951 in the API and model', async () => {
+    const atLimit = await adminApi.post(
+      `${categoryUrl()}/attributes`,
+      attributePayload({ name: 'Maximum m', mProb: 0.95 })
+    )
+    assert.equal(atLimit.status, 201)
+    assert.equal(atLimit.body.data.attributes.find((item) => item.name === 'Maximum m').mProb, 0.95)
+
+    const overLimit = await adminApi.post(
+      `${categoryUrl()}/attributes`,
+      attributePayload({ name: 'Over maximum m', mProb: 0.951 })
+    )
+    assert.equal(overLimit.status, 422)
+
+    const validModel = new CategoryAttribute({
+      category: category._id,
+      name: 'Valid maximum m',
+      mProb: 0.95,
+    })
+    await assert.doesNotReject(validModel.validate())
+
+    const invalidModel = new CategoryAttribute({
+      category: category._id,
+      name: 'Invalid maximum m',
+      mProb: 0.951,
+    })
+    await assert.rejects(invalidModel.validate(), (error) => Boolean(error.errors?.mProb))
+  })
+
   test('xóa thuộc tính chưa dùng sẽ dọn giá trị, alias và ghi nhật ký', async () => {
     const created = await adminApi.post(`${categoryUrl()}/attributes`, attributePayload())
     const attribute = created.body.data.attributes.find((item) => item.name === 'Màu sắc')
@@ -359,6 +395,101 @@ describe('Quản lý danh mục - API admin', () => {
       assert.equal(response.status, 422, JSON.stringify(relations))
     }
     assert.equal(await CategoryMatchRelation.countDocuments(), 0)
+  })
+
+  test('lưu quan hệ loại thành viên đã lưu trữ khỏi dữ liệu cũ và không cho thêm lại', async () => {
+    const active = await createCategory('Danh mục còn dùng')
+    const archived = await createCategory('Danh mục đã lưu trữ', { isActive: false })
+    const relation = await CategoryMatchRelation.create({
+      sourceCategory: category._id,
+      ratio: 0.6,
+    })
+    await CategoryMatchRelationMember.create([
+      { relation: relation._id, category: active._id },
+      { relation: relation._id, category: archived._id },
+    ])
+
+    const saved = await adminApi.put(`${categoryUrl()}/relations`, {
+      relations: [{ id: relation.id, ratio: 0.6, memberCategoryIds: [active.id, archived.id] }],
+    })
+    assert.equal(saved.status, 200)
+    assert.deepEqual(saved.body.data.relations[0].memberCategoryIds, [active.id])
+    assert.equal(await CategoryMatchRelationMember.exists({ category: archived._id }), null)
+
+    const reintroduced = await adminApi.put(`${categoryUrl()}/relations`, {
+      relations: [{ id: relation.id, ratio: 0.6, memberCategoryIds: [active.id, archived.id] }],
+    })
+    assert.equal(reintroduced.status, 422)
+    assert.deepEqual((await adminApi.get(categoryUrl())).body.data.relations[0].memberCategoryIds, [
+      active.id,
+    ])
+  })
+
+  test('lưu trữ gỡ thành viên, xóa nhóm rỗng, giữ bài cũ và kích hoạt tính lại u', async (t) => {
+    const mixedSource = await createCategory('Nguồn nhóm còn thành viên')
+    const emptySource = await createCategory('Nguồn nhóm hết thành viên')
+    const remaining = await createCategory('Thành viên còn lại')
+    const mixed = await CategoryMatchRelation.create({
+      sourceCategory: mixedSource._id,
+      ratio: 0.6,
+    })
+    const emptied = await CategoryMatchRelation.create({
+      sourceCategory: emptySource._id,
+      ratio: 0.4,
+    })
+    const untouched = await CategoryMatchRelation.create({
+      sourceCategory: emptySource._id,
+      ratio: 0.8,
+    })
+    await CategoryMatchRelationMember.create([
+      { relation: mixed._id, category: category._id },
+      { relation: mixed._id, category: remaining._id },
+      { relation: emptied._id, category: category._id },
+      { relation: untouched._id, category: remaining._id },
+    ])
+    const attribute = await CategoryAttribute.findOne({ category: category._id })
+    const value = await AttributeValue.findOne({ attribute: attribute._id })
+    const post = await makePost(admin, category, {
+      attributes: [{ attribute: attribute._id, attributeValue: value._id }],
+    })
+    let frequencyEvents = 0
+    const listener = () => {
+      frequencyEvents += 1
+    }
+    onFrequencyInputsChanged(listener)
+    t.after(() => offFrequencyInputsChanged(listener))
+
+    const response = await adminApi.delete(categoryUrl())
+    assert.equal(response.status, 200)
+    assert.equal(response.body.data.isActive, false)
+    assert.equal(frequencyEvents, 1)
+    assert.equal(await CategoryMatchRelationMember.exists({ category: category._id }), null)
+    assert.equal(await CategoryMatchRelation.exists({ _id: emptied._id }), null)
+    assert.ok(await CategoryMatchRelation.exists({ _id: mixed._id }))
+    assert.ok(await CategoryMatchRelation.exists({ _id: untouched._id }))
+    assert.deepEqual(
+      (await adminApi.get(categoryUrl(mixedSource.id))).body.data.relations.map((item) => ({
+        ratio: item.ratio,
+        memberCategoryIds: item.memberCategoryIds,
+      })),
+      [{ ratio: 0.6, memberCategoryIds: [remaining.id] }]
+    )
+    assert.deepEqual(
+      (await adminApi.get(categoryUrl(emptySource.id))).body.data.relations.map((item) => item.id),
+      [untouched.id]
+    )
+    const storedPost = await Post.findById(post._id)
+    assert.equal(String(storedPost.category), category.id)
+    assert.equal(storedPost.status, 'searching')
+    assert.equal(String(storedPost.attributes[0].attributeValue), value.id)
+    assert.ok(await CategoryAttribute.exists({ _id: attribute._id }))
+    assert.ok(await AttributeValue.exists({ _id: value._id }))
+    const relationAudit = await AuditLog.findOne({
+      entityId: mixedSource._id,
+      'detail.section': 'relations',
+    }).lean()
+    assert.ok(relationAudit.detail.before.relations[0].memberCategoryIds.includes(category.id))
+    assert.deepEqual(relationAudit.detail.after.relations[0].memberCategoryIds, [remaining.id])
   })
 
   test('thêm, sửa, xóa câu hỏi; từ chối câu trùng và lưu trữ mềm danh mục vẫn được bài cũ tham chiếu', async () => {

@@ -1,20 +1,34 @@
-const { AttributeValue, Category, Post } = require('../models')
+const { AttributeValue, Category, CategoryAttribute, Post, SystemConfig } = require('../models')
+const { DEFAULT_SETTINGS } = require('../config/systemSettings')
+const { settingError } = require('../utils/systemSettings')
 
 const MATCHABLE_STATUSES = ['searching', 'contacted']
 const FREQUENCY_PRECISION = 10_000
 
-const smoothedFrequency = (count, total, kinds) => {
+const smoothedFrequency = (count, total, kinds, floor) => {
   if (!kinds) return null
   const value = (count + 1) / (total + kinds)
-  return Math.round(value * FREQUENCY_PRECISION) / FREQUENCY_PRECISION
+  return Math.max(floor, Math.round(value * FREQUENCY_PRECISION) / FREQUENCY_PRECISION)
 }
 
 const recalculateFrequencies = async () => {
-  const [categories, values, [counts]] = await Promise.all([
-    Category.find({}).select('_id frequency').lean(),
-    AttributeValue.find({}).select('_id attribute frequency').lean(),
+  const categories = await Category.find({ isActive: { $ne: false } })
+    .select('_id frequency')
+    .lean()
+  const categoryIds = categories.map((category) => category._id)
+  const [attributes, floorConfig, [counts]] = await Promise.all([
+    CategoryAttribute.find({ category: { $in: categoryIds } })
+      .select('_id')
+      .lean(),
+    SystemConfig.findOne({ key: 'uFloor' }).select('value').lean(),
     Post.aggregate([
-      { $match: { status: { $in: MATCHABLE_STATUSES }, isHidden: false } },
+      {
+        $match: {
+          status: { $in: MATCHABLE_STATUSES },
+          isHidden: false,
+          category: { $in: categoryIds },
+        },
+      },
       {
         $facet: {
           total: [{ $count: 'count' }],
@@ -31,7 +45,14 @@ const recalculateFrequencies = async () => {
       },
     ]),
   ])
+  const values = await AttributeValue.find({
+    attribute: { $in: attributes.map((attribute) => attribute._id) },
+  })
+    .select('_id attribute frequency')
+    .lean()
 
+  const configuredFloor = Number(floorConfig?.value)
+  const uFloor = settingError('uFloor', configuredFloor) ? DEFAULT_SETTINGS.uFloor : configuredFloor
   const totalPosts = counts.total[0]?.count ?? 0
   const categoryCounts = new Map(counts.categories.map((item) => [String(item._id), item.count]))
   const attributeCounts = new Map(counts.attributes.map((item) => [String(item._id), item.count]))
@@ -42,7 +63,8 @@ const recalculateFrequencies = async () => {
     const frequency = smoothedFrequency(
       categoryCounts.get(String(category._id)) ?? 0,
       totalPosts,
-      categoryKinds
+      categoryKinds,
+      uFloor
     )
     return frequency === category.frequency
       ? []
@@ -69,7 +91,8 @@ const recalculateFrequencies = async () => {
       const frequency = smoothedFrequency(
         valueCounts.get(String(value._id)) ?? 0,
         totalWithAttribute,
-        attributeValues.length
+        attributeValues.length,
+        uFloor
       )
       if (frequency === value.frequency) continue
       valueOperations.push({

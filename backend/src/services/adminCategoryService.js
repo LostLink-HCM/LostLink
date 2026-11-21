@@ -13,7 +13,9 @@ const {
 } = require('../models')
 const ApiError = require('../utils/ApiError')
 const { normalizeText, slugify } = require('../utils/text')
+const { notifyFrequencyInputsChanged } = require('../utils/frequencyEvents')
 const imageService = require('./imageService')
+const { notifyCategoryArchived } = require('./categoryArchiveNotificationService')
 
 const CATEGORY_ICON_PATH = /^\/images\/categories\/[a-z0-9-]+\.svg$/
 const DEFAULT_ALGORITHM = {
@@ -745,11 +747,9 @@ const updateRelations = async (categoryId, input, actor) =>
     if (allMemberIds.includes(String(category._id)))
       throw invalid('Danh mục không thể liên quan đến chính nó.')
     const requestedIds = [...new Set(allMemberIds)]
-    const previousMemberIds = [...membersByRelation.values()].flat()
-    const categoryIdsToCheck = [...new Set([...requestedIds, ...previousMemberIds])]
-    const targetCategories = categoryIdsToCheck.length
+    const targetCategories = requestedIds.length
       ? await withSession(
-          Category.find({ _id: { $in: categoryIdsToCheck } })
+          Category.find({ _id: { $in: requestedIds } })
             .select('_id isActive')
             .lean(),
           session
@@ -764,22 +764,22 @@ const updateRelations = async (categoryId, input, actor) =>
     const previousByRelation = new Map(
       [...membersByRelation].map(([relationId, ids]) => [relationId, new Set(ids)])
     )
-    for (const relation of input.relations) {
-      const previousMembers = relation.id
-        ? (previousByRelation.get(relation.id) ?? new Set())
-        : new Set()
-      for (const memberId of relation.memberCategoryIds) {
-        if (!activeIds.has(memberId) && !previousMembers.has(memberId)) {
-          throw invalid('Chỉ có thể thêm danh mục đang hoạt động vào quan hệ.', 'relations')
+    const relationsToSave = input.relations
+      .map((relation) => {
+        const previousMembers = relation.id
+          ? (previousByRelation.get(relation.id) ?? new Set())
+          : new Set()
+        for (const memberId of relation.memberCategoryIds) {
+          if (!activeIds.has(memberId) && !previousMembers.has(memberId)) {
+            throw invalid('Chỉ có thể thêm danh mục đang hoạt động vào quan hệ.', 'relations')
+          }
         }
-      }
-      const retainedArchived = [...previousMembers].filter((id) => !activeIds.has(id))
-      relation.memberCategoryIds = [
-        ...new Set([...relation.memberCategoryIds, ...retainedArchived]),
-      ]
-    }
-
-    const relationsToSave = input.relations.filter((relation) => relation.memberCategoryIds.length)
+        return {
+          ...relation,
+          memberCategoryIds: relation.memberCategoryIds.filter((id) => activeIds.has(id)),
+        }
+      })
+      .filter((relation) => relation.memberCategoryIds.length)
     const receivedSet = new Set(relationsToSave.map((relation) => relation.id).filter(Boolean))
     const removedRelations = existingRelations.filter((item) => !receivedSet.has(String(item._id)))
     if (removedRelations.length) {
@@ -904,8 +904,8 @@ const deleteQuestion = async (categoryId, questionId, actor) =>
     return after
   })
 
-const archiveCategory = async (id, actor) =>
-  atomic(async (session) => {
+const archiveCategory = async (id, actor) => {
+  const result = await atomic(async (session) => {
     const category = await findActiveCategory(id, session)
     const activeCount = await withSession(
       Category.countDocuments({ isActive: { $ne: false } }),
@@ -913,12 +913,75 @@ const archiveCategory = async (id, actor) =>
     )
     if (activeCount <= 1) throw conflict('Không thể lưu trữ danh mục đang hoạt động cuối cùng.')
     const before = await findCategoryDetails(category, session)
+    const affectedRelationIds = await withSession(
+      CategoryMatchRelationMember.find({ category: category._id }).distinct('relation'),
+      session
+    )
+    const affectedSourceIds = await withSession(
+      CategoryMatchRelation.find({ _id: { $in: affectedRelationIds } }).distinct('sourceCategory'),
+      session
+    )
+    const affectedCategories = await withSession(
+      Category.find({ _id: { $in: affectedSourceIds, $ne: category._id } }),
+      session
+    )
+    const affectedBefore = new Map()
+    for (const source of affectedCategories) {
+      affectedBefore.set(String(source._id), await findCategoryDetails(source, session))
+    }
+
+    await CategoryMatchRelationMember.deleteMany(
+      { category: category._id },
+      session ? { session } : undefined
+    )
+    const remainingRelationIds = new Set(
+      (
+        await withSession(
+          CategoryMatchRelationMember.find({
+            relation: { $in: affectedRelationIds },
+          }).distinct('relation'),
+          session
+        )
+      ).map(String)
+    )
+    const emptyRelationIds = affectedRelationIds.filter(
+      (relationId) => !remainingRelationIds.has(String(relationId))
+    )
+    if (emptyRelationIds.length) {
+      await CategoryMatchRelation.deleteMany(
+        { _id: { $in: emptyRelationIds } },
+        session ? { session } : undefined
+      )
+    }
+    for (const source of affectedCategories) {
+      source.updatedAt = new Date()
+      await source.save(session ? { session } : undefined)
+      await writeAudit(
+        {
+          actor,
+          action: 'update',
+          section: 'relations',
+          before: affectedBefore.get(String(source._id)),
+          after: await findCategoryDetails(source, session),
+        },
+        session
+      )
+    }
+
     category.isActive = false
     await category.save(session ? { session } : undefined)
     const after = await findCategoryDetails(category, session)
     await writeAudit({ actor, action: 'delete', section: 'general', before, after }, session)
     return after
   })
+  notifyFrequencyInputsChanged()
+  try {
+    await notifyCategoryArchived(result)
+  } catch (error) {
+    console.error('Không gửi được thông báo sau khi lưu trữ danh mục', error)
+  }
+  return result
+}
 
 const uploadCategoryIcon = async (file) => {
   if (!file) throw invalid('Vui lòng chọn ảnh danh mục.', 'icon')

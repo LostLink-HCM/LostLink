@@ -82,7 +82,15 @@ Danh mục mới chưa có thuộc tính, quan hệ, câu hỏi và độ hiếm
 
 ### Hộp thoại Xóa danh mục
 
-Xóa danh mục thì xóa luôn thuộc tính, câu hỏi xác minh và cấu hình thuật toán của nó. Nếu danh mục khác đang khai báo danh mục này trong tab Quan hệ, hộp thoại liệt kê tên các danh mục đó, và danh mục bị xóa cũng được gỡ khỏi quan hệ của chúng. Nhóm quan hệ nào bị gỡ hết thành viên thì bị bỏ.
+Xóa danh mục sẽ chuyển danh mục sang trạng thái lưu trữ. Danh mục, thuộc tính, giá trị, câu hỏi xác minh và cấu hình thuật toán được giữ để bài đăng cũ tiếp tục tham chiếu. Nếu danh mục khác đang khai báo danh mục này trong tab Quan hệ, hộp thoại liệt kê tên các danh mục đó, và danh mục lưu trữ được gỡ khỏi quan hệ của chúng. Nhóm quan hệ nào bị gỡ hết thành viên thì bị bỏ.
+
+Job tính độ hiếm chỉ tính K từ các danh mục đang hoạt động; N và các số đếm liên quan cũng chỉ lấy từ bài hợp lệ thuộc những danh mục này. Lưu trữ sẽ kích hoạt tính lại độ hiếm.
+
+Các bài thuộc danh mục lưu trữ ngừng nhận gợi ý ghép mới, cả khi bài là đầu vào chạy ghép lẫn khi được tìm làm ứng viên cho bài khác. Trạng thái, nội dung, liên kết danh mục và gợi ý đã có được giữ nguyên. Người dùng vẫn xem và phản hồi gợi ý cũ theo các điều kiện hiển thị/liên hệ hiện tại; việc lưu trữ không tự chuyển gợi ý sang stale hoặc đóng hội thoại.
+
+Sau khi lưu trữ thành công, chủ các bài searching/pending/contacted nhận thông báo trong nhóm Bài đăng theo thiết lập nhận thông báo. Nội dung ghi tiêu đề, ngày đăng theo giờ Việt Nam, danh mục đã ngừng sử dụng và giải thích bài không nhận gợi ý mới. Email được gộp theo chủ bài, chỉ gửi khi họ bật email và nhóm Bài đăng. Bài searching/pending có liên kết chỉnh sửa để chọn danh mục đang hoạt động; bài contacted được hướng dẫn tiếp tục trao đổi và chưa thể sửa. Lỗi gửi thông báo/email được ghi log, không hoàn tác việc lưu trữ.
+
+Nếu chủ bài chỉnh sửa, luồng sửa bài hiện tại vẫn áp dụng: bài về pending, gợi ý pending/confirmed_one thành stale và thông báo ghép tương ứng bị ẩn. Hội thoại và tin nhắn được giữ. Sau khi duyệt, hệ thống chấm theo dữ liệu mới; cặp cũ nếu còn phù hợp có thể được hiển thị lại, cặp không phù hợp tiếp tục bị ẩn và các cặp khác phù hợp có thể tạo gợi ý mới.
 
 ## 1. Tab Thông tin chung
 

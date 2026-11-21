@@ -21,6 +21,7 @@ const GROUPS = {
     'comment',
     'post_approved',
     'post_rejected',
+    'category_archived',
     'post_closed',
     'post_deleted',
     'returned',
@@ -41,7 +42,14 @@ const POST_REF_FIELDS = 'title type slug status isHidden owner'
 const toPostRef = (post, viewerId) => {
   const isOwner = String(post.owner) === String(viewerId)
   const visible = isOwner || (!post.isHidden && !['pending', 'rejected'].includes(post.status))
-  return { title: post.title, type: post.type, slug: post.slug, visible }
+  return {
+    id: post._id,
+    title: post.title,
+    type: post.type,
+    slug: post.slug,
+    status: post.status,
+    visible,
+  }
 }
 
 const postRefsOf = async (items, viewerId) => {
@@ -61,12 +69,18 @@ const toNotification = (item, posts) => {
     actor: item.actor
       ? { username: item.actor.username, avatarUrl: item.actor.avatarUrl || null }
       : null,
-    text: item.preview,
+    text: item.body ?? item.preview,
     // null khi không gắn bài, available false khi bài đã bị xoá hoặc ẩn
     post:
       item.refType === 'Post'
         ? post?.visible
-          ? { available: true, title: post.title, type: post.type, slug: post.slug }
+          ? {
+              available: true,
+              title: post.title,
+              type: post.type,
+              slug: post.slug,
+              ...(item.type === 'category_archived' && { id: post.id, status: post.status }),
+            }
           : { available: false, title: post?.title ?? '' }
         : null,
     isRead: item.isRead,
@@ -106,7 +120,7 @@ const groupOf = (type) => Object.keys(GROUPS).find((group) => GROUPS[group].incl
 // Chỗ duy nhất tạo thông báo. Bỏ người trùng, người gây ra và người đã tắt nhóm thông báo này
 const notify = async (
   userIds,
-  { type, actor = null, refType = null, refId = null, match = null, text = '' }
+  { type, actor = null, refType = null, refId = null, match = null, text = '', body = null }
 ) => {
   const ids = [...new Set(userIds.map(String))].filter((id) => id !== String(actor))
   if (!ids.length) return
@@ -122,7 +136,16 @@ const notify = async (
   const recipients = ids.filter((id) => !muted.has(id))
   if (!recipients.length) return
   const docs = await Notification.insertMany(
-    recipients.map((user) => ({ user, type, actor, refType, refId, match, preview: preview(text) }))
+    recipients.map((user) => ({
+      user,
+      type,
+      actor,
+      refType,
+      refId,
+      match,
+      preview: preview(text),
+      body,
+    }))
   )
   // Thông báo đã lưu, lỗi khi đẩy qua socket chỉ ghi log
   try {

@@ -9,6 +9,7 @@ const {
 } = require('../config/systemSettings')
 const ApiError = require('../utils/ApiError')
 const { settingError, thresholdError } = require('../utils/systemSettings')
+const { notifyFrequencyInputsChanged } = require('../utils/frequencyEvents')
 
 const MANAGED_KEYS = [...SETTING_KEYS, ...Object.values(QUICK_REPLY_MARKERS)]
 const SHARED_KEYS = ['paginationPageSize', ...Object.values(QUICK_REPLY_MARKERS)]
@@ -269,14 +270,16 @@ const changeSettings = (actor, work) =>
       : change(null)
   })
 
-const updateSettings = (group, values, actor) =>
-  changeSettings(actor, async (records, session) => {
+const updateSettings = async (group, values, actor) => {
+  let uFloorChanged = false
+  const result = await changeSettings(actor, async (records, session) => {
     const keys = SETTING_GROUPS[group]
     const effective = { ...valuesOf(records), ...values }
     const error = group === 'matching' ? thresholdError(effective) : null
     if (error) throw invalidFields([{ field: 'weakThreshold', message: error }])
     const selected = Object.fromEntries(keys.map((key) => [key, effective[key]]))
     const changes = prepareConfigs(records, selected, actor, nextTimestamp(records))
+    uFloorChanged = changes.some((change) => change.after.key === 'uFloor')
     await persist(
       records,
       changes,
@@ -291,6 +294,9 @@ const updateSettings = (group, values, actor) =>
       session
     )
   })
+  if (uFloorChanged) notifyFrequencyInputsChanged()
+  return result
+}
 
 const updateQuickReplies = (groups, actor) =>
   changeSettings(actor, async (records, session) => {

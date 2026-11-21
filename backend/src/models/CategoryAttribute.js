@@ -26,8 +26,8 @@ const categoryAttributeSchema = new Schema(
       type: Number,
       default: 0.9,
       validate: {
-        validator: (value) => Number.isFinite(value) && value > 0 && value < 1,
-        message: 'Độ tin cậy m phải lớn hơn 0 và nhỏ hơn 1.',
+        validator: (value) => Number.isFinite(value) && value > 0 && value <= 0.95,
+        message: 'Độ tin cậy m phải lớn hơn 0 và không vượt quá 0,95.',
       },
     },
 

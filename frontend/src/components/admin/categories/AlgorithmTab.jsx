@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import useSystemSettings from '../../../hooks/useSystemSettings'
 import Icon from '../../common/Icon'
 import { isSame, validateAlgorithm } from '../../../lib/admin/categories'
 import {
@@ -81,10 +80,9 @@ function Preview({ form, valid, frequency, sMin }) {
   )
 }
 
-export default function AlgorithmTab({ category, onSave, active }) {
+export default function AlgorithmTab({ category, onSave, matchingConfig }) {
   const saved = pick(category)
-  const { systemSettings, settingsLoading, settingsError, reloadSystemSettings } =
-    useSystemSettings({ scope: 'matching', enabled: active })
+  const { systemSettings, settingsLoading, settingsError, reloadSystemSettings } = matchingConfig
   const sMin = systemSettings?.values.sMin
   const [form, setForm] = useState(saved)
   const [shape, setShape] = useState(() => timeShapeKey(saved.timeShape))
