@@ -18,6 +18,13 @@ const listReportsRules = [
   optionalString('targetType', 'Loại đối tượng không hợp lệ.')
     .isIn(REPORT_TYPES)
     .withMessage('Loại đối tượng không hợp lệ.'),
+  optionalString('targetId', 'Đối tượng report không hợp lệ.')
+    .isMongoId()
+    .withMessage('Đối tượng report không hợp lệ.'),
+  query('targetId').custom((targetId, { req }) => {
+    if (targetId && !req.query.targetType) throw new Error('Thiếu loại đối tượng report.')
+    return true
+  }),
   optionalString('severity', 'Mức độ không hợp lệ.')
     .isIn(SEVERITIES)
     .withMessage('Mức độ không hợp lệ.'),

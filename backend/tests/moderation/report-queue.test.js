@@ -145,6 +145,14 @@ describe('Hàng đợi report của Moderator - API', () => {
     assert.equal(pageTwo.body.data.items.length, 1)
     assert.equal(pageTwo.body.data.items[0].reportCount, 2)
     assert.equal(pageTwo.body.data.page, 2)
+    const linkedTargetPage = await modApi.get(path).query({
+      targetType: 'user',
+      targetId: owner.id,
+    })
+    assert.equal(linkedTargetPage.status, 200)
+    assert.equal(linkedTargetPage.body.data.page, 2)
+    assert.equal(linkedTargetPage.body.data.items.length, 1)
+    assert.equal(linkedTargetPage.body.data.items[0].target.id, owner.id)
     assert.equal((await modApi.get(path).query({ page: 99 })).body.data.page, 2)
     assert.equal((await Report.findById(second.report.id)).status, 'reviewing')
     const processedPage = await modApi.get(path).query({ queueStatus: 'processed' })
@@ -235,6 +243,8 @@ describe('Hàng đợi report của Moderator - API', () => {
     for (const [query, field] of [
       [{ q: 'a'.repeat(101) }, 'q'],
       [{ targetType: 'postage' }, 'targetType'],
+      [{ targetId: 'not-an-id' }, 'targetId'],
+      [{ targetId: owner.id }, 'targetId'],
       [{ severity: 'critical' }, 'severity'],
       [{ queueStatus: 'done' }, 'queueStatus'],
       [{ from: '2026-02-30' }, 'from'],

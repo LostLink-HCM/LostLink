@@ -7,6 +7,7 @@ const { seedAvatars } = require('./avatarSeed')
 const { seedCategories } = require('./categorySeed')
 const { seedCategoryMReliability } = require('./categoryMReliabilitySeed')
 const { seedBackofficeMessages } = require('./backofficeMessageSeed')
+const { seedBackofficeNotifications } = require('./backofficeNotificationSeed')
 const { seedConversations } = require('./conversationSeed')
 const { seedNotifications } = require('./notificationSeed')
 const { seedPosts } = require('./postSeed')
@@ -30,6 +31,7 @@ const settingsOnly = process.argv.includes('--settings-only')
 const auditOnly = process.argv.includes('--audit-only')
 const reportsOnly = process.argv.includes('--reports-only')
 const messagesOnly = process.argv.includes('--messages-only')
+const backofficeNotificationsOnly = process.argv.includes('--backoffice-notifications-only')
 const categoryMOnly = process.argv.includes('--category-m-only')
 // Chỉ gán ảnh đại diện mẫu, chạy được trên production vì không đè ảnh người dùng tự tải lên
 const avatarsOnly = process.argv.includes('--avatars-only')
@@ -39,39 +41,42 @@ const seeders = categoryMOnly
     ? [seedCategories]
     : messagesOnly
       ? [seedBackofficeMessages]
-      : reportsOnly
-        ? [seedReports]
-        : auditOnly
-          ? [seedAuditLogs]
-          : avatarsOnly
-            ? [seedAvatars]
-            : settingsOnly
-              ? [seedSystemSettings]
-              : demo
-                ? [
-                    seedMissingMembers,
-                    seedCategories,
-                    seedPosts,
-                    seedMemberReputation,
-                    seedNotifications,
-                  ]
-                : [
-                    seedUsers,
-                    seedAvatars,
-                    seedSystemSettings,
-                    seedCategories,
-                    seedPosts,
-                    seedReports,
-                    seedConversations,
-                    // Lời cảm ơn gắn với cuộc trao đổi đã seed, điểm uy tín tính sau khi có lời cảm ơn
-                    seedReviews,
-                    seedReputation,
-                    seedBackofficeMessages,
-                    seedNotifications,
-                    seedUserActivityDates,
-                    seedUserUpdateDates,
-                    seedAuditLogs,
-                  ]
+      : backofficeNotificationsOnly
+        ? [seedBackofficeNotifications]
+        : reportsOnly
+          ? [seedReports]
+          : auditOnly
+            ? [seedAuditLogs]
+            : avatarsOnly
+              ? [seedAvatars]
+              : settingsOnly
+                ? [seedSystemSettings]
+                : demo
+                  ? [
+                      seedMissingMembers,
+                      seedCategories,
+                      seedPosts,
+                      seedMemberReputation,
+                      seedNotifications,
+                    ]
+                  : [
+                      seedUsers,
+                      seedAvatars,
+                      seedSystemSettings,
+                      seedCategories,
+                      seedPosts,
+                      seedReports,
+                      seedConversations,
+                      // Lời cảm ơn gắn với cuộc trao đổi đã seed, điểm uy tín tính sau khi có lời cảm ơn
+                      seedReviews,
+                      seedReputation,
+                      seedBackofficeMessages,
+                      seedNotifications,
+                      seedBackofficeNotifications,
+                      seedUserActivityDates,
+                      seedUserUpdateDates,
+                      seedAuditLogs,
+                    ]
 
 // Kiểm tra tài khoản không tự tạo được trước khi ghi, thiếu thì dừng khi chưa đổi gì trong DB.
 // Tác giả bài mẫu còn thiếu sẽ do seedMissingMembers tạo, findSeedAccounts kiểm lại trong seedPosts
@@ -118,29 +123,47 @@ async function run() {
   if (categoriesOnly && env.nodeEnv === 'production')
     throw new Error('Không chạy seed danh mục trên production')
   if (demo && settingsOnly) throw new Error('Không kết hợp --demo với --settings-only')
+  if (
+    backofficeNotificationsOnly &&
+    (demo ||
+      categoriesOnly ||
+      settingsOnly ||
+      auditOnly ||
+      avatarsOnly ||
+      reportsOnly ||
+      messagesOnly ||
+      categoryMOnly)
+  ) {
+    throw new Error('Do not combine --backoffice-notifications-only with another seed mode.')
+  }
+  if (backofficeNotificationsOnly && env.nodeEnv === 'production') {
+    throw new Error('Backoffice notification seeding is disabled in production.')
+  }
   if (!demo && !settingsOnly && !avatarsOnly && env.nodeEnv === 'production') {
     throw new Error('Không chạy seed đầy đủ trên production, dùng npm run seed:demo')
   }
 
   await connectDatabase()
   const { host, name } = mongoose.connection
-  const mode = categoriesOnly
-    ? 'danh mục'
-    : categoryMOnly
-      ? 'dữ liệu độ tin cậy m'
-      : reportsOnly
-        ? 'báo cáo'
-        : messagesOnly
-          ? 'tin nhắn backoffice'
-          : auditOnly
-            ? 'nhật ký thao tác'
-            : avatarsOnly
-              ? 'ảnh đại diện'
-              : settingsOnly
-                ? 'cấu hình hệ thống'
-                : demo
-                  ? 'demo'
-                  : 'đầy đủ'
+  const mode = backofficeNotificationsOnly
+    ? 'backoffice notifications'
+    : categoriesOnly
+      ? 'danh mục'
+      : categoryMOnly
+        ? 'dữ liệu độ tin cậy m'
+        : reportsOnly
+          ? 'báo cáo'
+          : messagesOnly
+            ? 'tin nhắn backoffice'
+            : auditOnly
+              ? 'nhật ký thao tác'
+              : avatarsOnly
+                ? 'ảnh đại diện'
+                : settingsOnly
+                  ? 'cấu hình hệ thống'
+                  : demo
+                    ? 'demo'
+                    : 'đầy đủ'
   console.log(`Seed ${mode} vào ${host}/${name}`)
 
   if (demo) await checkAccounts()

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import Button from '../../components/backoffice/Button'
 import DataTable, { cell } from '../../components/backoffice/DataTable'
 import DateRange from '../../components/backoffice/DateRange'
@@ -21,6 +21,8 @@ import {
 import { downloadCsv } from '../../lib/csv'
 import { postPath } from '../../lib/user/homeFeed'
 import { profilePath } from '../../lib/user/profiles'
+import useLinkedHighlight from '../../hooks/useLinkedHighlight'
+import { linkedHighlight } from '../../components/backoffice/classes'
 
 const EMPTY_FILTERS = {
   targetType: 'user',
@@ -143,8 +145,19 @@ function ReportEntries({ reports, onPreview }) {
 }
 
 export default function Reports() {
-  const [filters, setFilters] = useState(EMPTY_FILTERS)
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
+  const targetTypeParam = searchParams.get('targetType')
+  const linkedTargetType = ['post', 'user'].includes(targetTypeParam) ? targetTypeParam : ''
+  const linkedTargetId = linkedTargetType ? searchParams.get('targetId') : ''
+  const focusKey = linkedTargetId ? `${location.key}:${linkedTargetType}:${linkedTargetId}` : null
+  const [filters, setFilters] = useState(() => ({
+    ...EMPTY_FILTERS,
+    ...(linkedTargetType && { targetType: linkedTargetType }),
+  }))
   const [page, setPage] = useState(1)
+  const [targetLookupPending, setTargetLookupPending] = useState(Boolean(linkedTargetId))
+  const [linkedTargetFound, setLinkedTargetFound] = useState(null)
   const [result, setResult] = useState({
     items: [],
     total: 0,
@@ -165,15 +178,33 @@ export default function Reports() {
   const [actionLoading, setActionLoading] = useState(false)
 
   const requestReports = useCallback(
-    () => listModeratorReports({ ...filters, page }),
-    [filters, page]
+    () =>
+      listModeratorReports({
+        ...filters,
+        page,
+        ...(targetLookupPending && linkedTargetId ? { targetId: linkedTargetId } : {}),
+      }),
+    [filters, linkedTargetId, page, targetLookupPending]
   )
 
   useEffect(() => {
     let active = true
     requestReports()
       .then((nextResult) => {
-        if (active) setResult(nextResult)
+        if (!active) return
+        setResult(nextResult)
+        if (targetLookupPending) {
+          const found = nextResult.items.some(
+            (report) =>
+              report.targetType === linkedTargetType && report.target?.id === linkedTargetId
+          )
+          setLinkedTargetFound(found)
+          setTargetLookupPending(false)
+          if (found && nextResult.page !== page) {
+            setLoading(true)
+            setPage(nextResult.page)
+          }
+        }
       })
       .catch((requestError) => {
         if (active) setError(requestError.message)
@@ -184,7 +215,7 @@ export default function Reports() {
     return () => {
       active = false
     }
-  }, [requestReports])
+  }, [linkedTargetId, linkedTargetType, page, requestReports, targetLookupPending])
 
   const loadReports = async () => {
     setLoading(true)
@@ -205,6 +236,15 @@ export default function Reports() {
   }, [notice])
 
   const items = result.items
+  const linkedReport = items.find(
+    (report) => report.targetType === linkedTargetType && report.target?.id === linkedTargetId
+  )
+  const highlight = useLinkedHighlight(focusKey, {
+    enabled: Boolean(linkedTargetId && linkedReport && !loading),
+  })
+  const linkedTargetUnavailable = Boolean(
+    linkedTargetId && linkedTargetFound === false && !loading && !error
+  )
   const selected = useMemo(() => {
     if (!modal) return null
     if (detail?.id === modal.id) return detail
@@ -390,6 +430,9 @@ export default function Reports() {
         )}
       </p>
       {notice && <Notice>{notice}</Notice>}
+      {linkedTargetUnavailable && (
+        <Notice>Đối tượng này không còn trong hàng đợi report chưa xử lý.</Notice>
+      )}
       {error && (
         <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger-soft bg-danger-soft px-4 py-3 text-small text-danger-ink">
           <span role="alert">{error}</span>
@@ -431,7 +474,15 @@ export default function Reports() {
           </tr>
         ) : (
           items.map((report) => (
-            <tr key={report.id} className="hover:bg-surface-muted">
+            <tr
+              key={report.id}
+              ref={report.id === linkedReport?.id && highlight.active ? highlight.targetRef : null}
+              className={
+                report.id === linkedReport?.id && highlight.active
+                  ? linkedHighlight
+                  : 'hover:bg-surface-muted'
+              }
+            >
               <td className={cell}>
                 {report.targetType === 'post' && (
                   <strong className="text-caption font-semibold text-primary">

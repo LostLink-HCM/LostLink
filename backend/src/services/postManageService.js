@@ -14,6 +14,7 @@ const {
 const imageService = require('./imageService')
 const { syncPostMatchNotices } = require('./matchingService')
 const { notify } = require('./notificationService')
+const { notifyPendingPost } = require('./backofficeNotificationEvents')
 const returnService = require('./returnService')
 const {
   ACTIVE_MATCH_STATES,
@@ -241,6 +242,7 @@ const updatePost = async (id, input, user, files = []) => {
 
   await Promise.all([syncChallenge(post, input.question), staleMatchesOf(post._id)])
   await deleteUnusedImages(removed)
+  await notifyPendingPost(post._id)
 
   return { id: post._id, code: post.code, slug: post.slug, type: post.type, status: post.status }
 }

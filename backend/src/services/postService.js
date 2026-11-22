@@ -22,6 +22,7 @@ const { hashAnswer } = require('../utils/crypto')
 const { blurPoint, distanceMeters, toGeoLine, toGeoPoint } = require('../utils/geo')
 const { escapeRegex, hasDiacritics, lowercaseText } = require('../utils/text')
 const { endOfVnDay, startOfVnDay, vnTimeRange } = require('../utils/vnTime')
+const { notifyPendingPost } = require('./backofficeNotificationEvents')
 
 const HOUR = 60 * 60 * 1000
 const RANGE_HOURS = { '24h': 24, '7d': 24 * 7, '30d': 24 * 30 }
@@ -598,6 +599,8 @@ const createPost = async (input, owner, files = []) => {
   } catch (error) {
     console.error('Không xoá được bản nháp sau khi đăng bài', error)
   }
+
+  await notifyPendingPost(post._id)
 
   // Chỉ trả định danh để frontend điều hướng, bài đang chờ duyệt nên chưa có trang công khai
   return {

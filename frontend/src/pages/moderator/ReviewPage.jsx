@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useLocation, useOutletContext, useSearchParams } from 'react-router-dom'
 import Badge from '../../components/backoffice/Badge'
 import Button from '../../components/backoffice/Button'
 import DataTable, { cell } from '../../components/backoffice/DataTable'
@@ -23,6 +23,8 @@ import {
 import { downloadCsv } from '../../lib/csv'
 import usePaginatedFilter from '../../hooks/usePaginatedFilter'
 import useBackofficePageSize from '../../hooks/useBackofficePageSize'
+import useLinkedHighlight from '../../hooks/useLinkedHighlight'
+import { linkedHighlight } from '../../components/backoffice/classes'
 
 const EMPTY_FILTERS = { category: '', type: '', district: '', from: '', to: '', query: '' }
 
@@ -56,6 +58,10 @@ function Meta({ icon, children }) {
 
 export default function Review() {
   const pageSize = useBackofficePageSize()
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
+  const linkedPostId = searchParams.get('post')
+  const focusKey = linkedPostId ? `${location.key}:${linkedPostId}` : null
   const {
     reviewPosts: posts,
     setReviewPosts,
@@ -89,9 +95,8 @@ export default function Review() {
     setFilter,
     resetFilters,
     setPage,
-    currentPage,
+    currentPage: paginatedPage,
     filteredItems: filtered,
-    visibleItems: visible,
   } = usePaginatedFilter({
     items: apiPosts ?? posts,
     initialFilters: EMPTY_FILTERS,
@@ -109,6 +114,21 @@ export default function Review() {
   const invalidDateRange = Boolean(filters.from && filters.to && filters.from > filters.to)
   const listLoading = hasActiveFilters ? filterLoading : reviewLoading
   const listError = hasActiveFilters ? filterError : reviewError
+  const linkedRowIndex = filtered.findIndex((post) => post.id === linkedPostId)
+  const focusedPage = linkedRowIndex < 0 ? null : Math.floor(linkedRowIndex / pageSize) + 1
+  const finishHighlight = useCallback(() => {
+    if (focusedPage != null) setPage(focusedPage)
+  }, [focusedPage, setPage])
+  const highlight = useLinkedHighlight(focusKey, {
+    enabled: focusedPage != null,
+    onExpire: finishHighlight,
+  })
+  const highlightedPostId = highlight.active ? linkedPostId : null
+  const currentPage = highlight.active ? focusedPage : paginatedPage
+  const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const linkedPostUnavailable = Boolean(
+    linkedPostId && !listLoading && !listError && !filtered.some((post) => post.id === linkedPostId)
+  )
 
   useEffect(() => {
     const requestId = ++filterRequestId.current
@@ -375,6 +395,7 @@ export default function Review() {
         </div>
       )}
       {notice && <Notice>{notice}</Notice>}
+      {linkedPostUnavailable && <Notice>Bài đăng này không còn trong hàng đợi kiểm duyệt.</Notice>}
 
       <DataTable
         caption="Bài đăng chờ kiểm duyệt"
@@ -400,7 +421,11 @@ export default function Review() {
         {visible.map((post) => {
           const code = post.postCode || post.id
           return (
-            <tr key={post.id} className="hover:bg-surface-muted">
+            <tr
+              key={post.id}
+              ref={post.id === highlightedPostId ? highlight.targetRef : null}
+              className={post.id === highlightedPostId ? linkedHighlight : 'hover:bg-surface-muted'}
+            >
               <td className={cell}>
                 <span className="whitespace-nowrap text-caption font-semibold text-primary">
                   {code}

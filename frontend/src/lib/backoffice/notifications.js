@@ -5,78 +5,9 @@ export const NOTIFICATION_TYPES = {
   system: { label: 'Hệ thống', icon: 'bell' },
 }
 
-export const NOTIFICATION_FILTER_TYPES = NOTIFICATION_TYPES
-
-export function unreadNotificationCount(notifications) {
-  return notifications.filter((notification) => notification.unread).length
-}
-
-export function filterNotifications(
-  notifications,
-  { filter = 'all', type = 'all', query = '', from = '', to = '' } = {}
-) {
-  const normalizedQuery = query.trim().toLocaleLowerCase('vi')
-  if (from && to && from > to) return []
-
-  return notifications
-    .filter((notification) => {
-      if (filter === 'unread' && !notification.unread) return false
-      if (filter === 'pinned' && !notification.pinned) return false
-      if (type !== 'all' && notification.type !== type) return false
-      if (
-        normalizedQuery &&
-        !`${notification.title} ${notification.body}`
-          .toLocaleLowerCase('vi')
-          .includes(normalizedQuery)
-      ) {
-        return false
-      }
-
-      const date = new Date(notification.createdAt).toISOString().slice(0, 10)
-      if (from && date < from) return false
-      if (to && date > to) return false
-      return true
-    })
-    .sort(
-      (left, right) =>
-        Number(right.pinned) - Number(left.pinned) ||
-        new Date(right.createdAt) - new Date(left.createdAt)
-    )
-}
-
-export function markNotificationRead(state, id) {
-  return {
-    ...state,
-    notifications: state.notifications.map((notification) =>
-      notification.id === id ? { ...notification, unread: false } : notification
-    ),
-  }
-}
-
-export function toggleNotificationRead(state, id) {
-  return {
-    ...state,
-    notifications: state.notifications.map((notification) =>
-      notification.id === id ? { ...notification, unread: !notification.unread } : notification
-    ),
-  }
-}
-
-export function markAllNotificationsRead(state) {
-  return {
-    ...state,
-    notifications: state.notifications.map((notification) => ({
-      ...notification,
-      unread: false,
-    })),
-  }
-}
-
-export function toggleNotificationPin(state, id) {
-  return {
-    ...state,
-    notifications: state.notifications.map((notification) =>
-      notification.id === id ? { ...notification, pinned: !notification.pinned } : notification
-    ),
-  }
+export const NOTIFICATION_FILTER_TYPES = {
+  review: NOTIFICATION_TYPES.review,
+  warning: NOTIFICATION_TYPES.warning,
+  report: NOTIFICATION_TYPES.report,
+  system: NOTIFICATION_TYPES.system,
 }

@@ -1,7 +1,10 @@
-const { AuditLog, Notification, Post, Report, User } = require('../models')
+const { AuditLog, Post, Report, User } = require('../models')
 const ApiError = require('../utils/ApiError')
 const imageService = require('./imageService')
-const { notify } = require('./notificationService')
+const {
+  notifyAdminAccountRestricted,
+  notifyReportQueue,
+} = require('./backofficeNotificationEvents')
 const { isPublic, postNotFound } = require('./postService')
 const { blockUser, isBlocked } = require('./relationService')
 const { userNotFound } = require('./userService')
@@ -88,7 +91,7 @@ const restrictWithAudit = async (userId, count) => {
       { $set: { status: 'restricted', updatedAt: changedAt } },
       { returnDocument: 'before', timestamps: false, session }
     ).select('username updatedAt')
-    if (!previous) return
+    if (!previous) return null
     const log = new AuditLog({
       actor: null,
       actorRole: 'system',
@@ -123,10 +126,10 @@ const restrictWithAudit = async (userId, count) => {
       }
       throw error
     }
+    return { username: previous.username }
   }
   const hello = await User.db.db.admin().command({ hello: 1 })
-  if (hello.setName || hello.msg === 'isdbgrid') await User.db.transaction(apply)
-  else await apply(null)
+  return hello.setName || hello.msg === 'isdbgrid' ? User.db.transaction(apply) : apply(null)
 }
 
 // Gắn cờ (nâng mức độ, báo Moderator) rồi hạn chế tài khoản khi đủ ngưỡng
@@ -146,27 +149,18 @@ const applyThresholds = async (userId) => {
     { severity }
   )
 
-  // Mỗi tài khoản chỉ báo Moderator một lần trong 7 ngày
-  const notified = await Notification.exists({
-    type: 'report_flagged',
-    refId: userId,
-    createdAt: { $gte: since },
-  })
-  if (!notified) {
-    const [target, moderators] = await Promise.all([
-      User.findById(userId).select('username').lean(),
-      User.find({ role: 'moderator', status: 'active' }).distinct('_id'),
-    ])
-    await notify(moderators, {
-      type: 'report_flagged',
-      refType: 'User',
-      refId: userId,
-      text: `@${target.username} bị ${count} người báo cáo trong 7 ngày`,
+  let restricted = null
+  if (count >= RESTRICT_REPORTERS) {
+    restricted = await restrictWithAudit(userId, count)
+  }
+  if (restricted) {
+    await notifyAdminAccountRestricted({
+      userId,
+      username: restricted.username,
+      reportCount: count,
     })
   }
-  if (count >= RESTRICT_REPORTERS) {
-    await restrictWithAudit(userId, count)
-  }
+  return restricted
 }
 
 const getPostReport = async (id, viewer) => {
@@ -195,6 +189,7 @@ const reportPost = async (id, viewer, input, files) => {
     files
   )
   await applyThresholds(post.owner._id)
+  await notifyReportQueue(report._id)
   return { report: toMyReport(report) }
 }
 
@@ -226,6 +221,7 @@ const reportUser = async (username, viewer, input, files) => {
   )
   if (input.block) await blockUser(user, viewer)
   await applyThresholds(user._id)
+  await notifyReportQueue(report._id)
   return {
     report: toMyReport(report),
     blocked: Boolean(input.block) || Boolean(await isBlocked(viewer._id, user._id)),

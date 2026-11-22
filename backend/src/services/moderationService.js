@@ -3,6 +3,7 @@ const ApiError = require('../utils/ApiError')
 const { notifyAreaSubscribers } = require('./areaService')
 const { runMatching } = require('./matchingService')
 const { notify } = require('./notificationService')
+const { suppressPendingPost } = require('./backofficeNotificationEvents')
 const { escapeRegex, lowercaseText, normalizeText } = require('../utils/text')
 const { endOfVnDay, startOfVnDay } = require('../utils/vnTime')
 const { updatePostWithAudit } = require('./postAuditService')
@@ -165,6 +166,8 @@ const changePendingPostStatus = async ({ id, moderator, status, note = '' }) => 
     }
     throw ApiError.conflict('Bài đăng không còn ở trạng thái chờ duyệt.', 'POST_NOT_PENDING')
   }
+
+  await suppressPendingPost(post._id)
 
   // Báo kết quả duyệt cho chủ bài, bị từ chối thì kèm lý do
   await notify([post.owner], {

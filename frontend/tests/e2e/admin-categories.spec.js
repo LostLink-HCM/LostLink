@@ -26,7 +26,7 @@ async function createCategory(api, name) {
 async function openCategories(page) {
   await page.goto('/admin/categories')
   await loginThroughUi(page, ADMIN)
-  await expect(categoryTabs(page)).toBeVisible()
+  await expect(categorySearch(page)).toBeVisible()
 }
 
 async function selectCategory(page, name) {
@@ -34,6 +34,7 @@ async function selectCategory(page, name) {
   await search.fill(name)
   await page.getByRole('option', { name, exact: true }).click()
   await expect(page.getByRole('heading', { name, level: 2 })).toBeVisible()
+  await expect(categoryTabs(page)).toBeVisible()
 }
 
 test('người dùng thường không được vào trang quản lý danh mục', async ({ page, api }) => {
