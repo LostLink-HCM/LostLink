@@ -506,12 +506,12 @@ test.describe('Nhật ký thao tác của admin', () => {
       await expect(rows(page).first().getByRole('cell').nth(2)).toHaveText(label)
       expect(genericRequests.at(-1)).toEqual({ page: '1', action, entityType: 'Category' })
     }
-    const differentEntity = waitForAudit(page, { action: 'delete', entityType: 'Post', page: '1' })
     await entitySelect.selectOption('Post')
-    expect((await differentEntity).ok()).toBeTruthy()
+    await expect
+      .poll(() => genericRequests.at(-1), { timeout: 5000 })
+      .toEqual({ page: '1', action: 'delete', entityType: 'Post' })
     await expect(actionSelect).toHaveValue('delete')
     await expect(page.getByRole('heading', { name: 'Không có bản ghi phù hợp' })).toBeVisible()
-    expect(genericRequests.at(-1)).toEqual({ page: '1', action: 'delete', entityType: 'Post' })
 
     const paginationRequests = await mockJournal(
       page,

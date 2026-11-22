@@ -220,7 +220,7 @@ describe('UC35 - Báo cáo người dùng', () => {
 })
 
 describe('UC35 - Ngưỡng báo cáo và giới hạn tần suất', () => {
-  test('đủ 3 người báo cáo trong 7 ngày thì gắn cờ và báo Moderator một lần', async () => {
+  test('ngưỡng report cập nhật mức độ; thông báo hàng đợi được gộp theo đối tượng', async () => {
     const mod = await createUser({
       username: 'kiemduyet',
       email: 'mod@example.com',
@@ -231,7 +231,15 @@ describe('UC35 - Ngưỡng báo cáo và giới hạn tần suất', () => {
     await reportBy(2, { createdAt: new Date(Date.now() - 8 * DAY) })
 
     assert.equal((await reportUser({ reason: 'spam' })).status, 201)
-    assert.equal(await Notification.countDocuments({ user: mod._id }), 0)
+    assert.equal(
+      await Notification.countDocuments({
+        user: mod._id,
+        type: 'report_queue',
+        refType: 'User',
+        refId: owner._id,
+      }),
+      1
+    )
 
     // Người thứ 3 báo cáo bài của tài khoản này
     await createUser({ username: 'nguoi3x', email: 'u3@example.com' })
@@ -242,11 +250,22 @@ describe('UC35 - Ngưỡng báo cáo và giới hạn tần suất', () => {
       .field('data', JSON.stringify({ reason: 'spam' }))
     assert.equal(res.status, 201, JSON.stringify(res.body))
 
-    const flagged = await Notification.find({ user: mod._id }).lean()
-    assert.deepEqual(
-      flagged.map((item) => [item.type, item.preview]),
-      [['report_flagged', '@Hoang.Nam bị 3 người báo cáo trong 7 ngày']]
-    )
+    const accountQueue = await Notification.findOne({
+      user: mod._id,
+      type: 'report_queue',
+      refType: 'User',
+      refId: owner._id,
+    }).lean()
+    const postQueue = await Notification.findOne({
+      user: mod._id,
+      type: 'report_queue',
+      refType: 'Post',
+      refId: post._id,
+    }).lean()
+    assert.ok(accountQueue)
+    assert.ok(postQueue)
+    assert.match(postQueue.preview, /Mức độ cao nhất: Cảnh cáo/)
+    assert.equal(await Notification.countDocuments({ user: mod._id, type: 'report_queue' }), 2)
     assert.deepEqual(await Report.find({ targetUser: owner._id }).distinct('severity'), ['medium'])
     assert.equal((await User.findById(owner._id)).status, 'active')
 
@@ -258,7 +277,15 @@ describe('UC35 - Ngưỡng báo cáo và giới hạn tần suất', () => {
       .post('/api/users/Hoang.Nam/report')
       .set('Authorization', `Bearer ${fifth.accessToken}`)
       .field('data', JSON.stringify({ reason: 'spam' }))
-    assert.equal(await Notification.countDocuments({ user: mod._id }), 1)
+    assert.equal(await Notification.countDocuments({ user: mod._id, type: 'report_queue' }), 2)
+    const updatedAccountQueue = await Notification.findOne({
+      user: mod._id,
+      type: 'report_queue',
+      refType: 'User',
+      refId: owner._id,
+    }).lean()
+    assert.match(updatedAccountQueue.preview, /Mức độ cao nhất: Nghiêm trọng/)
+    assert.equal(updatedAccountQueue.isPinned, true)
   })
 
   test('đủ 5 người báo cáo thì tài khoản bị hạn chế', async () => {

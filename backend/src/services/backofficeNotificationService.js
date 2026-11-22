@@ -19,31 +19,42 @@ const baseFilterFor = (user) => ({
   isSuppressed: { $ne: true },
 })
 
-const titleFor = (item, role) => {
+const titleFor = (item) => {
   if (item.type === 'post_pending') return 'Bài đăng đang chờ kiểm duyệt'
   if (item.type === 'report_queue') return 'Report cần được xử lý'
   if (item.type === 'report_flagged') return 'Tài khoản có nhiều báo cáo'
+  if (item.type === 'account_restricted') return 'Tài khoản tự động bị hạn chế'
   if (item.type === 'backoffice_message') {
-    if (!item.actor?.username) return 'Có tin nhắn backoffice mới'
-    return role === 'admin'
-      ? `Tin nhắn mới từ Moderator ${item.actor.username}`
-      : `Tin nhắn mới từ ${item.actor.username}`
+    return item.actor?.username
+      ? `Tin nhắn hỗ trợ mới từ ${item.actor.username}`
+      : 'Có tin nhắn hỗ trợ mới từ người dùng'
   }
   return 'Thông báo backoffice'
 }
 
 const actionFor = (item, role) => {
   if (item.type === 'post_pending') {
-    return { actionLabel: 'Mở hàng đợi kiểm duyệt', href: '/moderator/review' }
+    return {
+      actionLabel: 'Mở hàng đợi kiểm duyệt',
+      href: `/moderator/review?post=${encodeURIComponent(String(item.refId || ''))}`,
+    }
   }
   if (item.type === 'report_queue' || item.type === 'report_flagged') {
-    return { actionLabel: 'Mở hàng đợi report', href: '/moderator/reports' }
+    const targetType = item.refType === 'Post' ? 'post' : 'user'
+    const params = new URLSearchParams({
+      targetType,
+      targetId: String(item.refId || ''),
+    })
+    return { actionLabel: 'Mở hàng đợi report', href: `/moderator/reports?${params}` }
   }
-  if (item.type === 'backoffice_message') {
+  if (item.type === 'account_restricted') {
     return {
-      actionLabel: 'Mở tin nhắn',
-      href: role === 'admin' ? '/admin/messages' : '/moderator/messages',
+      actionLabel: 'Mở hồ sơ tài khoản',
+      href: `/admin/users?user=${encodeURIComponent(String(item.refId || ''))}`,
     }
+  }
+  if (item.type === 'backoffice_message' && role === 'moderator') {
+    return { actionLabel: 'Mở tin nhắn', href: '/moderator/messages' }
   }
   return { actionLabel: '', href: '' }
 }
@@ -52,7 +63,7 @@ const toBackofficeNotification = (item, role) => ({
   id: String(item._id),
   type: CATEGORY_BY_TYPE[item.type],
   eventType: item.type,
-  title: titleFor(item, role),
+  title: titleFor(item),
   body: item.preview,
   actor: item.actor
     ? { username: item.actor.username, avatarUrl: item.actor.avatarUrl || null }

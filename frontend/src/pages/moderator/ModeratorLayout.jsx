@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import BackofficeLayout from '../../components/backoffice/BackofficeLayout'
-import { createModeratorNotifications } from '../../data/moderatorNotifications'
 import { createEmptyMessageState } from '../../lib/backoffice/messages'
+import useBackofficeUnreadCount from '../../hooks/useBackofficeUnreadCount'
 import useSystemSettings from '../../hooks/useSystemSettings'
 import { listModeratorPendingPosts } from '../../lib/moderator/reviewPosts'
 
@@ -19,8 +19,9 @@ export default function ModeratorLayout() {
   const [reviewLoading, setReviewLoading] = useState(true)
   const [reviewError, setReviewError] = useState('')
   const [messageState, setMessageState] = useState(createEmptyMessageState)
+  const { unreadCount: unreadNotifications, setUnreadCount: setNotificationUnreadCount } =
+    useBackofficeUnreadCount()
   const settings = useSystemSettings()
-  const [notificationState, setNotificationState] = useState(createModeratorNotifications)
   const loadReviewPosts = useCallback(async () => {
     setReviewLoading(true)
     setReviewError('')
@@ -54,6 +55,7 @@ export default function ModeratorLayout() {
   }, [])
 
   const pendingCount = reviewPosts.length
+  const unreadMessages = messageState.threads.reduce((total, thread) => total + thread.unread, 0)
 
   return (
     <BackofficeLayout
@@ -65,6 +67,7 @@ export default function ModeratorLayout() {
       brandAriaLabel="LostLink - Bài đăng"
       pendingPath="/review"
       pendingCount={pendingCount}
+      pendingCounts={{ '/messages': unreadMessages, '/notifications': unreadNotifications }}
       outletContext={{
         reviewPosts,
         setReviewPosts,
@@ -73,9 +76,8 @@ export default function ModeratorLayout() {
         reloadReviewPosts: loadReviewPosts,
         messageState,
         setMessageState,
+        setNotificationUnreadCount,
         ...settings,
-        notificationState,
-        setNotificationState,
       }}
     />
   )

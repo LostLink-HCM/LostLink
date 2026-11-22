@@ -4,6 +4,7 @@ const ApiError = require('../utils/ApiError')
 const { escapeRegex, normalizeText } = require('../utils/text')
 const { endOfVnDay, startOfVnDay } = require('../utils/vnTime')
 const { notify } = require('./notificationService')
+const { suppressReportGroup } = require('./backofficeNotificationEvents')
 
 const OPEN_STATUSES = ['pending', 'reviewing']
 const PROCESSED_STATUSES = ['resolved', 'dismissed']
@@ -180,6 +181,7 @@ const listReports = async ({
   q = '',
   targetType,
   severity,
+  targetId,
   from,
   to,
   queueStatus = 'open',
@@ -230,7 +232,11 @@ const listReports = async ({
   }
   const total = groups.length
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
-  const currentPage = Math.min(page, totalPages)
+  const targetIndex = targetId
+    ? groups.findIndex((group) => groupKeyOf(group[0]) === `${targetType}:${targetId}`)
+    : -1
+  const requestedPage = targetIndex >= 0 ? Math.floor(targetIndex / pageSize) + 1 : page
+  const currentPage = Math.min(requestedPage, totalPages)
   const pageGroups = groups.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   const warningRows = await Report.aggregate([
     {
@@ -591,6 +597,11 @@ const resolveReport = async (id, moderator, action, reason = '') => {
   try {
     const result = await work
     const { updatedReport, targetUser, targetPost, changedAt, reporterIds } = result
+    await suppressReportGroup({
+      targetType: updatedReport.targetType,
+      targetId:
+        updatedReport.targetType === 'post' ? updatedReport.targetPost : updatedReport.targetUser,
+    })
     try {
       if (action === 'warn' || action === 'lock' || action === 'hide') {
         await notify([targetUser._id], {

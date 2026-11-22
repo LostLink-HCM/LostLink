@@ -31,6 +31,7 @@ const NOTIFICATION_TYPES = [
   'report_result',
   // Gửi Moderator khi một tài khoản bị nhiều người báo cáo
   'report_flagged',
+  'account_restricted',
   'warning',
   'badge',
   'tip',

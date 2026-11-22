@@ -75,6 +75,7 @@ const normalizeHistory = (entry) => ({
 const queryOf = ({
   query = '',
   targetType = '',
+  targetId = '',
   severity = '',
   queueStatus = 'open',
   from = '',
@@ -85,6 +86,7 @@ const queryOf = ({
   const values = {
     q: query.trim(),
     targetType,
+    targetId,
     severity,
     queueStatus: queueStatus === 'open' ? '' : queueStatus,
     from,

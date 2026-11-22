@@ -1,10 +1,8 @@
 import { useOutletContext } from 'react-router-dom'
 import NotificationsWorkspace from '../../components/backoffice/NotificationsWorkspace'
-import useBackofficeNotificationActions from '../../hooks/useBackofficeNotificationActions'
 
 export default function Notifications() {
-  const { notificationState, setNotificationState } = useOutletContext()
-  const notificationActions = useBackofficeNotificationActions(setNotificationState)
+  const { setNotificationUnreadCount } = useOutletContext()
 
-  return <NotificationsWorkspace notificationState={notificationState} {...notificationActions} />
+  return <NotificationsWorkspace role="admin" onUnreadCountChange={setNotificationUnreadCount} />
 }

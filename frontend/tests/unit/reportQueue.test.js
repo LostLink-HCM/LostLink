@@ -78,6 +78,22 @@ describe('Hàng đợi report - adapter API frontend', () => {
     })
   })
 
+  it('gửi loại đối tượng và ID khi mở nhóm report từ thông báo', async () => {
+    api.get.mockResolvedValue({
+      data: { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 },
+    })
+
+    await listModeratorReports({ targetType: 'post', targetId: '65f000000000000000000003' })
+
+    const url = new URL(api.get.mock.calls[0][0], 'http://localhost')
+    expect(url.pathname).toBe('/moderator/reports')
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      targetType: 'post',
+      targetId: '65f000000000000000000003',
+      page: '1',
+    })
+  })
+
   it('đọc chi tiết report bằng ID đã mã hóa URL', async () => {
     api.get.mockResolvedValue({ data: postReport() })
 

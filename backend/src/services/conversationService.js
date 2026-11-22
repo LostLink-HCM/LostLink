@@ -7,6 +7,7 @@ const {
   attachSupportKey,
 } = require('./supportConversationService')
 const { notify } = require('./notificationService')
+const { notifyUserSupportMessage } = require('./backofficeNotificationEvents')
 const { afterPostEnded } = require('./postManageService')
 const { invalidField, toAuthor } = require('./postService')
 const reputationService = require('./reputationService')
@@ -288,6 +289,7 @@ const sendMessage = async (id, user, { body = '' }, file) => {
   const data = toMessage(message, user)
   if (conversation.kind === 'support' && (conversation.supportType ?? 'user') === 'user') {
     emitToUsersAndRole(participantIds(conversation), 'moderator', 'message:new', data)
+    await notifyUserSupportMessage({ conversation, message, sender: user })
   } else {
     emitToUsers(participantIds(conversation), 'message:new', data)
   }

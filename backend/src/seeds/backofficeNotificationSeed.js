@@ -2,6 +2,9 @@ const { Conversation, Message, Notification, Post, Report, User } = require('../
 
 const REPORT_STATUSES = ['pending', 'reviewing']
 const MAX_PREVIEW_LENGTH = 120
+const SEVERITY_RANK = { low: 1, medium: 2, high: 3 }
+const SEVERITY_LABEL = { low: 'Thấp', medium: 'Cảnh cáo', high: 'Nghiêm trọng' }
+const VN_OFFSET_MS = 7 * 60 * 60 * 1000
 
 const previewOf = (value) => {
   const text = String(value || '').trim()
@@ -26,12 +29,53 @@ const upsertNotification = async ({ identity, actor = null, preview, createdAt }
   return result.upsertedCount
 }
 
+const dateInVietnam = (daysAgo, hour = 12) => {
+  const nowInVietnam = new Date(Date.now() + VN_OFFSET_MS)
+  return new Date(
+    Date.UTC(
+      nowInVietnam.getUTCFullYear(),
+      nowInVietnam.getUTCMonth(),
+      nowInVietnam.getUTCDate() - daysAgo,
+      hour - 7
+    )
+  )
+}
+
+const minutesAgo = (minutes) => new Date(Date.now() - minutes * 60 * 1000)
+
+const upsertSampleNotification = async ({
+  identity,
+  actor = null,
+  preview,
+  createdAt,
+  isRead,
+  isPinned,
+}) => {
+  const result = await Notification.updateOne(
+    identity,
+    {
+      $set: {
+        actor,
+        preview: previewOf(preview),
+        isSuppressed: false,
+        isRead,
+        isPinned,
+        createdAt,
+        updatedAt: createdAt,
+      },
+      $setOnInsert: identity,
+    },
+    { upsert: true, timestamps: false }
+  )
+  return result.upsertedCount + result.modifiedCount
+}
+
 const activeRecipients = async (role) =>
   User.find({ role, status: 'active' }).select('_id username').lean()
 
 const seedPendingPostNotifications = async (moderators) => {
   const posts = await Post.find({ status: 'pending', isHidden: { $ne: true } })
-    .select('_id title createdAt')
+    .select('_id code title createdAt')
     .sort({ createdAt: 1 })
     .lean()
   let added = 0
@@ -45,7 +89,7 @@ const seedPendingPostNotifications = async (moderators) => {
           refType: 'Post',
           refId: post._id,
         },
-        preview: `Bài đăng đang chờ kiểm duyệt: ${post.title}`,
+        preview: `${post.code}: ${post.title}`,
         createdAt: post.createdAt,
       })
     }
@@ -67,6 +111,7 @@ const unresolvedReportGroups = async () => {
         },
         count: { $sum: 1 },
         latestReportAt: { $max: '$createdAt' },
+        severities: { $addToSet: '$severity' },
       },
     },
   ])
@@ -78,7 +123,7 @@ const unresolvedReportGroups = async () => {
     .map((group) => group._id.targetId)
   const [posts, users] = await Promise.all([
     Post.find({ _id: { $in: postIds } })
-      .select('_id title')
+      .select('_id code title')
       .lean(),
     User.find({ _id: { $in: userIds } })
       .select('_id username')
@@ -100,7 +145,13 @@ const unresolvedReportGroups = async () => {
         targetId,
         count: group.count,
         latestReportAt: group.latestReportAt,
-        label: group._id.targetType === 'post' ? target.title : target.username,
+        severity: group.severities.reduce(
+          (highest, severity) =>
+            (SEVERITY_RANK[severity] || 0) > (SEVERITY_RANK[highest] || 0) ? severity : highest,
+          'low'
+        ),
+        label:
+          group._id.targetType === 'post' ? `${target.code}: ${target.title}` : target.username,
       },
     ]
   })
@@ -119,7 +170,7 @@ const seedReportQueueNotifications = async (moderators) => {
           refType: group.targetType === 'post' ? 'Post' : 'User',
           refId: group.targetId,
         },
-        preview: `${group.count} report chưa xử lý: ${group.label}`,
+        preview: `${group.count} report chưa xử lý • Mức độ cao nhất: ${SEVERITY_LABEL[group.severity]} • ${group.label}`,
         createdAt: group.latestReportAt,
       })
     }
@@ -128,42 +179,35 @@ const seedReportQueueNotifications = async (moderators) => {
   return { recipients: moderators.length, sources: groups.length, added }
 }
 
-const messageRecipients = (conversation, senderRole, admins, moderators) => {
-  const participantIds = conversation.participants.map((participant) => String(participant.user))
-  const candidates = senderRole === 'moderator' ? admins : moderators
-  return candidates.filter((user) => participantIds.includes(String(user._id)))
-}
-
-const seedMessageNotifications = async (admins, moderators) => {
+const seedUserSupportMessageNotifications = async (moderators) => {
   const conversations = await Conversation.find({
     kind: 'support',
-    supportType: { $in: ['internal', 'user'] },
+    $or: [{ supportType: 'user' }, { supportType: { $exists: false } }],
   })
-    .select('_id supportType participants')
+    .select('_id')
     .lean()
-  let added = 0
+  const messages = await Message.find({
+    conversation: { $in: conversations.map((conversation) => conversation._id) },
+  })
+    .sort({ sentAt: -1, _id: -1 })
+    .populate('sender', 'username role')
+    .lean()
+  const latestUserMessageByConversation = new Map()
 
-  for (const conversation of conversations) {
-    const message = await Message.findOne({ conversation: conversation._id })
-      .sort({ sentAt: -1, _id: -1 })
-      .populate('sender', 'username role')
-      .lean()
-    if (!message?.sender) continue
-
-    let recipients = []
-    if (conversation.supportType === 'internal' && message.sender.role === 'moderator') {
-      recipients = messageRecipients(conversation, 'moderator', admins, moderators)
-    } else if (conversation.supportType === 'internal' && message.sender.role === 'admin') {
-      recipients = messageRecipients(conversation, 'admin', admins, moderators)
-    } else if (conversation.supportType === 'user' && message.sender.role === 'user') {
-      recipients = messageRecipients(conversation, 'user', admins, moderators)
+  for (const message of messages) {
+    if (message.sender?.role !== 'user') continue
+    const conversationId = String(message.conversation)
+    if (!latestUserMessageByConversation.has(conversationId)) {
+      latestUserMessageByConversation.set(conversationId, message)
     }
-    if (!recipients.length) continue
+  }
 
-    for (const recipient of recipients) {
+  let added = 0
+  for (const message of latestUserMessageByConversation.values()) {
+    for (const moderator of moderators) {
       added += await upsertNotification({
         identity: {
-          user: recipient._id,
+          user: moderator._id,
           type: 'backoffice_message',
           refType: 'Message',
           refId: message._id,
@@ -178,6 +222,83 @@ const seedMessageNotifications = async (admins, moderators) => {
   return { conversations: conversations.length, added }
 }
 
+const seedInteractionSamples = async (admins, moderators) => {
+  const pendingPosts = await Post.find({ status: 'pending', isHidden: { $ne: true } })
+    .select('_id code title')
+    .sort({ createdAt: -1 })
+    .limit(2)
+    .lean()
+  const reportGroups = await unresolvedReportGroups()
+  const restrictedUser = await User.findOne({ role: 'user', status: 'restricted' })
+    .select('_id username')
+    .lean()
+  const reporters = restrictedUser
+    ? await Report.distinct('reporter', {
+        targetUser: restrictedUser._id,
+        createdAt: { $gte: dateInVietnam(7, 0) },
+      })
+    : []
+  if (!pendingPosts.length || !reportGroups.length) {
+    throw new Error('Cần seed tài khoản, bài chờ duyệt và report trước khi seed thông báo.')
+  }
+  if (!restrictedUser || reporters.length < 5) {
+    throw new Error(
+      'Cần có tài khoản đang bị hạn chế với ít nhất 5 người báo cáo trong 7 ngày để seed thông báo Admin.'
+    )
+  }
+
+  let updated = 0
+  for (const moderator of moderators) {
+    const queuePosts = pendingPosts.slice(0, 2)
+    for (const [index, post] of queuePosts.entries()) {
+      updated += await upsertSampleNotification({
+        identity: {
+          user: moderator._id,
+          type: 'post_pending',
+          refType: 'Post',
+          refId: post._id,
+        },
+        preview: `${post.code}: ${post.title}`,
+        createdAt: index === 0 ? minutesAgo(1) : dateInVietnam(1, 15),
+        isRead: index > 0,
+        isPinned: index === 0,
+      })
+    }
+
+    for (const [index, group] of reportGroups.slice(0, 2).entries()) {
+      updated += await upsertSampleNotification({
+        identity: {
+          user: moderator._id,
+          type: 'report_queue',
+          refType: group.targetType === 'post' ? 'Post' : 'User',
+          refId: group.targetId,
+        },
+        preview: `${group.count} report chưa xử lý • Mức độ cao nhất: ${SEVERITY_LABEL[group.severity]} • ${group.label}`,
+        createdAt: index === 0 ? dateInVietnam(1, 11) : dateInVietnam(2, 16),
+        isRead: index > 0,
+        isPinned: index === 0,
+      })
+    }
+  }
+
+  for (const admin of admins) {
+    updated += await upsertSampleNotification({
+      identity: {
+        user: admin._id,
+        type: 'account_restricted',
+        refType: 'User',
+        refId: restrictedUser._id,
+      },
+      preview: `Tài khoản ${restrictedUser.username} đã bị hệ thống hạn chế sau khi có ${reporters.length} người báo cáo trong 7 ngày.`,
+      createdAt: dateInVietnam(1, 9),
+      isRead: false,
+      isPinned: true,
+    })
+  }
+
+  return updated
+}
+
 const seedBackofficeNotifications = async () => {
   const [admins, moderators] = await Promise.all([
     activeRecipients('admin'),
@@ -189,14 +310,25 @@ const seedBackofficeNotifications = async () => {
     )
   }
 
-  const [pending, reports, messages] = await Promise.all([
+  const backofficeUserIds = await User.find({ role: { $in: ['admin', 'moderator'] } }).distinct(
+    '_id'
+  )
+  const removedMessageNotifications = await Notification.deleteMany({
+    user: { $in: backofficeUserIds },
+    type: 'backoffice_message',
+  })
+  const [pending, reports, userMessages] = await Promise.all([
     seedPendingPostNotifications(moderators),
     seedReportQueueNotifications(moderators),
-    seedMessageNotifications(admins, moderators),
+    seedUserSupportMessageNotifications(moderators),
   ])
+  const samplesUpdated = await seedInteractionSamples(admins, moderators)
   console.log(
     `  ✓ Moderator: ${pending.sources} bài chờ duyệt, ${reports.sources} nhóm report; ` +
-      `Admin/Moderator: ${messages.conversations} hội thoại đã xét; thêm ${pending.added + reports.added + messages.added} thông báo mới.`
+      `đã xóa ${removedMessageNotifications.deletedCount} thông báo tin nhắn cũ; ` +
+      `thêm ${pending.added + reports.added} thông báo theo nguồn và ` +
+      `${userMessages.added} thông báo hỗ trợ từ người dùng, ` +
+      `cập nhật ${samplesUpdated} bản ghi mẫu để kiểm tra ngày, ghim và trạng thái đọc.`
   )
 }
 
