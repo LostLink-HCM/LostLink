@@ -31,69 +31,8 @@ export function rangeError({ from, to }) {
   return ''
 }
 
-const emptyTotals = () => ({ lost: 0, found: 0, matches: 0, successful: 0, reports: 0, locks: 0 })
-
-function sumRows(rows) {
-  const totals = rows.reduce((sum, row) => {
-    for (const key of Object.keys(sum)) sum[key] += row[key]
-    return sum
-  }, emptyTotals())
-
-  return {
-    ...totals,
-    posts: totals.lost + totals.found,
-    rate: totals.matches ? (totals.successful / totals.matches) * 100 : null,
-  }
-}
-
 export const percentChange = (current, previous) =>
   previous === 0 ? (current === 0 ? 0 : null) : ((current - previous) / previous) * 100
-
-export function aggregateDashboard(rows, filters, coverage) {
-  if (rangeError(filters)) return null
-
-  const days = Math.round((Date.parse(filters.to) - Date.parse(filters.from)) / DAY) + 1
-  const previousRange = { from: shiftDate(filters.from, -days), to: shiftDate(filters.from, -1) }
-  const inArea = rows.filter((row) => !filters.area || row.area === filters.area)
-  const selected = inArea.filter((row) => row.date >= filters.from && row.date <= filters.to)
-  const previous = inArea.filter(
-    (row) => row.date >= previousRange.from && row.date <= previousRange.to
-  )
-  const daily = Array.from({ length: days }, (_, index) => ({
-    date: shiftDate(filters.from, index),
-    ...emptyTotals(),
-  }))
-  const dailyMap = new Map(daily.map((row) => [row.date, row]))
-
-  for (const row of selected) {
-    const day = dailyMap.get(row.date)
-    for (const key of Object.keys(emptyTotals())) day[key] += row[key]
-  }
-
-  const group = (key) =>
-    [...new Set(selected.map((row) => row[key]))]
-      .map((name) => {
-        const current = sumRows(selected.filter((row) => row[key] === name))
-        const before = sumRows(previous.filter((row) => row[key] === name))
-        return { name, ...current, change: percentChange(current.posts, before.posts) }
-      })
-      .sort((a, b) => b.posts - a.posts)
-
-  const totals = sumRows(selected)
-  return {
-    totals,
-    previous: sumRows(previous),
-    daily,
-    days,
-    previousRange,
-    areas: group('area'),
-    categories: group('category'),
-    average: totals.posts / days,
-    hasData: selected.length > 0,
-    complete: !coverage || (filters.from >= coverage.from && filters.to <= coverage.to),
-    canCompare: !coverage || (previousRange.from >= coverage.from && filters.to <= coverage.to),
-  }
-}
 
 export function dashboardToCsv(report, filters, areaLabel, areaLabels = {}) {
   if (!report || !report.hasData) return ''
@@ -102,18 +41,42 @@ export function dashboardToCsv(report, filters, areaLabel, areaLabels = {}) {
     ['LostLink - Báo cáo Dashboard'],
     ['Từ ngày', filters.from, 'Đến ngày', filters.to, 'Khu vực', areaLabel],
     ['Tổng tin', report.totals.posts, 'Tin/ngày', formatNumber(report.average, 1)],
-    [
-      'Match thành công',
-      report.totals.successful,
-      'Tổng match',
-      report.totals.matches,
-      'Tỷ lệ (%)',
-      report.totals.rate === null ? '' : formatNumber(report.totals.rate, 1),
-    ],
     ['Report phát sinh', report.totals.reports, 'Lượt khóa tài khoản', report.totals.locks],
     [
+      'Bài đăng được duyệt có gợi ý ghép cặp',
+      report.kpis.approvedWithSuggestions,
+      'Bài đăng được duyệt',
+      report.kpis.approvedPosts,
+      'Tỷ lệ (%)',
+      report.kpis.suggestionRate === null ? '' : formatNumber(report.kpis.suggestionRate, 1),
+    ],
+    [
+      'Bài đăng được trao trả',
+      report.kpis.returnedPosts,
+      'Bài đăng được duyệt',
+      report.kpis.approvedPosts,
+      'Tỷ lệ trao trả (%)',
+      report.kpis.returnRate === null ? '' : formatNumber(report.kpis.returnRate, 1),
+    ],
+    [
+      'Thời gian trung bình từ duyệt đến trao trả (ngày)',
+      report.kpis.averageReturnDays === null ? '' : formatNumber(report.kpis.averageReturnDays, 1),
+      'Thời gian duyệt trung bình (ngày)',
+      report.kpis.averageApprovalDays === null
+        ? ''
+        : formatNumber(report.kpis.averageApprovalDays, 1),
+    ],
+    [
+      'Lượt trả lời xác minh đúng',
+      report.kpis.verificationPassed,
+      'Lượt đã trả lời xác minh',
+      report.kpis.verificationRequests,
+      'Tỷ lệ xác minh (%)',
+      report.kpis.verificationRate === null ? '' : formatNumber(report.kpis.verificationRate, 1),
+    ],
+    [
       'Định nghĩa',
-      'Match thành công: cặp ghép được tạo trong kỳ và đã xác nhận trao trả. Lượt khóa: số thao tác khóa phát sinh trong kỳ.',
+      'K1-K4 tính theo nhóm bài được duyệt lần đầu trong kỳ; K5 tính trên lượt đã gửi câu trả lời xác minh. Lượt khóa: số thao tác khóa phát sinh trong kỳ.',
     ],
     [],
     [

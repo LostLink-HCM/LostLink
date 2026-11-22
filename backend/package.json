@@ -13,6 +13,7 @@
     "seed:settings": "node src/seeds/index.js --settings-only",
     "seed:messages": "node src/seeds/index.js --messages-only",
     "seed:backoffice-notifications": "node src/seeds/index.js --backoffice-notifications-only",
+    "seed:dashboard": "node src/seeds/index.js --dashboard-only",
     "seed:audit": "node src/seeds/index.js --audit-only",
     "seed:reports": "node src/seeds/index.js --reports-only",
     "seed:demo": "node src/seeds/index.js --demo",

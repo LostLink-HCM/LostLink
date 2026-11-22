@@ -1,7 +1,5 @@
-import { useId, useMemo, useState } from 'react'
-import { ADMIN_AREAS, createAdminDashboard } from '../../data/adminDashboard'
+import { useEffect, useId, useState } from 'react'
 import {
-  aggregateDashboard,
   dashboardToCsv,
   formatDate,
   formatNumber,
@@ -9,12 +7,26 @@ import {
   percentChange,
   rangeError,
 } from '../../lib/admin/dashboard'
+import { getAdminDashboard } from '../../api/adminDashboard'
 import Icon from '../../components/common/Icon'
 import { cx, focusRing } from '../../components/backoffice/classes'
 
 const number = formatNumber
 const percent = (value) => (value === null ? '—' : `${number(value, 1)}%`)
-const areaName = (id) => ADMIN_AREAS.find((area) => area.id === id)?.label || 'Tất cả khu vực'
+const areaName = (value, options) =>
+  value ? options?.find((area) => area === value) || value : 'Tất cả khu vực'
+const emptyKpis = {
+  approvedPosts: 0,
+  approvedWithSuggestions: 0,
+  suggestionRate: null,
+  returnedPosts: 0,
+  returnRate: null,
+  averageReturnDays: null,
+  averageApprovalDays: null,
+  verificationRequests: 0,
+  verificationPassed: 0,
+  verificationRate: null,
+}
 
 function Change({ value, suffix = '%', inverse = false }) {
   if (value === null) {
@@ -39,51 +51,128 @@ function Change({ value, suffix = '%', inverse = false }) {
 
 const statTones = {
   blue: {
-    border: 'border-t-[#3976bd]',
-    background: 'to-[#eef4fd]',
+    spark: '#3976bd',
     icon: 'bg-[#eef4fd] text-[#3976bd]',
   },
   teal: {
-    border: 'border-t-[#299687]',
-    background: 'to-[#e9f7f3]',
+    spark: '#299687',
     icon: 'bg-[#e9f7f3] text-[#299687]',
   },
   amber: {
-    border: 'border-t-[#b4852e]',
-    background: 'to-[#fcf6e9]',
+    spark: '#b4852e',
     icon: 'bg-[#fcf6e9] text-[#b4852e]',
   },
   rose: {
-    border: 'border-t-[#bd6076]',
-    background: 'to-[#fceff2]',
+    spark: '#bd6076',
     icon: 'bg-[#fceff2] text-[#bd6076]',
   },
 }
 
-function StatCard({ label, value, icon, tone, note, change, suffix, inverse }) {
+function RateSparkline({ values, label, tone }) {
+  const color = statTones[tone].spark
+  const gradientId = useId().replaceAll(':', '')
+  const numericValues = values.filter(Number.isFinite)
+  if (!numericValues.length) return null
+  const minValue = Math.min(...numericValues)
+  const maxValue = Math.max(...numericValues)
+  const padding = Math.max(3, (maxValue - minValue) * 0.15)
+  const domainMin = Math.max(0, minValue - padding)
+  const domainMax = Math.min(100, maxValue + padding)
+  const domainRange = domainMax - domainMin || 1
+  const points = values.map((value, index) => {
+    if (!Number.isFinite(value)) return null
+    return {
+      x: values.length === 1 ? 44 : 4 + (index / (values.length - 1)) * 80,
+      y: 30 - ((Math.max(0, Math.min(100, value)) - domainMin) / domainRange) * 24,
+      value,
+    }
+  })
+  const validPoints = points.filter(Boolean)
+
+  const segments = []
+  let segment = []
+  for (const point of points) {
+    if (point) segment.push(point)
+    else if (segment.length) {
+      segments.push(segment)
+      segment = []
+    }
+  }
+  if (segment.length) segments.push(segment)
+
+  const first = validPoints[0]
+  const last = validPoints[validPoints.length - 1]
+  const direction =
+    validPoints.length < 2 || first.value === last.value
+      ? 'ổn định hoặc chưa đủ dữ liệu'
+      : last.value > first.value
+        ? 'tăng'
+        : 'giảm'
+
+  return (
+    <svg
+      viewBox="0 0 88 36"
+      role="img"
+      aria-label={`Xu hướng ${label}: ${direction} trong kỳ`}
+      className="h-9 w-[76px] shrink-0 overflow-visible"
+    >
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.24" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.015" />
+        </linearGradient>
+      </defs>
+      <path d="M3 30 H85" fill="none" stroke="#e8eef5" strokeWidth="1" />
+      {segments
+        .filter((items) => items.length > 1)
+        .map((items, index) => {
+          const linePath = items
+            .map((point, pointIndex) => `${pointIndex ? 'L' : 'M'}${point.x},${point.y}`)
+            .join(' ')
+          const firstPoint = items[0]
+          const lastPoint = items[items.length - 1]
+          const areaPath = `${linePath} L${lastPoint.x},30 L${firstPoint.x},30 Z`
+
+          return (
+            <g key={index}>
+              <path d={areaPath} fill={`url(#${gradientId})`} />
+              <path
+                d={linePath}
+                fill="none"
+                stroke={color}
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </g>
+          )
+        })}
+      <title>{`Xu hướng ${label}: ${direction} trong kỳ`}</title>
+    </svg>
+  )
+}
+
+function StatCard({ label, value, icon, tone, note, change, suffix, inverse, trendValues }) {
   const colors = statTones[tone]
   return (
-    <article
-      className={cx(
-        'min-w-0 rounded-[10px] border border-[#b4c6db] border-t-[3px] bg-linear-to-br from-white via-white px-[19px] pt-[18px] pb-4 shadow-[0_3px_10px_#16233a08]',
-        colors.border,
-        colors.background
-      )}
-    >
-      <div className="flex items-center justify-between gap-2 text-sm font-medium text-[#6e7d90]">
+    <article className="min-w-0 rounded-[10px] border border-[#d3dfeb] bg-white px-[19px] pt-[18px] pb-4 shadow-[0_6px_18px_rgba(25,52,82,0.10)] transition-[transform,box-shadow] duration-200 hover:-translate-y-1 hover:shadow-[0_13px_28px_rgba(25,52,82,0.17)]">
+      <div className="flex items-center justify-between gap-2 text-[13px] font-medium text-[#40566f]">
         <span>{label}</span>
-        <span className={cx('shrink-0 rounded-lg p-[9px]', colors.icon)}>
-          <Icon name={icon} size={19} />
+        <span className={cx('shrink-0 rounded-lg p-2', colors.icon)}>
+          <Icon name={icon} size={17} />
         </span>
       </div>
-      <strong className="mt-[7px] mb-[11px] block text-[36px] font-[650] leading-[1.3] tracking-[-1px] tabular-nums text-[#213650]">
-        {value}
-      </strong>
-      <div className="flex flex-wrap items-center gap-1.5 text-xs text-[#6b7b90]">
+      <div className="mt-2 mb-2 flex items-center justify-between gap-2">
+        <strong className="block text-[22px] font-semibold leading-[1.3] tracking-[-0.2px] tabular-nums text-[#183b60]">
+          {value}
+        </strong>
+        {trendValues && <RateSparkline values={trendValues} label={label} tone={tone} />}
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-[#536982]">
         <Change value={change} suffix={suffix} inverse={inverse} />
         {change !== null && <span>so với kỳ trước</span>}
       </div>
-      <p className="mt-[13px] border-t border-[#e0e8f1] pt-[11px] text-xs leading-[1.6] text-[#65768c]">
+      <p className="mt-3 border-t border-[#d6e0eb] pt-2.5 text-xs leading-[1.55] text-[#536982]">
         {note}
       </p>
     </article>
@@ -127,28 +216,28 @@ function PostsChart({ daily }) {
   return (
     <>
       <div className="mx-[22px] mt-2 flex min-h-[18px] flex-wrap gap-[15px] max-[600px]:mx-[17px] max-[600px]:gap-2.5">
-        <span className="flex items-center gap-[5px] text-xs text-[#64758a]">
+        <span className="flex items-center gap-[5px] text-sm text-[#64758a]">
           {formatDate(day.date)}
         </span>
-        <span className="flex items-center gap-[5px] text-xs text-[#64758a]">
-          <i className="size-[7px] shrink-0 rounded-full bg-[#3976c6]" />
+        <span className="flex items-center gap-[5px] text-sm text-[#64758a]">
+          <i className="size-[9px] shrink-0 rounded-[2px] bg-[#b86f56]" />
           Mất đồ <b className="min-w-[22px] font-semibold text-[#5b6f89]">{number(day.lost)}</b>
         </span>
-        <span className="flex items-center gap-[5px] text-xs text-[#64758a]">
-          <i className="size-[7px] shrink-0 rounded-full bg-[#23a397]" />
+        <span className="flex items-center gap-[5px] text-sm text-[#64758a]">
+          <i className="size-[9px] shrink-0 rounded-[2px] bg-[#23a397]" />
           Nhặt được <b className="min-w-[22px] font-semibold text-[#5b6f89]">{number(day.found)}</b>
         </span>
       </div>
       <svg
-        className="my-[5px] ml-[14px] block w-[calc(100%-28px)] text-[13px] max-[600px]:mx-[6px] max-[600px]:w-[calc(100%-12px)]"
+        className="my-[5px] ml-[14px] block w-[calc(100%-28px)] text-[7.5px] max-[600px]:mx-[6px] max-[600px]:w-[calc(100%-12px)] max-[600px]:text-[26px]"
         viewBox={`0 0 ${width} ${height}`}
         role="img"
         aria-label="Biểu đồ tin mất đồ và nhặt được theo ngày"
       >
         <defs>
           <linearGradient id={gradient} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#3e7bce" stopOpacity=".18" />
-            <stop offset="100%" stopColor="#3e7bce" stopOpacity="0" />
+            <stop offset="0%" stopColor="#b86f56" stopOpacity=".18" />
+            <stop offset="100%" stopColor="#b86f56" stopOpacity="0" />
           </linearGradient>
         </defs>
         {[0, 1, 2, 3, 4].map((tick) => (
@@ -165,33 +254,39 @@ function PostsChart({ daily }) {
               x={left - 12}
               y={y((max * tick) / 4) + 4}
               textAnchor="end"
-              className="fill-[#65778f] text-[13px]"
+              className="fill-[#65778f] text-[7.5px] max-[600px]:text-[26px]"
             >
               {number((max * tick) / 4)}
             </text>
           </g>
         ))}
         {singleDay ? (
-          ['lost', 'found'].map((key, index) => (
-            <g key={key}>
-              <rect
-                x={x(0) + (index === 0 ? -102 : 18)}
-                y={y(day[key])}
-                width="84"
-                height={y(0) - y(day[key])}
-                rx="5"
-                fill={key === 'lost' ? '#3976c6' : '#23a397'}
-              />
-              <text
-                x={x(0) + (index === 0 ? -60 : 60)}
-                y={y(day[key]) - 9}
-                textAnchor="middle"
-                className="fill-[#65778f] text-[13px]"
-              >
-                {number(day[key])}
-              </text>
-            </g>
-          ))
+          ['lost', 'found'].map((key, index) => {
+            const barWidth = 56
+            const centerOffset = index === 0 ? -40 : 40
+            const center = x(0) + centerOffset
+
+            return (
+              <g key={key}>
+                <rect
+                  x={center - barWidth / 2}
+                  y={y(day[key])}
+                  width={barWidth}
+                  height={y(0) - y(day[key])}
+                  rx="5"
+                  fill={key === 'lost' ? '#b86f56' : '#23a397'}
+                />
+                <text
+                  x={center}
+                  y={y(day[key]) - 9}
+                  textAnchor="middle"
+                  className="fill-[#65778f] text-[7.5px] max-[600px]:text-[26px]"
+                >
+                  {number(day[key])}
+                </text>
+              </g>
+            )
+          })
         ) : (
           <>
             <path
@@ -201,7 +296,7 @@ function PostsChart({ daily }) {
             <path
               d={path('lost')}
               fill="none"
-              stroke="#3976c6"
+              stroke="#b86f56"
               strokeWidth="2.5"
               strokeLinejoin="round"
             />
@@ -226,7 +321,7 @@ function PostsChart({ daily }) {
                 cx={x(active)}
                 cy={y(day[key])}
                 r="4.5"
-                fill={key === 'lost' ? '#3976c6' : '#23a397'}
+                fill={key === 'lost' ? '#b86f56' : '#23a397'}
                 stroke="white"
                 strokeWidth="2"
               />
@@ -247,7 +342,7 @@ function PostsChart({ daily }) {
                     ? 'end'
                     : 'middle'
             }
-            className="fill-[#65778f] text-[13px]"
+            className="fill-[#65778f] text-[7.5px] max-[600px]:text-[26px]"
           >
             {formatDate(daily[index].date).slice(0, 5)}
           </text>
@@ -272,7 +367,7 @@ function PostsChart({ daily }) {
           onMouseLeave={() => setHoveredDate(null)}
         />
       </svg>
-      <details className="border-t border-[#dce5ef] text-[13px] text-[#7088a3]">
+      <details className="border-t border-[#dce5ef] text-sm text-[#7088a3]">
         <summary className="cursor-pointer px-[22px] py-3 max-[600px]:px-[17px]">
           Xem số liệu theo ngày
         </summary>
@@ -317,21 +412,214 @@ function PostsChart({ daily }) {
   )
 }
 
+const areaColor = (index, count) => `hsl(${Math.round((index * 360) / Math.max(count, 1))} 52% 46%)`
+
+const donutSegmentPath = (start, end) => {
+  const outerRadius = 80
+  const innerRadius = 40
+  const startAngle = start - Math.PI / 2
+  const endAngle = end - Math.PI / 2
+  const point = (radius, angle) => ({
+    x: 110 + radius * Math.cos(angle),
+    y: 110 + radius * Math.sin(angle),
+  })
+  const outerStart = point(outerRadius, startAngle)
+  const outerEnd = point(outerRadius, endAngle)
+  const innerEnd = point(innerRadius, endAngle)
+  const innerStart = point(innerRadius, startAngle)
+  const largeArc = end - start > Math.PI ? 1 : 0
+
+  return [
+    `M${outerStart.x},${outerStart.y}`,
+    `A${outerRadius},${outerRadius} 0 ${largeArc} 1 ${outerEnd.x},${outerEnd.y}`,
+    `L${innerEnd.x},${innerEnd.y}`,
+    `A${innerRadius},${innerRadius} 0 ${largeArc} 0 ${innerStart.x},${innerStart.y}`,
+    'Z',
+  ].join(' ')
+}
+
+function AreaRankingDonut({ areas, selectedArea, areaOptions, onSelect }) {
+  const [hoveredArea, setHoveredArea] = useState('')
+  const totalPosts = areas.reduce((total, row) => total + row.posts, 0)
+  const nonEmptyAreas = areas.filter((row) => row.posts > 0)
+  const activeArea =
+    areas.find((row) => row.name === hoveredArea) || areas.find((row) => row.name === selectedArea)
+  const activeAreaName = activeArea ? areaName(activeArea.name, areaOptions) : ''
+  const splitDistrictName =
+    activeAreaName.startsWith('Quận ') && activeAreaName.slice(5).includes(' ')
+  const activeShare = activeArea && totalPosts ? (activeArea.posts / totalPosts) * 100 : 0
+  const areaSlices = nonEmptyAreas.reduce((slices, row) => {
+    const share = row.posts / totalPosts
+    const start = slices.length ? slices[slices.length - 1].end : 0
+
+    return [
+      ...slices,
+      {
+        row,
+        index: areas.indexOf(row),
+        share,
+        start,
+        end: start + share * Math.PI * 2,
+      },
+    ]
+  }, [])
+
+  const selectArea = (name) => onSelect(name)
+  const hoverProps = (name) => ({
+    onMouseEnter: () => setHoveredArea(name),
+    onMouseLeave: () => setHoveredArea(''),
+    onFocus: () => setHoveredArea(name),
+    onBlur: () => setHoveredArea(''),
+    onClick: () => selectArea(name),
+  })
+  const selectByKeyboard = (name) => (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      selectArea(name)
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-3 px-5 py-4 max-[600px]:px-[17px]">
+      <div className="relative mx-auto aspect-square w-full max-w-[210px]">
+        <svg
+          viewBox="0 0 220 220"
+          role="group"
+          aria-label="Tỷ lệ bài đăng theo khu vực"
+          className="size-full overflow-visible"
+        >
+          {totalPosts === 0 ? (
+            <circle cx="110" cy="110" r="60" fill="none" stroke="#e8eef5" strokeWidth="40" />
+          ) : nonEmptyAreas.length === 1 ? (
+            <circle
+              cx="110"
+              cy="110"
+              r="60"
+              fill="none"
+              stroke={areaColor(areas.indexOf(nonEmptyAreas[0]), areas.length)}
+              strokeWidth="40"
+              {...hoverProps(nonEmptyAreas[0].name)}
+              onKeyDown={selectByKeyboard(nonEmptyAreas[0].name)}
+              opacity={selectedArea && selectedArea !== nonEmptyAreas[0].name ? 0.22 : 1}
+              role="button"
+              tabIndex={0}
+              aria-label={`${areaName(nonEmptyAreas[0].name, areaOptions)}: ${percent(100)} bài đăng`}
+              className="cursor-pointer outline-none"
+            >
+              <title>{`${areaName(nonEmptyAreas[0].name, areaOptions)} · ${percent(100)} bài đăng`}</title>
+            </circle>
+          ) : (
+            areaSlices.map(({ row, index, share, start, end }) => {
+              const selected = row.name === selectedArea
+              const color = areaColor(index, areas.length)
+              const opacity = selectedArea
+                ? selected
+                  ? 1
+                  : 0.22
+                : hoveredArea && hoveredArea !== row.name
+                  ? 0.55
+                  : 1
+
+              return (
+                <path
+                  key={row.name}
+                  d={donutSegmentPath(start, end)}
+                  fill={color}
+                  stroke="white"
+                  strokeWidth="1.5"
+                  opacity={opacity}
+                  {...hoverProps(row.name)}
+                  onKeyDown={selectByKeyboard(row.name)}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${areaName(row.name, areaOptions)}: ${percent(share * 100)} bài đăng`}
+                  className="cursor-pointer outline-none"
+                >
+                  <title>{`${areaName(row.name, areaOptions)} · ${percent(share * 100)} bài đăng`}</title>
+                </path>
+              )
+            })
+          )}
+        </svg>
+        {activeArea && (
+          <div className="pointer-events-none absolute inset-[32%] flex flex-col items-center justify-center text-center">
+            <span className="max-w-full text-[13px] leading-tight text-black">
+              {splitDistrictName ? (
+                <>
+                  <span className="block">Quận</span>
+                  <span className="block whitespace-nowrap">{activeAreaName.slice(5)}</span>
+                </>
+              ) : (
+                activeAreaName
+              )}
+            </span>
+            <strong className="mt-0.5 text-base font-semibold text-black">
+              {percent(activeShare)}
+            </strong>
+          </div>
+        )}
+      </div>
+
+      <div className="max-h-[220px] w-full overflow-y-auto pr-1">
+        {areas.map((row, index) => {
+          const share = totalPosts ? (row.posts / totalPosts) * 100 : 0
+          const color = areaColor(index, areas.length)
+          const selected = row.name === selectedArea
+
+          return (
+            <button
+              key={row.name}
+              type="button"
+              className={cx(
+                'flex w-full items-center gap-2.5 rounded-md border-b border-[#e5ebf2] px-2 py-2.5 text-left transition-colors last:border-b-0 hover:bg-[#f5f8fc]',
+                focusRing,
+                selected && 'bg-[#edf4fc]'
+              )}
+              {...hoverProps(row.name)}
+              aria-label={`Lọc theo ${areaName(row.name, areaOptions)}, ${percent(share)} bài đăng`}
+              title={`${areaName(row.name, areaOptions)} · ${percent(share)} bài đăng`}
+            >
+              <span className="w-7 shrink-0 text-xs font-semibold tabular-nums text-[#7388a1]">
+                {String(row.rank).padStart(2, '0')}
+              </span>
+              <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#405770]">
+                {areaName(row.name, areaOptions)}
+              </span>
+              <span className="flex shrink-0 flex-col items-end">
+                <strong className="text-xs font-semibold text-[#405770]">
+                  {number(row.posts)} bài
+                </strong>
+                <small className="text-[11px] text-[#71849c]">{percent(share)}</small>
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function Panel({ title, description, icon, headingIcon, badge, children, className = '' }) {
   return (
     <section
       className={cx(
-        'min-w-0 overflow-hidden rounded-[10px] border border-[#b4c6db] bg-white shadow-[0_3px_10px_#16233a08]',
+        'min-w-0 overflow-hidden rounded-[10px] border border-[#d3dfeb] bg-white shadow-[0_6px_18px_rgba(25,52,82,0.09)] transition-[transform,box-shadow] duration-200 hover:-translate-y-1 hover:shadow-[0_13px_28px_rgba(25,52,82,0.17)]',
         className
       )}
     >
-      <header className="flex items-center justify-between gap-3 px-[22px] pt-[21px] max-[600px]:px-[17px] max-[600px]:pt-[18px]">
+      <header className="flex items-center justify-between gap-3 border-b border-[#d6e0eb] bg-[#f6f9fd] px-[22px] pt-[19px] pb-[17px] max-[600px]:px-[17px] max-[600px]:pt-4 max-[600px]:pb-[14px]">
         <div>
-          <h3 className="mb-1.5 flex items-center gap-2 text-base font-semibold text-[#253850]">
+          <h3
+            className={cx(
+              'flex items-center gap-2 text-base font-semibold text-[#1f3854]',
+              description && 'mb-1.5'
+            )}
+          >
             {headingIcon && <Icon name={headingIcon} size={18} className="text-[#778da7]" />}
             {title}
           </h3>
-          <p className="text-[13px] leading-[1.6] text-[#62758c]">{description}</p>
+          {description && <p className="text-[13px] leading-[1.6] text-[#536982]">{description}</p>}
         </div>
         {badge || (
           <span className="shrink-0 text-[#a0b2c8]">
@@ -346,29 +634,55 @@ function Panel({ title, description, icon, headingIcon, badge, children, classNa
 
 export default function Dashboard() {
   const [today] = useState(localDate)
-  const [dataset] = useState(() => createAdminDashboard(today))
   const [filters, setFilters] = useState(() => ({ from: today, to: today, area: '' }))
   const [notice, setNotice] = useState('')
+  const [loadedReport, setLoadedReport] = useState(null)
+  const [requestError, setRequestError] = useState('')
+  const [retryCount, setRetryCount] = useState(0)
+  const [areaOptions, setAreaOptions] = useState([])
   const error = rangeError(filters)
-  const report = useMemo(
-    () => aggregateDashboard(dataset.rows, filters, dataset.coverage),
-    [dataset, filters]
-  )
+  const hasCurrentReport =
+    loadedReport?.from === filters.from &&
+    loadedReport?.to === filters.to &&
+    loadedReport?.area === filters.area
+  const report = hasCurrentReport ? loadedReport : null
+  const loading = !error && !requestError && !report
+
+  useEffect(() => {
+    if (error) return undefined
+
+    let active = true
+    getAdminDashboard(filters)
+      .then((data) => {
+        if (!active) return
+        setLoadedReport(data)
+        setAreaOptions(data.areaOptions || [])
+        setRequestError('')
+      })
+      .catch((err) => {
+        if (active) setRequestError(err.message || 'Không tải được dữ liệu Dashboard.')
+      })
+
+    return () => {
+      active = false
+    }
+  }, [filters, error, retryCount])
+
   const setFilter = (key, value) => {
     setFilters((current) => ({ ...current, [key]: value }))
     setNotice('')
+    setRequestError('')
   }
   const reset = () => {
     setFilters({ from: today, to: today, area: '' })
     setNotice('')
+    setRequestError('')
   }
   const exportReport = () => {
-    if (!report?.hasData || !report.complete) return
-    const areaLabels = Object.fromEntries(
-      ADMIN_AREAS.map((area) => [area.id, `${area.label} · ${area.city}`])
-    )
+    if (!report?.hasData) return
+    const areaLabels = Object.fromEntries(areaOptions.map((area) => [area, area]))
     const url = URL.createObjectURL(
-      new Blob([dashboardToCsv(report, filters, areaName(filters.area), areaLabels)], {
+      new Blob([dashboardToCsv(report, filters, areaName(filters.area, areaOptions), areaLabels)], {
         type: 'text/csv;charset=utf-8;',
       })
     )
@@ -380,22 +694,33 @@ export default function Dashboard() {
     link.remove()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
     setNotice(
-      `Đã xuất báo cáo CSV · ${formatDate(filters.from)} – ${formatDate(filters.to)} · ${areaName(filters.area)}.`
+      `Đã xuất báo cáo CSV · ${formatDate(filters.from)} – ${formatDate(filters.to)} · ${areaName(filters.area, areaOptions)}.`
     )
   }
 
   const total = report?.totals
-  const comparison = (key) =>
-    report?.canCompare ? percentChange(total[key], report.previous[key]) : null
-  const rateChange =
-    report?.canCompare && total.rate !== null && report.previous.rate !== null
-      ? total.rate - report.previous.rate
-      : null
+  const kpis = { ...emptyKpis, ...report?.kpis }
+  const previousKpis = { ...emptyKpis, ...report?.previousKpis }
+  const kpiChange = (key, percentagePoints = false) => {
+    const current = kpis?.[key]
+    const previous = previousKpis?.[key]
+    if (
+      !report?.canCompare ||
+      current === null ||
+      current === undefined ||
+      previous === null ||
+      previous === undefined
+    )
+      return null
+    return percentagePoints ? current - previous : percentChange(current, previous)
+  }
+  const averageDays = (value) => (value === null ? '—' : `${number(value, 1)} ngày`)
+  const areaRanking = report?.areaRanking || report?.areas || []
 
   return (
     <div className="mx-auto max-w-[1640px] px-8 pb-0 pt-7 max-[1200px]:px-[22px] max-[600px]:px-4 max-[600px]:py-[22px]">
       <section
-        className="grid grid-cols-[minmax(160px,1fr)_minmax(160px,1fr)_minmax(220px,1.35fr)_auto] items-end gap-4 rounded-[10px] border border-[#b4c6db] bg-white px-[22px] py-5 shadow-[0_3px_10px_#16233a08] max-[1200px]:grid-cols-2 max-[1200px]:gap-4 max-[600px]:gap-x-3 max-[600px]:gap-y-3.5 max-[600px]:p-4"
+        className="mb-[22px] grid grid-cols-[minmax(160px,1fr)_minmax(160px,1fr)_minmax(220px,1.35fr)_auto] items-end gap-4 rounded-[10px] border border-[#d3dfeb] bg-white px-[22px] py-5 shadow-[0_6px_18px_rgba(25,52,82,0.08)] max-[1200px]:grid-cols-2 max-[1200px]:gap-4 max-[600px]:mb-4 max-[600px]:gap-x-3 max-[600px]:gap-y-3.5 max-[600px]:p-4"
         aria-label="Bộ lọc Dashboard"
       >
         <label className="flex min-w-0 flex-col gap-2 text-[13px] font-semibold text-[#435970]">
@@ -438,9 +763,9 @@ export default function Dashboard() {
             )}
           >
             <option value="">Tất cả khu vực</option>
-            {ADMIN_AREAS.map((area) => (
-              <option key={area.id} value={area.id}>
-                {area.label}
+            {areaOptions.map((area) => (
+              <option key={area} value={area}>
+                {area}
               </option>
             ))}
           </select>
@@ -460,7 +785,7 @@ export default function Dashboard() {
           </button>
           <button
             type="button"
-            disabled={!report?.hasData || !report.complete}
+            disabled={!report?.hasData}
             onClick={exportReport}
             className={cx(
               'inline-flex min-h-[42px] cursor-pointer items-center justify-center gap-2 rounded-[7px] border border-primary bg-primary px-3.5 text-[13px] font-semibold whitespace-nowrap text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45',
@@ -472,19 +797,6 @@ export default function Dashboard() {
           </button>
         </div>
       </section>
-
-      <div className="my-[17px] mb-[22px] flex flex-wrap gap-2.5 text-xs text-[#647990]">
-        <span className="flex flex-wrap items-center gap-2">
-          <Icon name="calendar" size={16} />
-          {error
-            ? 'Chọn khoảng thời gian hợp lệ để xem báo cáo'
-            : filters.from === today && filters.to === today
-              ? `Hôm nay: ${formatDate(today)}`
-              : `${formatDate(filters.from)} - ${formatDate(filters.to)}`}
-          <span className="mx-[5px] text-[#9cacbf]">/</span>
-          {areaName(filters.area)}
-        </span>
-      </div>
 
       {notice && (
         <p
@@ -508,15 +820,42 @@ export default function Dashboard() {
           </h3>
           <p className="mb-5 max-w-[550px] text-sm leading-[1.9]">{error}</p>
         </div>
-      ) : !report?.hasData || !report.complete ? (
+      ) : requestError ? (
+        <div
+          className="flex flex-col items-center rounded-[10px] border border-dashed border-[#d5e0ed] bg-white px-6 py-[65px] text-center text-[#8a9bb3]"
+          role="alert"
+        >
+          <Icon name="dashboard" size={36} />
+          <h3 className="mt-5 mb-2.5 text-[19px] font-semibold text-[#354e6c]">
+            Không tải được dữ liệu Dashboard
+          </h3>
+          <p className="mb-5 max-w-[550px] text-sm leading-[1.9]">{requestError}</p>
+          <button
+            type="button"
+            onClick={() => setRetryCount((count) => count + 1)}
+            className={cx(
+              'inline-flex min-h-10 cursor-pointer items-center justify-center rounded-[7px] border border-[#c6d6e7] bg-white px-3.5 text-[13px] font-semibold text-primary hover:bg-primary-subtle',
+              focusRing
+            )}
+          >
+            Thử lại
+          </button>
+        </div>
+      ) : loading ? (
+        <div
+          className="flex min-h-[260px] items-center justify-center rounded-[10px] border border-[#d5e0ed] bg-white text-sm text-[#71849c]"
+          role="status"
+        >
+          Đang tải số liệu Dashboard...
+        </div>
+      ) : !report?.hasData ? (
         <div className="flex flex-col items-center rounded-[10px] border border-dashed border-[#d5e0ed] bg-white px-6 py-[65px] text-center text-[#8a9bb3]">
           <Icon name="dashboard" size={36} />
           <h3 className="mt-5 mb-2.5 text-[19px] font-semibold text-[#354e6c]">
-            {report?.hasData ? 'Chưa đủ dữ liệu cho cả kỳ' : 'Chưa có dữ liệu trong kỳ này'}
+            Chưa có dữ liệu trong kỳ này
           </h3>
           <p className="mb-5 max-w-[550px] text-sm leading-[1.9]">
-            Vui lòng chọn khoảng thời gian từ {formatDate(dataset.coverage.from)} đến{' '}
-            {formatDate(dataset.coverage.to)} để xem và xuất báo cáo.
+            Chưa có hoạt động trong khoảng thời gian đã chọn. Hãy thử chọn khoảng ngày khác.
           </p>
           <button
             type="button"
@@ -531,204 +870,102 @@ export default function Dashboard() {
         </div>
       ) : (
         <>
-          <section
-            aria-label="Chỉ số tổng quan"
-            className="mb-[22px] grid grid-cols-4 gap-[17px] max-[1200px]:grid-cols-2 max-[1200px]:gap-4 max-[360px]:grid-cols-1 max-[600px]:mb-4 max-[600px]:gap-2.5"
-          >
-            <StatCard
-              label="Tổng tin đăng"
-              value={number(total.posts)}
-              icon="list"
-              tone="blue"
-              note={`Trung bình ${number(report.average, 1)} tin / ngày`}
-              change={comparison('posts')}
-            />
-            <StatCard
-              label="Tỷ lệ match thành công"
-              value={percent(total.rate)}
-              icon="link"
-              tone="teal"
-              note={`${number(total.successful)} / ${number(total.matches)} cặp ghép đã trao trả`}
-              change={rateChange}
-              suffix=" điểm %"
-            />
-            <StatCard
-              label="Report phát sinh"
-              value={number(total.reports)}
-              icon="flag"
-              tone="amber"
-              note="Số báo cáo được tạo trong kỳ"
-              change={comparison('reports')}
-              inverse
-            />
-            <StatCard
-              label="Lượt khóa tài khoản"
-              value={number(total.locks)}
-              icon="lock"
-              tone="rose"
-              note="Số thao tác khóa phát sinh trong kỳ"
-              change={comparison('locks')}
-              inverse
-            />
+          <section aria-label="Chỉ số tổng quan" className="mb-[22px]">
+            <div className="mb-[18px]">
+              <div className="grid grid-cols-3 gap-4 max-[1000px]:grid-cols-2 max-[600px]:grid-cols-1 max-[600px]:gap-3">
+                <StatCard
+                  label="Tỷ lệ bài đăng có gợi ý ghép cặp"
+                  value={percent(kpis.suggestionRate)}
+                  icon="link"
+                  tone="teal"
+                  trendValues={report.rateTrends?.suggestionRate}
+                  note={`${number(kpis.approvedWithSuggestions)} / ${number(kpis.approvedPosts)} bài được duyệt có ít nhất 1 gợi ý`}
+                  change={kpiChange('suggestionRate', true)}
+                  suffix=" điểm %"
+                />
+                <StatCard
+                  label="Tỷ lệ bài được duyệt đã trao trả"
+                  value={percent(kpis.returnRate)}
+                  icon="gift"
+                  tone="blue"
+                  trendValues={report.rateTrends?.returnRate}
+                  note={`${number(kpis.returnedPosts)} / ${number(kpis.approvedPosts)} bài được duyệt trong kỳ đã chuyển sang Đã trao trả`}
+                  change={kpiChange('returnRate', true)}
+                  suffix=" điểm %"
+                />
+                <StatCard
+                  label="Tỷ lệ xác minh thành công"
+                  value={percent(kpis.verificationRate)}
+                  icon="shield"
+                  tone="teal"
+                  trendValues={report.rateTrends?.verificationRate}
+                  note={`${number(kpis.verificationPassed)} / ${number(kpis.verificationRequests)} lượt đã trả lời xác minh đúng`}
+                  change={kpiChange('verificationRate', true)}
+                  suffix=" điểm %"
+                />
+              </div>
+            </div>
+            <div>
+              <div className="grid grid-cols-2 gap-4 max-[700px]:grid-cols-1 max-[600px]:gap-3">
+                <StatCard
+                  label="Thời gian trung bình đến khi trao trả"
+                  value={averageDays(kpis.averageReturnDays)}
+                  icon="history"
+                  tone="amber"
+                  note="Tính từ lần duyệt đầu tiên đến khi bài chuyển sang Đã trao trả"
+                  change={kpiChange('averageReturnDays')}
+                  inverse
+                />
+                <StatCard
+                  label="Thời gian duyệt bài trung bình"
+                  value={averageDays(kpis.averageApprovalDays)}
+                  icon="calendar"
+                  tone="rose"
+                  note="Tính từ lúc đăng đến lần duyệt đầu tiên"
+                  change={kpiChange('averageApprovalDays')}
+                  inverse
+                />
+              </div>
+            </div>
           </section>
 
-          <div className="mb-[22px] grid grid-cols-[minmax(0,1.9fr)_minmax(270px,1fr)] items-stretch gap-5 max-[1200px]:grid-cols-[minmax(0,1.6fr)_minmax(280px,1fr)] max-[700px]:grid-cols-1 max-[700px]:gap-4">
-            <Panel
-              title="Số tin theo ngày"
-              description="Nhịp hoạt động của cộng đồng trong kỳ"
-              icon="activity"
-            >
-              <div className="flex items-baseline gap-2 px-[22px] pt-4 pb-1.5 max-[600px]:flex-wrap max-[600px]:px-[17px] max-[600px]:pt-[15px]">
-                <strong className="text-[28px] font-[650] tracking-[-0.5px] text-[#253850]">
-                  {number(total.posts)}
-                </strong>
-                <span className="text-[13px] text-[#65778e]">tin đăng</span>
-                <div className="ml-auto flex flex-wrap gap-[15px] max-[600px]:gap-2.5">
-                  <span className="flex items-center gap-[5px] text-xs text-[#64758a]">
-                    <i className="size-[7px] rounded-full bg-[#3976c6]" />
-                    Mất đồ
-                  </span>
-                  <span className="flex items-center gap-[5px] text-xs text-[#64758a]">
-                    <i className="size-[7px] rounded-full bg-[#23a397]" />
-                    Nhặt được
-                  </span>
-                </div>
-              </div>
-              <PostsChart daily={report.daily} />
-            </Panel>
-
-            <Panel
-              title="Hiệu quả kết nối"
-              description="Từ cặp ghép đến trao trả thành công"
-              icon="link"
-              className="flex flex-col"
-            >
-              <div className="relative mx-auto my-[23px] size-[186px] rotate-[-90deg]">
-                <svg
-                  viewBox="0 0 186 186"
-                  className="size-full"
-                  role="img"
-                  aria-label={`${number(total.successful)} trên ${number(total.matches)} cặp ghép thành công, tỷ lệ ${percent(total.rate)}`}
-                >
-                  <circle
-                    cx="93"
-                    cy="93"
-                    r="78"
-                    fill="none"
-                    stroke="#edf2f6"
-                    strokeWidth="30"
-                    pathLength="100"
-                  />
-                  <circle
-                    cx="93"
-                    cy="93"
-                    r="78"
-                    fill="none"
-                    stroke="#2d9b8b"
-                    strokeWidth="30"
-                    strokeLinecap="round"
-                    pathLength="100"
-                    strokeDasharray={`${total.rate || 0} 100`}
-                  />
-                </svg>
-                <div className="absolute inset-[15px] flex rotate-90 flex-col items-center justify-center gap-[5px] rounded-full bg-white text-center">
-                  <Icon name="check" size={21} className="mb-px text-[#69b2a3]" />
-                  <strong className="text-[32px] font-[650] tracking-[-0.7px] text-[#253d51]">
-                    {percent(total.rate)}
-                  </strong>
-                  <span className="text-xs text-[#64778f]">ghép thành công</span>
-                </div>
-              </div>
-              <div className="mx-6 mb-[21px] flex flex-col gap-[11px]">
-                <span className="flex items-center gap-2 text-[13px] text-[#5d728b]">
-                  <i className="size-[7px] rounded-full bg-[#23a397]" />
-                  Đã trao trả
-                  <strong className="ml-auto font-semibold text-[#455974]">
-                    {number(total.successful)}
-                  </strong>
+          <Panel title="Số tin theo ngày" icon="activity" className="mb-[22px]">
+            <div className="flex items-baseline gap-2 px-[22px] pt-4 pb-1.5 max-[600px]:flex-wrap max-[600px]:px-[17px] max-[600px]:pt-[15px]">
+              <strong className="text-[19px] font-semibold tracking-[-0.2px] text-[#183b60]">
+                {number(total.posts)}
+              </strong>
+              <span className="text-sm text-[#536982]">tin đăng</span>
+              <div className="ml-auto flex flex-wrap gap-[15px] max-[600px]:gap-2.5">
+                <span className="flex items-center gap-[5px] text-sm text-[#536982]">
+                  <i className="size-[9px] rounded-[2px] bg-[#b86f56]" />
+                  Mất đồ
                 </span>
-                <span className="flex items-center gap-2 text-[13px] text-[#5d728b]">
-                  <i className="size-[7px] rounded-full bg-[#e8eff4]" />
-                  Chưa xác nhận trao trả
-                  <strong className="ml-auto font-semibold text-[#455974]">
-                    {number(total.matches - total.successful)}
-                  </strong>
+                <span className="flex items-center gap-[5px] text-sm text-[#536982]">
+                  <i className="size-[9px] rounded-[2px] bg-[#23a397]" />
+                  Nhặt được
                 </span>
               </div>
-              <p className="mt-auto flex items-start gap-1.5 border-t border-[#dce5ef] px-[22px] py-3 text-xs leading-[1.8] text-[#65778f] max-[600px]:px-[17px]">
-                <Icon name="info" size={14} className="mt-px shrink-0" />
-                Tính trên các cặp ghép được tạo trong kỳ đã chọn; mỗi cặp chỉ được tính một lần.
-              </p>
-            </Panel>
-          </div>
+            </div>
+            <PostsChart daily={report.daily} />
+          </Panel>
 
-          <div className="grid grid-cols-2 items-start gap-5 max-[1200px]:grid-cols-1 max-[700px]:gap-4">
+          <div className="grid grid-cols-2 items-stretch gap-5 max-[1200px]:grid-cols-1 max-[700px]:gap-4">
             <Panel
               title="Khu vực nổi bật"
               description="Xếp hạng theo số tin đăng trong kỳ"
               headingIcon="pin"
               badge={
                 <span className="whitespace-nowrap rounded-[5px] bg-[#f3f6fa] px-2 py-[5px] text-xs text-[#5f7590]">
-                  {report.areas.length} khu vực
+                  {areaRanking.length} khu vực
                 </span>
               }
             >
-              <div className="px-[22px] pt-2 pb-3 max-[600px]:px-[17px]">
-                {report.areas.map((row, index) => (
-                  <button
-                    key={row.name}
-                    type="button"
-                    className={cx(
-                      'flex w-full items-center gap-[13px] border-b border-[#e0e8f1] py-[17px] text-left last:border-b-0 hover:bg-[#fbfcfe]',
-                      focusRing
-                    )}
-                    onClick={() => setFilter('area', row.name)}
-                    aria-label={`Lọc theo ${areaName(row.name)}`}
-                    title={`Xem Dashboard tại ${areaName(row.name)}`}
-                  >
-                    <span
-                      className={cx(
-                        'grid size-[27px] shrink-0 place-items-center rounded-[6px] text-[13px] font-semibold',
-                        index === 0 ? 'bg-[#edf3fc] text-[#497cba]' : 'bg-[#f5f7fa] text-[#8a9aaf]'
-                      )}
-                    >
-                      {String(index + 1).padStart(2, '0')}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex flex-wrap items-baseline gap-[7px]">
-                        <strong className="text-sm font-medium text-[#405770]">
-                          {areaName(row.name)}
-                        </strong>
-                        <small className="text-[11px] text-[#6d7f95]">
-                          {ADMIN_AREAS.find((area) => area.id === row.name)?.city}
-                        </small>
-                      </span>
-                      <svg
-                        viewBox="0 0 100 4"
-                        preserveAspectRatio="none"
-                        aria-hidden="true"
-                        className="mt-2.5 block h-1 w-full overflow-hidden rounded-[3px] bg-[#f0f4f8]"
-                      >
-                        <rect
-                          width={(row.posts / report.areas[0].posts) * 100}
-                          height="4"
-                          rx="2"
-                          fill={index === 0 ? '#3976c6' : '#80a5d2'}
-                        />
-                      </svg>
-                    </span>
-                    <span className="flex min-w-[72px] flex-col gap-[5px] text-right">
-                      <strong className="text-sm font-semibold text-[#405770]">
-                        {number(row.posts)}
-                      </strong>
-                      <small className="text-[11px] text-[#6a7d96]">
-                        {percent(total.posts ? (row.posts / total.posts) * 100 : null)}
-                      </small>
-                    </span>
-                    <Icon name="next" size={14} className="text-[#b0bdd0]" />
-                  </button>
-                ))}
-              </div>
+              <AreaRankingDonut
+                areas={areaRanking}
+                selectedArea={filters.area}
+                areaOptions={areaOptions}
+                onSelect={(area) => setFilter('area', area)}
+              />
               <p className="flex items-center gap-1.5 border-t border-[#dce5ef] px-[22px] py-3 text-xs leading-[1.8] text-[#65778f] max-[600px]:px-[17px]">
                 Chọn một khu vực để xem các chỉ số tương ứng.
               </p>
@@ -752,7 +989,7 @@ export default function Dashboard() {
                       <th className="bg-[#edf3fa] px-[22px] py-[11px] text-xs font-medium whitespace-nowrap text-[#64778f]">
                         Danh mục
                       </th>
-                      <th className="bg-[#edf3fa] px-[22px] py-[11px] text-right text-xs font-medium whitespace-nowrap text-[#64778f]">
+                      <th className="bg-[#edf3fa] px-[22px] py-[11px] text-center text-xs font-medium whitespace-nowrap text-[#64778f]">
                         Số tin
                       </th>
                       <th className="bg-[#edf3fa] px-[22px] py-[11px] text-right text-xs font-medium whitespace-nowrap text-[#64778f]">
@@ -780,7 +1017,7 @@ export default function Dashboard() {
                           />
                           {row.name}
                         </th>
-                        <td className="border-b border-[#e0e8f1] px-[22px] py-[13px] text-right whitespace-nowrap">
+                        <td className="border-b border-[#e0e8f1] px-[22px] py-[13px] text-center whitespace-nowrap">
                           {number(row.posts)}
                         </td>
                         <td className="border-b border-[#e0e8f1] px-[22px] py-[13px] text-right whitespace-nowrap">
@@ -795,10 +1032,6 @@ export default function Dashboard() {
           </div>
 
           <footer className="mt-[22px] flex flex-wrap justify-between gap-3 text-xs leading-[1.7] text-[#667b94]">
-            <span className="flex items-center gap-[7px]">
-              <Icon name="eye" size={15} />
-              Thống kê report và khóa tài khoản chỉ để theo dõi.
-            </span>
             <span>
               {report.canCompare
                 ? `Kỳ so sánh: ${formatDate(report.previousRange.from)} - ${formatDate(report.previousRange.to)}`
