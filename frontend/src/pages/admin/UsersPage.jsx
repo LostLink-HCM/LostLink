@@ -68,6 +68,12 @@ const actionTones = {
   success: 'border-[#b7d9cb] bg-[#f4fbf8] text-[#2b866d] hover:bg-[#e4f5ed]',
 }
 
+const actionTextTones = {
+  primary: 'text-primary',
+  danger: 'text-danger-ink',
+  success: 'text-success',
+}
+
 function Avatar({ account, large = false }) {
   return (
     <span
@@ -117,6 +123,7 @@ function ActionButton({
   actor,
   expanded = false,
   showIcon = true,
+  colorOnly = false,
   label,
   onAction,
 }) {
@@ -128,8 +135,11 @@ function ActionButton({
     <button
       type="button"
       className={cx(
-        'inline-flex min-h-8 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-md border px-2 py-1.5 text-caption font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40',
-        actionTones[settings.tone],
+        'inline-flex min-h-8 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-md border px-2 py-1.5 text-caption font-medium disabled:cursor-not-allowed disabled:opacity-40',
+        colorOnly
+          ? 'border-transparent bg-transparent transition-opacity hover:opacity-75'
+          : 'transition-colors',
+        colorOnly ? actionTextTones[settings.tone] : actionTones[settings.tone],
         focusRing
       )}
       disabled={Boolean(disabledReason)}
@@ -149,6 +159,7 @@ function UserActions({
   onAction,
   expanded = false,
   showIcons = true,
+  colorOnly = false,
   labels,
   roleFirst = false,
 }) {
@@ -166,6 +177,7 @@ function UserActions({
           actor={actor}
           expanded={expanded}
           showIcon={showIcons}
+          colorOnly={colorOnly}
           label={labels?.[action]}
           onAction={onAction}
         />
@@ -806,7 +818,7 @@ export default function Users() {
           <button
             type="button"
             className={cx(
-              'inline-flex size-9 cursor-pointer items-center justify-center rounded-lg border border-line bg-surface text-ink-muted hover:bg-primary-subtle hover:text-primary',
+              'inline-flex size-9 cursor-pointer items-center justify-center rounded-md border border-transparent bg-primary-subtle p-0 text-primary transition-colors hover:bg-primary-soft',
               focusRing
             )}
             onClick={resetFiltersAndNotice}
@@ -856,6 +868,8 @@ export default function Users() {
 
       <DataTable
         variant="admin"
+        containerClassName="!border-[#b3c7df] !shadow-[0_10px_26px_rgba(34,65,100,0.14)]"
+        headingClassName="!border-b-2 !border-b-[#c5d5e7] !bg-[#edf3fa] !text-[#244d78] !text-small"
         caption="Người dùng, vai trò, trạng thái, ngày tham gia và thao tác"
         ariaLabel="Bảng người dùng, cuộn ngang để xem thêm"
         minWidth="min-w-[1100px] table-fixed"
@@ -905,7 +919,8 @@ export default function Users() {
             key={account.id}
             ref={account.id === focusedUserId ? highlight.targetRef : null}
             className={cx(
-              account.id === focusedUserId ? linkedHighlight : 'hover:bg-[#f7fafd]',
+              'transition-colors duration-150',
+              account.id === focusedUserId ? linkedHighlight : 'hover:bg-[#edf4fc]',
               account.id !== focusedUserId && account.status === 'locked' && 'bg-[#fffbfc]'
             )}
           >
@@ -949,7 +964,7 @@ export default function Users() {
                   type="button"
                   title="Xem hồ sơ người dùng"
                   className={cx(
-                    'inline-flex min-h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-[#c8d8eb] bg-[#f8fbff] px-2 py-1.5 text-caption font-medium text-[#376490] enabled:hover:border-[#86a9d2] enabled:hover:bg-[#e7f0fc] disabled:cursor-not-allowed disabled:opacity-40',
+                    'inline-flex min-h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-transparent bg-transparent px-2 py-1.5 text-caption font-medium text-primary transition-opacity hover:opacity-75 disabled:cursor-not-allowed disabled:opacity-40',
                     focusRing
                   )}
                   onClick={() => openProfile(account.id)}
@@ -960,6 +975,7 @@ export default function Users() {
                 <UserActions
                   account={account}
                   actor={actor}
+                  colorOnly
                   onAction={(action) => openAction(account.id, action)}
                 />
               </div>

@@ -30,6 +30,8 @@ export function toBackofficePost(post) {
   return {
     id: post.id,
     postCode: post.code || '',
+    slug: post.slug || '',
+    publicDetailAvailable: Boolean(post.publicDetailAvailable),
     title: post.title || '',
     category: category.name || '',
     categorySlug: category.slug || '',
@@ -50,7 +52,9 @@ export function toBackofficePost(post) {
         }))
       : [],
     views: counts.views ?? 0,
+    likes: counts.likes ?? 0,
     comments: counts.comments ?? 0,
+    saves: counts.saves ?? 0,
     matches: counts.matches ?? 0,
     hidden: Boolean(post.isHidden),
     hiddenReason: post.hiddenReason || '',

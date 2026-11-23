@@ -5,6 +5,7 @@ const {
   Notification,
   Post,
   PostFollow,
+  SavedPost,
   User,
 } = require('../models')
 const ApiError = require('../utils/ApiError')
@@ -12,13 +13,13 @@ const { escapeRegex, lowercaseText, normalizeText } = require('../utils/text')
 const { endOfVnDay, startOfVnDay } = require('../utils/vnTime')
 const { syncPostMatchNotices } = require('./matchingService')
 const returnService = require('./returnService')
-const { ACTIVE_MATCH_STATES } = require('./postService')
+const { ACTIVE_MATCH_STATES, isPublic } = require('./postService')
 const { updatePostWithAudit } = require('./postAuditService')
 
 const MATCHABLE_STATUSES = ['searching', 'contacted']
 const FINAL_STATUSES = ['closed', 'returned']
 const MANAGEMENT_POST_FIELDS =
-  'code title type status category owner area placeName placeNameTo locType description images isHidden hiddenReason viewCount likeCount commentCount createdAt'
+  'code slug title type status statusHistory.status statusHistory.changedAt category owner area placeName placeNameTo locType description images isHidden hiddenReason viewCount likeCount commentCount createdAt'
 
 const postNotFound = () => new ApiError(404, 'Bài đăng không tồn tại.', undefined, 'POST_NOT_FOUND')
 
@@ -93,6 +94,8 @@ const toPost = (post, matchCount = 0) => {
   return {
     id: String(post._id),
     code: post.code,
+    slug: post.slug || '',
+    publicDetailAvailable: Boolean(post.slug && isPublic(post, Date.now())),
     title: post.title,
     type: post.type,
     status: post.status,
@@ -175,14 +178,17 @@ const getPost = async (id) => {
   const post = await populatedPostQuery(Post.findById(id)).lean()
   if (!post) throw postNotFound()
 
-  const matches = await MatchSuggestion.find({
-    state: { $in: ACTIVE_MATCH_STATES },
-    $or: [{ postLost: post._id }, { postFound: post._id }],
-  })
-    .populate(matchPostPopulate('postLost'))
-    .populate(matchPostPopulate('postFound'))
-    .sort({ score: -1, _id: 1 })
-    .lean()
+  const [matches, saves] = await Promise.all([
+    MatchSuggestion.find({
+      state: { $in: ACTIVE_MATCH_STATES },
+      $or: [{ postLost: post._id }, { postFound: post._id }],
+    })
+      .populate(matchPostPopulate('postLost'))
+      .populate(matchPostPopulate('postFound'))
+      .sort({ score: -1, _id: 1 })
+      .lean(),
+    SavedPost.countDocuments({ post: post._id }),
+  ])
 
   const matchingPosts = matches.flatMap((match) => {
     const postLost = match.postLost
@@ -204,8 +210,10 @@ const getPost = async (id) => {
     ]
   })
 
+  const summary = toPost(post, matchingPosts.length)
   return {
-    ...toPost(post, matchingPosts.length),
+    ...summary,
+    counts: { ...summary.counts, saves },
     description: post.description || '',
     images: orderedImageUrls(post.images),
     statusHistory: (post.statusHistory || []).map(({ status, note, changedAt }) => ({

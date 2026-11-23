@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import Badge from './Badge'
 import Button from './Button'
 import DataTable, { cell } from './DataTable'
@@ -27,10 +27,11 @@ import {
   updateBackofficePostVisibility,
 } from '../../lib/backoffice/postsApi'
 import { downloadCsv } from '../../lib/csv'
+import { postPath } from '../../lib/user/homeFeed'
 import usePaginatedFilter from '../../hooks/usePaginatedFilter'
 import useBackofficePageSize from '../../hooks/useBackofficePageSize'
 import useLinkedHighlight from '../../hooks/useLinkedHighlight'
-import { linkedHighlight } from './classes'
+import { cx, linkedHighlight } from './classes'
 
 const STATUS_TONES = {
   pending: 'warning',
@@ -248,6 +249,7 @@ export default function PostsWorkspace() {
   const [actionPending, setActionPending] = useState(false)
   const [notice, setNotice] = useState('')
   const [noticeTone, setNoticeTone] = useState('info')
+  const [toast, setToast] = useState(null)
   const [retryCount, setRetryCount] = useState(0)
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [listState, setListState] = useState({ key: null, items: [], error: '' })
@@ -351,6 +353,12 @@ export default function PostsWorkspace() {
   }, [notice])
 
   useEffect(() => {
+    if (!toast) return undefined
+    const timeout = window.setTimeout(() => setToast(null), 3000)
+    return () => window.clearTimeout(timeout)
+  }, [toast])
+
+  useEffect(() => {
     if (invalidRange || queryDebouncing) return undefined
     let active = true
     listBackofficePosts(requestFilters)
@@ -439,6 +447,9 @@ export default function PostsWorkspace() {
     downloadCsv('LostLink_Danh_sach_bai_dang.csv', postsToRows(filtered))
     setNotice(`Đã xuất ${filtered.length} bài đăng ra CSV.`)
     setNoticeTone('success')
+  }
+  const showUnavailablePostToast = () => {
+    setToast({ message: 'Bài đăng này hiện không hiển thị trên trang người dùng.' })
   }
   const saveStatus = async () => {
     if (!selected || actionPending) return
@@ -529,7 +540,7 @@ export default function PostsWorkspace() {
                 value={filters.status}
                 onChange={(e) => changeFilter('status', e.target.value)}
               >
-                <option value="">Tất cả trạng thái</option>
+                <option value="">Tất cả</option>
                 {Object.entries(STATUS_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>
                     {label}
@@ -546,7 +557,7 @@ export default function PostsWorkspace() {
                 value={filters.category}
                 onChange={(e) => changeFilter('category', e.target.value)}
               >
-                <option value="">Tất cả danh mục</option>
+                <option value="">Tất cả</option>
                 {categoryOptions.map((category) => (
                   <option key={category.slug} value={category.slug}>
                     {category.name}
@@ -562,7 +573,7 @@ export default function PostsWorkspace() {
                 value={filters.type}
                 onChange={(e) => changeFilter('type', e.target.value)}
               >
-                <option value="">Tất cả loại tin</option>
+                <option value="">Tất cả</option>
                 <option value="lost">Mất đồ</option>
                 <option value="found">Nhặt được</option>
               </Select>
@@ -575,7 +586,7 @@ export default function PostsWorkspace() {
                 value={filters.district}
                 onChange={(e) => changeFilter('district', e.target.value)}
               >
-                <option value="">Tất cả khu vực</option>
+                <option value="">Tất cả</option>
                 {districtOptions.map((district) => (
                   <option key={district}>{district}</option>
                 ))}
@@ -588,7 +599,8 @@ export default function PostsWorkspace() {
             <IconButton
               icon="reset"
               label="Đặt lại bộ lọc"
-              bordered
+              tone="view"
+              colored
               size={36}
               onClick={resetFilters}
             />
@@ -640,14 +652,15 @@ export default function PostsWorkspace() {
       <DataTable
         caption="Danh sách bài đăng của cộng đồng"
         minWidth="min-w-[900px]"
+        containerClassName="!border-[#b3c7df] !shadow-[0_10px_26px_rgba(34,65,100,0.14)]"
+        headingClassName="!border-b-2 !border-b-[#c5d5e7] !bg-[#edf3fa] !text-[#244d78] !text-small"
         columns={[
-          ['ID', 'w-[9%]'],
-          ['Thông tin bài đăng', 'w-[25%]'],
-          ['Phân loại', 'w-[11%]'],
-          ['Thời gian & Vị trí', 'w-[18%]'],
-          ['Thống kê', 'w-[13%]'],
+          ['ID', 'w-[10%]'],
+          ['Thông tin bài đăng', 'w-[36%]'],
+          ['Thời gian & Vị trí', 'w-[19%]'],
           ['Trạng thái', 'w-[12%]'],
-          ['Thao tác', 'w-[12%]'],
+          ['Thống kê', 'w-[12%]'],
+          ['Thao tác', 'w-[11%]'],
         ]}
         empty={
           !visible.length && (
@@ -685,17 +698,33 @@ export default function PostsWorkspace() {
           <tr
             key={post.id}
             ref={post.id === focusedPostId ? highlight.targetRef : null}
-            className={post.id === focusedPostId ? linkedHighlight : 'hover:bg-surface-muted'}
+            className={cx(
+              'transition-colors duration-150',
+              post.id === focusedPostId ? linkedHighlight : 'hover:bg-[#edf4fc]'
+            )}
           >
             <td className={cell}>
-              <span className="whitespace-nowrap text-caption font-semibold text-primary">
-                {post.postCode}
-              </span>
+              {post.publicDetailAvailable && post.slug ? (
+                <Link
+                  to={postPath(post)}
+                  className="whitespace-nowrap text-caption font-semibold text-primary hover:underline underline-offset-4"
+                >
+                  {post.postCode}
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  className="cursor-pointer whitespace-nowrap text-caption font-semibold text-primary hover:underline underline-offset-4"
+                  onClick={showUnavailablePostToast}
+                >
+                  {post.postCode}
+                </button>
+              )}
             </td>
             <td className={cell}>
               <button
                 type="button"
-                className="mb-1.5 block cursor-pointer text-left text-small font-semibold leading-relaxed text-ink hover:text-primary"
+                className="mb-1.5 block cursor-pointer text-left text-small font-semibold leading-relaxed text-ink hover:text-primary hover:underline underline-offset-4"
                 onClick={() => openDetail(post.id)}
               >
                 {post.title}
@@ -703,15 +732,21 @@ export default function PostsWorkspace() {
               <Badge>{post.category}</Badge>
             </td>
             <td className={cell}>
-              <span
-                className={`text-caption font-semibold ${post.type === 'lost' ? 'text-danger-ink' : 'text-primary'}`}
-              >
-                {post.type === 'lost' ? 'Mất đồ' : 'Nhặt được'}
-              </span>
-            </td>
-            <td className={cell}>
               <div className="text-caption font-semibold">{post.dateTime}</div>
               <Location>{post.district}</Location>
+            </td>
+            <td className={cell}>
+              <span
+                className={`inline-flex flex-col items-start gap-1 text-caption font-semibold ${TONE_TEXT_CLASSES[STATUS_TONES[post.status]] || 'text-ink-secondary'}`}
+              >
+                <span>{STATUS_LABELS[post.status] || 'Không xác định'}</span>
+                {post.hidden && (
+                  <span className="inline-flex items-center gap-1 text-neutral">
+                    <Icon name="eyeOff" size={13} />
+                    Đã ẩn
+                  </span>
+                )}
+              </span>
             </td>
             <td className={cell}>
               <div className="flex gap-2 whitespace-nowrap text-caption text-ink-muted">
@@ -733,29 +768,18 @@ export default function PostsWorkspace() {
               </div>
             </td>
             <td className={cell}>
-              <span
-                className={`inline-flex flex-col items-start gap-1 text-caption font-semibold ${TONE_TEXT_CLASSES[STATUS_TONES[post.status]] || 'text-ink-secondary'}`}
-              >
-                <span>{STATUS_LABELS[post.status] || 'Không xác định'}</span>
-                {post.hidden && (
-                  <span className="inline-flex items-center gap-1 text-neutral">
-                    <Icon name="eyeOff" size={13} />
-                    Đã ẩn
-                  </span>
-                )}
-              </span>
-            </td>
-            <td className={cell}>
               <div className="flex flex-wrap gap-1.5">
                 <IconButton
                   icon="eye"
                   tone="view"
+                  colorOnly
                   label="Xem chi tiết bài đăng"
                   onClick={() => openDetail(post.id)}
                 />
                 <IconButton
                   icon="edit"
                   tone="edit"
+                  colorOnly
                   label="Cập nhật trạng thái bài đăng"
                   onClick={() => {
                     setNextStatus(post.status)
@@ -768,6 +792,7 @@ export default function PostsWorkspace() {
                 <IconButton
                   icon={post.hidden ? 'eyeCheck' : 'eyeOff'}
                   tone={post.hidden ? 'success' : 'danger'}
+                  colorOnly
                   label={`${post.hidden ? 'Hiện lại' : 'Ẩn'} bài đăng`}
                   onClick={() => {
                     setActionError('')
@@ -779,6 +804,14 @@ export default function PostsWorkspace() {
           </tr>
         ))}
       </DataTable>
+      {toast && (
+        <div
+          role="status"
+          className="fixed bottom-6 left-1/2 z-[70] -translate-x-1/2 rounded-full bg-ink px-4 py-2.5 text-caption font-medium text-white shadow-dialog"
+        >
+          {toast.message}
+        </div>
+      )}
       <Pagination
         page={currentPage}
         total={filtered.length}
@@ -916,6 +949,33 @@ export default function PostsWorkspace() {
               )}
             </section>
           )}
+          <section
+            aria-label="Thống kê bài đăng"
+            className="mb-3 rounded-lg border border-line bg-surface-muted px-3.5 py-2"
+          >
+            <h4 className="mb-1 border-b border-line-subtle py-2 text-small font-semibold text-primary">
+              Thống kê
+            </h4>
+            <div className="grid grid-cols-2 gap-x-4 sm:grid-cols-4">
+              {detailLoading ? (
+                <p className="col-span-full py-2 text-center text-caption text-ink-muted">
+                  Đang tải thống kê...
+                </p>
+              ) : (
+                [
+                  ['Lượt xem', selected.views],
+                  ['Lượt bình luận', selected.comments],
+                  ['Lượt yêu thích', selected.likes],
+                  ['Lượt lưu', selected.saves],
+                ].map(([label, count]) => (
+                  <div key={label} className="py-2 text-center">
+                    <div className="text-caption text-ink-muted">{label}</div>
+                    <div className="text-small font-semibold text-ink">{count ?? 0}</div>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
           {selected.hidden && selected.hiddenReason && (
             <section
               aria-label="Lý do ẩn bài đăng"

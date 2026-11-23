@@ -583,7 +583,7 @@ export default function AttributesTab({
         }
       >
         {category.attributes.length ? (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-xl border border-[#b3c7df] shadow-[0_10px_26px_rgba(34,65,100,0.14)]">
             <table className="w-full min-w-[820px] border-collapse text-left">
               <thead>
                 <tr>
@@ -596,12 +596,12 @@ export default function AttributesTab({
                   ].map((heading) => (
                     <th
                       key={heading}
-                      className="bg-primary-faint px-3.5 py-3 text-caption font-bold whitespace-nowrap text-ink-muted"
+                      className="border-b-2 border-[#c5d5e7] bg-[#edf3fa] px-3.5 py-3 text-small font-semibold whitespace-nowrap text-[#244d78]"
                     >
                       {heading}
                     </th>
                   ))}
-                  <th className="w-28 bg-primary-faint px-1 py-3">
+                  <th className="w-28 border-b-2 border-[#c5d5e7] bg-[#edf3fa] px-1 py-3">
                     <span className="sr-only">Thao tác</span>
                   </th>
                 </tr>
@@ -610,7 +610,7 @@ export default function AttributesTab({
                 {category.attributes.map((attribute) => (
                   <tr
                     key={attribute.id}
-                    className="border-b border-line-subtle transition-colors last:border-b-0 hover:bg-primary-faint"
+                    className="border-b border-line-subtle transition-colors last:border-b-0 hover:bg-[#edf4fc]"
                   >
                     <td className="w-[22%] px-3.5 py-3.5 align-top">
                       <strong className="block text-body font-semibold text-primary">
@@ -635,12 +635,14 @@ export default function AttributesTab({
                           label={`Xem ${attribute.name}`}
                           icon="eye"
                           tone="view"
+                          colorOnly
                           onClick={() => setModal({ kind: 'detail', attribute })}
                         />
                         <IconButton
                           label={`Sửa ${attribute.name}`}
                           icon="edit"
                           tone="edit"
+                          colorOnly
                           onClick={() =>
                             setModal({ kind: 'form', value: attribute, editing: true })
                           }
@@ -648,7 +650,8 @@ export default function AttributesTab({
                         <IconButton
                           label={`Xóa ${attribute.name}`}
                           icon="close"
-                          danger
+                          tone="danger"
+                          colorOnly
                           onClick={() => setModal({ kind: 'delete', attribute })}
                         />
                       </div>

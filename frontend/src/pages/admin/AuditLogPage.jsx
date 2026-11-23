@@ -218,7 +218,8 @@ export default function AuditLog() {
             <IconButton
               icon="reset"
               label="Đặt lại bộ lọc nhật ký"
-              bordered
+              tone="view"
+              colored
               size={36}
               onClick={resetFilters}
             />
@@ -257,6 +258,8 @@ export default function AuditLog() {
           ariaLabel="Bảng nhật ký thao tác, cuộn ngang để xem thêm"
           minWidth="min-w-[900px]"
           variant="admin"
+          containerClassName="!border-[#b3c7df] !shadow-[0_10px_26px_rgba(34,65,100,0.14)]"
+          headingClassName="!border-b-2 !border-b-[#c5d5e7] !bg-[#edf3fa] !text-[#244d78] !text-small"
           columns={[
             ['Thời gian', 'w-[17%]'],
             ['Người thực hiện', 'w-[17%]'],
@@ -286,7 +289,7 @@ export default function AuditLog() {
           }
         >
           {logs.map((log) => (
-            <tr key={log.id} className="hover:bg-surface-muted">
+            <tr key={log.id} className="transition-colors duration-150 hover:bg-[#edf4fc]">
               <td className={cell}>
                 <time dateTime={log.createdAt} className="text-caption text-ink-secondary">
                   {formatAuditDate(log.createdAt)}
