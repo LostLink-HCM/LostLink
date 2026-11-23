@@ -3,6 +3,7 @@ const env = require('../config/env')
 const { connectDatabase, disconnectDatabase } = require('../config/database')
 const { User } = require('../models')
 const { seedAuditLogs } = require('./auditLogSeed')
+const { seedAdminDashboard } = require('./adminDashboardSeed')
 const { seedAvatars } = require('./avatarSeed')
 const { seedCategories } = require('./categorySeed')
 const { seedCategoryMReliability } = require('./categoryMReliabilitySeed')
@@ -33,50 +34,54 @@ const reportsOnly = process.argv.includes('--reports-only')
 const messagesOnly = process.argv.includes('--messages-only')
 const backofficeNotificationsOnly = process.argv.includes('--backoffice-notifications-only')
 const categoryMOnly = process.argv.includes('--category-m-only')
+const dashboardOnly = process.argv.includes('--dashboard-only')
 // Chỉ gán ảnh đại diện mẫu, chạy được trên production vì không đè ảnh người dùng tự tải lên
 const avatarsOnly = process.argv.includes('--avatars-only')
-const seeders = categoryMOnly
-  ? [seedCategoryMReliability]
-  : categoriesOnly
-    ? [seedCategories]
-    : messagesOnly
-      ? [seedBackofficeMessages]
-      : backofficeNotificationsOnly
-        ? [seedBackofficeNotifications]
-        : reportsOnly
-          ? [seedReports]
-          : auditOnly
-            ? [seedAuditLogs]
-            : avatarsOnly
-              ? [seedAvatars]
-              : settingsOnly
-                ? [seedSystemSettings]
-                : demo
-                  ? [
-                      seedMissingMembers,
-                      seedCategories,
-                      seedPosts,
-                      seedMemberReputation,
-                      seedNotifications,
-                    ]
-                  : [
-                      seedUsers,
-                      seedAvatars,
-                      seedSystemSettings,
-                      seedCategories,
-                      seedPosts,
-                      seedReports,
-                      seedConversations,
-                      // Lời cảm ơn gắn với cuộc trao đổi đã seed, điểm uy tín tính sau khi có lời cảm ơn
-                      seedReviews,
-                      seedReputation,
-                      seedBackofficeMessages,
-                      seedNotifications,
-                      seedBackofficeNotifications,
-                      seedUserActivityDates,
-                      seedUserUpdateDates,
-                      seedAuditLogs,
-                    ]
+const seeders = dashboardOnly
+  ? [seedAdminDashboard]
+  : categoryMOnly
+    ? [seedCategoryMReliability]
+    : categoriesOnly
+      ? [seedCategories]
+      : messagesOnly
+        ? [seedBackofficeMessages]
+        : backofficeNotificationsOnly
+          ? [seedBackofficeNotifications]
+          : reportsOnly
+            ? [seedReports]
+            : auditOnly
+              ? [seedAuditLogs]
+              : avatarsOnly
+                ? [seedAvatars]
+                : settingsOnly
+                  ? [seedSystemSettings]
+                  : demo
+                    ? [
+                        seedMissingMembers,
+                        seedCategories,
+                        seedPosts,
+                        seedMemberReputation,
+                        seedNotifications,
+                      ]
+                    : [
+                        seedUsers,
+                        seedAvatars,
+                        seedSystemSettings,
+                        seedCategories,
+                        seedPosts,
+                        seedAdminDashboard,
+                        seedReports,
+                        seedConversations,
+                        // Lời cảm ơn gắn với cuộc trao đổi đã seed, điểm uy tín tính sau khi có lời cảm ơn
+                        seedReviews,
+                        seedReputation,
+                        seedBackofficeMessages,
+                        seedNotifications,
+                        seedBackofficeNotifications,
+                        seedUserActivityDates,
+                        seedUserUpdateDates,
+                        seedAuditLogs,
+                      ]
 
 // Kiểm tra tài khoản không tự tạo được trước khi ghi, thiếu thì dừng khi chưa đổi gì trong DB.
 // Tác giả bài mẫu còn thiếu sẽ do seedMissingMembers tạo, findSeedAccounts kiểm lại trong seedPosts
@@ -86,6 +91,23 @@ const checkAccounts = async () => {
 }
 
 async function run() {
+  if (
+    dashboardOnly &&
+    (demo ||
+      categoriesOnly ||
+      settingsOnly ||
+      auditOnly ||
+      avatarsOnly ||
+      reportsOnly ||
+      messagesOnly ||
+      categoryMOnly ||
+      backofficeNotificationsOnly)
+  ) {
+    throw new Error('Không kết hợp --dashboard-only với chế độ seed khác')
+  }
+  if (dashboardOnly && env.nodeEnv === 'production') {
+    throw new Error('Không chạy seed Dashboard trên production')
+  }
   if (
     categoryMOnly &&
     (demo ||
@@ -145,25 +167,27 @@ async function run() {
 
   await connectDatabase()
   const { host, name } = mongoose.connection
-  const mode = backofficeNotificationsOnly
-    ? 'backoffice notifications'
-    : categoriesOnly
-      ? 'danh mục'
-      : categoryMOnly
-        ? 'dữ liệu độ tin cậy m'
-        : reportsOnly
-          ? 'báo cáo'
-          : messagesOnly
-            ? 'tin nhắn backoffice'
-            : auditOnly
-              ? 'nhật ký thao tác'
-              : avatarsOnly
-                ? 'ảnh đại diện'
-                : settingsOnly
-                  ? 'cấu hình hệ thống'
-                  : demo
-                    ? 'demo'
-                    : 'đầy đủ'
+  const mode = dashboardOnly
+    ? 'Dashboard admin'
+    : backofficeNotificationsOnly
+      ? 'backoffice notifications'
+      : categoriesOnly
+        ? 'danh mục'
+        : categoryMOnly
+          ? 'dữ liệu độ tin cậy m'
+          : reportsOnly
+            ? 'báo cáo'
+            : messagesOnly
+              ? 'tin nhắn backoffice'
+              : auditOnly
+                ? 'nhật ký thao tác'
+                : avatarsOnly
+                  ? 'ảnh đại diện'
+                  : settingsOnly
+                    ? 'cấu hình hệ thống'
+                    : demo
+                      ? 'demo'
+                      : 'đầy đủ'
   console.log(`Seed ${mode} vào ${host}/${name}`)
 
   if (demo) await checkAccounts()

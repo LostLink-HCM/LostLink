@@ -25,4 +25,6 @@ const AREAS = [
   'Huyện Nhà Bè',
 ]
 
-module.exports = { AREAS }
+const DISTRICTS = AREAS.filter((area) => area.startsWith('Quận '))
+
+module.exports = { AREAS, DISTRICTS }
