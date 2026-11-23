@@ -1,7 +1,6 @@
 import Icon from '../../common/Icon'
 import { cx, focusRing } from '../classes'
 
-// light: ô tìm trên nền trắng; sky: ô kính mờ trên header màu trời, bấm vào thì sáng lên
 const TONES = {
   light: {
     icon: 'text-ink-subtle',
@@ -10,11 +9,10 @@ const TONES = {
     clear: 'text-ink-subtle hover:bg-line-subtle hover:text-ink',
   },
   sky: {
-    icon: 'text-white/60 group-focus-within:text-ink-subtle',
+    icon: 'text-primary',
     input:
-      'h-9 border-white/18 bg-white/10 text-white placeholder:text-white/55 focus:border-white focus:bg-surface focus:text-ink focus:placeholder:text-ink-subtle',
-    clear:
-      'text-white/70 hover:bg-white/15 hover:text-white group-focus-within:text-ink-subtle group-focus-within:hover:bg-line-subtle',
+      'h-9 border-white bg-white text-primary shadow-[0_2px_8px_-3px_rgb(5_11_22/0.45)] placeholder:text-primary/60 focus:border-primary',
+    clear: 'text-primary/70 hover:bg-primary-soft hover:text-primary',
   },
 }
 

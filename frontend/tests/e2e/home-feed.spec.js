@@ -4,6 +4,7 @@ const feed = (page) => page.getByRole('region', { name: 'Danh sách bài đăng'
 const cards = (page) => feed(page).getByRole('article')
 const cardTitles = (page) => cards(page).getByRole('heading', { level: 3 }).allTextContents()
 const filters = (page) => page.getByRole('complementary', { name: 'Bộ lọc bài đăng' })
+const categoryStrip = (page) => page.getByRole('group', { name: 'Lọc theo danh mục' })
 
 const listFromApi = async (api, params = {}) => {
   const res = await api.get(`posts?${new URLSearchParams({ limit: '50', ...params })}`)
@@ -65,13 +66,8 @@ test.describe('UC02 - Lọc và tìm kiếm bài đăng', () => {
     await expect(cards(page)).toHaveCount(12)
 
     const panel = filters(page)
-    await panel.getByRole('button', { name: 'Xem tất cả 22 khu vực' }).click()
-    await panel.getByRole('button', { name: 'Quận Bình Thạnh', exact: true }).click()
-    // Chọn xong danh sách khu vực tự thu gọn, chỉ còn khu vực vừa chọn
-    await expect(
-      panel.getByRole('button', { name: 'Quận Bình Thạnh', exact: true })
-    ).toHaveAttribute('aria-pressed', 'true')
-    await expect(panel.getByRole('button', { name: 'Quận 1', exact: true })).toHaveCount(0)
+    await page.getByRole('combobox', { name: 'Khu vực' }).selectOption('Quận Bình Thạnh')
+    await expect(panel.getByRole('button', { name: 'Bỏ lọc Quận Bình Thạnh' })).toBeVisible()
     // Chọn chip là lọc ngay, không cần bấm Áp dụng
     await panel.getByRole('button', { name: '30 ngày qua' }).click()
 
@@ -123,17 +119,18 @@ test.describe('UC02 - Lọc và tìm kiếm bài đăng', () => {
 
     await page.goto('/')
     const panel = filters(page)
-    await panel.getByRole('button', { name: /^Xem tất cả \d+ danh mục$/ }).click()
-    await panel.getByRole('button', { name: 'Thú cưng', exact: true }).click()
+    await categoryStrip(page).getByRole('button', { name: 'Thú cưng' }).click()
+    await expect(panel.getByRole('button', { name: 'Bỏ lọc Thú cưng' })).toBeVisible()
 
     await expect(feed(page).getByText('Danh mục này không còn tồn tại.')).toBeVisible()
     await feed(page).getByRole('button', { name: 'Xem tất cả danh mục' }).click()
 
     await expect(cards(page)).toHaveCount(12)
-    await expect(panel.getByRole('button', { name: 'Tất cả danh mục' })).toHaveAttribute(
+    await expect(categoryStrip(page).getByRole('button', { name: 'Tất cả' })).toHaveAttribute(
       'aria-pressed',
       'true'
     )
+    await expect(panel.getByRole('button', { name: /^Bỏ lọc/ })).toHaveCount(0)
   })
 })
 

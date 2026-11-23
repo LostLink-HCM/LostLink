@@ -56,6 +56,7 @@ export default function FeedFilters({
   error,
   idPrefix,
   scrollBody = false,
+  pickers = true,
 }) {
   // Ô ngày đang mở lịch ('from' | 'to' | null), lịch hiện ngay dưới hai ô
   const [picking, setPicking] = useState(null)
@@ -124,6 +125,20 @@ export default function FeedFilters({
             '-mr-3 min-h-0 overflow-y-auto overscroll-contain pr-3 pb-1 [scrollbar-width:thin]'
         )}
       >
+        {!pickers && (
+          <ActiveChips
+            items={[
+              draft.category && {
+                key: 'category',
+                label: categoryName(draft.category) || draft.category,
+                icon: <CategoryIcon name={categoryName(draft.category)} size={12} />,
+              },
+              draft.area && { key: 'area', label: draft.area, icon: <Icon name="pin" size={12} /> },
+            ].filter(Boolean)}
+            onRemove={(key) => onChange({ [key]: '' })}
+          />
+        )}
+
         <fieldset className="m-0 border-0 p-0">
           <legend className={legendClass}>Loại tin</legend>
           <div className="grid grid-cols-3 gap-1.5">
@@ -151,26 +166,32 @@ export default function FeedFilters({
           </div>
         </fieldset>
 
-        <PickList
-          legend="Danh mục"
-          value={draft.category}
-          options={categories.map((item) => item.slug)}
-          labelOf={categoryName}
-          allLabel="Tất cả danh mục"
-          unit="danh mục"
-          renderIcon={(slug) => <CategoryIcon name={categoryName(slug) || 'Tất cả'} size={14} />}
-          onPick={(category) => onChange({ category })}
-        />
+        {pickers && (
+          <>
+            <PickList
+              legend="Danh mục"
+              value={draft.category}
+              options={categories.map((item) => item.slug)}
+              labelOf={categoryName}
+              allLabel="Tất cả danh mục"
+              unit="danh mục"
+              renderIcon={(slug) => (
+                <CategoryIcon name={categoryName(slug) || 'Tất cả'} size={14} />
+              )}
+              onPick={(category) => onChange({ category })}
+            />
 
-        <PickList
-          legend="Khu vực"
-          value={draft.area}
-          options={AREAS}
-          allLabel="Tất cả khu vực"
-          unit="khu vực"
-          renderIcon={(area) => <Icon name={area ? 'pin' : 'locate'} size={14} />}
-          onPick={(area) => onChange({ area })}
-        />
+            <PickList
+              legend="Khu vực"
+              value={draft.area}
+              options={AREAS}
+              allLabel="Tất cả khu vực"
+              unit="khu vực"
+              renderIcon={(area) => <Icon name={area ? 'pin' : 'locate'} size={14} />}
+              onPick={(area) => onChange({ area })}
+            />
+          </>
+        )}
 
         <fieldset className="m-0 border-0 p-0">
           <legend className={legendClass}>Khoảng thời gian</legend>
@@ -243,6 +264,33 @@ export default function FeedFilters({
         </fieldset>
       </div>
     </form>
+  )
+}
+
+function ActiveChips({ items, onRemove }) {
+  if (!items.length) return null
+  return (
+    <div className="motion-safe:animate-ll-fade">
+      <p className={cx(legendClass, 'm-0')}>Đang lọc</p>
+      <div className="flex flex-wrap gap-1.5">
+        {items.map(({ key, label, icon }) => (
+          <button
+            key={key}
+            type="button"
+            aria-label={`Bỏ lọc ${label}`}
+            onClick={() => onRemove(key)}
+            className={cx(
+              'inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-full border border-primary/30 bg-primary-soft py-1 pr-1.5 pl-2 text-caption font-semibold text-primary transition-colors hover:bg-primary hover:text-white',
+              focusRing
+            )}
+          >
+            <span className="shrink-0">{icon}</span>
+            <span className="truncate">{label}</span>
+            <Icon name="close" size={11} className="shrink-0" />
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }
 

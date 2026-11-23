@@ -26,6 +26,7 @@ const userTheme = [
 ].join(' ')
 
 const TOAST_MS = 3000
+const FEED_PATHS = ['/', '/trending']
 
 export default function UserLayout() {
   const { user } = useAuth()
@@ -38,6 +39,7 @@ export default function UserLayout() {
   const [draft, setDraft] = useState(DEFAULT_FILTERS)
   const [applied, setApplied] = useState(DEFAULT_FILTERS)
   const [toast, setToast] = useState('')
+  const [heroSearchPassed, setHeroSearchPassed] = useState(false)
   const openFeedback = useCallback(() => {
     if (!openFeedbackForm()) setToast(FORM_PENDING)
   }, [])
@@ -96,7 +98,7 @@ export default function UserLayout() {
     // Tìm từ trang khác thì quay về trang chủ để xem kết quả, đang ở Tin hot thì lọc ngay tại đó
     onSearch: (value) => {
       setKeyword(value)
-      if (!['/', '/trending'].includes(location.pathname)) navigate('/')
+      if (!FEED_PATHS.includes(location.pathname)) navigate('/')
     },
     onClear: () => {
       setSearchInput('')
@@ -127,6 +129,8 @@ export default function UserLayout() {
         unreadNotifications={unreadNotifications}
         pendingMatches={matchBadge.pending}
         onFeedback={openFeedback}
+        hero={FEED_PATHS.includes(location.pathname)}
+        heroSearchPassed={heroSearchPassed}
       />
 
       <Outlet
@@ -145,6 +149,7 @@ export default function UserLayout() {
           refreshPendingMatches: matchBadge.refresh,
           interactions,
           notify: setToast,
+          setHeroSearchPassed,
         }}
       />
       <MobileTabBar

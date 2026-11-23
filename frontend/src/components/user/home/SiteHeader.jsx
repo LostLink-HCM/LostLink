@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '../../../auth/AuthContext'
 import Logo from '../../auth/scene/Logo'
@@ -32,6 +32,18 @@ function SkyOrb({ time }) {
   )
 }
 
+function useScrolled(enabled) {
+  const [scrolled, setScrolled] = useState(false)
+  useEffect(() => {
+    if (!enabled) return undefined
+    const onScroll = () => setScrolled(window.scrollY > 8)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [enabled])
+  return scrolled
+}
+
 export default function SiteHeader({
   time,
   search,
@@ -39,12 +51,17 @@ export default function SiteHeader({
   unreadNotifications = 0,
   pendingMatches = 0,
   onFeedback,
+  hero = false,
+  heroSearchPassed = false,
 }) {
   const { user } = useAuth()
   const unread = user ? unreadMessages : 0
   const unreadAlerts = user ? unreadNotifications : 0
   // Điện thoại: ô tìm thu thành nút kính lúp, bấm mới mở đè lên header
   const [searchOpen, setSearchOpen] = useState(false)
+  const scrolled = useScrolled(hero)
+  const fullHeader = !hero || heroSearchPassed
+  const reveal = hero && 'motion-safe:animate-ll-fade'
 
   const tabs = [
     { to: '/', end: true, label: 'Trang chủ', icon: 'home' },
@@ -79,7 +96,12 @@ export default function SiteHeader({
   ].filter(Boolean)
 
   return (
-    <header className="sticky top-0 z-40 bg-au-sky-1 max-lg:rounded-b-2xl bg-linear-to-r from-au-sky-1 via-au-sky-2 to-au-sky-3 text-white shadow-[0_6px_24px_-14px_rgb(5_11_22/0.7)]">
+    <header
+      className={cx(
+        'sticky top-0 z-40 bg-au-sky-1 max-lg:rounded-b-2xl bg-linear-to-r from-au-sky-1 via-au-sky-2 to-au-sky-3 text-white transition-shadow',
+        (!hero || scrolled) && 'shadow-[0_6px_24px_-14px_rgb(5_11_22/0.7)]'
+      )}
+    >
       <span
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 rounded-[inherit] opacity-(--au-star-opacity)"
@@ -102,30 +124,40 @@ export default function SiteHeader({
 
         {/* Khoảng trống còn lại của header, nửa mặt trời hoặc trăng nằm trên mép dưới */}
         <div className="flex min-w-0 flex-1 items-end self-stretch lg:justify-end">
-          <SkyOrb time={time} />
+          {fullHeader && <SkyOrb time={time} />}
         </div>
 
-        <HeaderPets className="h-7 shrink-0 self-end max-[359px]:hidden lg:hidden xl:flex" />
-
-        <SearchBox
-          id="header-search"
-          tone="sky"
-          {...search}
-          className="hidden shrink-0 lg:block lg:w-44 xl:w-64 2xl:w-72"
+        <HeaderPets
+          className={cx(
+            'h-7 shrink-0 self-end max-[359px]:hidden lg:hidden',
+            fullHeader && 'xl:flex'
+          )}
         />
 
+        {fullHeader && (
+          <SearchBox
+            id="header-search"
+            tone="sky"
+            {...search}
+            className={cx('hidden shrink-0 lg:block lg:w-44 xl:w-64 2xl:w-72', reveal)}
+          />
+        )}
+
         <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            aria-label="Tìm bài đăng"
-            onClick={() => setSearchOpen(true)}
-            className={cx(
-              'grid size-9 cursor-pointer place-items-center rounded-full border border-white/25 bg-white/10 text-white transition-colors hover:bg-white/18 lg:hidden',
-              focusRing
-            )}
-          >
-            <Icon name="search" size={17} />
-          </button>
+          {fullHeader && (
+            <button
+              type="button"
+              aria-label="Tìm bài đăng"
+              onClick={() => setSearchOpen(true)}
+              className={cx(
+                'grid size-9 cursor-pointer place-items-center rounded-full border border-white/25 bg-white/10 text-white transition-colors hover:bg-white/18 lg:hidden',
+                reveal,
+                focusRing
+              )}
+            >
+              <Icon name="search" size={17} />
+            </button>
+          )}
           {user ? (
             <>
               <Link
@@ -163,7 +195,7 @@ export default function SiteHeader({
         </div>
       </div>
 
-      {searchOpen && (
+      {searchOpen && fullHeader && (
         <div className="absolute inset-0 z-20 flex items-center gap-2 rounded-[inherit] bg-au-sky-1 bg-linear-to-r from-au-sky-1 to-au-sky-2 px-3 motion-safe:animate-ll-fade lg:hidden">
           <SearchBox
             id="header-search-mobile"

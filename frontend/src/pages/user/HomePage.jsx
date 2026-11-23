@@ -9,6 +9,7 @@ import { PeekCat, PeekDog } from '../../components/user/mascots/PeekPets'
 import SleepingCat from '../../components/user/mascots/SleepingCat'
 import { cx, focusRing } from '../../components/user/classes'
 import FeedFilters from '../../components/user/home/FeedFilters'
+import HomeHero from '../../components/user/home/HomeHero'
 import PostCard from '../../components/user/home/PostCard'
 import RightRail from '../../components/user/home/RightRail'
 import StickyPanel from '../../components/user/home/StickyPanel'
@@ -24,7 +25,7 @@ import {
 // Dùng chung cho Trang chủ và Tin hot gần đây (hot), cùng bộ lọc, chỉ khác cách sắp xếp
 export default function HomePage({ hot = false }) {
   const { user } = useAuth()
-  const { now, search, keyword, filters, interactions } = useOutletContext()
+  const { now, search, keyword, filters, interactions, setHeroSearchPassed } = useOutletContext()
   const { draft, setDraft, applied, setApplied } = filters
   const [filterError, setFilterError] = useState('')
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -88,10 +89,17 @@ export default function HomePage({ hot = false }) {
 
   return (
     <>
-      <div className="mx-auto max-w-360 px-4 pt-5 pb-10 sm:px-6 lg:px-10 lg:pt-7">
+      <HomeHero
+        search={search}
+        area={draft.area}
+        category={draft.category}
+        onFilter={filterProps.onChange}
+        onSearchPassed={setHeroSearchPassed}
+      />
+
+      <div className="mx-auto max-w-360 px-4 pt-4 pb-10 sm:px-6 lg:px-10 lg:pt-5">
         <h1 className="sr-only">{hot ? 'Tin hot gần đây' : 'Bài đăng mới trên LostLink'}</h1>
 
-        {/* Trên mobile ô tìm nằm ở nút kính lúp trên header, bộ lọc nằm trong drawer */}
         <div className="mb-4 flex items-center gap-2 lg:hidden">
           {keyword && (
             <button
@@ -122,7 +130,7 @@ export default function HomePage({ hot = false }) {
               'hidden p-4 lg:flex lg:flex-col has-[[aria-expanded=true]]:max-h-[calc(100dvh-100px)]'
             )}
           >
-            <FeedFilters {...filterProps} idPrefix="filter" scrollBody />
+            <FeedFilters {...filterProps} idPrefix="filter" scrollBody pickers={false} />
           </StickyPanel>
 
           <section
