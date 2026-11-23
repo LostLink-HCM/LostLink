@@ -17,7 +17,7 @@ const { notifyFrequencyInputsChanged } = require('../utils/frequencyEvents')
 const imageService = require('./imageService')
 const { notifyCategoryArchived } = require('./categoryArchiveNotificationService')
 
-const CATEGORY_ICON_PATH = /^\/images\/categories\/[a-z0-9-]+\.svg$/
+const CATEGORY_ICON_PATH = /^\/images\/categories\/[a-z0-9-]+\.(png|svg)$/
 const DEFAULT_ALGORITHM = {
   matchRadius: 400,
   timeShape: 1,

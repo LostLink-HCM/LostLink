@@ -87,6 +87,17 @@ const seedRelations = async (categoriesByName) => {
   }
 }
 
+const iconOf = (slug) => `/images/categories/${slug}.png`
+
+const upgradeSeededIcon = async (category) => {
+  const seeded = ['', `/images/categories/${category.slug}.svg`]
+  if (category.icon && !seeded.includes(category.icon)) return
+  const icon = iconOf(category.slug)
+  if (category.icon === icon) return
+  await Category.updateOne({ _id: category._id }, { $set: { icon } }, { timestamps: false })
+  category.icon = icon
+}
+
 const seedCategories = async () => {
   const admin = await User.findOne({ role: 'admin' })
   if (!admin) throw new Error('Cần chạy seedUsers trước để có tài khoản admin')
@@ -99,7 +110,7 @@ const seedCategories = async () => {
         $setOnInsert: {
           name: definition.name,
           slug: definition.slug,
-          icon: `/images/categories/${definition.slug}.svg`,
+          icon: iconOf(definition.slug),
           order: index + 1,
           matchRadius: definition.matchRadius,
           timeShape: definition.timeShape,
@@ -111,6 +122,7 @@ const seedCategories = async () => {
       },
       { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
     )
+    await upgradeSeededIcon(category)
     categoriesByName[definition.name] = category
 
     await seedAttributes(category, definition)
