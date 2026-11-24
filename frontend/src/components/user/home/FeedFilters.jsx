@@ -30,7 +30,7 @@ const typeButtonTones = {
 }
 
 const legendClass =
-  'mb-1.5 p-0 text-[9px] font-semibold tracking-[0.06em] text-ink-subtle uppercase'
+  'mb-1.5 p-0 text-micro font-semibold tracking-[0.06em] text-ink-subtle uppercase'
 
 const chipClass = (active) =>
   cx(
@@ -42,7 +42,7 @@ const chipClass = (active) =>
   )
 
 const dateClass =
-  'h-8 rounded-lg border border-line bg-surface px-2 text-caption outline-none focus-visible:border-primary aria-invalid:border-danger'
+  'h-9 rounded-lg border border-line bg-surface px-2 text-caption outline-none focus-visible:border-primary aria-invalid:border-danger'
 
 // Chọn chip (loại tin, danh mục, khu vực, khoảng thời gian) là lọc ngay. Riêng khoảng ngày tự chọn
 // nằm ở bản nháp, pendingDates bật nút "Áp dụng khoảng ngày" để xác nhận rồi mới lọc
@@ -56,7 +56,7 @@ export default function FeedFilters({
   error,
   idPrefix,
   scrollBody = false,
-  pickers = true,
+  categoryPicker = true,
 }) {
   // Ô ngày đang mở lịch ('from' | 'to' | null), lịch hiện ngay dưới hai ô
   const [picking, setPicking] = useState(null)
@@ -92,7 +92,7 @@ export default function FeedFilters({
         e.preventDefault()
         onApply()
       }}
-      className="flex min-h-0 flex-col gap-3 [--text-body:10.5px] [--text-caption:9.5px] [--text-small:9.5px]"
+      className="flex min-h-0 flex-col gap-3"
     >
       {/* Giữ chiều cao cố định để nút xuất hiện không đẩy các mục bên dưới */}
       <div className="flex min-h-7 items-center justify-between">
@@ -104,13 +104,13 @@ export default function FeedFilters({
             onClick={onReset}
             aria-label={`Xóa lọc, đang chọn ${activeCount} tiêu chí`}
             className={cx(
-              'group inline-flex cursor-pointer items-center gap-1 rounded-full border border-primary/30 bg-primary-soft py-1 pr-1 pl-2.5 text-caption font-semibold text-primary shadow-[0_2px_8px_-2px_color-mix(in_srgb,var(--color-primary)_35%,transparent)] transition-colors hover:bg-primary hover:text-white motion-safe:animate-ll-fade',
+              'group inline-flex cursor-pointer items-center gap-1 rounded-full border border-primary/30 bg-primary-soft py-1.5 pr-1.5 pl-3 text-caption font-semibold text-primary shadow-[0_2px_8px_-2px_color-mix(in_srgb,var(--color-primary)_35%,transparent)] transition-colors hover:bg-primary hover:text-white motion-safe:animate-ll-fade',
               focusRing
             )}
           >
             <Icon name="reset" size={12} />
             Xóa lọc
-            <span className="grid min-w-4.5 place-items-center rounded-full bg-primary px-1 text-[9px] leading-4.5 font-bold text-white transition-colors group-hover:bg-white group-hover:text-primary">
+            <span className="grid min-w-4.5 place-items-center rounded-full bg-primary px-1 text-micro leading-4.5 font-bold text-white transition-colors group-hover:bg-white group-hover:text-primary">
               {activeCount}
             </span>
           </button>
@@ -125,7 +125,7 @@ export default function FeedFilters({
             '-mr-3 min-h-0 overflow-y-auto overscroll-contain pr-3 pb-1 [scrollbar-width:thin]'
         )}
       >
-        {!pickers && (
+        {!categoryPicker && (
           <ActiveChips
             items={[
               draft.category && {
@@ -133,7 +133,6 @@ export default function FeedFilters({
                 label: categoryName(draft.category) || draft.category,
                 icon: <CategoryIcon name={categoryName(draft.category)} size={12} />,
               },
-              draft.area && { key: 'area', label: draft.area, icon: <Icon name="pin" size={12} /> },
             ].filter(Boolean)}
             onRemove={(key) => onChange({ [key]: '' })}
           />
@@ -153,7 +152,7 @@ export default function FeedFilters({
                   onClick={() => onChange({ type: value })}
                   className={cx(
                     // Cùng khuôn với các chip khác trong bộ lọc, giữ màu riêng của từng loại tin
-                    'h-7.5 cursor-pointer rounded-xl border px-1 text-caption whitespace-nowrap transition',
+                    'h-9 cursor-pointer rounded-xl border px-1 text-caption whitespace-nowrap transition',
                     tone.base,
                     active ? cx('font-semibold', tone.active) : cx('font-medium', tone.idle),
                     focusRing
@@ -166,32 +165,28 @@ export default function FeedFilters({
           </div>
         </fieldset>
 
-        {pickers && (
-          <>
-            <PickList
-              legend="Danh mục"
-              value={draft.category}
-              options={categories.map((item) => item.slug)}
-              labelOf={categoryName}
-              allLabel="Tất cả danh mục"
-              unit="danh mục"
-              renderIcon={(slug) => (
-                <CategoryIcon name={categoryName(slug) || 'Tất cả'} size={14} />
-              )}
-              onPick={(category) => onChange({ category })}
-            />
-
-            <PickList
-              legend="Khu vực"
-              value={draft.area}
-              options={AREAS}
-              allLabel="Tất cả khu vực"
-              unit="khu vực"
-              renderIcon={(area) => <Icon name={area ? 'pin' : 'locate'} size={14} />}
-              onPick={(area) => onChange({ area })}
-            />
-          </>
+        {categoryPicker && (
+          <PickList
+            legend="Danh mục"
+            value={draft.category}
+            options={categories.map((item) => item.slug)}
+            labelOf={categoryName}
+            allLabel="Tất cả danh mục"
+            unit="danh mục"
+            renderIcon={(slug) => <CategoryIcon name={categoryName(slug) || 'Tất cả'} size={16} />}
+            onPick={(category) => onChange({ category })}
+          />
         )}
+
+        <PickList
+          legend="Khu vực"
+          value={draft.area}
+          options={AREAS}
+          allLabel="Tất cả khu vực"
+          unit="khu vực"
+          renderIcon={(area) => <Icon name={area ? 'pin' : 'locate'} size={16} />}
+          onPick={(area) => onChange({ area })}
+        />
 
         <fieldset className="m-0 border-0 p-0">
           <legend className={legendClass}>Khoảng thời gian</legend>
@@ -202,7 +197,7 @@ export default function FeedFilters({
                 type="button"
                 aria-pressed={draft.range === range.value}
                 onClick={() => onChange({ range: range.value, from: '', to: '' })}
-                className={cx('h-7.5 whitespace-nowrap', chipClass(draft.range === range.value))}
+                className={cx('h-9 whitespace-nowrap', chipClass(draft.range === range.value))}
               >
                 {range.label}
               </button>
@@ -214,7 +209,7 @@ export default function FeedFilters({
                 <div key={key}>
                   <label
                     htmlFor={`${idPrefix}-${key}`}
-                    className="mb-0.5 block text-[9px] font-medium text-ink-secondary"
+                    className="mb-0.5 block text-tiny font-medium text-ink-secondary"
                   >
                     {DATE_LABELS[key]}
                   </label>
@@ -326,7 +321,7 @@ function PickList({
                 setExpanded(false)
               }}
               className={cx(
-                'flex cursor-pointer items-center gap-2 rounded-lg border-0 px-1.5 py-1 text-left text-caption transition-colors',
+                'flex cursor-pointer items-center gap-2.5 rounded-lg border-0 px-2 py-1.5 text-left text-small transition-colors',
                 active
                   ? 'bg-primary-soft font-semibold text-primary'
                   : 'bg-transparent font-medium text-ink hover:bg-surface-muted',
@@ -335,7 +330,7 @@ function PickList({
             >
               <span
                 className={cx(
-                  'grid size-6.5 shrink-0 place-items-center rounded-md',
+                  'grid size-7.5 shrink-0 place-items-center rounded-md',
                   active ? 'bg-surface text-primary' : 'bg-line-subtle text-ink-muted'
                 )}
               >

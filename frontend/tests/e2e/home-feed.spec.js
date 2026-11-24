@@ -66,8 +66,12 @@ test.describe('UC02 - Lọc và tìm kiếm bài đăng', () => {
     await expect(cards(page)).toHaveCount(12)
 
     const panel = filters(page)
-    await page.getByRole('combobox', { name: 'Khu vực' }).selectOption('Quận Bình Thạnh')
-    await expect(panel.getByRole('button', { name: 'Bỏ lọc Quận Bình Thạnh' })).toBeVisible()
+    await panel.getByRole('button', { name: 'Xem tất cả 22 khu vực' }).click()
+    await panel.getByRole('button', { name: 'Quận Bình Thạnh', exact: true }).click()
+    await expect(
+      panel.getByRole('button', { name: 'Quận Bình Thạnh', exact: true })
+    ).toHaveAttribute('aria-pressed', 'true')
+    await expect(panel.getByRole('button', { name: 'Quận 1', exact: true })).toHaveCount(0)
     // Chọn chip là lọc ngay, không cần bấm Áp dụng
     await panel.getByRole('button', { name: '30 ngày qua' }).click()
 

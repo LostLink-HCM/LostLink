@@ -90,8 +90,8 @@ export default function HomePage({ hot = false }) {
   return (
     <>
       <HomeHero
+        hot={hot}
         search={search}
-        area={draft.area}
         category={draft.category}
         onFilter={filterProps.onChange}
         onSearchPassed={setHeroSearchPassed}
@@ -121,7 +121,7 @@ export default function HomePage({ hot = false }) {
           </Button>
         </div>
 
-        <main className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[248px_minmax(0,1fr)] xl:grid-cols-[248px_minmax(0,1fr)_272px]">
+        <main className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[268px_minmax(0,1fr)] xl:grid-cols-[268px_minmax(0,1fr)_288px]">
           <StickyPanel
             aria-label="Bộ lọc bài đăng"
             className={cx(
@@ -130,7 +130,7 @@ export default function HomePage({ hot = false }) {
               'hidden p-4 lg:flex lg:flex-col has-[[aria-expanded=true]]:max-h-[calc(100dvh-100px)]'
             )}
           >
-            <FeedFilters {...filterProps} idPrefix="filter" scrollBody pickers={false} />
+            <FeedFilters {...filterProps} idPrefix="filter" scrollBody categoryPicker={false} />
           </StickyPanel>
 
           <section
@@ -150,11 +150,8 @@ export default function HomePage({ hot = false }) {
 
           {/* Cột phải cao đúng một màn hình (trừ header và khoảng hở dưới); phóng to trình duyệt
               làm nội dung dài hơn thì cuộn bên trong cột */}
-          <StickyPanel
-            aria-label="Cộng đồng"
-            className="-mx-1 hidden h-[calc(100dvh-100px)] overflow-y-auto overscroll-contain px-1 [scrollbar-width:thin] xl:block"
-          >
-            <RightRail isGuest={!user} fill />
+          <StickyPanel aria-label="Cộng đồng" className="hidden xl:block">
+            <RightRail isGuest={!user} />
           </StickyPanel>
         </main>
       </div>
@@ -275,6 +272,8 @@ function FeedList({ hot, feed, now, interactions, defaultView, onShowAllCategori
             liked={state.liked}
             likeCount={state.likes}
             onToggleLike={() => interactions.toggleLike(post)}
+            saved={state.saved}
+            onToggleSave={() => interactions.toggleSaved(post)}
           />
         )
       })}
