@@ -194,7 +194,7 @@ export default function Categories() {
     id: `category-panel-${key}`,
     'aria-labelledby': `category-tab-${key}`,
     hidden: tab !== key,
-    className: 'pt-5',
+    className: 'mt-5',
   })
 
   return (
@@ -270,10 +270,10 @@ export default function Categories() {
       <div className="min-w-0">
         {selected && (
           <section
-            className="min-w-0 overflow-hidden rounded-2xl border border-line-soft bg-surface shadow-soft"
+            className="min-w-0 overflow-hidden rounded-2xl border border-[#8fa7c2] bg-white shadow-[0_4px_14px_#16233a12]"
             aria-label={`Chi tiết danh mục ${selected.name}`}
           >
-            <header className="bg-linear-to-b from-primary-subtle to-primary-faint p-6 pb-4 max-[1100px]:p-4.5 max-[1100px]:pb-4 max-sm:p-4">
+            <header className="border-b border-[#c4d2e2] bg-[#edf3fa] p-6 pb-4 max-[1100px]:p-4.5 max-[1100px]:pb-4 max-sm:p-4">
               <div className="flex flex-wrap items-center justify-between gap-4 pb-5">
                 <div className="flex min-w-0 items-center gap-4">
                   <CategoryAvatar
@@ -281,9 +281,12 @@ export default function Categories() {
                     className="size-14 rounded-2xl shadow-raised"
                   />
                   <div className="min-w-0">
-                    <h2 className="m-0 text-2xl font-bold tracking-[-.4px] text-primary-hover">
+                    <h2 className="m-0 text-2xl font-bold tracking-[-.4px] text-[#24476b]">
                       {selected.name}
                     </h2>
+                    <p className="m-0 mt-1 text-small text-ink-muted">
+                      {selected.postCount ?? 0} bài đăng
+                    </p>
                   </div>
                 </div>
                 <Button

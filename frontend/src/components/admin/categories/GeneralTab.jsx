@@ -58,7 +58,12 @@ export default function GeneralTab({ category, categories, onSave }) {
   }
 
   return (
-    <form id="category-general-form" className="flex flex-col gap-5" onSubmit={submit} noValidate>
+    <form
+      id="category-general-form"
+      className="flex flex-col gap-5 rounded-[10px] border border-[#8fa7c2] bg-white p-4 shadow-[0_4px_14px_#16233a12]"
+      onSubmit={submit}
+      noValidate
+    >
       <div className="grid gap-4 sm:[grid-template-columns:minmax(0,1fr)_180px]">
         <label className={labelClass}>
           Tên danh mục

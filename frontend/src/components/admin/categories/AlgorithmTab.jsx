@@ -19,9 +19,9 @@ const toNumbers = (form) => Object.fromEntries(FIELDS.map((key) => [key, Number(
 
 function Card({ title, icon, children }) {
   return (
-    <section className="flex min-w-0 flex-col gap-4 rounded-2xl border border-line-soft bg-primary-faint p-4">
-      <h3 className="m-0 flex items-center gap-2.5 text-body font-semibold text-primary">
-        <span className="grid size-8 place-items-center rounded-full bg-primary-soft text-primary">
+    <section className="flex min-w-0 flex-col gap-4 rounded-[10px] border border-[#8fa7c2] bg-white p-4 shadow-[0_4px_14px_#16233a12]">
+      <h3 className="m-0 flex items-center gap-2.5 text-body font-semibold text-[#24476b]">
+        <span className="grid size-8 place-items-center rounded-full border border-[#d5e0ec] bg-[#edf3fa] text-[#3976bd]">
           <Icon name={icon} size={15} />
         </span>
         {title}
@@ -33,7 +33,7 @@ function Card({ title, icon, children }) {
 
 function Stat({ label, value }) {
   return (
-    <div className="min-w-0 rounded-xl bg-white px-3.5 py-3 shadow-raised">
+    <div className="min-w-0 rounded-lg border border-[#d5e0ec] bg-white px-3.5 py-3 shadow-[0_2px_8px_#16233a0d]">
       <dt className="text-caption text-ink-muted">{label}</dt>
       <dd className="m-0 mt-1 text-title font-bold text-primary tabular-nums">{value}</dd>
     </div>
@@ -47,10 +47,10 @@ function Preview({ form, valid, frequency, sMin }) {
   return (
     <section
       aria-label="Xem trước"
-      className="rounded-2xl bg-linear-to-br from-primary-soft to-primary-faint p-4"
+      className="rounded-[10px] border border-[#d5e0ec] bg-[#edf3fa] p-4"
       aria-live="polite"
     >
-      <h3 className="m-0 flex items-center gap-2 text-body font-semibold text-primary">
+      <h3 className="m-0 flex items-center gap-2 text-body font-semibold text-[#24476b]">
         <Icon name="eye" size={16} />
         Xem trước (chỉ đọc)
       </h3>

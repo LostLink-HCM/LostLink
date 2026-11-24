@@ -107,7 +107,12 @@ export default function ImageField({ label, value, onChange, onBusyChange, disab
       </div>
       {error && <FormError>{error}</FormError>}
       {previewOpen && value && (
-        <Dialog title="Ảnh đại diện danh mục" size="lg" onClose={() => setPreviewOpen(false)}>
+        <Dialog
+          title="Ảnh đại diện danh mục"
+          size="lg"
+          onClose={() => setPreviewOpen(false)}
+          scrollableContent
+        >
           <img
             src={value}
             alt={`Ảnh đại diện danh mục: ${label}`}

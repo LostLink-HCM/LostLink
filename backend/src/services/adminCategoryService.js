@@ -123,6 +123,7 @@ const findCategoryDetails = async (category, session = null) => {
   const [values, members] = session
     ? [await relatedQueries[0], await relatedQueries[1]]
     : await Promise.all(relatedQueries)
+  const postCount = await withSession(Post.countDocuments({ category: categoryId }), session)
 
   const aliasesByAttribute = new Map()
   const aliasesByValue = new Map()
@@ -165,6 +166,7 @@ const findCategoryDetails = async (category, session = null) => {
     icon: category.icon || '',
     order: category.order,
     isActive: category.isActive !== false,
+    postCount,
     aliases,
     matchRadius: category.matchRadius,
     timeShape: category.timeShape,

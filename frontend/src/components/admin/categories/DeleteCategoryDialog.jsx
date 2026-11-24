@@ -10,7 +10,7 @@ export default function DeleteCategoryDialog({ category, categories, onConfirm, 
   return (
     <ConfirmDeleteDialog
       title="Xóa danh mục"
-      confirmLabel="Xóa danh mục"
+      confirmLabel="Xóa"
       onConfirm={onConfirm}
       onClose={onClose}
     >

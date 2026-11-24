@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import Button from '../../backoffice/Button'
 import Dialog from '../../backoffice/Dialog'
 import IconButton from '../../backoffice/IconButton'
@@ -31,13 +31,13 @@ export function Panel({ title, description, action, className, children }) {
   return (
     <section
       className={cx(
-        'min-w-0 overflow-hidden rounded-2xl border border-line-soft bg-surface shadow-soft',
+        'flex min-w-0 flex-col gap-4 rounded-[10px] border border-[#8fa7c2] bg-white p-4 shadow-[0_4px_14px_#16233a12]',
         className
       )}
     >
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft bg-primary-faint px-4.5 py-3.5">
+      <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="m-0 text-lead font-semibold text-primary">{title}</h3>
+          <h3 className="m-0 text-body font-semibold text-[#24476b]">{title}</h3>
           {description && (
             <p className="mt-1 mb-0 text-small leading-relaxed text-ink-muted">{description}</p>
           )}
@@ -60,18 +60,67 @@ export function TextListField({
   errors = [],
 }) {
   const listId = useId()
-  const update = (index, next) => onChange(value.map((item, i) => (i === index ? next : item)))
+  const [highlightedIndex, setHighlightedIndex] = useState(null)
+  const highlightTimer = useRef(null)
+  const inputRefs = useRef([])
+  const pendingScrollIndex = useRef(null)
+
+  useEffect(() => () => clearTimeout(highlightTimer.current), [])
+
+  useEffect(() => {
+    const index = pendingScrollIndex.current
+    if (index == null || index >= value.length) return
+
+    const frame = requestAnimationFrame(() => {
+      const input = inputRefs.current[index]
+      input?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      input?.focus()
+      pendingScrollIndex.current = null
+    })
+
+    return () => cancelAnimationFrame(frame)
+  }, [value.length])
+
+  const clearHighlight = () => {
+    clearTimeout(highlightTimer.current)
+    highlightTimer.current = null
+    setHighlightedIndex(null)
+  }
+
+  const highlightEmpty = (index) => {
+    clearTimeout(highlightTimer.current)
+    setHighlightedIndex(index)
+    highlightTimer.current = setTimeout(() => setHighlightedIndex(null), 3000)
+    requestAnimationFrame(() =>
+      inputRefs.current[index]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    )
+  }
+
+  const update = (index, next) => {
+    if (highlightedIndex === index) clearHighlight()
+    onChange(value.map((item, i) => (i === index ? next : item)))
+  }
+
+  const addItem = () => {
+    const emptyIndex = value.findIndex((item) => !String(item ?? '').trim())
+    if (emptyIndex >= 0) {
+      highlightEmpty(emptyIndex)
+      return
+    }
+    pendingScrollIndex.current = value.length
+    onChange([...value, ''])
+  }
+
+  const removeItem = (index) => {
+    clearHighlight()
+    onChange(value.filter((_, i) => i !== index))
+  }
 
   return (
     <div className={labelClass}>
       <div className="flex items-center gap-1.5">
         <span>{label}</span>
-        <IconButton
-          label={`Thêm ${itemLabel}`}
-          icon="plus"
-          bordered
-          onClick={() => onChange([...value, ''])}
-        />
+        <IconButton label={`Thêm ${itemLabel}`} icon="plus" bordered onClick={addItem} />
       </div>
       {hint && <Hint>{hint}</Hint>}
       {value.length > 0 && (
@@ -83,9 +132,14 @@ export function TextListField({
               <div key={index} className="min-w-0">
                 <div className="flex items-center gap-2">
                   <input
+                    ref={(node) => {
+                      inputRefs.current[index] = node
+                    }}
                     className={cx(
                       inputClass,
-                      error && 'border-danger/35 focus:border-danger/50 focus:ring-danger/10'
+                      error
+                        ? 'border-danger/35 focus:border-danger/50 focus:ring-danger/10'
+                        : highlightedIndex === index && 'border-[#3976bd] ring-2 ring-[#3976bd]/20'
                     )}
                     value={item}
                     onChange={(event) => update(index, event.target.value)}
@@ -98,7 +152,7 @@ export function TextListField({
                     label={`Xóa ${itemLabel} ${index + 1}`}
                     icon="close"
                     danger
-                    onClick={() => onChange(value.filter((_, i) => i !== index))}
+                    onClick={() => removeItem(index)}
                   />
                 </div>
                 {error && (
@@ -208,6 +262,7 @@ export function ConfirmDeleteDialog({ title, confirmLabel, onConfirm, onClose, c
     <Dialog
       title={title}
       onClose={close}
+      scrollableContent
       footer={
         <>
           <Button data-autofocus onClick={close} disabled={saving}>
@@ -235,6 +290,7 @@ export function SaveBar({
   saving = false,
   busy = false,
   blocked = false,
+  saveLabel = 'Lưu thay đổi',
   onReset,
 }) {
   return (
@@ -256,7 +312,7 @@ export function SaveBar({
         icon="check"
         disabled={!dirty || saving || busy || blocked}
       >
-        {saving ? 'Đang lưu…' : busy ? 'Đang tải ảnh…' : 'Lưu thay đổi'}
+        {saving ? 'Đang lưu…' : busy ? 'Đang tải ảnh…' : saveLabel}
       </Button>
     </div>
   )
