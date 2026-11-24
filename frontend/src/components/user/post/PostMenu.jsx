@@ -9,7 +9,7 @@ const itemClass = cx(
 
 // Nút ⋯ mở menu thao tác với bài. actions: [{ label, icon, onClick, tone? }], danger ở cuối.
 // Mũi tên lên/xuống chuyển mục, Esc đóng và trả focus về nút ⋯
-export default function PostMenu({ title, actions }) {
+export default function PostMenu({ title, label, actions }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   const buttonRef = useRef(null)
@@ -61,7 +61,7 @@ export default function PostMenu({ title, actions }) {
       <button
         ref={buttonRef}
         type="button"
-        aria-label={`Tuỳ chọn bài ${title}`}
+        aria-label={label ?? `Tuỳ chọn bài ${title}`}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}

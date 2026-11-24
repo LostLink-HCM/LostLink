@@ -2,7 +2,7 @@ import Icon from '../../common/Icon'
 import Button from '../Button'
 import Card from '../Card'
 import { cx } from '../classes'
-import { SAFE_MEETUPS, canClose } from '../../../lib/user/messages'
+import { SAFE_MEETUPS } from '../../../lib/user/messages'
 
 function CheckRow({ done, children }) {
   return (
@@ -29,7 +29,7 @@ function InfoCard({ title, children }) {
   )
 }
 
-export default function TradePanel({ thread, busy, onConfirm, onReview, onClose }) {
+export default function TradePanel({ thread, busy, onConfirm, onReview }) {
   const { status, peer, confirmed, closedBy } = thread
 
   if (thread.kind === 'support') {
@@ -87,13 +87,6 @@ export default function TradePanel({ thread, busy, onConfirm, onReview, onClose 
 
   return (
     <>
-      {canClose(thread) && (
-        <Button variant="dangerSoft" size="lg" block disabled={busy} onClick={onClose}>
-          <Icon name="close" size={16} />
-          Đóng hội thoại
-        </Button>
-      )}
-
       <Card as="section" padding="sm">
         <h2 className="m-0 mb-0.5 text-body font-bold text-ink">
           {returned ? 'Đã trao trả' : 'Đã nhận được đồ chưa?'}
@@ -141,14 +134,15 @@ export default function TradePanel({ thread, busy, onConfirm, onReview, onClose 
       {status === 'open' && (
         <Card as="section" padding="sm">
           <h2 className="m-0 mb-1 text-body font-bold text-ink">Gợi ý chỗ hẹn an toàn</h2>
-          <ul className="m-0 list-none divide-y divide-line-subtle p-0">
+          <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
             {SAFE_MEETUPS.map((place) => (
-              <li key={place.name} className="flex items-start gap-2.5 py-2 last:pb-0">
-                <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary" />
-                <span className="min-w-0">
-                  <span className="block text-caption font-semibold text-ink">{place.name}</span>
-                  <span className="block text-tiny leading-snug text-ink-muted">{place.hint}</span>
-                </span>
+              <li
+                key={place.name}
+                title={place.hint}
+                className="flex items-center gap-2 text-caption font-medium text-ink"
+              >
+                <span className="size-1.5 shrink-0 rounded-full bg-primary" />
+                <span className="min-w-0 truncate">{place.name}</span>
               </li>
             ))}
           </ul>

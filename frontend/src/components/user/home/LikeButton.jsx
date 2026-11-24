@@ -3,7 +3,7 @@ import { formatCount } from '../../../lib/user/homeFeed'
 import { cx, focusRing } from '../classes'
 const BURST = [0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => [
   angle,
-  i % 2 ? '#f59eb3' : '#d93a5b',
+  i % 2 ? '#ff8fa3' : '#f0284a',
 ])
 
 // Nút Thích dùng chung cho thẻ bài đăng và trang chi tiết; count đã gồm lượt của mình.
@@ -14,6 +14,7 @@ export default function LikeButton({
   onClick,
   withLabel = false,
   variant = 'outline',
+  size = 'md',
   className,
 }) {
   const ghost = variant === 'ghost'
@@ -29,13 +30,14 @@ export default function LikeButton({
       aria-label={withLabel ? undefined : liked ? 'Bỏ thích' : 'Thích'}
       onClick={toggle}
       className={cx(
-        'inline-flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 font-semibold transition-colors',
+        'inline-flex shrink-0 cursor-pointer items-center rounded-full border font-semibold transition-colors',
+        size === 'sm' ? 'h-7 gap-1 px-2' : 'h-8 gap-1.5 px-3',
         ghost ? 'text-caption' : 'text-tiny',
         liked
-          ? 'border-[#f3c4ce] bg-[#fdecef] text-[#d93a5b]'
+          ? 'border-[#fbb4c1] bg-[#ffe6eb] text-[#f0284a]'
           : ghost
-            ? 'border-transparent bg-transparent text-ink-secondary hover:bg-[#fdecef] hover:text-[#d93a5b]'
-            : 'border-line bg-surface text-ink-muted hover:border-[#f3c4ce] hover:text-[#d93a5b]',
+            ? 'border-transparent bg-transparent text-ink-secondary hover:bg-[#ffe6eb] hover:text-[#f0284a]'
+            : 'border-line bg-surface text-ink-muted hover:border-[#fbb4c1] hover:text-[#f0284a]',
         focusRing,
         className
       )}
@@ -43,8 +45,8 @@ export default function LikeButton({
       {/* Thả tim: tim nảy lên và chùm chấm bung ra quanh tim (tắt khi giảm chuyển động) */}
       <span key={pop} className="relative grid place-items-center">
         <svg
-          width="13"
-          height="13"
+          width={size === 'sm' ? 13 : 15}
+          height={size === 'sm' ? 13 : 15}
           viewBox="0 0 24 24"
           aria-hidden="true"
           className={cx(pop > 0 && 'motion-safe:animate-ll-heart-pop')}

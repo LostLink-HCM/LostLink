@@ -9,12 +9,13 @@ const SPRING = 'ease-[cubic-bezier(0.3,1.3,0.5,1)]'
 const LAYOUTS = {
   // Thanh tab ngang trên header máy tính
   bar: {
-    nav: 'relative flex items-center gap-0.5',
-    item: 'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-small',
-    pill: 'rounded-full bg-white/16 ring-1 ring-white/18 ring-inset',
-    active: 'text-white',
-    idle: 'text-white/70 hover:text-white',
-    iconSize: 15,
+    nav: 'relative flex items-center gap-1.5',
+    item: 'flex h-9 items-center gap-1.5 rounded-full px-3.5 text-small',
+    pill: 'overflow-hidden rounded-full bg-linear-to-b from-au-primary-light to-au-primary-dark ring-1 ring-white/50 ring-inset shadow-[0_0_18px_-3px_var(--color-au-primary-light),0_10px_24px_-10px_var(--color-au-button-glow)]',
+    shine: true,
+    active: 'bg-transparent text-au-on-primary',
+    idle: 'bg-white text-ink-secondary shadow-[0_2px_8px_-3px_rgb(5_11_22/0.45)] hover:text-primary',
+    iconSize: 16,
     // Khổ lg còn thêm tab Bảng vinh danh, bỏ icon cho vừa header
     iconClass: 'hidden xl:block',
     badge: '',
@@ -93,7 +94,11 @@ export default function SlidingTabs({ items, layout = 'bar', label, className })
             height: pill.h,
             transform: `translate(${pill.x}px, ${pill.y}px)`,
           }}
-        ></span>
+        >
+          {style.shine && (
+            <span className="absolute inset-y-0 left-0 w-1/3 -skew-x-12 bg-linear-to-r from-transparent via-white/60 to-transparent motion-safe:animate-ll-shine motion-reduce:hidden" />
+          )}
+        </span>
       )}
 
       {items.map(({ to, end, label: text, icon, badge = 0, unit, className: itemClass }) => (

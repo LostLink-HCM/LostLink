@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { useCommunityBoard } from '../../../hooks/useCommunityBoard'
 import { profilePath } from '../../../lib/user/profiles'
 import { communityStatItems, quarterLabel } from '../../../lib/user/reputation'
+import Icon from '../../common/Icon'
 import Card from '../Card'
 import RankFrame from '../RankFrame'
 import { cx, focusRing } from '../classes'
@@ -32,20 +33,14 @@ function LeaderRow({ leader }) {
   )
 }
 
-// fill: cột cao bằng khung chứa, thẻ Bảng vinh danh giãn ra để thẻ Cộng đồng nằm sát đáy
-export default function RightRail({ isGuest, limit = 5, titled = true, fill = false }) {
+export default function RightRail({ isGuest, limit = 5, titled = true }) {
   const { pathname } = useLocation()
   const { leaders, stats, loading, failed } = useCommunityBoard(limit)
   if (failed) return null
 
   return (
-    <div className={cx('flex flex-col gap-4', fill && 'min-h-full')}>
-      <Card
-        as="section"
-        padding="sm"
-        aria-label={titled ? undefined : 'Bảng vinh danh'}
-        className={cx(fill && 'flex flex-1 flex-col')}
-      >
+    <div className="flex flex-col gap-4">
+      <Card as="section" padding="sm" aria-label={titled ? undefined : 'Bảng vinh danh'}>
         {titled && (
           <div className="mb-3 flex items-baseline justify-between">
             <h2 className="m-0 text-body font-bold text-ink">Bảng vinh danh</h2>
@@ -59,13 +54,7 @@ export default function RightRail({ isGuest, limit = 5, titled = true, fill = fa
             ))}
           </div>
         ) : leaders.length ? (
-          <ol
-            className={cx(
-              'm-0 flex list-none flex-col gap-0.5 p-0',
-              // Khoảng trống dư chia đều giữa các dòng thay vì dồn xuống cuối thẻ
-              fill && 'flex-1 justify-evenly'
-            )}
-          >
+          <ol className="m-0 flex list-none flex-col gap-1 p-0">
             {leaders.map((leader) => (
               <li key={leader.username}>
                 {/* Guest đăng nhập xong quay về trang đang xem */}
@@ -76,7 +65,7 @@ export default function RightRail({ isGuest, limit = 5, titled = true, fill = fa
                     isGuest ? 'Đăng nhập để xem hồ sơ' : `Xem trang cá nhân của ${leader.username}`
                   }
                   className={cx(
-                    'flex items-center gap-3 rounded-xl px-2 py-1 no-underline transition-colors hover:bg-surface-muted',
+                    'flex items-center gap-3 rounded-xl px-2 py-1.5 no-underline transition-colors hover:bg-surface-muted',
                     focusRing
                   )}
                 >
@@ -85,7 +74,20 @@ export default function RightRail({ isGuest, limit = 5, titled = true, fill = fa
               </li>
             ))}
           </ol>
-        ) : (
+        ) : null}
+        {!loading && leaders.length > 0 && (
+          <Link
+            to="/leaderboard"
+            className={cx(
+              'mt-2 flex items-center justify-center gap-1 rounded-xl py-2 text-caption font-semibold text-primary no-underline transition-colors hover:bg-primary-subtle',
+              focusRing
+            )}
+          >
+            Xem bảng vinh danh
+            <Icon name="next" size={14} />
+          </Link>
+        )}
+        {!loading && !leaders.length && (
           <p className="m-0 rounded-xl bg-surface-muted px-3 py-5 text-center text-caption text-ink-muted">
             Quý này chưa có lượt trao trả nào
           </p>

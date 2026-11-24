@@ -141,6 +141,7 @@
   /* backwards: hết hiệu ứng thì trả về vị trí thường (chỉ ló tai) để rê chuột vẫn ngoi lên được */
   --animate-ll-peek: ll-peek 4.2s ease-in-out backwards;
   --animate-ll-bob: ll-bob 1.6s ease-in-out infinite;
+  --animate-ll-shine: ll-shine 3.6s ease-in-out infinite;
   /* Hai bé ôm bảng góp ý chạy ra từ mép phải, bảng đung đưa, chạy vào lại khi ẩn */
   --animate-ll-run-in: ll-run-in 1.4s cubic-bezier(0.2, 0.7, 0.3, 1) both;
   --animate-ll-run-out: ll-run-out 0.9s ease-in both;
@@ -309,6 +310,15 @@
     }
     50% {
       translate: 0 0;
+    }
+  }
+  @keyframes ll-shine {
+    0% {
+      translate: -120% 0;
+    }
+    55%,
+    100% {
+      translate: 260% 0;
     }
   }
   @keyframes logo-glow {

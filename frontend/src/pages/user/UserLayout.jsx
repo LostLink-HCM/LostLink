@@ -20,12 +20,12 @@ import { useUnreadNotifications } from '../../hooks/useUnreadNotifications'
 // Ban ngày khu người dùng dùng xanh da trời, cùng họ với nút chính trên header (au-primary);
 // chiều và đêm do .user-tone trong tailwind.css đổi tông
 const userTheme = [
-  '[--color-primary:#0369a1] [--color-primary-hover:#075985] [--color-primary-soft:#e0f2fe] [--color-primary-subtle:#f0f9ff] [--color-primary-faint:#f7fbff] [--color-primary-muted:#7cc4ea] [--color-focus:#0ea5e9]',
-  // Khoảng 80% cỡ chữ cũ cho thoáng; cỡ nhỏ nhất giữ từ 8.5px trở lên để chữ có dấu còn đọc được
-  '[--text-caption:9.5px] [--text-small:9.8px] [--text-body:10.2px] [--text-lead:10.8px] [--text-title:13px] [--text-heading:17.3px] [--text-display:22.4px] [--text-tiny:9px] [--text-micro:8.5px]',
+  '[--color-primary:#0369a1] [--color-primary-hover:#075985] [--color-primary-soft:#e0f2fe] [--color-primary-subtle:#f0f9ff] [--color-primary-faint:#f7fbff] [--color-primary-muted:#7cc4ea] [--color-focus:#0ea5e9] [--text-tiny:11.5px] [--text-micro:10.5px]',
+  "[--font-sans:'Inter',system-ui,-apple-system,'Segoe_UI',sans-serif]",
 ].join(' ')
 
 const TOAST_MS = 3000
+const FEED_PATHS = ['/', '/trending']
 
 export default function UserLayout() {
   const { user } = useAuth()
@@ -38,6 +38,7 @@ export default function UserLayout() {
   const [draft, setDraft] = useState(DEFAULT_FILTERS)
   const [applied, setApplied] = useState(DEFAULT_FILTERS)
   const [toast, setToast] = useState('')
+  const [heroSearchPassed, setHeroSearchPassed] = useState(false)
   const openFeedback = useCallback(() => {
     if (!openFeedbackForm()) setToast(FORM_PENDING)
   }, [])
@@ -96,7 +97,7 @@ export default function UserLayout() {
     // Tìm từ trang khác thì quay về trang chủ để xem kết quả, đang ở Tin hot thì lọc ngay tại đó
     onSearch: (value) => {
       setKeyword(value)
-      if (!['/', '/trending'].includes(location.pathname)) navigate('/')
+      if (!FEED_PATHS.includes(location.pathname)) navigate('/')
     },
     onClear: () => {
       setSearchInput('')
@@ -127,6 +128,8 @@ export default function UserLayout() {
         unreadNotifications={unreadNotifications}
         pendingMatches={matchBadge.pending}
         onFeedback={openFeedback}
+        hero={FEED_PATHS.includes(location.pathname)}
+        heroSearchPassed={heroSearchPassed}
       />
 
       <Outlet
@@ -145,6 +148,7 @@ export default function UserLayout() {
           refreshPendingMatches: matchBadge.refresh,
           interactions,
           notify: setToast,
+          setHeroSearchPassed,
         }}
       />
       <MobileTabBar

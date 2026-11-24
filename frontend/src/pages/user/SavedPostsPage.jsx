@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { Link, useOutletContext } from 'react-router-dom'
+import { buttonClass } from '../../components/user/buttonClass'
 import { getSavedPosts } from '../../api/users'
 import Icon from '../../components/common/Icon'
 import BackLink from '../../components/user/BackLink'
@@ -55,7 +56,16 @@ export default function SavedPostsPage() {
   } else if (!items.length) {
     content = (
       <Card>
-        <EmptyState icon="bookmark" title="Bạn chưa lưu bài nào" />
+        <EmptyState
+          items
+          title="Bạn chưa lưu bài nào"
+          description="Bấm biểu tượng lưu trên bài đăng để xem lại bài đó ở đây bất cứ lúc nào."
+          action={
+            <Link to="/" className={buttonClass({ variant: 'primary', size: 'lg' })}>
+              Xem tin mới
+            </Link>
+          }
+        />
       </Card>
     )
   } else {

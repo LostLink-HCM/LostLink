@@ -4,7 +4,7 @@ let cache = null
 
 const loadCategories = () => {
   cache ??= listCategories()
-    .then(({ data }) => data.map(({ slug, name }) => ({ slug, name })))
+    .then(({ data }) => data.map(({ slug, name, icon }) => ({ slug, name, icon: icon || '' })))
     .catch((error) => {
       cache = null
       throw error
@@ -12,18 +12,22 @@ const loadCategories = () => {
   return cache
 }
 
-export function useFeedCategories() {
-  const [categories, setCategories] = useState([])
+export function useFeedCategoryList() {
+  const [state, setState] = useState({ categories: [], loading: true })
 
   useEffect(() => {
     let active = true
     loadCategories()
-      .then((items) => active && setCategories(items))
-      .catch(() => {})
+      .then((categories) => active && setState({ categories, loading: false }))
+      .catch(() => active && setState({ categories: [], loading: false }))
     return () => {
       active = false
     }
   }, [])
 
-  return categories
+  return state
+}
+
+export function useFeedCategories() {
+  return useFeedCategoryList().categories
 }

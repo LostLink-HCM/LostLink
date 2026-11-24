@@ -64,7 +64,7 @@ export default function AuthLayout({ children }) {
       {/* Số đo bố cục dùng chung cho form, mặt đất và cảnh */}
       <div
         data-auth-time={time}
-        className="fixed inset-0 [--au-form:440px] [--au-frame:1040px] [--au-gutter:clamp(16px,4vw,40px)] [--au-horizon:62%] [--au-scene:min(560px,86vh)] overflow-x-hidden overflow-y-auto bg-au-sky-1 bg-linear-to-b from-au-sky-1 via-au-sky-2 via-55% to-au-sky-3 text-left font-sans text-au-ink"
+        className="fixed inset-0 [--au-form:440px] [--au-frame:1040px] [--au-gutter:clamp(16px,4vw,40px)] [--au-horizon:62%] [--au-scene:min(560px,86vh)] overflow-x-hidden overflow-y-auto bg-au-sky-1 bg-linear-to-b from-au-sky-1 via-au-sky-2 via-55% to-au-sky-3 text-left font-sans text-au-ink [--font-sans:'Inter',system-ui,-apple-system,'Segoe_UI',sans-serif]"
       >
         <Sky time={time} paused={paused} />
         <Ground />

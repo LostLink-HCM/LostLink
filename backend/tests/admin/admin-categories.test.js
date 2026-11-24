@@ -172,6 +172,26 @@ describe('Quản lý danh mục - API admin', () => {
       'general'
     )
 
+    const illustrated = await adminApi.patch(`${categoryUrl()}/general`, {
+      name: 'Ví cá nhân',
+      icon: '/images/categories/vi-tien.png',
+      order: 8,
+      aliases: ['bóp tiền', 'ví cầm tay'],
+    })
+    assert.equal(illustrated.status, 200)
+    assert.equal(illustrated.body.data.icon, '/images/categories/vi-tien.png')
+    assert.equal(
+      (
+        await adminApi.patch(`${categoryUrl()}/general`, {
+          name: 'Ví cá nhân',
+          icon: '/images/other/vi-tien.png',
+          order: 8,
+          aliases: [],
+        })
+      ).status,
+      422
+    )
+
     assert.equal(
       (
         await adminApi.patch(`${categoryUrl()}/general`, {

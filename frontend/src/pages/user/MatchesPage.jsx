@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { useLocation, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
+import { buttonClass } from '../../components/user/buttonClass'
 import { confirmMatch, listMatches, rejectMatch } from '../../api/matches'
 import Button from '../../components/user/Button'
 import Card from '../../components/user/Card'
 import Dialog from '../../components/user/Dialog'
 import EmptyState from '../../components/user/EmptyState'
+import Icon from '../../components/common/Icon'
 import IconButton from '../../components/user/IconButton'
 import { cx } from '../../components/user/classes'
 import MatchCard from '../../components/user/matches/MatchCard'
@@ -94,7 +96,13 @@ export default function MatchesPage() {
         <h1 className={cx(titleClass, 'mb-5')}>Manh mối</h1>
         <Card>
           <EmptyState
-            icon="search"
+            items
+            action={
+              <Link to="/posts/new" className={buttonClass({ variant: 'primary', size: 'lg' })}>
+                <Icon name="compose" size={16} />
+                Đăng bài
+              </Link>
+            }
             title="Bạn chưa có bài nào đang tìm"
             description="Khi bạn đăng bài Mất đồ hoặc Nhặt được, LostLink sẽ tìm manh mối từ các bài có thể khớp và hiện ở đây."
           />
@@ -228,7 +236,7 @@ export default function MatchesPage() {
           ) : (
             <Card>
               <EmptyState
-                icon="search"
+                items
                 title="Chưa có manh mối nào cho bài này"
                 description="LostLink sẽ báo cho bạn ngay khi có bài phù hợp."
               />
