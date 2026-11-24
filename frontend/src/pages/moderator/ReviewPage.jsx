@@ -16,11 +16,11 @@ import TypeBadge from '../../components/backoffice/TypeBadge'
 import { REJECT_REASONS } from '../../lib/moderator/moderation'
 import {
   approveModeratorPendingPost,
+  downloadModeratorPendingPostsCsv,
   getModeratorPendingPost,
   listModeratorPendingPosts,
   rejectModeratorPendingPost,
 } from '../../lib/moderator/reviewPosts'
-import { downloadCsv } from '../../lib/csv'
 import usePaginatedFilter from '../../hooks/usePaginatedFilter'
 import useBackofficePageSize from '../../hooks/useBackofficePageSize'
 import useLinkedHighlight from '../../hooks/useLinkedHighlight'
@@ -75,6 +75,7 @@ export default function Review() {
   const [error, setError] = useState('')
   const [actionError, setActionError] = useState('')
   const [decisionLoading, setDecisionLoading] = useState(false)
+  const [csvExporting, setCsvExporting] = useState(false)
   const [notice, setNotice] = useState('')
   const [detailPost, setDetailPost] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -255,21 +256,16 @@ export default function Review() {
       setDecisionLoading(false)
     }
   }
-  const exportCsv = () => {
-    downloadCsv('LostLink_Bai_dang_cho_duyet.csv', [
-      ['ID', 'Tiêu đề', 'Người đăng', 'Điểm uy tín', 'Danh mục', 'Loại tin', 'Thời gian', 'Vị trí'],
-      ...filtered.map((post) => [
-        post.postCode || post.id,
-        post.title,
-        post.author,
-        post.reputation,
-        post.category,
-        post.type === 'lost' ? 'Mất đồ' : 'Nhặt được',
-        post.dateTime,
-        post.location,
-      ]),
-    ])
-    setNotice(`Đã xuất ${filtered.length} bài đăng chờ duyệt ra CSV.`)
+  const exportCsv = async () => {
+    setCsvExporting(true)
+    try {
+      await downloadModeratorPendingPostsCsv(filters)
+      setNotice('Đã tải file CSV bài đăng chờ duyệt.')
+    } catch (exportError) {
+      setNotice(exportError.message)
+    } finally {
+      setCsvExporting(false)
+    }
   }
   return (
     <div className="px-6 py-5 text-small text-ink max-xl:px-5 max-sm:px-4 max-sm:py-4">
@@ -358,9 +354,19 @@ export default function Review() {
                 void reloadReviewPosts()
               }}
             />
-            <Button variant="primary" onClick={exportCsv} disabled={!filtered.length}>
-              <Icon name="download" />
-              Xuất CSV
+            <Button
+              variant="primary"
+              onClick={exportCsv}
+              disabled={csvExporting || !filtered.length}
+            >
+              {csvExporting ? (
+                'Đang xuất…'
+              ) : (
+                <>
+                  <Icon name="download" />
+                  Xuất CSV
+                </>
+              )}
             </Button>
           </div>
         </DateRange>

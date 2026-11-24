@@ -146,7 +146,7 @@ const matchCountsFor = async (postIds) => {
   return new Map(rows.map((row) => [String(row._id), row.count]))
 }
 
-const listPosts = async ({ status, isHidden, type, category, area, from, to, q }) => {
+const buildPostFilter = async ({ status, isHidden, type, category, area, from, to, q }) => {
   const filter = {}
   if (status) filter.status = status
   if (isHidden !== undefined) filter.isHidden = isHidden === 'true'
@@ -155,12 +155,66 @@ const listPosts = async ({ status, isHidden, type, category, area, from, to, q }
   if (category) filter.category = await resolveCategory(category)
   addDateFilter(filter, { from, to })
   await addSearchFilter(filter, q)
+  return filter
+}
+
+const listPosts = async (filters) => {
+  const filter = await buildPostFilter(filters)
 
   const posts = await populatedPostQuery(Post.find(filter)).sort({ createdAt: -1, _id: -1 }).lean()
   const matchCounts = await matchCountsFor(posts.map((post) => post._id))
 
   return {
     items: posts.map((post) => toPost(post, matchCounts.get(String(post._id)) ?? 0)),
+    total: posts.length,
+  }
+}
+
+const matchingPostsFor = async (postIds) => {
+  if (!postIds.length) return new Map()
+
+  const rows = await MatchSuggestion.find({
+    state: { $in: ACTIVE_MATCH_STATES },
+    $or: [{ postLost: { $in: postIds } }, { postFound: { $in: postIds } }],
+  })
+    .select('postLost postFound score')
+    .populate('postLost', 'code')
+    .populate('postFound', 'code')
+    .lean()
+
+  const result = new Map(postIds.map((id) => [String(id), []]))
+  for (const row of rows) {
+    const lost = row.postLost
+    const found = row.postFound
+    if (!lost?._id || !found?.code || !Number.isFinite(row.score)) continue
+    if (result.has(String(lost._id))) {
+      result.get(String(lost._id)).push({ code: found.code, score: row.score })
+    }
+    if (found?._id && lost.code && result.has(String(found._id))) {
+      result.get(String(found._id)).push({ code: lost.code, score: row.score })
+    }
+  }
+
+  for (const matches of result.values()) {
+    matches.sort((a, b) => b.score - a.score || a.code.localeCompare(b.code))
+  }
+  return result
+}
+
+const listPostsForCsv = async (filters) => {
+  const filter = await buildPostFilter(filters)
+  const posts = await populatedPostQuery(Post.find(filter)).sort({ createdAt: -1, _id: -1 }).lean()
+  const postIds = posts.map((post) => post._id)
+  const [matchCounts, matchingPosts] = await Promise.all([
+    matchCountsFor(postIds),
+    matchingPostsFor(postIds),
+  ])
+
+  return {
+    items: posts.map((post) => ({
+      ...toPost(post, matchCounts.get(String(post._id)) ?? 0),
+      matchingPosts: matchingPosts.get(String(post._id)) ?? [],
+    })),
     total: posts.length,
   }
 }
@@ -345,4 +399,4 @@ const updateVisibility = async (id, actor, isHidden, reason = '') => {
   }
 }
 
-module.exports = { listPosts, getPost, updateStatus, updateVisibility }
+module.exports = { listPosts, listPostsForCsv, getPost, updateStatus, updateVisibility }

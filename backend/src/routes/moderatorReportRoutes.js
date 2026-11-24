@@ -12,6 +12,7 @@ const {
 const router = Router()
 
 router.use(protect, requireRole('moderator'))
+router.get('/export.csv', listReportsRules, validate, ctrl.exportReports)
 router.get('/', listReportsRules, validate, ctrl.listReports)
 router.get('/:id', reportPathRules, validate, ctrl.getReport)
 router.patch('/:id/resolve', reportPathRules, resolveReportRules, validate, ctrl.resolveReport)

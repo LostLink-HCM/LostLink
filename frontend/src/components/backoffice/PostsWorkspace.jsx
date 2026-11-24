@@ -17,16 +17,15 @@ import {
   EMPTY_FILTERS,
   STATUS_LABELS,
   hasInvalidRange,
-  postsToRows,
   validateHideReason,
 } from '../../lib/backoffice/posts'
 import {
   getBackofficePost,
   listBackofficePosts,
+  downloadBackofficePostsCsv,
   updateBackofficePostStatus,
   updateBackofficePostVisibility,
 } from '../../lib/backoffice/postsApi'
-import { downloadCsv } from '../../lib/csv'
 import { postPath } from '../../lib/user/homeFeed'
 import usePaginatedFilter from '../../hooks/usePaginatedFilter'
 import useBackofficePageSize from '../../hooks/useBackofficePageSize'
@@ -247,6 +246,7 @@ export default function PostsWorkspace() {
   const statusReasonRef = useRef(null)
   const [actionError, setActionError] = useState('')
   const [actionPending, setActionPending] = useState(false)
+  const [csvExporting, setCsvExporting] = useState(false)
   const [notice, setNotice] = useState('')
   const [noticeTone, setNoticeTone] = useState('info')
   const [toast, setToast] = useState(null)
@@ -443,10 +443,18 @@ export default function PostsWorkspace() {
     setNotice('')
     setNoticeTone('info')
   }
-  const exportCsv = () => {
-    downloadCsv('LostLink_Danh_sach_bai_dang.csv', postsToRows(filtered))
-    setNotice(`Đã xuất ${filtered.length} bài đăng ra CSV.`)
-    setNoticeTone('success')
+  const exportCsv = async () => {
+    setCsvExporting(true)
+    try {
+      await downloadBackofficePostsCsv(requestFilters)
+      setNotice('Đã tải file CSV danh sách bài đăng.')
+      setNoticeTone('success')
+    } catch (error) {
+      setNotice(error.message)
+      setNoticeTone('error')
+    } finally {
+      setCsvExporting(false)
+    }
   }
   const showUnavailablePostToast = () => {
     setToast({ message: 'Bài đăng này hiện không hiển thị trên trang người dùng.' })
@@ -607,10 +615,18 @@ export default function PostsWorkspace() {
             <Button
               variant="primary"
               onClick={exportCsv}
-              disabled={invalidRange || loading || Boolean(listError) || !filtered.length}
+              disabled={
+                csvExporting || invalidRange || loading || Boolean(listError) || !filtered.length
+              }
             >
-              <Icon name="download" />
-              Xuất CSV
+              {csvExporting ? (
+                'Đang xuất…'
+              ) : (
+                <>
+                  <Icon name="download" />
+                  Xuất CSV
+                </>
+              )}
             </Button>
           </div>
         </DateRange>

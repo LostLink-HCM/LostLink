@@ -14,11 +14,11 @@ import Pagination from '../../components/backoffice/Pagination'
 import { REPORT_ACTIONS, SEVERITY_LABELS } from '../../lib/moderator/moderation'
 import {
   getModeratorReport,
+  downloadModeratorReportsCsv,
   listModeratorReports,
   REPORT_REASON_LABELS,
   resolveModeratorReport,
 } from '../../lib/moderator/reportQueue'
-import { downloadCsv } from '../../lib/csv'
 import { postPath } from '../../lib/user/homeFeed'
 import { profilePath } from '../../lib/user/profiles'
 import useLinkedHighlight from '../../hooks/useLinkedHighlight'
@@ -176,6 +176,7 @@ export default function Reports() {
   const [reason, setReason] = useState('')
   const [actionError, setActionError] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
+  const [csvExporting, setCsvExporting] = useState(false)
 
   const requestReports = useCallback(
     () =>
@@ -314,30 +315,16 @@ export default function Reports() {
     }
   }
 
-  const exportCsv = () => {
-    downloadCsv('LostLink_Hang_doi_report.csv', [
-      [
-        'ID',
-        'Thời gian',
-        'Loại đối tượng',
-        'Đối tượng',
-        'Người bị report',
-        'Mức độ',
-        'Lý do',
-        'Người gửi',
-      ],
-      ...items.map((report) => [
-        report.displayCode,
-        report.time,
-        report.targetType === 'post' ? 'Bài đăng' : 'Tài khoản',
-        report.targetTitle,
-        report.reportedUser,
-        SEVERITY_LABELS[report.severity],
-        report.reasonLabel,
-        report.reporter,
-      ]),
-    ])
-    setNotice(`Đã xuất ${items.length} report đang hiển thị ra CSV.`)
+  const exportCsv = async () => {
+    setCsvExporting(true)
+    try {
+      await downloadModeratorReportsCsv(filters)
+      setNotice('Đã tải file CSV hàng đợi report.')
+    } catch (exportError) {
+      setNotice(exportError.message)
+    } finally {
+      setCsvExporting(false)
+    }
   }
 
   const showEmpty = !loading && !error && !items.length
@@ -412,9 +399,15 @@ export default function Reports() {
               size={36}
               onClick={resetFilters}
             />
-            <Button variant="primary" onClick={exportCsv} disabled={!items.length}>
-              <Icon name="download" />
-              Xuất CSV
+            <Button variant="primary" onClick={exportCsv} disabled={csvExporting || !items.length}>
+              {csvExporting ? (
+                'Đang xuất…'
+              ) : (
+                <>
+                  <Icon name="download" />
+                  Xuất CSV
+                </>
+              )}
             </Button>
           </div>
         </DateRange>

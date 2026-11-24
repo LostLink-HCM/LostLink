@@ -7,17 +7,20 @@ import DataTable from '../../components/backoffice/DataTable'
 import Dialog from '../../components/backoffice/Dialog'
 import Pagination from '../../components/backoffice/Pagination'
 import { cx, focusRing, linkedHighlight } from '../../components/backoffice/classes'
-import { downloadCsv } from '../../lib/csv'
 import {
   isCurrentUser,
   USER_ACTIONS,
   USER_FILTERS,
   USER_ROLES,
   USER_STATUSES,
-  usersToRows,
   userActionUnavailable,
 } from '../../lib/admin/users'
-import { applyAdminUserAction, getAdminUser, listAdminUsers } from '../../lib/admin/usersApi'
+import {
+  applyAdminUserAction,
+  downloadAdminUsersCsv,
+  getAdminUser,
+  listAdminUsers,
+} from '../../lib/admin/usersApi'
 import usePaginatedFilter from '../../hooks/usePaginatedFilter'
 import useBackofficePageSize from '../../hooks/useBackofficePageSize'
 import useLinkedHighlight from '../../hooks/useLinkedHighlight'
@@ -135,7 +138,8 @@ function ActionButton({
     <button
       type="button"
       className={cx(
-        'inline-flex min-h-8 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-md border px-2 py-1.5 text-caption font-medium disabled:cursor-not-allowed disabled:opacity-40',
+        'inline-flex min-h-8 cursor-pointer items-center justify-center whitespace-nowrap rounded-md border py-1.5 font-medium disabled:cursor-not-allowed disabled:opacity-40',
+        colorOnly ? 'gap-1 px-1 text-small' : 'gap-1.5 px-2 text-caption',
         colorOnly
           ? 'border-transparent bg-transparent transition-opacity hover:opacity-75'
           : 'transition-colors',
@@ -147,7 +151,7 @@ function ActionButton({
       aria-label={`${settings.label} · ${account.username}`}
       onClick={() => onAction(action)}
     >
-      {showIcon && <Icon name={settings.icon} size={15} />}
+      {showIcon && <Icon name={settings.icon} size={colorOnly ? 13 : 15} />}
       {label || (expanded ? settings.label : shortLabels[action])}
     </button>
   )
@@ -488,7 +492,7 @@ function UserActionDialog({
           <div className="min-w-0">
             <strong className="block text-lead text-[#365676]">{account.name}</strong>
             <span className="mt-1 block break-words text-caption text-[#768ba5]">
-              {isStatusAction ? account.email : `@${account.username} · ${account.email}`}
+              {account.email}
             </span>
           </div>
         </div>
@@ -566,6 +570,8 @@ export default function Users() {
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [modal, setModal] = useState(null)
   const [notice, setNotice] = useState('')
+  const [exportError, setExportError] = useState('')
+  const [csvExporting, setCsvExporting] = useState(false)
   const [actionError, setActionError] = useState('')
   const [actionPending, setActionPending] = useState(false)
   const actionInFlight = useRef(false)
@@ -686,6 +692,7 @@ export default function Users() {
     setRowFocus({ key: focusKey, id: null, missing: false })
     setFilter(key, value)
     setNotice('')
+    setExportError('')
   }
 
   const resetFiltersAndNotice = () => {
@@ -693,12 +700,21 @@ export default function Users() {
     resetFilters()
     setRetryCount((previous) => previous + 1)
     setNotice('')
+    setExportError('')
   }
 
-  const exportUsers = () => {
-    if (!filtered.length) return
-    downloadCsv('LostLink_Danh_sach_nguoi_dung.csv', usersToRows(filtered))
-    setNotice(`Đã xuất ${number(filtered.length)} tài khoản ra CSV.`)
+  const exportUsers = async () => {
+    if (!filtered.length || csvExporting) return
+    setCsvExporting(true)
+    setExportError('')
+    try {
+      await downloadAdminUsersCsv(requestFilters)
+      setNotice(`Đã tải CSV của ${number(filtered.length)} tài khoản.`)
+    } catch (error) {
+      setExportError(error.message || 'Không thể xuất danh sách tài khoản.')
+    } finally {
+      setCsvExporting(false)
+    }
   }
 
   const openProfile = (id) => {
@@ -778,7 +794,7 @@ export default function Users() {
             onChange={(event) => changeFilter('role', event.target.value)}
             className="h-9 w-full cursor-pointer rounded-lg border border-line-strong bg-surface px-3 text-small font-normal text-ink outline-none focus:border-focus focus:ring-2 focus:ring-focus/20"
           >
-            <option value="">Tất cả vai trò</option>
+            <option value="">Tất cả</option>
             {Object.entries(USER_ROLES).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
@@ -793,7 +809,7 @@ export default function Users() {
             onChange={(event) => changeFilter('status', event.target.value)}
             className="h-9 w-full cursor-pointer rounded-lg border border-line-strong bg-surface px-3 text-small font-normal text-ink outline-none focus:border-focus focus:ring-2 focus:ring-focus/20"
           >
-            <option value="">Tất cả trạng thái</option>
+            <option value="">Tất cả</option>
             {Object.entries(USER_STATUSES).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
@@ -827,12 +843,31 @@ export default function Users() {
           >
             <Icon name="reset" />
           </button>
-          <Button variant="primary" onClick={exportUsers} disabled={loading || !filtered.length}>
-            <Icon name="download" size={16} />
-            Xuất CSV
+          <Button
+            variant="primary"
+            onClick={exportUsers}
+            disabled={loading || csvExporting || !filtered.length}
+          >
+            {csvExporting ? (
+              'Đang xuất…'
+            ) : (
+              <>
+                <Icon name="download" size={16} />
+                Xuất CSV
+              </>
+            )}
           </Button>
         </div>
       </section>
+
+      {exportError && (
+        <p
+          className="mt-3 rounded-lg border border-danger-soft bg-danger-soft px-3 py-2 text-caption text-danger-ink"
+          role="alert"
+        >
+          Không thể xuất CSV. {exportError}
+        </p>
+      )}
 
       {notice && (
         <div
@@ -869,16 +904,16 @@ export default function Users() {
       <DataTable
         variant="admin"
         containerClassName="!border-[#b3c7df] !shadow-[0_10px_26px_rgba(34,65,100,0.14)]"
-        headingClassName="!border-b-2 !border-b-[#c5d5e7] !bg-[#edf3fa] !text-[#244d78] !text-small"
+        headingClassName="!border-b-2 !border-b-[#c5d5e7] !bg-[#edf3fa] !px-2.5 !py-3 !text-[#244d78] !text-small"
         caption="Người dùng, vai trò, trạng thái, ngày tham gia và thao tác"
-        ariaLabel="Bảng người dùng, cuộn ngang để xem thêm"
-        minWidth="min-w-[1100px] table-fixed"
+        ariaLabel="Bảng người dùng"
+        minWidth="table-fixed"
         columns={[
-          ['Tài khoản', 'w-[26%]'],
-          ['Vai trò', 'w-[12%]'],
-          ['Trạng thái', 'w-[15%]'],
-          ['Ngày tham gia', 'w-[20%]'],
-          ['Thao tác', 'w-[27%]'],
+          ['Tài khoản', 'w-[18.5%]'],
+          ['Vai trò', 'w-[18.5%]'],
+          ['Trạng thái', 'w-[18.5%]'],
+          ['Ngày tham gia', 'w-[18.5%]'],
+          ['Thao tác', 'w-[26%]', '!text-center'],
         ]}
         empty={
           (loading || listError || !filtered.length) && (
@@ -924,7 +959,7 @@ export default function Users() {
               account.id !== focusedUserId && account.status === 'locked' && 'bg-[#fffbfc]'
             )}
           >
-            <td className="border-b border-[#e2eaf3] px-4 py-[18px]">
+            <td className="border-b border-[#e2eaf3] px-2.5 py-3">
               <div className="flex items-center gap-3">
                 <div className="min-w-0">
                   <button
@@ -949,27 +984,27 @@ export default function Users() {
                 </div>
               </div>
             </td>
-            <td className="border-b border-[#e2eaf3] px-4 py-[18px]">
+            <td className="border-b border-[#e2eaf3] px-2.5 py-3">
               <Role role={account.role} />
             </td>
-            <td className="border-b border-[#e2eaf3] px-4 py-[18px]">
+            <td className="border-b border-[#e2eaf3] px-2.5 py-3">
               <Status status={account.status} />
             </td>
-            <td className="border-b border-[#e2eaf3] px-4 py-[18px] text-small text-ink-secondary">
+            <td className="border-b border-[#e2eaf3] px-2.5 py-3 text-small text-ink-secondary">
               <time dateTime={account.createdAt}>{date(account.createdAt)}</time>
             </td>
-            <td className="border-b border-[#e2eaf3] px-4 py-[18px]">
-              <div className="flex flex-wrap gap-1.5">
+            <td className="border-b border-[#e2eaf3] px-1.5 py-3">
+              <div className="flex min-w-0 flex-nowrap items-center justify-center gap-1">
                 <button
                   type="button"
                   title="Xem hồ sơ người dùng"
                   className={cx(
-                    'inline-flex min-h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-transparent bg-transparent px-2 py-1.5 text-caption font-medium text-primary transition-opacity hover:opacity-75 disabled:cursor-not-allowed disabled:opacity-40',
+                    'inline-flex min-h-8 cursor-pointer items-center justify-center gap-1 whitespace-nowrap rounded-md border border-transparent bg-transparent px-1 py-1.5 text-small font-medium text-primary transition-opacity hover:opacity-75 disabled:cursor-not-allowed disabled:opacity-40',
                     focusRing
                   )}
                   onClick={() => openProfile(account.id)}
                 >
-                  <Icon name="eye" size={15} />
+                  <Icon name="eye" size={13} />
                   Hồ sơ
                 </button>
                 <UserActions

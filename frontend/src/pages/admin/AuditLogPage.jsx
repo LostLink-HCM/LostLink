@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { listAuditLogs } from '../../api/auditLogs'
+import { downloadAuditLogsCsv, listAuditLogs } from '../../api/auditLogs'
 import Button from '../../components/backoffice/Button'
 import DataTable, { cell } from '../../components/backoffice/DataTable'
 import DateRange from '../../components/backoffice/DateRange'
@@ -69,6 +69,9 @@ export default function AuditLog() {
   const [page, setPage] = useState(1)
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [retryCount, setRetryCount] = useState(0)
+  const [csvExporting, setCsvExporting] = useState(false)
+  const [csvNotice, setCsvNotice] = useState('')
+  const [csvError, setCsvError] = useState('')
   const [result, setResult] = useState({ key: null, data: null, error: '', fieldErrors: {} })
   const pending = useRef(null)
   const requestFilters = useMemo(
@@ -109,6 +112,12 @@ export default function AuditLog() {
   }, [filters.query])
 
   useEffect(() => {
+    if (!csvNotice) return undefined
+    const timeout = window.setTimeout(() => setCsvNotice(''), 3000)
+    return () => window.clearTimeout(timeout)
+  }, [csvNotice])
+
+  useEffect(() => {
     if (queryDebouncing || invalidRange) return undefined
     let active = true
     if (pending.current?.key !== requestKey)
@@ -135,6 +144,8 @@ export default function AuditLog() {
   const changeFilter = (key, value) => {
     setFilters((current) => ({ ...current, [key]: value }))
     setPage(1)
+    setCsvNotice('')
+    setCsvError('')
     if (key === 'query' && !value.trim()) setDebouncedQuery('')
   }
 
@@ -143,6 +154,22 @@ export default function AuditLog() {
     setDebouncedQuery('')
     setPage(1)
     setRetryCount((count) => count + 1)
+    setCsvNotice('')
+    setCsvError('')
+  }
+
+  const exportLogs = async () => {
+    if (!data?.total || csvExporting) return
+    setCsvExporting(true)
+    setCsvError('')
+    try {
+      await downloadAuditLogsCsv(requestFilters)
+      setCsvNotice('Đã tải CSV nhật ký thao tác.')
+    } catch (error) {
+      setCsvError(error.message || 'Không thể xuất nhật ký thao tác.')
+    } finally {
+      setCsvExporting(false)
+    }
   }
 
   return (
@@ -171,7 +198,7 @@ export default function AuditLog() {
                 value={filters.actorRole}
                 onChange={(event) => changeFilter('actorRole', event.target.value)}
               >
-                <option value="">Tất cả vai trò</option>
+                <option value="">Tất cả</option>
                 {Object.entries(AUDIT_ROLES).map(([value, label]) => (
                   <option key={value} value={value}>
                     {label}
@@ -187,7 +214,7 @@ export default function AuditLog() {
                 value={filters.action}
                 onChange={(event) => changeFilter('action', event.target.value)}
               >
-                <option value="">Tất cả hành động</option>
+                <option value="">Tất cả</option>
                 {Object.entries(AUDIT_ACTIONS).map(([value, label]) => (
                   <option key={value} value={value}>
                     {label}
@@ -203,7 +230,7 @@ export default function AuditLog() {
                 value={filters.entityType}
                 onChange={(event) => changeFilter('entityType', event.target.value)}
               >
-                <option value="">Tất cả đối tượng</option>
+                <option value="">Tất cả</option>
                 {Object.entries(AUDIT_ENTITY_TYPES).map(([value, label]) => (
                   <option key={value} value={value}>
                     {label}
@@ -223,15 +250,40 @@ export default function AuditLog() {
               size={36}
               onClick={resetFilters}
             />
-            <span title="Xuất CSV sẽ được bổ sung sau.">
-              <Button variant="primary" disabled>
-                <Icon name="download" size={16} />
-                Xuất CSV
-              </Button>
-            </span>
+            <Button
+              variant="primary"
+              onClick={exportLogs}
+              disabled={loading || csvExporting || !data?.total}
+            >
+              {csvExporting ? (
+                'Đang xuất…'
+              ) : (
+                <>
+                  <Icon name="download" size={16} />
+                  Xuất CSV
+                </>
+              )}
+            </Button>
           </div>
         </DateRange>
       </section>
+
+      {csvError && (
+        <p
+          className="my-3 rounded-lg border border-danger-soft bg-danger-soft px-3 py-2 text-caption text-danger-ink"
+          role="alert"
+        >
+          Không thể xuất CSV. {csvError}
+        </p>
+      )}
+      {csvNotice && (
+        <p
+          className="my-3 rounded-lg border border-[#acd8c4] bg-[#edf9f2] px-3 py-2 text-caption text-[#287c5e]"
+          role="status"
+        >
+          {csvNotice}
+        </p>
+      )}
 
       {error && (
         <div
