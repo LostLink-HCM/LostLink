@@ -24,6 +24,7 @@ export default function SearchBox({
   onClear,
   tone = 'light',
   autoFocus = false,
+  placeholder = 'Tìm đồ vật, khu vực, người đăng…',
   className,
 }) {
   const style = TONES[tone]
@@ -51,7 +52,7 @@ export default function SearchBox({
         autoFocus={autoFocus}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Tìm đồ vật, khu vực, người đăng…"
+        placeholder={placeholder}
         className={cx(
           'w-full rounded-full border pr-10 pl-10 text-small outline-none transition focus:ring-3 focus:ring-primary/12 [&::-webkit-search-cancel-button]:hidden',
           style.input

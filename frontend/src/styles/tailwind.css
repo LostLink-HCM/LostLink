@@ -142,9 +142,6 @@
   --animate-ll-peek: ll-peek 4.2s ease-in-out backwards;
   --animate-ll-bob: ll-bob 1.6s ease-in-out infinite;
   --animate-ll-shine: ll-shine 3.6s ease-in-out infinite;
-  --animate-hero-launch: hero-launch 4.4s ease-in-out infinite;
-  --animate-hero-hop: hero-hop 4.4s ease-in-out infinite;
-  --animate-hero-dash: hero-dash 1.4s linear infinite;
   /* Hai bé ôm bảng góp ý chạy ra từ mép phải, bảng đung đưa, chạy vào lại khi ẩn */
   --animate-ll-run-in: ll-run-in 1.4s cubic-bezier(0.2, 0.7, 0.3, 1) both;
   --animate-ll-run-out: ll-run-out 0.9s ease-in both;
@@ -313,33 +310,6 @@
     }
     50% {
       translate: 0 0;
-    }
-  }
-  @keyframes hero-launch {
-    0%,
-    16%,
-    100% {
-      transform: translateY(0);
-    }
-    6% {
-      transform: translateY(-10px);
-    }
-  }
-  @keyframes hero-hop {
-    0%,
-    58%,
-    84%,
-    100% {
-      transform: translateY(0);
-    }
-    66%,
-    72% {
-      transform: translateY(-10px);
-    }
-  }
-  @keyframes hero-dash {
-    to {
-      stroke-dashoffset: -20;
     }
   }
   @keyframes ll-shine {

@@ -107,7 +107,7 @@ export default function SiteHeader({
         className="pointer-events-none absolute inset-0 rounded-[inherit] opacity-(--au-star-opacity)"
         style={{ backgroundImage: SKY_STARS }}
       />
-      <div className="relative mx-auto flex h-16 max-w-360 items-center gap-3 px-4 sm:gap-4 sm:px-6 lg:gap-4 lg:px-8 xl:gap-5">
+      <div className="relative mx-auto flex h-16 max-w-360 items-center gap-3 px-4 sm:gap-4 sm:px-6 lg:gap-3 lg:px-8 2xl:gap-5">
         <Link
           to="/"
           aria-label="LostLink - Trang chủ"
@@ -129,8 +129,8 @@ export default function SiteHeader({
 
         <HeaderPets
           className={cx(
-            'h-7 shrink-0 self-end max-[359px]:hidden lg:hidden',
-            fullHeader && 'xl:flex'
+            'h-7 shrink-0 self-end max-[359px]:hidden',
+            fullHeader ? 'lg:max-[1359px]:hidden' : 'lg:hidden'
           )}
         />
 
@@ -138,8 +138,9 @@ export default function SiteHeader({
           <SearchBox
             id="header-search"
             tone="sky"
+            placeholder="Tìm đồ thất lạc…"
             {...search}
-            className={cx('hidden shrink-0 lg:block lg:w-44 xl:w-64 2xl:w-72', reveal)}
+            className={cx('hidden shrink-0 lg:block lg:w-40 xl:w-52 2xl:w-72', reveal)}
           />
         )}
 
