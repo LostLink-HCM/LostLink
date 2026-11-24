@@ -199,7 +199,7 @@ export default function MiniCalendar({
                 key={day}
                 role="columnheader"
                 className={cx(
-                  'py-1 text-center text-[9px] font-semibold',
+                  'py-1 text-center text-micro font-semibold',
                   day === 'CN' ? 'text-danger-ink' : 'text-ink-subtle'
                 )}
               >

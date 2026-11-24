@@ -159,7 +159,7 @@ export default function NotificationsPage() {
                 aria-pressed={group === tab.value}
                 onClick={() => setGroup(tab.value)}
                 className={cx(
-                  'h-8 cursor-pointer truncate rounded-full border-0 px-0.5 text-tiny font-semibold max-[359px]:text-[9.5px] transition-colors lg:px-3.5 lg:text-caption',
+                  'h-8 cursor-pointer truncate rounded-full border-0 px-0.5 text-tiny font-semibold max-[359px]:text-micro transition-colors lg:px-3.5 lg:text-caption',
                   group === tab.value
                     ? 'bg-primary text-white'
                     : 'bg-line-subtle text-ink-secondary hover:bg-primary-soft hover:text-primary',

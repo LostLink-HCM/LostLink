@@ -10,12 +10,12 @@ const LAYOUTS = {
   // Thanh tab ngang trên header máy tính
   bar: {
     nav: 'relative flex items-center gap-1.5',
-    item: 'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-small',
+    item: 'flex h-9 items-center gap-1.5 rounded-full px-3.5 text-small',
     pill: 'overflow-hidden rounded-full bg-linear-to-b from-au-primary-light to-au-primary-dark ring-1 ring-white/50 ring-inset shadow-[0_0_18px_-3px_var(--color-au-primary-light),0_10px_24px_-10px_var(--color-au-button-glow)]',
     shine: true,
     active: 'bg-transparent text-au-on-primary',
     idle: 'bg-white text-ink-secondary shadow-[0_2px_8px_-3px_rgb(5_11_22/0.45)] hover:text-primary',
-    iconSize: 15,
+    iconSize: 16,
     // Khổ lg còn thêm tab Bảng vinh danh, bỏ icon cho vừa header
     iconClass: 'hidden xl:block',
     badge: '',

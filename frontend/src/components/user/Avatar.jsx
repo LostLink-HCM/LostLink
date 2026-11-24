@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { cx } from './classes'
 
 const sizes = {
-  xs: 'size-6 text-[9.5px]',
+  xs: 'size-6 text-micro',
   sm: 'size-8 text-micro',
   md: 'size-9 text-tiny',
   lg: 'size-10.5 text-caption',
