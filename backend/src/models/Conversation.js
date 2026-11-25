@@ -78,6 +78,8 @@ const conversationSchema = new Schema(
     confirmedFound: { type: Boolean, default: false },
 
     lastMessageAt: { type: Date, default: null },
+    reminderSentAt: { type: Date, default: null },
+    counterpartAsk: { type: Schema.Types.ObjectId, ref: 'Post', default: null },
 
     events: [conversationEventSchema],
   },

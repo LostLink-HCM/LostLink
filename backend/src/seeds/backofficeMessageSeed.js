@@ -64,7 +64,9 @@ const pairKey = (ids) => ids.map(String).sort().join(':')
 const toUserMap = (users) => new Map(users.map((user) => [user.username, user]))
 
 const findConversationMap = async () => {
-  const conversations = await Conversation.find({ kind: 'support' }).select('_id participants')
+  const conversations = await Conversation.find({ kind: 'support' }).select(
+    '_id participants moderatorStates lastMessageAt'
+  )
   return new Map(
     conversations.map((conversation) => [
       pairKey(conversation.participants.map((participant) => participant.user)),

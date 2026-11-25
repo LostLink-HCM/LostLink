@@ -123,6 +123,8 @@ const devices = [
       'Nhân viên ga Suối Tiên nhặt được tai nghe chụp tai màu xám để quên trên tàu chuyến tối, đã chuyển về phòng đồ thất lạc ở ga. Mình đi ngang thấy thông báo nên đăng giúp, ai mất liên hệ nhà ga nha.',
     ...at('ga-suoi-tien'),
     postedHoursAgo: 37,
+    status: 'returned',
+    returnedHoursAgo: 24,
     dayPart: 'evening',
     attributes: { 'Loại thiết bị': 'Tai nghe', 'Màu chủ đạo': 'Xám' },
     views: 300,
@@ -281,6 +283,8 @@ const devices = [
       'Nhặt được tai nghe nhét tai màu đen có dây, đựng trong hộp cứng màu đen, ở ghế chờ trạm xe buýt chợ An Đông. Ai mất nhắn mình nói đúng hãng tai nghe nha.',
     ...at('an-dong'),
     postedHoursAgo: 88,
+    status: 'returned',
+    returnedHoursAgo: 70,
     dayPart: 'afternoon',
     question: {
       text: 'Tai nghe của hãng nào?',

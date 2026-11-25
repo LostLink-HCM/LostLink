@@ -323,7 +323,7 @@ describe('UC40 - Duyệt yêu cầu liên hệ', () => {
     const { post, claimId } = await sendRequest()
     await Post.updateOne({ _id: post._id }, { status: 'closed' })
     expectError(await ownerApi.post(`/api/claims/${claimId}/accept`), 409, 'CLAIM_EXPIRED')
-    assert.equal((await Claim.findById(claimId)).status, 'rejected')
+    assert.equal((await Claim.findById(claimId)).status, 'expired')
   })
 
   test('người khác không duyệt được yêu cầu', async () => {

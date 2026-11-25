@@ -13,7 +13,7 @@ const {
 } = require('../../src/models')
 const { createUser, loginAs, newClient } = require('../helpers/auth')
 const { useTestDb } = require('../helpers/db')
-const { authed, createWalletCategory, makePost } = require('../helpers/posts')
+const { authed, createWalletCategory, makeConfirmedTrade, makePost } = require('../helpers/posts')
 
 useTestDb()
 
@@ -351,22 +351,27 @@ describe('Quản lý tất cả bài đăng - moderator và admin', () => {
     const first = await api.patch(`${path}/${post.id}/status`, { status: 'closed' })
     assert.equal(first.status, 200)
     assert.equal((await MatchSuggestion.findById(match.id)).state, 'stale')
-    assert.equal((await Claim.findById(claim.id)).status, 'rejected')
+    assert.equal((await Claim.findById(claim.id)).status, 'expired')
     const notices = await Notification.find({ refId: post.id }).lean()
-    assert.equal(notices.length, 1)
-    assert.equal(String(notices[0].user), follower.id)
-    assert.equal(notices[0].type, 'post_closed')
-    assert.equal(String(notices[0].actor), actors[0].user.id)
+    assert.deepEqual(notices.map((item) => item.type).sort(), ['post_closed', 'trade_ended'])
+    assert.ok(notices.every((item) => String(item.user) === follower.id))
+    assert.ok(notices.every((item) => String(item.actor) === actors[0].user.id))
 
     const repeated = await api.patch(`${path}/${post.id}/status`, { status: 'closed' })
     assert.equal(repeated.status, 200)
     assert.equal(repeated.body.data.changedAt, first.body.data.changedAt)
     assert.equal((await Post.findById(post.id)).statusHistory.length, 1)
-    assert.equal(await Notification.countDocuments({ refId: post.id }), 1)
+    assert.equal(await Notification.countDocuments({ refId: post.id }), 2)
   })
 
-  test('đánh dấu Đã trao trả cập nhật số lần trả đồ, hoàn tác trạng thái tính lại đúng', async () => {
+  test('đánh dấu Đã trao trả chỉ tính lần trao trả hai bên đã xác nhận, hoàn tác tính lại đúng', async () => {
+    const outside = await makePost(owner, wallet.category, { type: 'found' })
+    await actors[1].api.patch(`${path}/${outside.id}/status`, { status: 'returned' })
+    assert.equal((await User.findById(owner.id)).returnCount, 0)
+
     const post = await makePost(owner, wallet.category, { type: 'found' })
+    const receiver = await createUser({ username: 'nguoinhan', email: 'nhan@example.com' })
+    await makeConfirmedTrade(post, receiver)
     const returned = await actors[1].api.patch(`${path}/${post.id}/status`, { status: 'returned' })
     assert.equal(returned.status, 200)
     assert.equal((await User.findById(owner.id)).returnCount, 1)

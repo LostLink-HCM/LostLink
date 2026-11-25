@@ -1,17 +1,10 @@
-const {
-  Category,
-  Claim,
-  MatchSuggestion,
-  Notification,
-  Post,
-  PostFollow,
-  User,
-} = require('../models')
+const { Category, MatchSuggestion, Notification, Post, PostFollow, User } = require('../models')
 const ApiError = require('../utils/ApiError')
 const { escapeRegex, lowercaseText, normalizeText } = require('../utils/text')
 const { endOfVnDay, startOfVnDay } = require('../utils/vnTime')
 const { syncPostMatchNotices } = require('./matchingService')
 const returnService = require('./returnService')
+const { endTradesOf } = require('./postManageService')
 const { ACTIVE_MATCH_STATES } = require('./postService')
 const { updatePostWithAudit } = require('./postAuditService')
 
@@ -259,7 +252,7 @@ const updateStatus = async (id, actor, status, reason = '') => {
     fields: ['status'],
     changedAt,
     update: {
-      $set: { status },
+      $set: { status, ...(status !== 'returned' && { returnedWith: null }) },
       $push: {
         statusHistory: {
           status,
@@ -285,12 +278,7 @@ const updateStatus = async (id, actor, status, reason = '') => {
     )
   }
   if (FINAL_STATUSES.includes(status)) {
-    effects.push(
-      Claim.updateMany(
-        { post: updated._id, status: { $in: ['pending', 'verifying'] } },
-        { $set: { status: 'rejected', respondedAt: changedAt } }
-      )
-    )
+    effects.push(endTradesOf(updated, status, actor._id, changedAt))
     effects.push(notifyFollowersOfFinalStatus(updated, actor, status, changedAt))
   }
   if (previousStatus === 'returned' && status !== 'returned') {

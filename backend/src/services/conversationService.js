@@ -1,4 +1,4 @@
-const { Claim, Conversation, Message, Post, Review, User } = require('../models')
+const { Claim, Conversation, MatchSuggestion, Message, Post, Review, User } = require('../models')
 const { emitToUsers, emitToUsersAndRole } = require('../socket')
 const { createMessage } = require('./messageWriteService')
 const {
@@ -9,7 +9,7 @@ const {
 const { notify } = require('./notificationService')
 const { notifyUserSupportMessage } = require('./backofficeNotificationEvents')
 const { afterPostEnded } = require('./postManageService')
-const { invalidField, toAuthor } = require('./postService')
+const { CLOSABLE_STATUSES, invalidField, toAuthor } = require('./postService')
 const reputationService = require('./reputationService')
 const returnService = require('./returnService')
 const ApiError = require('../utils/ApiError')
@@ -42,6 +42,7 @@ const POPULATE = [
     ],
   },
   { path: 'participants.user', select: 'username avatarUrl role' },
+  { path: 'counterpartAsk', select: 'owner type status title slug' },
 ]
 
 // Bài Đang tìm chuyển Đã liên hệ, bài đã Đã liên hệ thì giữ nguyên
@@ -97,6 +98,13 @@ const toMessage = (message, sender) => ({
   sentAt: message.sentAt,
 })
 
+const counterpartAskOf = (conversation, user) => {
+  const ask = conversation.counterpartAsk
+  if (!ask?.owner || idOf(ask.owner) !== String(user._id)) return null
+  if (!CLOSABLE_STATUSES.includes(ask.status)) return null
+  return { id: ask._id, slug: ask.slug, type: ask.type, title: ask.title }
+}
+
 // Hội thoại nhìn từ phía người xem: "me" là mình, "peer" là người còn lại
 const toConversation = (conversation, user, extra = {}) => {
   const post = conversation.post
@@ -114,6 +122,7 @@ const toConversation = (conversation, user, extra = {}) => {
     closedBy: closedBy(conversation, user),
     returned: isReturned(conversation),
     confirmed: { me: Boolean(mine), peer: Boolean(theirs) },
+    counterpartAsk: counterpartAskOf(conversation, user),
     events: (conversation.events ?? []).map((event) => ({
       type: event.type,
       by: idOf(event.by) === String(user._id) ? 'me' : 'peer',
@@ -390,6 +399,112 @@ const reopenConversation = async (id, user) => {
 
 const cannotConfirm = (message, code) => ApiError.conflict(message, code)
 
+const counterpartOf = async (post, ownerId, otherId) => {
+  const ids = await Post.find({
+    owner: otherId,
+    type: post.type === 'lost' ? 'found' : 'lost',
+    status: { $in: CLOSABLE_STATUSES },
+  }).distinct('_id')
+  if (!ids.length) return null
+
+  const [mine, theirs] =
+    post.type === 'lost' ? ['postLost', 'postFound'] : ['postFound', 'postLost']
+  const matched = await MatchSuggestion.find({
+    [mine]: post._id,
+    [theirs]: { $in: ids },
+    state: { $nin: ['rejected', 'failed'] },
+  }).distinct(theirs)
+  if (matched.length) return matched.length === 1 ? matched[0] : null
+
+  const talked = await Conversation.find({
+    kind: 'trade',
+    post: { $in: ids },
+    status: 'open',
+    'participants.user': { $all: [ownerId, otherId] },
+    participants: { $not: { $elemMatch: { closedAt: { $ne: null } } } },
+  }).distinct('post')
+  return talked.length === 1 ? talked[0] : null
+}
+
+const settleWith = async (counterpartId, post, actorId, skip) => {
+  const changedAt = new Date()
+  const settled = await Post.findOneAndUpdate(
+    { _id: counterpartId, status: { $in: CLOSABLE_STATUSES } },
+    {
+      $set: { status: 'returned', returnedWith: post._id },
+      $push: {
+        statusHistory: {
+          status: 'returned',
+          changedBy: actorId,
+          changedAt,
+          note: `Trao trả cùng bài "${post.title}"`,
+        },
+      },
+    },
+    { returnDocument: 'after' }
+  )
+  if (settled) await afterPostEnded(settled, 'returned', actorId, changedAt, { skip })
+  return settled
+}
+
+const askCandidateOf = async (post, otherId) => {
+  const candidates = await Post.find({
+    owner: otherId,
+    type: post.type === 'lost' ? 'found' : 'lost',
+    category: idOf(post.category),
+    status: { $in: CLOSABLE_STATUSES },
+  })
+    .select('title')
+    .limit(2)
+    .lean()
+  return candidates.length === 1 ? candidates[0] : null
+}
+
+const settleCounterpart = async (post, conversation, actorId) => {
+  const ownerId = idOf(post.owner)
+  const otherId = conversation.participants
+    .map((item) => idOf(item.user))
+    .find((id) => id !== ownerId)
+  if (!otherId) return
+  const counterpartId = await counterpartOf(post, ownerId, otherId)
+  if (counterpartId) {
+    await settleWith(counterpartId, post, actorId, [ownerId, otherId])
+    return
+  }
+
+  const candidate = await askCandidateOf(post, otherId)
+  if (!candidate) return
+  await Conversation.updateOne(
+    { _id: conversation._id },
+    { $set: { counterpartAsk: candidate._id } }
+  )
+  await notify([otherId], {
+    type: 'counterpart_ask',
+    refType: 'Post',
+    refId: post._id,
+    text: `Bài "${candidate.title}" của bạn có phải cùng món với bài "${post.title}" vừa trao trả không?`,
+  })
+}
+
+const answerCounterpart = async (id, user, { same }) => {
+  const conversation = await findMine(id, user, { populate: true })
+  const ask = counterpartAskOf(conversation, user)
+  const gone = () => ApiError.conflict('Câu hỏi này không còn hiệu lực.', 'COUNTERPART_ASK_GONE')
+  if (!ask) throw gone()
+  const { modifiedCount } = await Conversation.updateOne(
+    { _id: conversation._id, counterpartAsk: ask.id },
+    { $set: { counterpartAsk: null } }
+  )
+  if (!modifiedCount) throw gone()
+
+  if (same) {
+    const { post } = conversation
+    await settleWith(ask.id, post, user._id, [idOf(post.owner), String(user._id)])
+  }
+  broadcastUpdate(conversation)
+  return freshConversation(id, user)
+}
+
 // Mỗi bên xác nhận phần của mình; bên thứ hai xác nhận thì bài chuyển Đã trao trả,
 // người trả đồ được cộng điểm. Đổi trạng thái bài trong một lệnh nên chỉ chạy một lần
 const confirmReturn = async (id, user) => {
@@ -441,6 +556,7 @@ const confirmReturn = async (id, user) => {
   )
   if (returned) {
     await afterPostEnded(returned, 'returned', user._id)
+    await settleCounterpart(returned, conversation, user._id)
     const returners = await returnService.returnersOf(returned)
     await Promise.all([
       reputationService.awardReturn(returners),
@@ -578,6 +694,7 @@ module.exports = {
   closeConversation,
   reopenConversation,
   confirmReturn,
+  answerCounterpart,
   reviewConversation,
   openSupport,
 }

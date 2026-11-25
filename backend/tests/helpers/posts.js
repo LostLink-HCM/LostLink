@@ -1,4 +1,10 @@
-const { AttributeValue, Category, CategoryAttribute, Post } = require('../../src/models')
+const {
+  AttributeValue,
+  Category,
+  CategoryAttribute,
+  Conversation,
+  Post,
+} = require('../../src/models')
 const { todayVn } = require('../../src/utils/vnTime')
 
 const DAY = 24 * 60 * 60 * 1000
@@ -34,6 +40,15 @@ const makePost = (owner, category, fields = {}) =>
     locPublic: { type: 'Point', coordinates: [106.6995, 10.7738] },
     status: 'searching',
     ...fields,
+  })
+
+const makeConfirmedTrade = (post, other) =>
+  Conversation.create({
+    kind: 'trade',
+    post: post._id,
+    participants: [{ user: post.owner }, { user: other._id }],
+    confirmedLost: true,
+    confirmedFound: true,
   })
 
 const jpeg = (name = 'anh.jpg', size = 1024) => ({
@@ -73,6 +88,7 @@ module.exports = {
   yesterday,
   createWalletCategory,
   makePost,
+  makeConfirmedTrade,
   jpeg,
   multipart,
   authed,
