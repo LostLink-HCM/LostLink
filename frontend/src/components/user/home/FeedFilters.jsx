@@ -10,6 +10,24 @@ import DateField from './DateField'
 import MiniCalendar from './MiniCalendar'
 
 const DATE_LABELS = { from: 'Từ ngày', to: 'Đến ngày' }
+const ALL_ICON = '/images/categories/tat-ca.png'
+
+function CategoryArt({ icon, name, size }) {
+  const [broken, setBroken] = useState(false)
+  if (icon && !broken) {
+    return (
+      <img
+        src={icon}
+        alt=""
+        loading="lazy"
+        onError={() => setBroken(true)}
+        style={{ width: size, height: size }}
+        className="object-contain"
+      />
+    )
+  }
+  return <CategoryIcon name={name} size={Math.round(size * 0.75)} />
+}
 
 const typeButtonTones = {
   all: {
@@ -83,7 +101,14 @@ export default function FeedFilters({
   }, [picking])
 
   const categories = useFeedCategories()
-  const categoryName = (slug) => categories.find((item) => item.slug === slug)?.name ?? ''
+  const categoryOf = (slug) => categories.find((item) => item.slug === slug)
+  const categoryName = (slug) => categoryOf(slug)?.name ?? ''
+  const categoryArt = (slug, size) =>
+    slug ? (
+      <CategoryArt key={slug} icon={categoryOf(slug)?.icon} name={categoryName(slug)} size={size} />
+    ) : (
+      <CategoryArt icon={ALL_ICON} name="Tất cả" size={size} />
+    )
 
   return (
     <form
@@ -131,7 +156,7 @@ export default function FeedFilters({
               draft.category && {
                 key: 'category',
                 label: categoryName(draft.category) || draft.category,
-                icon: <CategoryIcon name={categoryName(draft.category)} size={12} />,
+                icon: categoryArt(draft.category, 14),
               },
             ].filter(Boolean)}
             onRemove={(key) => onChange({ [key]: '' })}
@@ -173,7 +198,7 @@ export default function FeedFilters({
             labelOf={categoryName}
             allLabel="Tất cả danh mục"
             unit="danh mục"
-            renderIcon={(slug) => <CategoryIcon name={categoryName(slug) || 'Tất cả'} size={16} />}
+            renderIcon={(slug) => categoryArt(slug, 26)}
             onPick={(category) => onChange({ category })}
           />
         )}

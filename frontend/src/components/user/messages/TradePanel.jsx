@@ -67,6 +67,31 @@ export default function TradePanel({ thread, busy, onConfirm, onReview }) {
     )
   }
 
+  if (status === 'expired') {
+    return (
+      <InfoCard title="Yêu cầu đã hết hiệu lực">
+        <p className="m-0">
+          Bài đăng đã được trao trả hoặc đã đóng trước khi yêu cầu được đồng ý, nên không thể trò
+          chuyện về bài này nữa.
+        </p>
+      </InfoCard>
+    )
+  }
+
+  if (status === 'ended') {
+    const returned = thread.post?.status === 'returned'
+    return (
+      <InfoCard title={returned ? 'Bài đã được trao trả' : 'Bài đã đóng'}>
+        <p className="m-0">
+          {returned
+            ? 'Bài này đã chuyển sang Đã trao trả nên không cần xác nhận trong hội thoại này nữa.'
+            : 'Người đăng đã đóng bài nên không thể xác nhận trao trả qua bài này nữa.'}{' '}
+          Hai bạn vẫn nhắn tin được.
+        </p>
+      </InfoCard>
+    )
+  }
+
   if (status === 'declined' || status === 'locked' || closedBy) {
     return (
       <InfoCard title={closedBy === 'me' ? 'Bạn đã đóng hội thoại' : 'Hội thoại đã đóng'}>

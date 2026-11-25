@@ -7,6 +7,7 @@ const { messageLimiter } = require('../middleware/rateLimiter')
 const validate = require('../middleware/validate')
 const {
   conversationIdRules,
+  counterpartRules,
   historyRules,
   messageRules,
   rejectInvalidConversationId,
@@ -37,6 +38,7 @@ router.post(
 router.post('/:id/close', ...byId, ctrl.closeConversation)
 router.post('/:id/reopen', ...byId, ctrl.reopenConversation)
 router.post('/:id/confirm', ...byId, ctrl.confirmReturn)
+router.post('/:id/counterpart', ...byId, counterpartRules, validate, ctrl.answerCounterpart)
 router.post('/:id/review', ...byId, reviewRules, validate, ctrl.reviewConversation)
 
 module.exports = router

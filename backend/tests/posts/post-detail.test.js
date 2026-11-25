@@ -341,12 +341,19 @@ describe('Mã bài đăng', () => {
 })
 
 describe('UC04 - Số lần trao trả của người đăng', () => {
-  test('đếm bài Nhặt được đã trao trả và bài Mất đồ của người khác mà mình đã trả đồ', async () => {
+  test('chỉ đếm lần trả đồ hai bên đã xác nhận, qua bài Nhặt được của mình hoặc bài Mất đồ của người khác', async () => {
     const finder = owner
     const loser = await createMember('nguoimat')
 
     // Tự đăng bài Nhặt được rồi trả đồ: tính
-    await makePost({ type: 'found', title: 'Nhặt được ví', status: 'returned' })
+    const foundPost = await makePost({ type: 'found', title: 'Nhặt được ví', status: 'returned' })
+    await Conversation.create({
+      post: foundPost._id,
+      participants: [{ user: finder._id }, { user: loser._id }],
+      confirmedLost: true,
+      confirmedFound: true,
+    })
+    await makePost({ type: 'found', title: 'Nhặt được thẻ', status: 'returned' })
     // Bài Nhặt được chưa trao trả: không tính
     await makePost({ type: 'found', title: 'Nhặt được chìa khóa' })
     // Trả đồ qua bài Mất đồ của người khác, hai bên đã xác nhận: tính

@@ -20,6 +20,8 @@ export const sendMessage = (id, { body = '', image = null }) => {
 export const closeConversation = (id) => api.post(`/conversations/${id}/close`)
 export const reopenConversation = (id) => api.post(`/conversations/${id}/reopen`)
 export const confirmReturn = (id) => api.post(`/conversations/${id}/confirm`)
+export const answerCounterpart = (id, same) =>
+  api.post(`/conversations/${id}/counterpart`, { same })
 
 // { rating, praises, comment, isPublic }
 export const reviewConversation = (id, review) => api.post(`/conversations/${id}/review`, review)

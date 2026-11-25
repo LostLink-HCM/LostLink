@@ -128,6 +128,7 @@ const postSchema = new Schema(
     locPublic: { type: geoSchema, default: null },
 
     status: { type: String, enum: POST_STATUSES, default: 'pending', index: true },
+    returnedWith: { type: Schema.Types.ObjectId, ref: 'Post', default: null },
 
     // Moderator ẩn bài hoặc bài tự ẩn 7 ngày sau khi trao trả
     isHidden: { type: Boolean, default: false, index: true },

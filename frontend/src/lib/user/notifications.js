@@ -83,6 +83,21 @@ const DESCRIBE = {
     title: `${item.actor?.username ?? 'Người kia'} đã xác nhận trao trả, bạn xác nhận giúp nhé`,
     body: item.post?.title ?? item.text,
   }),
+  trade_reminder: (item) => ({
+    kind: 'contact',
+    title: 'Món đồ đã được trao trả chưa?',
+    body: item.text,
+  }),
+  trade_ended: (item) => ({
+    kind: 'contact',
+    title: 'Bài bạn đang liên hệ đã kết thúc',
+    body: item.text,
+  }),
+  counterpart_ask: (item) => ({
+    kind: 'contact',
+    title: 'Bài của bạn có phải cùng món vừa trao trả?',
+    body: item.text,
+  }),
   return_completed: (item) => ({
     kind: 'contact',
     title: 'Hai bên đã xác nhận trao trả',
@@ -108,6 +123,9 @@ const MESSAGE_TYPES = [
   'verification_passed',
   'conversation_closed',
   'return_reminder',
+  'trade_reminder',
+  'trade_ended',
+  'counterpart_ask',
   'return_completed',
 ]
 
@@ -121,6 +139,9 @@ const GROUP_OF = {
   conversation_closed: 'trade',
   return_completed: 'trade',
   return_reminder: 'trade',
+  trade_reminder: 'trade',
+  trade_ended: 'trade',
+  counterpart_ask: 'trade',
   review: 'trade',
   contact_12h: 'trade',
   report_result: 'system',

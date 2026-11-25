@@ -2,8 +2,10 @@ const assert = require('node:assert/strict')
 const { afterEach, beforeEach, describe, mock, test } = require('node:test')
 
 const {
+  Category,
   Claim,
   Conversation,
+  MatchSuggestion,
   Message,
   Notification,
   Post,
@@ -248,6 +250,151 @@ describe('UC43 - Xác nhận đã trao trả', () => {
     await loserApi.post(`${path()}/reopen`)
     await Post.updateOne({ _id: post._id }, { status: 'closed' })
     expectError(await finderApi.post(`${path()}/confirm`), 409, 'POST_STATUS_CHANGED')
+  })
+})
+
+describe('UC43 - Trao trả xong thì bài đối ứng và các liên hệ khác kết thúc theo', () => {
+  const confirmBoth = async () => {
+    await loserApi.post(`${path()}/confirm`)
+    return finderApi.post(`${path()}/confirm`)
+  }
+
+  test('cùng món có hai bài: bài Mất đồ theo sang Đã trao trả, không cộng điểm thêm lần nữa', async () => {
+    const lost = await makePost(loser, wallet.category, { status: 'contacted' })
+    await MatchSuggestion.create({ postLost: lost._id, postFound: post._id, score: 0.9 })
+    const talk = await Conversation.create({
+      kind: 'trade',
+      post: lost._id,
+      participants: [{ user: loser._id }, { user: finder._id }],
+    })
+
+    assert.equal((await confirmBoth()).body.data.returned, true)
+
+    const settled = await Post.findById(lost._id)
+    assert.equal(settled.status, 'returned')
+    assert.equal(String(settled.returnedWith), String(post._id))
+    assert.match(settled.statusHistory.at(-1).note, /Trao trả cùng bài/)
+    const detail = await loserApi.get(`/api/conversations/${talk._id}`)
+    assert.equal(detail.body.data.post.status, 'returned')
+    expectError(
+      await loserApi.post(`/api/conversations/${talk._id}/confirm`),
+      409,
+      'POST_STATUS_CHANGED'
+    )
+    const finderAfter = await User.findById(finder._id)
+    assert.equal(finderAfter.reputationScore, 10)
+    assert.equal(finderAfter.returnCount, 1)
+    assert.equal((await newClient().get('/api/stats/community')).body.data.returned, 1)
+    assert.equal(await Notification.countDocuments({ type: 'trade_ended' }), 0)
+  })
+
+  test('không có manh mối và có hơn một bài đối ứng thì không tự đổi bài nào', async () => {
+    const lostPosts = []
+    for (const title of ['Mất ví', 'Mất ví khác']) {
+      lostPosts.push(await makePost(loser, wallet.category, { title, status: 'contacted' }))
+    }
+    await Conversation.create(
+      lostPosts.map((lost) => ({
+        kind: 'trade',
+        post: lost._id,
+        participants: [{ user: loser._id }, { user: finder._id }],
+      }))
+    )
+
+    await confirmBoth()
+    const after = await Post.find({ _id: { $in: lostPosts.map((lost) => lost._id) } }).lean()
+    assert.ok(after.every((item) => item.status === 'contacted' && !item.returnedWith))
+    assert.equal((await loserApi.get(path())).body.data.counterpartAsk, null)
+  })
+
+  test('không có manh mối, người kia có đúng một bài cùng danh mục: hỏi, trả lời Đúng thì bài theo sang', async () => {
+    const lost = await makePost(loser, wallet.category)
+    await confirmBoth()
+
+    assert.equal((await Post.findById(lost._id)).status, 'searching')
+    const notice = await Notification.findOne({ type: 'counterpart_ask' }).lean()
+    assert.equal(String(notice.user), String(loser._id))
+    assert.match(notice.preview, /có phải cùng món/)
+    assert.equal(String((await loserApi.get(path())).body.data.counterpartAsk.id), String(lost._id))
+    assert.equal((await finderApi.get(path())).body.data.counterpartAsk, null)
+    expectError(await finderApi.post(`${path()}/counterpart`, { same: true }), 409)
+    expectError(await loserApi.post(`${path()}/counterpart`, { same: 'true' }), 422)
+
+    const res = await loserApi.post(`${path()}/counterpart`, { same: true })
+    assert.equal(res.status, 200, JSON.stringify(res.body))
+    assert.equal(res.body.data.counterpartAsk, null)
+    const settled = await Post.findById(lost._id)
+    assert.equal(settled.status, 'returned')
+    assert.equal(String(settled.returnedWith), String(post._id))
+    const finderAfter = await User.findById(finder._id)
+    assert.equal(finderAfter.reputationScore, 10)
+    assert.equal(finderAfter.returnCount, 1)
+    assert.equal((await newClient().get('/api/stats/community')).body.data.returned, 1)
+    expectError(
+      await loserApi.post(`${path()}/counterpart`, { same: true }),
+      409,
+      'COUNTERPART_ASK_GONE'
+    )
+  })
+
+  test('trả lời Không phải thì bài giữ nguyên; bài khác danh mục thì không hỏi', async () => {
+    const phone = await Category.create({ name: 'Điện thoại', slug: 'dien-thoai' })
+    await makePost(loser, phone, { title: 'Mất điện thoại' })
+    const lost = await makePost(loser, wallet.category)
+    await confirmBoth()
+
+    assert.equal(String((await loserApi.get(path())).body.data.counterpartAsk.id), String(lost._id))
+    const res = await loserApi.post(`${path()}/counterpart`, { same: false })
+    assert.equal(res.status, 200)
+    assert.equal(res.body.data.counterpartAsk, null)
+    const kept = await Post.findById(lost._id)
+    assert.equal(kept.status, 'searching')
+    assert.equal(kept.returnedWith, null)
+  })
+
+  test('bài được hỏi đã kết thúc trước khi trả lời thì câu hỏi hết hiệu lực', async () => {
+    const lost = await makePost(loser, wallet.category)
+    await confirmBoth()
+    await Post.updateOne({ _id: lost._id }, { status: 'closed' })
+
+    assert.equal((await loserApi.get(path())).body.data.counterpartAsk, null)
+    expectError(
+      await loserApi.post(`${path()}/counterpart`, { same: true }),
+      409,
+      'COUNTERPART_ASK_GONE'
+    )
+  })
+
+  test('người khác đang liên hệ cùng bài: yêu cầu hết hiệu lực, hội thoại hết xác nhận, có thông báo', async () => {
+    const other = await createUser({ username: 'nguoikhac', email: 'other@example.com' })
+    const waiter = await createUser({ username: 'nguoicho', email: 'waiter@example.com' })
+    const otherTalk = await Conversation.create({
+      kind: 'trade',
+      post: post._id,
+      participants: [{ user: finder._id }, { user: other._id }],
+    })
+    const claim = await Claim.create({
+      post: post._id,
+      claimant: waiter._id,
+      kind: 'is_mine',
+      introMessage: 'Ví đó của mình',
+    })
+
+    await confirmBoth()
+
+    assert.equal((await Claim.findById(claim._id)).status, 'expired')
+    const ended = await Notification.find({ type: 'trade_ended' }).lean()
+    assert.deepEqual(ended.map((item) => String(item.user)).sort(), [other.id, waiter.id].sort())
+    const { client, accessToken } = await loginAs('other@example.com')
+    const otherApi = authed(client, accessToken)
+    const detail = await otherApi.get(`/api/conversations/${otherTalk._id}`)
+    assert.equal(detail.body.data.status, 'open')
+    assert.equal(detail.body.data.post.status, 'returned')
+    expectError(
+      await otherApi.post(`/api/conversations/${otherTalk._id}/confirm`),
+      409,
+      'POST_STATUS_CHANGED'
+    )
   })
 })
 

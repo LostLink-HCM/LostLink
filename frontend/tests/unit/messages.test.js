@@ -7,8 +7,12 @@ import {
   canClose,
   claimThread,
   conversationThread,
+  counterpartAsks,
   filterThreads,
+  groupThreads,
   inboxUnread,
+  pendingTrades,
+  samePeerThreads,
   threadNotes,
   threadPreview,
   toMessage,
@@ -64,6 +68,22 @@ describe('UC41 - danh sách hội thoại', () => {
     // receiver true trên bài Nhặt được: mình không phải chủ bài
     expect(conversationThread(conversation()).post.mine).toBe(false)
     expect(conversationThread(conversation({ receiver: false })).post.mine).toBe(true)
+  })
+
+  it('bài đã trao trả qua hội thoại khác hoặc đã đóng: hội thoại kết thúc, yêu cầu hết hiệu lực', () => {
+    const ended = (status) => conversationThread(conversation({ post: { ...POST, status } })).status
+    expect(ended('returned')).toBe('ended')
+    expect(ended('closed')).toBe('ended')
+    expect(ended('contacted')).toBe('open')
+    expect(
+      conversationThread(conversation({ returned: true, post: { ...POST, status: 'returned' } }))
+        .status
+    ).toBe('returned')
+    expect(
+      canClose(conversationThread(conversation({ post: { ...POST, status: 'closed' } })))
+    ).toBe(false)
+    expect(claimThread(claim({ status: 'expired' })).status).toBe('expired')
+    expect(claimThread(claim({ status: 'rejected' })).status).toBe('declined')
   })
 
   it('hội thoại hỗ trợ hiện nhãn LostLink, không có bài đăng', () => {
@@ -168,6 +188,62 @@ describe('UC41 - danh sách hội thoại', () => {
     expect(validateMessage('   ')).toBe('Vui lòng nhập nội dung tin nhắn.')
     expect(validateMessage('a'.repeat(2001))).toBe('Tin nhắn tối đa 2.000 ký tự.')
     expect(validateMessage('Số mình 0901234567', { intro: true })).toMatch(/số điện thoại/)
+  })
+})
+
+describe('UC41 - gom hội thoại theo người', () => {
+  const contacted = { ...POST, status: 'contacted' }
+  const older = conversationThread(conversation({ post: contacted }))
+  const newer = conversationThread(
+    conversation({
+      id: 'c2',
+      post: { ...contacted, id: 'p2', title: 'Nhặt được chìa khoá' },
+      createdAt: '2026-11-20T08:00:00.000Z',
+      lastMessageAt: '2026-11-20T09:00:00.000Z',
+      unread: 1,
+    })
+  )
+  const other = conversationThread(
+    conversation({ id: 'c3', peer: { username: 'minhtu' }, lastMessageAt: '2026-11-18T09:00:00Z' })
+  )
+  const support = conversationThread(
+    conversation({ id: 's1', kind: 'support', post: null, peer: { username: 'hoangnam' } })
+  )
+
+  it('một dòng mỗi người, dòng đại diện là bài mới nhất, cộng dồn chưa đọc', () => {
+    const groups = groupThreads(filterThreads([older, other, newer, support], ''))
+    expect(groups.map((group) => group.lead.id)).toEqual(['c2', 'c3', 's1'])
+    expect(groups[0].threads.map((thread) => thread.id)).toEqual(['c2', 'c1'])
+    expect(groups[0].unread).toBe(3)
+    expect(samePeerThreads([older, newer, other], older).map((thread) => thread.id)).toEqual([
+      'c2',
+      'c1',
+    ])
+  })
+
+  it('bài cũ còn treo hiện ở hội thoại mới, không hiện ngược lại hay khi đã xong', () => {
+    expect(pendingTrades([older, newer], newer).map((thread) => thread.id)).toEqual(['c1'])
+    expect(pendingTrades([older, newer], older)).toEqual([])
+
+    const done = [
+      conversationThread(conversation({ post: contacted, returned: true })),
+      conversationThread(conversation({ post: contacted, closedBy: 'peer' })),
+      conversationThread(conversation({ post: { ...contacted, status: 'returned' } })),
+    ]
+    for (const thread of done) expect(pendingTrades([thread, newer], newer)).toEqual([])
+  })
+
+  it('câu hỏi bài đối ứng hiện ở mọi hội thoại với cùng người', () => {
+    const ask = { id: 'p9', slug: 'mat-vi', type: 'lost', title: 'Mất ví' }
+    const returned = conversationThread(
+      conversation({ returned: true, post: { ...POST, status: 'returned' }, counterpartAsk: ask })
+    )
+    expect(returned.counterpartAsk).toEqual(ask)
+    expect(counterpartAsks([returned, newer, other], newer).map((thread) => thread.id)).toEqual([
+      'c1',
+    ])
+    expect(counterpartAsks([returned, newer, other], other)).toEqual([])
+    expect(conversationThread(conversation()).counterpartAsk).toBeNull()
   })
 })
 

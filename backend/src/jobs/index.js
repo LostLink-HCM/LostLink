@@ -1,7 +1,9 @@
 const accountService = require('../services/accountService')
 const categoryFrequencyService = require('../services/categoryFrequencyService')
+const tradeReminderService = require('../services/tradeReminderService')
 const { onFrequencyInputsChanged, offFrequencyInputsChanged } = require('../utils/frequencyEvents')
 const PURGE_INTERVAL_MS = 15 * 60 * 1000
+const TRADE_REMINDER_INTERVAL_MS = 60 * 60 * 1000
 const CATEGORY_FREQUENCY_INTERVAL_MS = 15 * 60 * 1000
 const CATEGORY_FREQUENCY_DEBOUNCE_MS = 1000
 
@@ -12,6 +14,8 @@ let frequencyDebounceTimer = null
 let frequencyRunning = false
 let frequencyRequestedWhileRunning = false
 let jobsStarted = false
+let reminderTimer = null
+let reminderRunning = false
 
 const purgeAccounts = async () => {
   if (running) return
@@ -23,6 +27,19 @@ const purgeAccounts = async () => {
     console.error('Account purge failed:', err)
   } finally {
     running = false
+  }
+}
+
+const remindOpenTrades = async () => {
+  if (reminderRunning) return
+  reminderRunning = true
+  try {
+    const reminded = await tradeReminderService.remindOpenTrades()
+    if (reminded) console.log(`Sent reminders for ${reminded} open conversation(s)`)
+  } catch (err) {
+    console.error('Trade reminder failed:', err)
+  } finally {
+    reminderRunning = false
   }
 }
 
@@ -71,6 +88,9 @@ const startJobs = () => {
   recalculateCategoryFrequencies()
   frequencyTimer = setInterval(recalculateCategoryFrequencies, CATEGORY_FREQUENCY_INTERVAL_MS)
   frequencyTimer.unref()
+  remindOpenTrades()
+  reminderTimer = setInterval(remindOpenTrades, TRADE_REMINDER_INTERVAL_MS)
+  reminderTimer.unref()
 }
 
 const stopJobs = () => {
@@ -80,6 +100,8 @@ const stopJobs = () => {
   timer = null
   clearInterval(frequencyTimer)
   frequencyTimer = null
+  clearInterval(reminderTimer)
+  reminderTimer = null
   offFrequencyInputsChanged(scheduleCategoryFrequencyRecalculation)
   clearTimeout(frequencyDebounceTimer)
   frequencyDebounceTimer = null

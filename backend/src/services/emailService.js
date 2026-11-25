@@ -94,6 +94,21 @@ const sendContactReminder = ({ to, postTitle, messagesUrl }) =>
       </div>`,
   })
 
+const sendTradeReminder = ({ to, postTitle, days, messagesUrl }) =>
+  sendMail({
+    to,
+    subject: 'Món đồ của bạn đã được trao trả chưa?',
+    text: `Hội thoại về bài "${postTitle}" đã mở hơn ${days} ngày nhưng chưa được xác nhận. Nếu đã trao trả, hãy xác nhận; nếu món đồ không khớp, hãy đóng hội thoại: ${messagesUrl}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto">
+        <h2>Món đồ đã được trao trả chưa?</h2>
+        <p>Hội thoại về bài <strong>${escapeHtml(postTitle)}</strong> đã mở hơn ${days} ngày nhưng chưa được xác nhận.</p>
+        <p>Nếu đã trao trả, hãy xác nhận để hoàn tất. Nếu món đồ không khớp, hãy đóng hội thoại để bài tiếp tục được tìm kiếm.</p>
+        <p><a href="${messagesUrl}" style="display:inline-block;padding:12px 20px;background:#3B76D6;color:#fff;border-radius:8px;text-decoration:none">Mở tin nhắn</a></p>
+        <p style="color:#666">Bạn nhận email này vì đã bật nhận email từ LostLink.</p>
+      </div>`,
+  })
+
 const sendEmailChangeCode = ({ to, code, minutes }) =>
   sendMail({
     to,
@@ -160,6 +175,7 @@ module.exports = {
   sendVerificationCode,
   sendResetLink,
   sendContactReminder,
+  sendTradeReminder,
   sendEmailChangeCode,
   sendAccountDeletionNotice,
   sendCategoryArchivedNotice,

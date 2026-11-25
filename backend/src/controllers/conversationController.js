@@ -34,6 +34,13 @@ module.exports = {
   closeConversation: send((req) => conversationService.closeConversation(idOf(req), req.user)),
   reopenConversation: send((req) => conversationService.reopenConversation(idOf(req), req.user)),
   confirmReturn: send((req) => conversationService.confirmReturn(idOf(req), req.user)),
+  answerCounterpart: send((req) =>
+    conversationService.answerCounterpart(
+      idOf(req),
+      req.user,
+      matchedData(req, { locations: ['body'] })
+    )
+  ),
   reviewConversation: send(
     (req) =>
       conversationService.reviewConversation(

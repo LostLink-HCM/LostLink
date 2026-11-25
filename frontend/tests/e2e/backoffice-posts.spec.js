@@ -87,8 +87,8 @@ for (const manager of MANAGERS) {
 
       await filters.getByRole('searchbox', { name: 'Tìm kiếm' }).fill(`${prefix} không tồn tại`)
       await expect(page.getByText('Không tìm thấy bài đăng phù hợp', { exact: true })).toBeVisible()
-      await filters.getByLabel('Từ ngày').fill('2026-11-12')
-      await filters.getByLabel('Đến ngày').fill('2026-11-10')
+      await filters.getByRole('textbox', { name: 'Từ ngày', exact: true }).fill('2026-11-12')
+      await filters.getByRole('textbox', { name: 'Đến ngày', exact: true }).fill('2026-11-10')
       await expect(page.getByText('Khoảng thời gian chưa hợp lệ', { exact: true })).toBeVisible()
 
       await filters.getByRole('button', { name: 'Đặt lại bộ lọc', exact: true }).click()
@@ -96,8 +96,8 @@ for (const manager of MANAGERS) {
       for (const label of ['Trạng thái', 'Danh mục', 'Loại bài đăng', 'Khu vực']) {
         await expect(filters.getByRole('combobox', { name: label })).toHaveValue('')
       }
-      await expect(filters.getByLabel('Từ ngày')).toHaveValue('')
-      await expect(filters.getByLabel('Đến ngày')).toHaveValue('')
+      await expect(filters.getByRole('textbox', { name: 'Từ ngày', exact: true })).toHaveValue('')
+      await expect(filters.getByRole('textbox', { name: 'Đến ngày', exact: true })).toHaveValue('')
       await expect(table(page).getByRole('row').nth(1)).toBeVisible()
     })
 

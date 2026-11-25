@@ -72,11 +72,13 @@ export default function Composer({
     )
   }
 
-  if (status === 'declined') {
+  if (status === 'declined' || status === 'expired') {
     return (
       <p className="m-0 flex items-center gap-2 border-t border-line bg-surface-muted px-5 py-4 text-caption text-ink-muted">
         <Icon name="lock" size={15} />
-        Yêu cầu trò chuyện đã bị từ chối.
+        {status === 'declined'
+          ? 'Yêu cầu trò chuyện đã bị từ chối.'
+          : 'Bài đã kết thúc nên yêu cầu trò chuyện không còn hiệu lực.'}
       </p>
     )
   }
@@ -97,7 +99,7 @@ export default function Composer({
   }
 
   // Đã trao trả vẫn nhắn tiếp được
-  const open = status === 'open' || status === 'returned'
+  const open = ['open', 'returned', 'ended'].includes(status)
   const pending = status === 'pending'
   const placeholder = pending
     ? `Đã hết lượt, chờ ${peer.name} đồng ý trò chuyện`

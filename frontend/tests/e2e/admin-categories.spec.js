@@ -111,7 +111,7 @@ test('lưu trữ báo quan hệ bị ảnh hưởng và cập nhật nhóm còn 
       response.url().endsWith(`/api/admin/categories/${target.id}`) &&
       response.request().method() === 'DELETE'
   )
-  await dialog.getByRole('button', { name: 'Xóa danh mục', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Xóa', exact: true }).click()
   expect((await archivedResponse).status()).toBe(200)
   await expect(dialog).toHaveCount(0)
 
@@ -229,12 +229,11 @@ test('lưu cấu hình thuật toán, thêm rồi gỡ danh mục quan hệ và 
 
   await categoryTabs(page).getByRole('tab', { name: 'Câu hỏi xác minh', exact: true }).click()
   await page.getByRole('button', { name: 'Thêm câu hỏi', exact: true }).click()
-  const questionDialog = page.getByRole('dialog', { name: 'Thêm câu hỏi xác minh' })
-  await questionDialog.getByLabel('Nội dung câu hỏi').fill('Ví có màu gì?')
+  await page.getByRole('textbox', { name: 'Câu hỏi xác minh 1', exact: true }).fill('Ví có màu gì?')
   const questionResponse = page.waitForResponse((response) =>
     response.url().endsWith(`/api/admin/categories/${category.id}/verification-questions`)
   )
-  await questionDialog.getByRole('button', { name: 'Lưu câu hỏi', exact: true }).click()
+  await page.getByRole('button', { name: 'Lưu cấu hình', exact: true }).click()
   expect((await questionResponse).status()).toBe(201)
   await expect(page.getByText('Ví có màu gì?', { exact: true })).toBeVisible()
 

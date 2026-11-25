@@ -4,7 +4,6 @@ const MINUTE = 60 * 1000
 const HOUR = 60 * MINUTE
 
 // Lời cảm ơn sau trao trả: người nhận lại đồ đánh giá người nhặt được (chủ bài Nhặt được).
-// Điểm lệch nhau để bảng vinh danh có đủ hạng 1 tới 5
 const REVIEWS = [
   {
     post: 'Lượm được ví nữ da nâu nắp gập ở KTX khu A',
@@ -47,6 +46,69 @@ const REVIEWS = [
     rating: 4,
     praises: ['Nhắn tin rõ ràng'],
     comment: 'Bạn chỉ chỗ lấy rất rõ, cảm ơn bạn.',
+  },
+  {
+    post: 'Lượm được đồng hồ mặt đen số La Mã ở công viên Tao Đàn',
+    reviewer: 'hoaiphuong.q3',
+    rating: 1,
+    praises: [],
+    comment: 'Bạn đòi tiền cà phê mới chịu trả đồng hồ, mình thấy không thoải mái.',
+  },
+  {
+    post: 'Nhặt được dây chuyền bạc mặt thánh giá ở Nhà thờ Đức Bà',
+    reviewer: 'dangkhoa.nb',
+    rating: 2,
+    praises: ['Giữ đồ cẩn thận'],
+    comment: 'Dây chuyền còn nguyên nhưng bạn dời hẹn ba lần mới gặp được.',
+  },
+  {
+    post: 'Lượm được tai nghe chụp tai màu xám ở ga metro Suối Tiên',
+    reviewer: 'tuananh.tb',
+    rating: 4,
+    praises: ['Chọn chỗ gặp an toàn'],
+    comment: 'Hẹn ngay ở ga metro, nhận tai nghe nhanh gọn.',
+  },
+  {
+    post: 'Nhặt được thú bông con khỉ mặc váy hồng ở Thảo Cầm Viên',
+    reviewer: 'hoangnam.q1',
+    rating: 4,
+    praises: ['Nhắn tin rõ ràng'],
+    comment: 'Bé nhà mình mừng lắm khi gặp lại con khỉ bông, cảm ơn bạn.',
+  },
+  {
+    post: 'Nhặt được túi đeo chéo da màu be xám ở Lotte Mart Q7',
+    reviewer: 'quocbao.gv',
+    rating: 5,
+    praises: ['Nhắn tin rõ ràng', 'Đúng hẹn'],
+    comment: 'Túi còn đủ đồ bên trong, bạn còn nhắn trước khi tới. Cảm ơn bạn!',
+  },
+  {
+    post: 'Lượm được giấy khai sinh và học bạ trong bìa nhựa lỗ',
+    reviewer: 'thaovy.q11',
+    rating: 3,
+    praises: [],
+    comment: 'Nhận lại đủ giấy tờ, chỉ là phải chờ khá lâu bạn mới trả lời tin nhắn.',
+  },
+  {
+    post: 'Nhặt được tai nghe nhét tai màu đen ở trạm xe buýt chợ An Đông',
+    reviewer: 'duchuy.bth',
+    rating: 4,
+    praises: ['Đúng hẹn'],
+    comment: 'Nhận lại tai nghe đúng giờ hẹn ở trạm xe buýt, cảm ơn bạn.',
+  },
+  {
+    post: 'Nhặt được túi vải xám xanh có sách ở Đại học Y Dược',
+    reviewer: 'baotran.sg',
+    rating: 3,
+    praises: [],
+    comment: 'Sách còn đủ, hai bên hẹn lại một lần mới gặp được.',
+  },
+  {
+    post: 'Nhặt được thẻ ATM ở đường Nguyễn Thị Minh Khai',
+    reviewer: 'thanhhuong.bt',
+    rating: 3,
+    praises: ['Không đòi tiền'],
+    comment: 'Nhận lại được thẻ, cảm ơn bạn.',
   },
 ]
 

@@ -339,15 +339,48 @@ const changePostStatus = async (id, user, status) => {
   return { id: post._id, status: post.status, changedAt }
 }
 
-const afterPostEnded = async (post, status, actorId, changedAt = new Date()) => {
+const WAITING_CLAIMS = ['pending', 'verifying']
+
+const endTradesOf = async (post, status, actorId, changedAt = new Date(), skip = []) => {
+  const [claims, talks] = await Promise.all([
+    Claim.find({ post: post._id, status: { $in: WAITING_CLAIMS } })
+      .select('claimant')
+      .lean(),
+    Conversation.find({
+      kind: 'trade',
+      post: post._id,
+      status: 'open',
+      $nor: [{ confirmedLost: true, confirmedFound: true }],
+    })
+      .select('participants.user')
+      .lean(),
+  ])
+  if (claims.length) {
+    await Claim.updateMany(
+      { _id: { $in: claims.map((claim) => claim._id) }, status: { $in: WAITING_CLAIMS } },
+      { $set: { status: 'expired', respondedAt: changedAt } }
+    )
+  }
+  const skipped = new Set([String(post.owner?._id ?? post.owner), ...skip.map(String)])
+  const users = [
+    ...claims.map((claim) => claim.claimant),
+    ...talks.flatMap((talk) => talk.participants.map((item) => item.user)),
+  ].filter((id) => !skipped.has(String(id)))
+  await notify(users, {
+    type: 'trade_ended',
+    actor: actorId,
+    refType: 'Post',
+    refId: post._id,
+    text: `Bài "${post.title}" ${status === 'returned' ? 'đã được trao trả' : 'đã đóng'}, bạn không thể nhận đồ hay xác nhận trao trả qua bài này nữa.`,
+  })
+}
+
+const afterPostEnded = async (post, status, actorId, changedAt = new Date(), { skip } = {}) => {
   const followers = await PostFollow.find({ post: post._id }).distinct('user')
   const notice = STATUS_NOTICES[status]
   await Promise.all([
     staleMatchesOf(post._id),
-    Claim.updateMany(
-      { post: post._id, status: { $in: ['pending', 'verifying'] } },
-      { $set: { status: 'rejected', respondedAt: changedAt } }
-    ),
+    endTradesOf(post, status, actorId, changedAt, skip),
     notify(followers, {
       type: notice.type,
       actor: actorId,
@@ -366,4 +399,5 @@ module.exports = {
   removePost,
   changePostStatus,
   afterPostEnded,
+  endTradesOf,
 }

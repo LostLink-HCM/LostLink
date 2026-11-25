@@ -164,6 +164,8 @@ module.exports = [
       'Nhặt được thẻ ATM của một ngân hàng rơi trên vỉa hè Nguyễn Thị Minh Khai, đoạn gần Hồ Con Rùa. Mình đã cắt góc thẻ cho an toàn và đang giữ, chủ thẻ nhắn mình nói đúng tên ngân hàng và 4 số cuối.',
     ...along('nguyen-thi-minh-khai'),
     postedHoursAgo: 31,
+    status: 'returned',
+    returnedHoursAgo: 20,
     dayPart: 'noon',
     question: {
       text: 'Thẻ của ngân hàng nào?',
@@ -230,6 +232,8 @@ module.exports = [
       'Mình lượm được mấy bìa nhựa lỗ trong suốt đựng giấy khai sinh bản sao và học bạ của một bé học sinh, ở trạm xe buýt trước chợ Tân Bình. Chắc phụ huynh đi nộp hồ sơ nhập học làm rơi. Ai mất nhắn mình, nói đúng tên trường ghi trong học bạ.',
     ...at('cho-tan-binh'),
     postedHoursAgo: 85,
+    status: 'returned',
+    returnedHoursAgo: 60,
     dayPart: 'afternoon',
     question: {
       text: 'Học bạ là của trường nào?',
