@@ -25,7 +25,20 @@ export const SESSION_EXPIRED_EVENT = 'auth:session-expired'
 
 // auth: false cho API công khai: không gửi token, không tự refresh.
 // body là FormData thì gửi nguyên, trình duyệt tự đặt Content-Type multipart
-async function send(path, { method = 'GET', body, auth = true } = {}) {
+const filenameFromDisposition = (header) => {
+  if (!header) return null
+  const encoded = header.match(/filename\*=UTF-8''([^;]+)/i)?.[1]
+  if (encoded) {
+    try {
+      return decodeURIComponent(encoded)
+    } catch {
+      return encoded
+    }
+  }
+  return header.match(/filename="?([^";]+)"?/i)?.[1] || null
+}
+
+async function send(path, { method = 'GET', body, auth = true, responseType = 'json' } = {}) {
   const token = auth ? getAccessToken() : null
   const isForm = body instanceof FormData
   let res
@@ -41,6 +54,13 @@ async function send(path, { method = 'GET', body, auth = true } = {}) {
     })
   } catch {
     throw new ApiError('Không kết nối được máy chủ, vui lòng thử lại.', 0)
+  }
+
+  if (res.ok && responseType === 'blob') {
+    return {
+      blob: await res.blob(),
+      filename: filenameFromDisposition(res.headers.get('content-disposition')),
+    }
   }
 
   const data = await res.json().catch(() => null)
@@ -89,6 +109,7 @@ async function request(path, options = {}) {
 
 export const api = {
   get: (path, options) => request(path, options),
+  download: (path, options = {}) => request(path, { ...options, responseType: 'blob' }),
   post: (path, body, options) => request(path, { ...options, method: 'POST', body }),
   put: (path, body, options) => request(path, { ...options, method: 'PUT', body }),
   patch: (path, body, options) => request(path, { ...options, method: 'PATCH', body }),

@@ -1,4 +1,5 @@
 import { api } from '../api'
+import { downloadCsvFromApi } from '../csv'
 
 const formatDateTime = (value) => {
   const date = new Date(value)
@@ -30,6 +31,8 @@ export function toBackofficePost(post) {
   return {
     id: post.id,
     postCode: post.code || '',
+    slug: post.slug || '',
+    publicDetailAvailable: Boolean(post.publicDetailAvailable),
     title: post.title || '',
     category: category.name || '',
     categorySlug: category.slug || '',
@@ -50,7 +53,9 @@ export function toBackofficePost(post) {
         }))
       : [],
     views: counts.views ?? 0,
+    likes: counts.likes ?? 0,
     comments: counts.comments ?? 0,
+    saves: counts.saves ?? 0,
     matches: counts.matches ?? 0,
     hidden: Boolean(post.isHidden),
     hiddenReason: post.hiddenReason || '',
@@ -65,18 +70,9 @@ export function toBackofficePost(post) {
 }
 
 export async function listBackofficePosts(filters = {}) {
-  const params = new URLSearchParams()
-  const queryFilters = {
-    q: filters.query?.trim(),
-    status: filters.status === 'hidden' ? undefined : filters.status,
-    isHidden: filters.status === 'hidden' ? 'true' : undefined,
-    category: filters.category,
-    type: filters.type,
-    area: filters.district,
-    from: filters.from,
-    to: filters.to,
-  }
+  const queryFilters = postQueryFilters(filters)
 
+  const params = new URLSearchParams()
   for (const [key, value] of Object.entries(queryFilters)) {
     if (value) params.set(key, value)
   }
@@ -84,6 +80,25 @@ export async function listBackofficePosts(filters = {}) {
   const query = params.toString()
   const response = await api.get('/backoffice/posts' + (query ? '?' + query : ''))
   return response.data.items.map(toBackofficePost)
+}
+
+const postQueryFilters = (filters = {}) => ({
+  q: filters.query?.trim(),
+  status: filters.status === 'hidden' ? undefined : filters.status,
+  isHidden: filters.status === 'hidden' ? 'true' : undefined,
+  category: filters.category,
+  type: filters.type,
+  area: filters.district,
+  from: filters.from,
+  to: filters.to,
+})
+
+export function downloadBackofficePostsCsv(filters = {}) {
+  return downloadCsvFromApi(
+    '/backoffice/posts/export.csv',
+    postQueryFilters(filters),
+    'LostLink_Danh_sach_bai_dang.csv'
+  )
 }
 
 export async function getBackofficePost(id) {

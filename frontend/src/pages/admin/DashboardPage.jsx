@@ -1,13 +1,13 @@
 import { useEffect, useId, useState } from 'react'
 import {
-  dashboardToCsv,
   formatDate,
   formatNumber,
   localDate,
+  periodRange,
   percentChange,
   rangeError,
 } from '../../lib/admin/dashboard'
-import { getAdminDashboard } from '../../api/adminDashboard'
+import { downloadAdminDashboardCsv, getAdminDashboard } from '../../api/adminDashboard'
 import Icon from '../../components/common/Icon'
 import { cx, focusRing } from '../../components/backoffice/classes'
 
@@ -634,8 +634,10 @@ function Panel({ title, description, icon, headingIcon, badge, children, classNa
 
 export default function Dashboard() {
   const [today] = useState(localDate)
-  const [filters, setFilters] = useState(() => ({ from: today, to: today, area: '' }))
+  const [filters, setFilters] = useState(() => ({ ...periodRange(7, today), area: '' }))
   const [notice, setNotice] = useState('')
+  const [exportError, setExportError] = useState('')
+  const [csvExporting, setCsvExporting] = useState(false)
   const [loadedReport, setLoadedReport] = useState(null)
   const [requestError, setRequestError] = useState('')
   const [retryCount, setRetryCount] = useState(0)
@@ -671,31 +673,29 @@ export default function Dashboard() {
   const setFilter = (key, value) => {
     setFilters((current) => ({ ...current, [key]: value }))
     setNotice('')
+    setExportError('')
     setRequestError('')
   }
   const reset = () => {
-    setFilters({ from: today, to: today, area: '' })
+    setFilters({ ...periodRange(7, today), area: '' })
     setNotice('')
+    setExportError('')
     setRequestError('')
   }
-  const exportReport = () => {
-    if (!report?.hasData) return
-    const areaLabels = Object.fromEntries(areaOptions.map((area) => [area, area]))
-    const url = URL.createObjectURL(
-      new Blob([dashboardToCsv(report, filters, areaName(filters.area, areaOptions), areaLabels)], {
-        type: 'text/csv;charset=utf-8;',
-      })
-    )
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `LostLink_Dashboard_${filters.from}_${filters.to}${filters.area ? `_${filters.area}` : ''}.csv`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-    setNotice(
-      `Đã xuất báo cáo CSV · ${formatDate(filters.from)} – ${formatDate(filters.to)} · ${areaName(filters.area, areaOptions)}.`
-    )
+  const exportReport = async () => {
+    if (!report?.hasData || csvExporting) return
+    setCsvExporting(true)
+    setExportError('')
+    try {
+      await downloadAdminDashboardCsv(filters)
+      setNotice(
+        `Đã tải báo cáo CSV · ${formatDate(filters.from)} – ${formatDate(filters.to)} · ${areaName(filters.area, areaOptions)}.`
+      )
+    } catch (error) {
+      setExportError(error.message || 'Không thể xuất báo cáo Dashboard.')
+    } finally {
+      setCsvExporting(false)
+    }
   }
 
   const total = report?.totals
@@ -762,7 +762,7 @@ export default function Dashboard() {
               focusRing
             )}
           >
-            <option value="">Tất cả khu vực</option>
+            <option value="">Tất cả</option>
             {areaOptions.map((area) => (
               <option key={area} value={area}>
                 {area}
@@ -774,7 +774,7 @@ export default function Dashboard() {
           <button
             type="button"
             aria-label="Đặt lại bộ lọc Dashboard"
-            title="Đặt lại về hôm nay"
+            title="Đặt lại về 7 ngày gần nhất"
             onClick={reset}
             className={cx(
               'inline-flex size-[42px] cursor-pointer items-center justify-center rounded-[7px] border border-[#c6d6e7] bg-white p-0 text-primary hover:bg-primary-subtle',
@@ -785,18 +785,33 @@ export default function Dashboard() {
           </button>
           <button
             type="button"
-            disabled={!report?.hasData}
+            disabled={csvExporting || !report?.hasData}
             onClick={exportReport}
             className={cx(
               'inline-flex min-h-[42px] cursor-pointer items-center justify-center gap-2 rounded-[7px] border border-primary bg-primary px-3.5 text-[13px] font-semibold whitespace-nowrap text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45',
               focusRing
             )}
           >
-            <Icon name="download" size={17} />
-            Xuất CSV
+            {csvExporting ? (
+              'Đang xuất…'
+            ) : (
+              <>
+                <Icon name="download" size={17} />
+                Xuất CSV
+              </>
+            )}
           </button>
         </div>
       </section>
+
+      {exportError && (
+        <p
+          className="mb-5 rounded-[7px] border border-danger-soft bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+          role="alert"
+        >
+          Không thể xuất CSV. {exportError}
+        </p>
+      )}
 
       {notice && (
         <p

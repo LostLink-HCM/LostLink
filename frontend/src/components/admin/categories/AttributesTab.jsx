@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Icon from '../../common/Icon'
 import Badge from '../../backoffice/Badge'
 import Button from '../../backoffice/Button'
@@ -46,7 +46,7 @@ function ValueSummary({ values }) {
       {sorted.map((attributeValue) => (
         <li
           key={attributeValue.id}
-          className="flex min-w-0 items-center justify-between gap-2 rounded-md bg-primary-faint px-2 py-1.5"
+          className="flex min-w-0 items-center justify-between gap-2 py-1"
         >
           <span className="min-w-0 truncate text-ink-secondary" title={attributeValue.value}>
             {attributeValue.value}
@@ -69,6 +69,10 @@ function AttributeForm({ value, category, editing, uFloor, uFloorReady, onSubmit
   const [error, setError] = useState('')
   const [mError, setMError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [highlightedValueIndex, setHighlightedValueIndex] = useState(null)
+  const valueHighlightTimer = useRef(null)
+  const valueInputRefs = useRef([])
+  const pendingValueScrollIndex = useRef(null)
   const otherAttributeAliases = category.attributes
     .filter((attribute) => attribute.id !== value.id)
     .flatMap((attribute) => [
@@ -118,11 +122,62 @@ function AttributeForm({ value, category, editing, uFloor, uFloorReady, onSubmit
     change('mProb', next)
     if (mError) setMError(isValidMProb(next) ? '' : M_PROB_ERROR)
   }
-  const updateValue = (index, next) =>
+  useEffect(() => () => clearTimeout(valueHighlightTimer.current), [])
+
+  useEffect(() => {
+    const index = pendingValueScrollIndex.current
+    if (index == null || index >= form.values.length) return
+
+    const frame = requestAnimationFrame(() => {
+      const input = valueInputRefs.current[index]
+      input?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      input?.focus()
+      pendingValueScrollIndex.current = null
+    })
+
+    return () => cancelAnimationFrame(frame)
+  }, [form.values.length])
+
+  const updateValue = (index, next) => {
+    if (highlightedValueIndex === index && String(next.value ?? '').trim()) {
+      clearTimeout(valueHighlightTimer.current)
+      valueHighlightTimer.current = null
+      setHighlightedValueIndex(null)
+    }
     change(
       'values',
       form.values.map((item, i) => (i === index ? next : item))
     )
+  }
+
+  const addValue = () => {
+    const emptyIndex = form.values.findIndex((item) => !String(item.value ?? '').trim())
+    if (emptyIndex >= 0) {
+      clearTimeout(valueHighlightTimer.current)
+      setHighlightedValueIndex(emptyIndex)
+      valueHighlightTimer.current = setTimeout(() => setHighlightedValueIndex(null), 3000)
+      requestAnimationFrame(() =>
+        valueInputRefs.current[emptyIndex]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      )
+      return
+    }
+
+    pendingValueScrollIndex.current = form.values.length
+    change('values', [
+      ...form.values,
+      { id: makeId('attribute-value'), value: '', aliases: [], frequency: null },
+    ])
+  }
+
+  const removeValue = (index) => {
+    clearTimeout(valueHighlightTimer.current)
+    valueHighlightTimer.current = null
+    setHighlightedValueIndex(null)
+    change(
+      'values',
+      form.values.filter((_, itemIndex) => itemIndex !== index)
+    )
+  }
 
   const submit = async (event) => {
     event.preventDefault()
@@ -166,6 +221,7 @@ function AttributeForm({ value, category, editing, uFloor, uFloorReady, onSubmit
       title={editing ? 'Sửa thuộc tính' : 'Thêm thuộc tính'}
       size="lg"
       onClose={onClose}
+      scrollableContent
       footer={
         <>
           <Button onClick={onClose} disabled={saving}>
@@ -213,7 +269,7 @@ function AttributeForm({ value, category, editing, uFloor, uFloorReady, onSubmit
           {form.matchRole === 'exclude' && (
             <p
               role="note"
-              className="m-0 flex items-start gap-2 rounded-xl bg-warning-soft px-3.5 py-2.5 text-small leading-relaxed text-warning"
+              className="m-0 flex items-start gap-2 rounded-xl px-3.5 py-2.5 text-small leading-relaxed text-warning"
             >
               <Icon name="warning" size={16} className="mt-0.5 shrink-0" />
               Hai bài khác giá trị ở thuộc tính này sẽ không bao giờ được ghép. Chỉ dùng cho thuộc
@@ -286,7 +342,7 @@ function AttributeForm({ value, category, editing, uFloor, uFloorReady, onSubmit
         )}
 
         {editing && (
-          <div className="rounded-xl border border-line-soft bg-primary-faint px-3.5 py-3 text-small">
+          <div className="rounded-lg border border-[#d5e0ec] bg-[#edf3fa] px-3.5 py-3 text-small">
             {value.mRecommendation ? (
               <>
                 <p className="m-0 font-semibold text-ink-secondary">
@@ -325,22 +381,12 @@ function AttributeForm({ value, category, editing, uFloor, uFloorReady, onSubmit
         <div className={labelClass}>
           <div className="flex items-center gap-1.5">
             <span>Giá trị</span>
-            <IconButton
-              label="Thêm giá trị"
-              icon="plus"
-              bordered
-              onClick={() =>
-                change('values', [
-                  ...form.values,
-                  { id: makeId('attribute-value'), value: '', aliases: [], frequency: null },
-                ])
-              }
-            />
+            <IconButton label="Thêm giá trị" icon="plus" bordered onClick={addValue} />
           </div>
           {form.values.map((attributeValue, index) => (
             <article
               key={attributeValue.id}
-              className="rounded-xl border border-line-soft bg-primary-faint p-3"
+              className="rounded-[10px] border border-[#8fa7c2] bg-white p-4 shadow-[0_4px_14px_#16233a12]"
             >
               <div className="flex items-start gap-2">
                 <div className={cx(labelClass, 'min-w-0 flex-1')}>
@@ -355,11 +401,16 @@ function AttributeForm({ value, category, editing, uFloor, uFloorReady, onSubmit
                       </span>
                     </span>
                     <input
+                      ref={(node) => {
+                        valueInputRefs.current[index] = node
+                      }}
                       id={`attribute-value-input-${index}`}
                       className={cx(
                         inputClass,
-                        attributeValueErrors[index] &&
-                          'border-danger/35 focus:border-danger/50 focus:ring-danger/10'
+                        attributeValueErrors[index]
+                          ? 'border-danger/35 focus:border-danger/50 focus:ring-danger/10'
+                          : highlightedValueIndex === index &&
+                              'border-[#3976bd] ring-2 ring-[#3976bd]/20'
                       )}
                       value={attributeValue.value}
                       aria-invalid={attributeValueErrors[index] ? true : undefined}
@@ -382,12 +433,7 @@ function AttributeForm({ value, category, editing, uFloor, uFloorReady, onSubmit
                   icon="close"
                   danger
                   className="mt-7"
-                  onClick={() =>
-                    change(
-                      'values',
-                      form.values.filter((_, i) => i !== index)
-                    )
-                  }
+                  onClick={() => removeValue(index)}
                 />
               </div>
               <div className="mt-3">
@@ -414,6 +460,7 @@ function AttributeDetailDialog({ attribute, onClose, onEdit }) {
       title={`Thuộc tính: ${attribute.name}`}
       size="lg"
       onClose={onClose}
+      scrollableContent
       footer={
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Đóng</Button>
@@ -423,14 +470,14 @@ function AttributeDetailDialog({ attribute, onClose, onEdit }) {
         </div>
       }
     >
-      <div className="space-y-4">
+      <div className="flex flex-col gap-4">
         <dl className="m-0 grid grid-cols-3 gap-3 max-sm:grid-cols-1">
           {[
             ['Vai trò ghép cặp', <RoleBadge key="role" role={attribute.matchRole} />],
             ['Độ tin cậy', `m = ${formatNumber(attribute.mProb, 4)}`],
             ['Bắt buộc khi đăng', attribute.isRequired ? 'Có' : 'Không'],
           ].map(([label, value]) => (
-            <div key={label} className="rounded-xl bg-primary-faint p-3">
+            <div key={label} className="rounded-lg border border-[#d5e0ec] bg-[#edf3fa] p-3">
               <dt className="text-caption text-ink-muted">{label}</dt>
               <dd className="m-0 mt-1 text-body font-semibold text-ink-secondary">{value}</dd>
             </div>
@@ -440,7 +487,7 @@ function AttributeDetailDialog({ attribute, onClose, onEdit }) {
         <div className="overflow-x-auto rounded-xl border border-line-soft">
           <table className="w-full min-w-[460px] border-collapse text-left text-small">
             <thead>
-              <tr className="bg-primary-faint text-caption text-ink-muted">
+              <tr className="bg-[#edf3fa] text-caption text-[#526a83]">
                 <th className="px-3 py-2.5 font-bold">Giá trị</th>
                 <th className="px-3 py-2.5 font-bold">Alias</th>
                 <th className="px-3 py-2.5 text-right font-bold">Độ hiếm u</th>
@@ -514,7 +561,7 @@ function ContentsPanel({ category, onSave }) {
     <Panel title="Bên trong có">
       <form
         id="category-contents-form"
-        className="flex flex-col gap-4 px-4.5 pt-3 pb-4"
+        className="flex flex-col gap-4"
         onSubmit={submit}
         noValidate
       >
@@ -596,12 +643,12 @@ export default function AttributesTab({
                   ].map((heading) => (
                     <th
                       key={heading}
-                      className="bg-primary-faint px-3.5 py-3 text-caption font-bold whitespace-nowrap text-ink-muted"
+                      className="border-b-2 border-[#c5d5e7] bg-[#edf3fa] px-3.5 py-3 text-small font-semibold whitespace-nowrap text-[#244d78]"
                     >
                       {heading}
                     </th>
                   ))}
-                  <th className="w-28 bg-primary-faint px-1 py-3">
+                  <th className="w-28 border-b-2 border-[#c5d5e7] bg-[#edf3fa] px-1 py-3">
                     <span className="sr-only">Thao tác</span>
                   </th>
                 </tr>
@@ -610,7 +657,7 @@ export default function AttributesTab({
                 {category.attributes.map((attribute) => (
                   <tr
                     key={attribute.id}
-                    className="border-b border-line-subtle transition-colors last:border-b-0 hover:bg-primary-faint"
+                    className="border-b border-line-subtle transition-colors last:border-b-0 hover:bg-[#f7fafd]"
                   >
                     <td className="w-[22%] px-3.5 py-3.5 align-top">
                       <strong className="block text-body font-semibold text-primary">
@@ -635,12 +682,14 @@ export default function AttributesTab({
                           label={`Xem ${attribute.name}`}
                           icon="eye"
                           tone="view"
+                          colorOnly
                           onClick={() => setModal({ kind: 'detail', attribute })}
                         />
                         <IconButton
                           label={`Sửa ${attribute.name}`}
                           icon="edit"
                           tone="edit"
+                          colorOnly
                           onClick={() =>
                             setModal({ kind: 'form', value: attribute, editing: true })
                           }
@@ -648,7 +697,8 @@ export default function AttributesTab({
                         <IconButton
                           label={`Xóa ${attribute.name}`}
                           icon="close"
-                          danger
+                          tone="danger"
+                          colorOnly
                           onClick={() => setModal({ kind: 'delete', attribute })}
                         />
                       </div>
@@ -690,7 +740,7 @@ export default function AttributesTab({
       {modal?.kind === 'delete' && (
         <ConfirmDeleteDialog
           title="Xóa thuộc tính"
-          confirmLabel="Xóa thuộc tính"
+          confirmLabel="Xóa"
           onClose={() => setModal(null)}
           onConfirm={() => onRemoveAttribute(modal.attribute.id)}
         >

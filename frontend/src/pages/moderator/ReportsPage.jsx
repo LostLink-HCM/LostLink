@@ -14,15 +14,15 @@ import Pagination from '../../components/backoffice/Pagination'
 import { REPORT_ACTIONS, SEVERITY_LABELS } from '../../lib/moderator/moderation'
 import {
   getModeratorReport,
+  downloadModeratorReportsCsv,
   listModeratorReports,
   REPORT_REASON_LABELS,
   resolveModeratorReport,
 } from '../../lib/moderator/reportQueue'
-import { downloadCsv } from '../../lib/csv'
 import { postPath } from '../../lib/user/homeFeed'
 import { profilePath } from '../../lib/user/profiles'
 import useLinkedHighlight from '../../hooks/useLinkedHighlight'
-import { linkedHighlight } from '../../components/backoffice/classes'
+import { cx, linkedHighlight } from '../../components/backoffice/classes'
 
 const EMPTY_FILTERS = {
   targetType: 'user',
@@ -176,6 +176,7 @@ export default function Reports() {
   const [reason, setReason] = useState('')
   const [actionError, setActionError] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
+  const [csvExporting, setCsvExporting] = useState(false)
 
   const requestReports = useCallback(
     () =>
@@ -314,30 +315,16 @@ export default function Reports() {
     }
   }
 
-  const exportCsv = () => {
-    downloadCsv('LostLink_Hang_doi_report.csv', [
-      [
-        'ID',
-        'Thời gian',
-        'Loại đối tượng',
-        'Đối tượng',
-        'Người bị report',
-        'Mức độ',
-        'Lý do',
-        'Người gửi',
-      ],
-      ...items.map((report) => [
-        report.displayCode,
-        report.time,
-        report.targetType === 'post' ? 'Bài đăng' : 'Tài khoản',
-        report.targetTitle,
-        report.reportedUser,
-        SEVERITY_LABELS[report.severity],
-        report.reasonLabel,
-        report.reporter,
-      ]),
-    ])
-    setNotice(`Đã xuất ${items.length} report đang hiển thị ra CSV.`)
+  const exportCsv = async () => {
+    setCsvExporting(true)
+    try {
+      await downloadModeratorReportsCsv(filters)
+      setNotice('Đã tải file CSV hàng đợi report.')
+    } catch (exportError) {
+      setNotice(exportError.message)
+    } finally {
+      setCsvExporting(false)
+    }
   }
 
   const showEmpty = !loading && !error && !items.length
@@ -367,7 +354,7 @@ export default function Reports() {
                 value={filters.targetType}
                 onChange={(event) => changeFilter('targetType', event.target.value)}
               >
-                <option value="">Tất cả đối tượng</option>
+                <option value="">Tất cả</option>
                 <option value="post">Bài đăng</option>
                 <option value="user">Tài khoản</option>
               </Select>
@@ -380,7 +367,7 @@ export default function Reports() {
                 value={filters.severity}
                 onChange={(event) => changeFilter('severity', event.target.value)}
               >
-                <option value="">Tất cả mức độ</option>
+                <option value="">Tất cả</option>
                 {Object.entries(SEVERITY_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>
                     {label}
@@ -407,13 +394,20 @@ export default function Reports() {
             <IconButton
               icon="reset"
               label="Đặt lại bộ lọc"
-              bordered
+              tone="view"
+              colored
               size={36}
               onClick={resetFilters}
             />
-            <Button variant="primary" onClick={exportCsv} disabled={!items.length}>
-              <Icon name="download" />
-              Xuất CSV
+            <Button variant="primary" onClick={exportCsv} disabled={csvExporting || !items.length}>
+              {csvExporting ? (
+                'Đang xuất…'
+              ) : (
+                <>
+                  <Icon name="download" />
+                  Xuất CSV
+                </>
+              )}
             </Button>
           </div>
         </DateRange>
@@ -445,6 +439,8 @@ export default function Reports() {
       <DataTable
         caption="Hàng đợi report cần xử lý"
         minWidth="min-w-[900px]"
+        containerClassName="!border-[#b3c7df] !shadow-[0_10px_26px_rgba(34,65,100,0.14)]"
+        headingClassName="!border-b-2 !border-b-[#c5d5e7] !bg-[#edf3fa] !text-[#244d78] !text-small"
         columns={[
           ['Thời gian', 'w-1/6'],
           ['Đối tượng', 'w-1/6'],
@@ -477,11 +473,12 @@ export default function Reports() {
             <tr
               key={report.id}
               ref={report.id === linkedReport?.id && highlight.active ? highlight.targetRef : null}
-              className={
+              className={cx(
+                'transition-colors duration-150',
                 report.id === linkedReport?.id && highlight.active
                   ? linkedHighlight
-                  : 'hover:bg-surface-muted'
-              }
+                  : 'hover:bg-[#edf4fc]'
+              )}
             >
               <td className={cell}>
                 {report.targetType === 'post' && (
@@ -525,6 +522,7 @@ export default function Reports() {
                   <IconButton
                     icon="eye"
                     tone="view"
+                    colorOnly
                     label={`Xem report ${report.displayCode}`}
                     onClick={() => openDetail(report.id)}
                   />
@@ -533,6 +531,7 @@ export default function Reports() {
                       key={key}
                       icon={settings.icon}
                       tone={settings.tone}
+                      colorOnly
                       label={actionLabel(report, settings)}
                       disabled={report.queueStatus === 'processed' || !actionAllowed(report, key)}
                       onClick={() => confirmAction(report.id, key)}

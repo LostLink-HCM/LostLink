@@ -9,6 +9,22 @@ const tones = {
   danger: 'hover:bg-danger-soft hover:text-danger',
   success: 'hover:bg-success-soft hover:text-success',
 }
+const coloredTones = {
+  neutral: 'bg-primary-subtle text-primary',
+  view: 'bg-primary-subtle text-primary',
+  edit: 'bg-warning-soft text-warning',
+  warning: 'bg-warning-soft text-warning',
+  danger: 'bg-danger-soft text-danger-ink',
+  success: 'bg-success-soft text-success',
+}
+const colorOnlyTones = {
+  neutral: 'text-primary',
+  view: 'text-primary',
+  edit: 'text-warning',
+  warning: 'text-warning',
+  danger: 'text-danger-ink',
+  success: 'text-success',
+}
 
 const sizes = {
   30: 'size-[30px]',
@@ -21,6 +37,8 @@ export default function IconButton({
   label,
   danger = false,
   tone = 'neutral',
+  colored = false,
+  colorOnly = false,
   size = 32,
   bordered = false,
   className,
@@ -35,10 +53,18 @@ export default function IconButton({
       aria-label={label}
       title={label}
       className={cx(
-        'inline-flex shrink-0 cursor-pointer items-center justify-center rounded-md border p-0 text-ink-subtle transition-colors disabled:cursor-not-allowed disabled:opacity-45',
+        'inline-flex shrink-0 cursor-pointer items-center justify-center rounded-md border p-0 transition-colors disabled:cursor-not-allowed disabled:opacity-45',
+        !colored && !colorOnly && 'text-ink-subtle',
         sizeClass,
-        bordered ? 'border-line bg-surface' : 'border-transparent bg-transparent',
-        tones[resolvedTone],
+        colored || colorOnly
+          ? 'border-transparent'
+          : bordered
+            ? 'border-line bg-surface'
+            : 'border-transparent bg-transparent',
+        !colorOnly && tones[resolvedTone],
+        colored && !colorOnly && coloredTones[resolvedTone],
+        colorOnly && colorOnlyTones[resolvedTone],
+        colorOnly && 'hover:opacity-75',
         focusRing,
         className
       )}

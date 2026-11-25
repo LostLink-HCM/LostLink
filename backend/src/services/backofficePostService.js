@@ -1,17 +1,25 @@
-const { Category, MatchSuggestion, Notification, Post, PostFollow, User } = require('../models')
+const {
+  Category,
+  MatchSuggestion,
+  Notification,
+  Post,
+  PostFollow,
+  SavedPost,
+  User,
+} = require('../models')
 const ApiError = require('../utils/ApiError')
 const { escapeRegex, lowercaseText, normalizeText } = require('../utils/text')
 const { endOfVnDay, startOfVnDay } = require('../utils/vnTime')
 const { syncPostMatchNotices } = require('./matchingService')
 const returnService = require('./returnService')
 const { endTradesOf } = require('./postManageService')
-const { ACTIVE_MATCH_STATES } = require('./postService')
+const { ACTIVE_MATCH_STATES, isPublic } = require('./postService')
 const { updatePostWithAudit } = require('./postAuditService')
 
 const MATCHABLE_STATUSES = ['searching', 'contacted']
 const FINAL_STATUSES = ['closed', 'returned']
 const MANAGEMENT_POST_FIELDS =
-  'code title type status category owner area placeName placeNameTo locType description images isHidden hiddenReason viewCount likeCount commentCount createdAt'
+  'code slug title type status statusHistory.status statusHistory.changedAt category owner area placeName placeNameTo locType description images isHidden hiddenReason viewCount likeCount commentCount createdAt'
 
 const postNotFound = () => new ApiError(404, 'Bài đăng không tồn tại.', undefined, 'POST_NOT_FOUND')
 
@@ -86,6 +94,8 @@ const toPost = (post, matchCount = 0) => {
   return {
     id: String(post._id),
     code: post.code,
+    slug: post.slug || '',
+    publicDetailAvailable: Boolean(post.slug && isPublic(post, Date.now())),
     title: post.title,
     type: post.type,
     status: post.status,
@@ -136,7 +146,7 @@ const matchCountsFor = async (postIds) => {
   return new Map(rows.map((row) => [String(row._id), row.count]))
 }
 
-const listPosts = async ({ status, isHidden, type, category, area, from, to, q }) => {
+const buildPostFilter = async ({ status, isHidden, type, category, area, from, to, q }) => {
   const filter = {}
   if (status) filter.status = status
   if (isHidden !== undefined) filter.isHidden = isHidden === 'true'
@@ -145,12 +155,66 @@ const listPosts = async ({ status, isHidden, type, category, area, from, to, q }
   if (category) filter.category = await resolveCategory(category)
   addDateFilter(filter, { from, to })
   await addSearchFilter(filter, q)
+  return filter
+}
+
+const listPosts = async (filters) => {
+  const filter = await buildPostFilter(filters)
 
   const posts = await populatedPostQuery(Post.find(filter)).sort({ createdAt: -1, _id: -1 }).lean()
   const matchCounts = await matchCountsFor(posts.map((post) => post._id))
 
   return {
     items: posts.map((post) => toPost(post, matchCounts.get(String(post._id)) ?? 0)),
+    total: posts.length,
+  }
+}
+
+const matchingPostsFor = async (postIds) => {
+  if (!postIds.length) return new Map()
+
+  const rows = await MatchSuggestion.find({
+    state: { $in: ACTIVE_MATCH_STATES },
+    $or: [{ postLost: { $in: postIds } }, { postFound: { $in: postIds } }],
+  })
+    .select('postLost postFound score')
+    .populate('postLost', 'code')
+    .populate('postFound', 'code')
+    .lean()
+
+  const result = new Map(postIds.map((id) => [String(id), []]))
+  for (const row of rows) {
+    const lost = row.postLost
+    const found = row.postFound
+    if (!lost?._id || !found?.code || !Number.isFinite(row.score)) continue
+    if (result.has(String(lost._id))) {
+      result.get(String(lost._id)).push({ code: found.code, score: row.score })
+    }
+    if (found?._id && lost.code && result.has(String(found._id))) {
+      result.get(String(found._id)).push({ code: lost.code, score: row.score })
+    }
+  }
+
+  for (const matches of result.values()) {
+    matches.sort((a, b) => b.score - a.score || a.code.localeCompare(b.code))
+  }
+  return result
+}
+
+const listPostsForCsv = async (filters) => {
+  const filter = await buildPostFilter(filters)
+  const posts = await populatedPostQuery(Post.find(filter)).sort({ createdAt: -1, _id: -1 }).lean()
+  const postIds = posts.map((post) => post._id)
+  const [matchCounts, matchingPosts] = await Promise.all([
+    matchCountsFor(postIds),
+    matchingPostsFor(postIds),
+  ])
+
+  return {
+    items: posts.map((post) => ({
+      ...toPost(post, matchCounts.get(String(post._id)) ?? 0),
+      matchingPosts: matchingPosts.get(String(post._id)) ?? [],
+    })),
     total: posts.length,
   }
 }
@@ -168,14 +232,17 @@ const getPost = async (id) => {
   const post = await populatedPostQuery(Post.findById(id)).lean()
   if (!post) throw postNotFound()
 
-  const matches = await MatchSuggestion.find({
-    state: { $in: ACTIVE_MATCH_STATES },
-    $or: [{ postLost: post._id }, { postFound: post._id }],
-  })
-    .populate(matchPostPopulate('postLost'))
-    .populate(matchPostPopulate('postFound'))
-    .sort({ score: -1, _id: 1 })
-    .lean()
+  const [matches, saves] = await Promise.all([
+    MatchSuggestion.find({
+      state: { $in: ACTIVE_MATCH_STATES },
+      $or: [{ postLost: post._id }, { postFound: post._id }],
+    })
+      .populate(matchPostPopulate('postLost'))
+      .populate(matchPostPopulate('postFound'))
+      .sort({ score: -1, _id: 1 })
+      .lean(),
+    SavedPost.countDocuments({ post: post._id }),
+  ])
 
   const matchingPosts = matches.flatMap((match) => {
     const postLost = match.postLost
@@ -197,8 +264,10 @@ const getPost = async (id) => {
     ]
   })
 
+  const summary = toPost(post, matchingPosts.length)
   return {
-    ...toPost(post, matchingPosts.length),
+    ...summary,
+    counts: { ...summary.counts, saves },
     description: post.description || '',
     images: orderedImageUrls(post.images),
     statusHistory: (post.statusHistory || []).map(({ status, note, changedAt }) => ({
@@ -325,4 +394,4 @@ const updateVisibility = async (id, actor, isHidden, reason = '') => {
   }
 }
 
-module.exports = { listPosts, getPost, updateStatus, updateVisibility }
+module.exports = { listPosts, listPostsForCsv, getPost, updateStatus, updateVisibility }

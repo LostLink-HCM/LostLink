@@ -1,163 +1,302 @@
-import { useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Button from '../../backoffice/Button'
-import Dialog from '../../backoffice/Dialog'
 import IconButton from '../../backoffice/IconButton'
 import { cx } from '../../backoffice/classes'
-import { inputClass, labelClass } from './styles'
-import { ConfirmDeleteDialog, FormError, Panel } from './ui'
+import { isSame, makeId } from '../../../lib/admin/categories'
+import { ConfirmDeleteDialog, FormError, Panel, SaveBar } from './ui'
 
 const MAX_LENGTH = 500
+const DUPLICATE_QUESTION_MESSAGE =
+  'Câu hỏi xác minh này đã tồn tại trong danh mục, vui lòng nhập lại giá trị khác.'
 
-function QuestionForm({ question, categoryName, onSubmit, onClose }) {
-  const [text, setText] = useState(question?.text || '')
-  const [error, setError] = useState('')
+const copyQuestions = (questions) => questions.map(({ id, text }) => ({ id, text }))
+const normalizeQuestion = (text) =>
+  String(text ?? '')
+    .trim()
+    .normalize('NFC')
+
+export default function QuestionsTab({ category, onSaveQuestion, onRemoveQuestion }) {
+  const [savedQuestions, setSavedQuestions] = useState(() => copyQuestions(category.questions))
+  const [questions, setQuestions] = useState(() => copyQuestions(category.questions))
+  const [showValidation, setShowValidation] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [saving, setSaving] = useState(false)
-  const inputRef = useRef(null)
-  const submit = async (event) => {
-    event.preventDefault()
-    const value = text.trim()
-    if (!value || value.length > MAX_LENGTH) {
-      setError(
-        !value ? 'Vui lòng nhập nội dung câu hỏi.' : 'Câu hỏi không được vượt quá 500 ký tự.'
-      )
-      inputRef.current?.focus()
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [highlightedId, setHighlightedId] = useState(null)
+  const highlightTimer = useRef(null)
+  const questionRefs = useRef(new Map())
+  const pendingScrollId = useRef(null)
+  const dirty = !isSame(questions, savedQuestions)
+
+  const normalizedQuestions = questions.map((question) => normalizeQuestion(question.text))
+  const questionCounts = new Map()
+  normalizedQuestions.filter(Boolean).forEach((text) => {
+    questionCounts.set(text, (questionCounts.get(text) ?? 0) + 1)
+  })
+  const savedQuestionById = new Map(savedQuestions.map((question) => [question.id, question]))
+  const duplicateErrors = questions.map((question, index) => {
+    const text = normalizedQuestions[index]
+    const savedQuestion = savedQuestionById.get(question.id)
+    const changed = !savedQuestion || normalizeQuestion(savedQuestion.text) !== text
+    if (changed && questionCounts.get(text) > 1) return DUPLICATE_QUESTION_MESSAGE
+    return ''
+  })
+  const hasDuplicates = duplicateErrors.some(Boolean)
+  const questionErrors = questions.map((_, index) => {
+    if (!normalizedQuestions[index]) return showValidation ? 'Vui lòng nhập nội dung câu hỏi.' : ''
+    if (normalizedQuestions[index].length > MAX_LENGTH)
+      return 'Câu hỏi không được vượt quá 500 ký tự.'
+    return duplicateErrors[index]
+  })
+
+  useEffect(() => () => clearTimeout(highlightTimer.current), [])
+
+  useLayoutEffect(() => {
+    questionRefs.current.forEach((input) => {
+      input.style.height = 'auto'
+      input.style.height = `${Math.max(input.scrollHeight, 40)}px`
+    })
+  }, [questions])
+
+  useEffect(() => {
+    const id = pendingScrollId.current
+    const input = id ? questionRefs.current.get(id) : null
+    if (!input) return
+
+    const frame = requestAnimationFrame(() => {
+      input.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      input.focus()
+      pendingScrollId.current = null
+    })
+
+    return () => cancelAnimationFrame(frame)
+  }, [questions.length])
+
+  const highlightQuestion = (id) => {
+    clearTimeout(highlightTimer.current)
+    setHighlightedId(id)
+    highlightTimer.current = setTimeout(() => setHighlightedId(null), 3000)
+    requestAnimationFrame(() =>
+      questionRefs.current.get(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    )
+  }
+
+  const addQuestion = () => {
+    const emptyQuestion = questions.find((question) => !normalizeQuestion(question.text))
+    if (emptyQuestion) {
+      highlightQuestion(emptyQuestion.id)
+      questionRefs.current.get(emptyQuestion.id)?.focus()
       return
     }
+
+    const question = { id: makeId('question'), text: '' }
+    pendingScrollId.current = question.id
+    setQuestions((current) => [...current, question])
+    setShowValidation(false)
+    setSaveError('')
+  }
+
+  const updateQuestion = (id, text) => {
+    if (highlightedId === id && normalizeQuestion(text)) {
+      clearTimeout(highlightTimer.current)
+      setHighlightedId(null)
+    }
+    setQuestions((current) =>
+      current.map((question) => (question.id === id ? { ...question, text } : question))
+    )
+    setSaveError('')
+  }
+
+  const removeQuestionFromDraft = (id) => {
+    setQuestions((current) => current.filter((question) => question.id !== id))
+    if (highlightedId === id) {
+      clearTimeout(highlightTimer.current)
+      setHighlightedId(null)
+    }
+  }
+
+  const submit = async (event) => {
+    event.preventDefault()
+    setShowValidation(true)
+    setSaveError('')
+    const validationErrors = questions.map((question, index) => {
+      const text = normalizeQuestion(question.text)
+      if (!text) return 'Vui lòng nhập nội dung câu hỏi.'
+      if (text.length > MAX_LENGTH) return 'Câu hỏi không được vượt quá 500 ký tự.'
+      return duplicateErrors[index]
+    })
+    if (validationErrors.some(Boolean)) {
+      const firstInvalid = questions.find((_, index) => validationErrors[index])
+      if (firstInvalid) {
+        requestAnimationFrame(() => {
+          const input = questionRefs.current.get(firstInvalid.id)
+          input?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          input?.focus()
+        })
+      }
+      return
+    }
+
+    const nextQuestions = questions.map((question, index) => ({
+      id: question.id,
+      text: normalizedQuestions[index],
+    }))
+    const nextIds = new Set(nextQuestions.map((question) => question.id))
+    const originalIds = new Set(savedQuestions.map((question) => question.id))
+    const removed = savedQuestions.filter((question) => !nextIds.has(question.id))
+    const updated = nextQuestions.filter((question) => {
+      const previous = savedQuestions.find((item) => item.id === question.id)
+      return previous && normalizeQuestion(previous.text) !== question.text
+    })
+    const added = nextQuestions.filter((question) => !originalIds.has(question.id))
+
     setSaving(true)
-    setError('')
+    let latestQuestions = savedQuestions
     try {
-      await onSubmit(value)
-      setSaving(false)
-      onClose()
-    } catch (submitError) {
-      setError(submitError.message || 'Không lưu được câu hỏi. Vui lòng thử lại.')
+      for (const question of removed) {
+        const result = await onRemoveQuestion(question.id)
+        latestQuestions = copyQuestions(result.questions)
+        setSavedQuestions(latestQuestions)
+      }
+
+      for (const question of updated) {
+        const result = await onSaveQuestion(question.id, question.text)
+        latestQuestions = copyQuestions(result.questions)
+        setSavedQuestions(latestQuestions)
+      }
+
+      for (const question of added) {
+        const previousIds = new Set(latestQuestions.map((item) => item.id))
+        const result = await onSaveQuestion(null, question.text)
+        latestQuestions = copyQuestions(result.questions)
+        const created = latestQuestions.find(
+          (item) => !previousIds.has(item.id) && item.text === question.text
+        )
+        if (!created)
+          throw new Error('Không xác định được câu hỏi vừa lưu. Vui lòng tải lại danh mục.')
+
+        setQuestions((current) => current.map((item) => (item.id === question.id ? created : item)))
+        setSavedQuestions(latestQuestions)
+      }
+
+      setQuestions(latestQuestions)
+      setSavedQuestions(latestQuestions)
+      setShowValidation(false)
+    } catch (error) {
+      setSaveError(error.message || 'Không lưu được cấu hình câu hỏi. Vui lòng thử lại.')
+    } finally {
       setSaving(false)
     }
   }
 
-  return (
-    <Dialog
-      title={question ? 'Sửa câu hỏi xác minh' : 'Thêm câu hỏi xác minh'}
-      onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose} disabled={saving}>
-            Hủy
-          </Button>
-          <Button
-            type="submit"
-            form="admin-question-form"
-            variant="primary"
-            icon="check"
-            disabled={saving}
-          >
-            {saving ? 'Đang lưu…' : 'Lưu câu hỏi'}
-          </Button>
-        </>
-      }
-    >
-      <form id="admin-question-form" className="flex flex-col gap-4.5" noValidate onSubmit={submit}>
-        <p className="m-0 text-body text-ink-muted">
-          Danh mục: <strong className="text-ink-secondary">{categoryName}</strong>
-        </p>
-        <label htmlFor="admin-question-text" className={labelClass}>
-          Nội dung câu hỏi
-          <textarea
-            ref={inputRef}
-            id="admin-question-text"
-            autoFocus
-            rows={5}
-            maxLength={MAX_LENGTH}
-            required
-            className={cx(inputClass, 'min-h-32 resize-y leading-relaxed')}
-            value={text}
-            onChange={(event) => {
-              setText(event.target.value)
-              setError('')
-            }}
-            placeholder="Nhập câu hỏi xác minh…"
-            aria-invalid={Boolean(error)}
-            aria-describedby={`admin-question-count${error ? ' admin-question-error' : ''}`}
-          />
-        </label>
-        <small id="admin-question-count" className="-mt-3 text-right text-caption text-ink-muted">
-          {text.length}/{MAX_LENGTH} ký tự
-        </small>
-        {error && <FormError id="admin-question-error">{error}</FormError>}
-      </form>
-    </Dialog>
-  )
-}
-
-export default function QuestionsTab({ category, onSaveQuestion, onRemoveQuestion }) {
-  const [modal, setModal] = useState(null)
+  const reset = () => {
+    setQuestions(copyQuestions(savedQuestions))
+    setShowValidation(false)
+    setSaveError('')
+    clearTimeout(highlightTimer.current)
+    setHighlightedId(null)
+  }
 
   return (
     <>
-      <Panel
-        title="Câu hỏi xác minh"
-        action={
-          <Button
-            className="text-caption"
-            icon="plus"
-            onClick={() => setModal({ kind: 'form', question: null })}
-          >
-            Thêm câu hỏi
-          </Button>
-        }
+      <form
+        id="category-questions-form"
+        className="flex flex-col gap-4"
+        onSubmit={submit}
+        noValidate
       >
-        {category.questions.length ? (
-          <ol className="m-0 list-none px-4 py-2">
-            {category.questions.map((question, index) => (
-              <li
-                key={question.id}
-                className="flex min-w-0 items-center gap-3 border-b border-line-subtle py-2.5 text-body text-ink-secondary last:border-b-0"
-              >
-                <span className="grid size-7 shrink-0 place-items-center rounded-full bg-primary-soft text-caption font-bold text-primary">
-                  {index + 1}
-                </span>
-                <p className="m-0 min-w-0 flex-1 break-words leading-relaxed">{question.text}</p>
-                <div className="flex shrink-0 gap-1">
-                  <IconButton
-                    label={`Sửa câu hỏi ${index + 1}`}
-                    icon="edit"
-                    tone="edit"
-                    onClick={() => setModal({ kind: 'form', question })}
-                  />
-                  <IconButton
-                    label={`Xóa câu hỏi ${index + 1}`}
-                    icon="close"
-                    danger
-                    onClick={() => setModal({ kind: 'delete', question })}
-                  />
-                </div>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className="m-0 p-6 text-center text-body text-ink-muted">Chưa có câu hỏi xác minh.</p>
-        )}
-      </Panel>
+        <Panel
+          title="Câu hỏi xác minh"
+          action={
+            <Button className="text-caption" icon="plus" onClick={addQuestion} disabled={saving}>
+              Thêm câu hỏi
+            </Button>
+          }
+        >
+          {questions.length ? (
+            <ol className="m-0 list-none px-4 py-2">
+              {questions.map((question, index) => {
+                const error = questionErrors[index]
+                const inputId = `admin-question-input-${index}`
+                const errorId = `admin-question-error-${index}`
 
-      {modal?.kind === 'form' && (
-        <QuestionForm
-          question={modal.question}
-          categoryName={category.name}
-          onClose={() => setModal(null)}
-          onSubmit={(text) => onSaveQuestion(modal.question?.id, text)}
+                return (
+                  <li
+                    key={question.id}
+                    className="flex min-w-0 items-start gap-3 py-1 text-body text-ink-secondary"
+                  >
+                    <span className="grid size-7 shrink-0 place-items-center rounded-full bg-primary-soft text-caption font-bold text-primary">
+                      {index + 1}
+                    </span>
+                    <div
+                      className={cx(
+                        'flex min-w-0 flex-1 flex-col gap-1 border-b border-line-subtle pb-1',
+                        error && 'border-danger/35',
+                        highlightedId === question.id
+                          ? 'border-[#3976bd]'
+                          : !error && 'focus-within:border-[#3976bd]'
+                      )}
+                    >
+                      <label htmlFor={inputId} className="sr-only">
+                        Câu hỏi xác minh {index + 1}
+                      </label>
+                      <textarea
+                        ref={(node) => {
+                          if (node) questionRefs.current.set(question.id, node)
+                          else questionRefs.current.delete(question.id)
+                        }}
+                        id={inputId}
+                        rows={1}
+                        maxLength={MAX_LENGTH}
+                        disabled={saving}
+                        className="min-h-10 w-full resize-none overflow-hidden rounded-none border-0 bg-transparent px-0 py-1 leading-relaxed text-ink outline-none focus:ring-0"
+                        value={question.text}
+                        aria-invalid={error ? true : undefined}
+                        aria-describedby={error ? errorId : undefined}
+                        placeholder="Nhập câu hỏi xác minh…"
+                        onChange={(event) => updateQuestion(question.id, event.target.value)}
+                      />
+                      {error && (
+                        <FormError id={errorId} subtle>
+                          {error}
+                        </FormError>
+                      )}
+                    </div>
+                    <IconButton
+                      label={`Xóa câu hỏi ${index + 1}`}
+                      icon="close"
+                      danger
+                      disabled={saving}
+                      onClick={() => setDeleteTarget(question)}
+                    />
+                  </li>
+                )
+              })}
+            </ol>
+          ) : (
+            <p className="m-0 text-center text-body text-ink-muted">Chưa có câu hỏi xác minh.</p>
+          )}
+        </Panel>
+        <SaveBar
+          formId="category-questions-form"
+          dirty={dirty}
+          error={saveError}
+          saving={saving}
+          blocked={hasDuplicates}
+          saveLabel="Lưu cấu hình"
+          onReset={reset}
         />
-      )}
-      {modal?.kind === 'delete' && (
+      </form>
+
+      {deleteTarget && (
         <ConfirmDeleteDialog
           title="Xóa câu hỏi xác minh"
-          confirmLabel="Xóa câu hỏi"
-          onClose={() => setModal(null)}
-          onConfirm={() => onRemoveQuestion(modal.question.id)}
+          confirmLabel="Xóa"
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={() => removeQuestionFromDraft(deleteTarget.id)}
         >
           <p className="m-0">Bạn có chắc muốn xóa câu hỏi xác minh này?</p>
-          <p className="m-0 rounded-xl bg-primary-faint px-3.5 py-2.5 break-words text-ink">
-            “{modal.question.text}”
-          </p>
+          <p className="m-0 break-words font-semibold text-primary">“{deleteTarget.text}”</p>
         </ConfirmDeleteDialog>
       )}
     </>

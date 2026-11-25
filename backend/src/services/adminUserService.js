@@ -32,6 +32,8 @@ const toUser = (user) => ({
   reputationScore: user.reputationScore,
   avatarUrl: user.avatarUrl || null,
   createdAt: user.createdAt,
+  lastActiveAt: user.lastActiveAt ?? null,
+  updatedAt: user.updatedAt ?? null,
 })
 
 const listUsers = async ({ q = '', role, status, sort = 'newest' }) => {
@@ -53,7 +55,7 @@ const listUsers = async ({ q = '', role, status, sort = 'newest' }) => {
   }
 
   const users = await User.find(filter)
-    .select('username email role status reputationScore avatarUrl createdAt')
+    .select('username email role status reputationScore avatarUrl createdAt lastActiveAt updatedAt')
     .collation(User.USERNAME_COLLATION)
     .sort(SORTS[sort])
     .lean()
