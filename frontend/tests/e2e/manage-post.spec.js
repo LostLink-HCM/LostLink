@@ -86,7 +86,7 @@ test.describe('UC13 - Xem hồ sơ cá nhân', () => {
 })
 
 test.describe('UC27 - Đóng bài / đánh dấu đã trao trả', () => {
-  test('đánh dấu đã trao trả từ trang cá nhân: bài rời danh sách, số lần trao trả tăng', async ({
+  test('đánh dấu đã trao trả từ trang cá nhân: bài rời danh sách, chưa cộng lần trao trả khi chưa có hai bên xác nhận', async ({
     page,
     api,
   }) => {
@@ -105,7 +105,7 @@ test.describe('UC27 - Đóng bài / đánh dấu đã trao trả', () => {
     await expect(page.getByText('Cập nhật trạng thái bài thành công.')).toBeVisible()
     await expect(cardOf(page, title)).toHaveCount(0)
     const me = await (await api.get('users/me', { headers: bearer(token) })).json()
-    expect(me.data.profile.returnCount).toBe(1)
+    expect(me.data.profile.returnCount).toBe(0)
   })
 
   test('đóng bài từ trang chi tiết: bài hiện Đã đóng, không còn nút Đóng bài', async ({
