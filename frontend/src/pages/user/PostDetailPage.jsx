@@ -164,6 +164,7 @@ function PostDetail({ post, onChanged }) {
 
   const lost = post.type === 'lost'
   const isMine = post.viewer.isOwner
+  const canClaim = !isMine && post.status !== 'returned'
   const claimLabel = lost ? 'Tôi đang giữ món này' : 'Đây là đồ của tôi'
 
   // Xem hồ sơ cần đăng nhập, Guest được đưa sang đăng nhập rồi quay lại bài này
@@ -317,7 +318,10 @@ function PostDetail({ post, onChanged }) {
         },
         ...ownerActions,
       ].filter(Boolean)
-    : [{ label: claimLabel, icon: 'check', tone: 'primary', onClick: claim }, ...viewerActions]
+    : [
+        canClaim && { label: claimLabel, icon: 'check', tone: 'primary', onClick: claim },
+        ...viewerActions,
+      ].filter(Boolean)
 
   return (
     <div className={pageClass}>
@@ -499,7 +503,7 @@ function PostDetail({ post, onChanged }) {
           )}
 
           {/* Bài của chính mình thì không có khối nhận đồ; báo cáo nằm trong menu ⋯ của bài */}
-          {!isMine && (
+          {canClaim && (
             <Card as="section" padding="md">
               <h2 className="m-0 mb-4 text-body font-bold text-ink">
                 {lost ? 'Bạn nhặt được món này?' : 'Đây là đồ của bạn?'}

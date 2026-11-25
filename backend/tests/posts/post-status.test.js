@@ -53,10 +53,10 @@ describe('UC27 - Đóng bài', () => {
     assert.equal(saved.statusHistory.at(-1).status, 'closed')
     assert.equal(String(saved.statusHistory.at(-1).changedBy), String(owner._id))
     assert.equal((await MatchSuggestion.findById(match._id)).state, 'stale')
-    assert.equal((await Claim.findById(claim._id)).status, 'rejected')
-    const notice = await Notification.findOne({ user: follower._id })
-    assert.equal(notice.type, 'post_closed')
-    assert.equal(String(notice.refId), String(post._id))
+    assert.equal((await Claim.findById(claim._id)).status, 'expired')
+    const notices = await Notification.find({ user: follower._id }).lean()
+    assert.deepEqual(notices.map((item) => item.type).sort(), ['post_closed', 'trade_ended'])
+    assert.ok(notices.every((item) => String(item.refId) === String(post._id)))
 
     // Ẩn khỏi danh sách công khai nhưng liên kết đã chia sẻ vẫn mở được
     const list = await newClient().get('/api/posts?range=30d')
@@ -71,7 +71,7 @@ describe('UC27 - Đóng bài', () => {
 })
 
 describe('UC27 - Đánh dấu đã trao trả', () => {
-  test('bài Nhặt được: chủ bài là người trả đồ, số lần trao trả được đếm lại', async () => {
+  test('trao trả bên ngoài rồi tự đánh dấu: bài kết thúc nhưng không tính lần trao trả', async () => {
     const post = await makePost(owner, wallet.category, { type: 'found' })
     await PostFollow.create({ user: follower._id, post: post._id })
 
@@ -79,11 +79,26 @@ describe('UC27 - Đánh dấu đã trao trả', () => {
 
     assert.equal(res.status, 200)
     assert.equal((await Post.findById(post._id)).statusHistory.at(-1).status, 'returned')
-    assert.equal((await User.findById(owner._id)).returnCount, 1)
+    assert.equal((await User.findById(owner._id)).returnCount, 0)
     assert.equal((await Notification.findOne({ user: follower._id })).type, 'returned')
     // Bài vừa trao trả vẫn hiện trên danh sách công khai trong 7 ngày
     const list = await newClient().get('/api/posts?range=30d')
     assert.ok(list.body.data.items.some((item) => item.id === String(post._id)))
+  })
+
+  test('bài Nhặt được có hội thoại đã xác nhận: chủ bài là người trả đồ, được đếm lại', async () => {
+    const post = await makePost(owner, wallet.category, { type: 'found' })
+    await Conversation.create({
+      kind: 'trade',
+      post: post._id,
+      participants: [{ user: owner._id }, { user: follower._id }],
+      confirmedLost: true,
+      confirmedFound: true,
+    })
+
+    assert.equal((await setStatus(post, 'returned')).status, 200)
+    assert.equal((await User.findById(owner._id)).returnCount, 1)
+    assert.equal((await User.findById(follower._id)).returnCount, 0)
   })
 
   test('bài Mất đồ: người còn lại trong hội thoại đã xác nhận trao trả được cộng', async () => {

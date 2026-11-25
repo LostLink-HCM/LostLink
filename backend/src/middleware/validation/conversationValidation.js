@@ -46,10 +46,15 @@ const reviewRules = [
   body('isPublic').optional().isBoolean({ strict: true }).withMessage('Giá trị không hợp lệ.'),
 ]
 
+const counterpartRules = [
+  body('same').isBoolean({ strict: true }).withMessage('Giá trị không hợp lệ.'),
+]
+
 module.exports = {
   conversationIdRules,
   rejectInvalidConversationId,
   historyRules,
   messageRules,
   reviewRules,
+  counterpartRules,
 }

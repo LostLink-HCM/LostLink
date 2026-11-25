@@ -75,7 +75,7 @@ export default function RightRail({ isGuest, limit = 5, titled = true }) {
             ))}
           </ol>
         ) : null}
-        {!loading && leaders.length > 0 && (
+        {!loading && leaders.length > 0 && pathname !== '/leaderboard' && (
           <Link
             to="/leaderboard"
             className={cx(

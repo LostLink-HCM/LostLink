@@ -344,7 +344,7 @@ const acceptClaim = async (id, user) => {
   const claim = await findIncomingClaim(id, user)
   const { post } = claim
   if (!CLAIMABLE_STATUSES.includes(post.status)) {
-    await respond(claim, 'rejected')
+    await respond(claim, 'expired')
     throw ApiError.conflict('Yêu cầu không còn hiệu lực.', 'CLAIM_EXPIRED')
   }
   if (await blockedEither(user._id, claim.claimant)) {

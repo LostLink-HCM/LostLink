@@ -58,7 +58,7 @@ export default function PostPicker({ groups, current, onSelect }) {
                     {TYPE_LABELS[post.type]}
                   </span>
                 </span>
-                {pending > 0 && <CountBadge count={pending > 9 ? '9+' : pending} tone="primary" />}
+                {pending > 0 && <CountBadge count={pending > 9 ? '9+' : pending} />}
               </button>
             </li>
           )

@@ -1,5 +1,5 @@
 const { Conversation, Post, Review, User } = require('../models')
-const { deletedReturnedPosts } = require('./returnService')
+const { confirmedReturnPostIds, deletedReturnedPosts } = require('./returnService')
 const { RETURN_POINTS, REVIEW_POINTS } = require('./reputationService')
 
 const VN_OFFSET_MS = 7 * 60 * 60 * 1000
@@ -19,6 +19,7 @@ const quarterRange = (now = Date.now()) => {
 
 const returnedInRange = ({ start, end }) => ({
   status: 'returned',
+  returnedWith: null,
   statusHistory: { $elemMatch: { status: 'returned', changedAt: { $gte: start, $lt: end } } },
 })
 
@@ -26,13 +27,11 @@ const returnedInRange = ({ start, end }) => ({
 // bài Nhặt được là chủ bài, bài Mất đồ là người còn lại trong hội thoại đã được hai bên xác nhận
 const returnersInRange = async (range) => {
   const posts = await Post.find(returnedInRange(range)).select('type owner').lean()
-  const lostOwner = new Map(
-    posts.filter((post) => post.type === 'lost').map((post) => [String(post._id), post.owner])
-  )
-  const trades = lostOwner.size
+  const postById = new Map(posts.map((post) => [String(post._id), post]))
+  const trades = posts.length
     ? await Conversation.find({
         kind: 'trade',
-        post: { $in: [...lostOwner.keys()] },
+        post: { $in: posts.map((post) => post._id) },
         confirmedLost: true,
         confirmedFound: true,
       })
@@ -40,17 +39,20 @@ const returnersInRange = async (range) => {
         .lean()
     : []
 
-  const returners = posts
-    .filter((post) => post.type === 'found')
-    .map((post) => [post._id, post.owner])
+  const returners = []
   for (const trade of trades) {
-    const owner = String(lostOwner.get(String(trade.post)))
-    const helpers = new Set(trade.participants.map((item) => String(item.user)))
-    helpers.delete(owner)
-    for (const helper of helpers) returners.push([trade.post, helper])
+    const post = postById.get(String(trade.post))
+    const owner = String(post.owner)
+    if (post.type === 'found') {
+      returners.push([trade.post, owner])
+      continue
+    }
+    for (const item of trade.participants) {
+      if (String(item.user) !== owner) returners.push([trade.post, String(item.user)])
+    }
   }
   // Mỗi bài chỉ tính một lần cho mỗi người, dù có nhiều hội thoại
-  return [...new Map(returners.map(([post, user]) => [`${post}:${user}`, String(user)])).values()]
+  return [...new Map(returners.map(([post, user]) => [`${post}:${user}`, user])).values()]
 }
 
 // Bảng "Người tốt bụng" của quý: điểm uy tín phát sinh trong quý (trao trả và đánh giá),
@@ -102,12 +104,17 @@ const getLeaderboard = async ({ limit = LEADERS_DEFAULT } = {}, now = Date.now()
 
 // Số liệu chung, không kèm tên người dùng. Tỷ lệ ghép cặp thành công = đồ đã trao trả / tin đã đăng
 const getCommunityStats = async () => {
+  const counted = {
+    _id: { $in: await confirmedReturnPostIds() },
+    status: 'returned',
+    returnedWith: null,
+  }
   const [published, returnedNow, deletedReturns, durations] = await Promise.all([
     Post.countDocuments({ status: { $nin: PUBLISHED_EXCLUDED } }),
-    Post.countDocuments({ status: 'returned' }),
+    Post.countDocuments(counted),
     deletedReturnedPosts(),
     Post.aggregate([
-      { $match: { status: 'returned' } },
+      { $match: counted },
       {
         $project: {
           returnedAt: {

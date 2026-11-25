@@ -31,6 +31,21 @@ const returnLostItem = async (owner, helper, date) => {
   return { post, conversation }
 }
 
+const returnFoundItem = async (owner, date) => {
+  const post = await makePost(owner, wallet.category, { type: 'found', ...returnedAt(date) })
+  await trade(post, users['dung.q7'])
+  return post
+}
+
+const trade = (post, other) =>
+  Conversation.create({
+    kind: 'trade',
+    post: post._id,
+    participants: [{ user: post.owner }, { user: other._id }],
+    confirmedLost: true,
+    confirmedFound: true,
+  })
+
 beforeEach(async () => {
   wallet = await createWalletCategory()
   users = {}
@@ -59,7 +74,7 @@ describe('UC05 - Bảng vinh danh theo quý', () => {
     }
 
     // an trả 2 món (bài Nhặt được của mình) và được đánh giá 5 sao: 2×10 + 3
-    await makePost(an, wallet.category, { type: 'found', ...returnedAt(inQuarter) })
+    await returnFoundItem(an, inQuarter)
     const { conversation } = await returnLostItem(dung, an, inQuarter)
     await Review.create({
       conversation: conversation._id,
@@ -68,19 +83,17 @@ describe('UC05 - Bảng vinh danh theo quý', () => {
       rating: 5,
     })
     // binh trả 2 món nhưng bị 1 sao: 2×10 − 3; chi trả 1 món và quý trước 1 món
-    await makePost(binh, wallet.category, { type: 'found', ...returnedAt(inQuarter) })
-    await makePost(binh, wallet.category, { type: 'found', ...returnedAt(inQuarter) })
+    await returnFoundItem(binh, inQuarter)
+    await returnFoundItem(binh, inQuarter)
     await Review.create({
       conversation: conversation._id,
       reviewer: an._id,
       reviewee: binh._id,
       rating: 1,
     })
+    await returnFoundItem(chi, inQuarter)
+    await returnFoundItem(chi, new Date(start.getTime() - DAY))
     await makePost(chi, wallet.category, { type: 'found', ...returnedAt(inQuarter) })
-    await makePost(chi, wallet.category, {
-      type: 'found',
-      ...returnedAt(new Date(start.getTime() - DAY)),
-    })
     // dung chỉ là người mất đồ nên không lên bảng
 
     const { leaders } = await getLeaderboard({ limit: 10 }, now)
@@ -99,8 +112,12 @@ describe('UC05 - Bảng vinh danh theo quý', () => {
     assert.equal(empty.status, 200)
     assert.deepEqual(empty.body.data.leaders, [])
 
-    await makePost(users['an.q1'], wallet.category, { type: 'found', ...returnedAt(new Date()) })
-    await makePost(users['binh.q3'], wallet.category, { type: 'found', ...returnedAt(new Date()) })
+    await makePost(users['chi.q5'], wallet.category, { type: 'found', ...returnedAt(new Date()) })
+    const selfMarked = await newClient().get('/api/stats/leaderboard')
+    assert.deepEqual(selfMarked.body.data.leaders, [])
+
+    await returnFoundItem(users['an.q1'], new Date())
+    await returnFoundItem(users['binh.q3'], new Date())
     const res = await newClient().get('/api/stats/leaderboard?limit=1')
     assert.equal(res.body.data.leaders.length, 1)
     // Bằng điểm thì xếp theo tên, cùng hạng 1
@@ -116,14 +133,14 @@ describe('UC05 - Thống kê cộng đồng', () => {
     const owner = users['an.q1']
     const now = Date.now()
     // Hai bài trao trả sau 1 và 3 ngày; bài chờ duyệt, bị từ chối không tính
-    await makePost(owner, wallet.category, {
-      createdAt: new Date(now - 4 * DAY),
-      ...returnedAt(new Date(now - 3 * DAY)),
-    })
-    await makePost(owner, wallet.category, {
-      createdAt: new Date(now - 4 * DAY),
-      ...returnedAt(new Date(now - DAY)),
-    })
+    for (const days of [3, 1]) {
+      const post = await makePost(owner, wallet.category, {
+        createdAt: new Date(now - 4 * DAY),
+        ...returnedAt(new Date(now - days * DAY)),
+      })
+      await trade(post, users['binh.q3'])
+    }
+    await makePost(owner, wallet.category, returnedAt(new Date(now - DAY)))
     await makePost(owner, wallet.category)
     await makePost(owner, wallet.category, { status: 'closed' })
     await makePost(owner, wallet.category, { status: 'pending' })
@@ -133,9 +150,9 @@ describe('UC05 - Thống kê cộng đồng', () => {
     const res = await newClient().get('/api/stats/community')
     assert.equal(res.status, 200)
     const { posted, returned, matchRate, avgReturnDays } = res.body.data
-    assert.equal(posted, 5)
+    assert.equal(posted, 6)
     assert.equal(returned, 3)
-    assert.equal(matchRate, 3 / 5)
+    assert.equal(matchRate, 3 / 6)
     assert.ok(Math.abs(avgReturnDays - 2) < 0.01, String(avgReturnDays))
   })
 

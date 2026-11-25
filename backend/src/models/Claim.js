@@ -14,7 +14,7 @@ const claimSchema = new Schema(
 
     status: {
       type: String,
-      enum: ['pending', 'verifying', 'linked', 'rejected'],
+      enum: ['pending', 'verifying', 'linked', 'rejected', 'expired'],
       default: 'pending',
       index: true,
     },

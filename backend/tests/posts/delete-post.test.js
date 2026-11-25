@@ -142,8 +142,14 @@ describe('UC26 - Xóa bài đăng', () => {
 
     // Bài Nhặt được đã trao trả: người trả đồ là chủ bài
     const found = await makePost(owner, wallet.category, { type: 'found', status: 'returned' })
+    await trade(found, { confirmedLost: true, confirmedFound: true })
     assert.equal(await refreshReturnCount(owner._id), 1)
     assert.equal((await api.delete(`/api/posts/${found._id}`)).status, 200)
+    assert.equal(await refreshReturnCount(owner._id), 1)
+    assert.equal(await deletedReturnedPosts(), 2)
+
+    const outside = await makePost(owner, wallet.category, { type: 'found', status: 'returned' })
+    assert.equal((await api.delete(`/api/posts/${outside._id}`)).status, 200)
     assert.equal(await refreshReturnCount(owner._id), 1)
     assert.equal(await deletedReturnedPosts(), 2)
   })
@@ -157,6 +163,7 @@ describe('UC26 - Xóa bài đăng', () => {
 
   test('hai yêu cầu xoá cùng lúc chỉ tính lượt trao trả một lần', async () => {
     const post = await makePost(owner, wallet.category, { type: 'found', status: 'returned' })
+    await trade(post, { confirmedLost: true, confirmedFound: true })
     const results = await Promise.all([
       api.delete(`/api/posts/${post._id}`),
       api.delete(`/api/posts/${post._id}`),
@@ -183,6 +190,7 @@ describe('UC26 - Xóa bài đăng', () => {
 
   test('số liệu cộng đồng lưu trong SystemConfig dạng chuỗi', async () => {
     const post = await makePost(owner, wallet.category, { type: 'found', status: 'returned' })
+    await trade(post, { confirmedLost: true, confirmedFound: true })
     await api.delete(`/api/posts/${post._id}`)
     assert.equal((await SystemConfig.findOne({ key: DELETED_RETURNS_KEY })).value, '1')
   })
