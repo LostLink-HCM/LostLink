@@ -5,6 +5,7 @@ const { escapeRegex, normalizeText } = require('../utils/text')
 const { endOfVnDay, startOfVnDay } = require('../utils/vnTime')
 const { notify } = require('./notificationService')
 const { suppressReportGroup } = require('./backofficeNotificationEvents')
+const { assertAvailableForMutation } = require('./backofficeActionLockService')
 
 const OPEN_STATUSES = ['pending', 'reviewing']
 const PROCESSED_STATUSES = ['resolved', 'dismissed']
@@ -591,6 +592,11 @@ const resolveReportUnsafe = async (id, moderator, action, reason) => {
 const resolveReport = async (id, moderator, action, reason = '') => {
   const report = await Report.findById(id).lean()
   if (!report) throw reportNotFound()
+  const resourceType = report.targetType === 'post' ? 'post' : 'user'
+  const resourceId = report.targetPost || report.targetUser
+  if (resourceId) {
+    await assertAvailableForMutation({ resourceType, resourceId, actor: moderator })
+  }
   const processingKey = groupKeyOf(report)
   const previous = PROCESSING.get(processingKey) || Promise.resolve()
   const work = previous

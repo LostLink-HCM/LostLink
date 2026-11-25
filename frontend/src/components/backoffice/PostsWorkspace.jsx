@@ -13,6 +13,7 @@ import IconButton from './IconButton'
 import Notice from './Notice'
 import Pagination from './Pagination'
 import TypeBadge from './TypeBadge'
+import ActionLockNotice from './ActionLockNotice'
 import {
   EMPTY_FILTERS,
   STATUS_LABELS,
@@ -30,6 +31,7 @@ import { postPath } from '../../lib/user/homeFeed'
 import usePaginatedFilter from '../../hooks/usePaginatedFilter'
 import useBackofficePageSize from '../../hooks/useBackofficePageSize'
 import useLinkedHighlight from '../../hooks/useLinkedHighlight'
+import useBackofficeActionLock from '../../hooks/useBackofficeActionLock'
 import { cx, linkedHighlight } from './classes'
 
 const STATUS_TONES = {
@@ -139,7 +141,15 @@ function getMatchesForPost(post) {
   return post?.matchingPosts || []
 }
 
-function VisibilityDialog({ post, onSubmit, onClose, submitting, serverError }) {
+function VisibilityDialog({
+  post,
+  onSubmit,
+  onClose,
+  submitting,
+  serverError,
+  lockNotice,
+  canAct,
+}) {
   const [reason, setReason] = useState('')
   const [error, setError] = useState('')
   const reasonRef = useRef(null)
@@ -151,7 +161,7 @@ function VisibilityDialog({ post, onSubmit, onClose, submitting, serverError }) 
       reasonRef.current?.focus()
       return
     }
-    onSubmit(reason.trim())
+    if (canAct) onSubmit(reason.trim())
   }
   const title = post.hidden ? 'Hiện lại bài đăng' : 'Ẩn bài đăng'
 
@@ -171,7 +181,7 @@ function VisibilityDialog({ post, onSubmit, onClose, submitting, serverError }) 
             type="submit"
             form="post-visibility-form"
             variant={post.hidden ? 'primary' : 'danger'}
-            disabled={submitting}
+            disabled={submitting || !canAct}
           >
             {submitting ? (
               <span
@@ -187,6 +197,7 @@ function VisibilityDialog({ post, onSubmit, onClose, submitting, serverError }) 
       }
     >
       <form id="post-visibility-form" className="flex flex-col gap-3" onSubmit={submit} noValidate>
+        <ActionLockNotice message={lockNotice} />
         {serverError && (
           <p role="alert" className="rounded-lg bg-danger-soft/50 p-3 text-small text-danger-ink">
             {serverError}
@@ -216,7 +227,7 @@ function VisibilityDialog({ post, onSubmit, onClose, submitting, serverError }) 
                 rows={4}
                 maxLength={500}
                 value={reason}
-                disabled={submitting}
+                disabled={submitting || !canAct}
                 onChange={(e) => {
                   setReason(e.target.value)
                   setError('')
@@ -326,6 +337,13 @@ export default function PostsWorkspace() {
         : selectedDetail || selectedFromList
       : selectedFromList
   const detailPost = modal?.kind === 'detail' ? selected : null
+  const lockRequired = Boolean(modal && ['edit', 'visibility'].includes(modal.kind))
+  const actionLock = useBackofficeActionLock(
+    lockRequired ? 'post' : null,
+    lockRequired ? modal.id : null
+  )
+  const actionLockNotice = lockRequired ? actionLock.notice : ''
+  const canMutate = !lockRequired || actionLock.canAct
   const detailLoading = Boolean(detailId && !detailIsCurrent)
   const detailError = detailIsCurrent ? detailState.error : ''
   const matchingPosts = detailPost ? getMatchesForPost(detailPost) : []
@@ -460,7 +478,7 @@ export default function PostsWorkspace() {
     setToast({ message: 'Bài đăng này hiện không hiển thị trên trang người dùng.' })
   }
   const saveStatus = async () => {
-    if (!selected || actionPending) return
+    if (!selected || actionPending || !canMutate) return
     if (nextStatus === selected.status) {
       setActionError('Vui lòng chọn trạng thái khác với trạng thái hiện tại.')
       return
@@ -492,7 +510,7 @@ export default function PostsWorkspace() {
     }
   }
   const saveVisibility = async (reason) => {
-    if (!selected || actionPending) return
+    if (!selected || actionPending || !canMutate) return
     const hidden = !selected.hidden
     setActionPending(true)
     setActionError('')
@@ -1091,7 +1109,7 @@ export default function PostsWorkspace() {
               <Button
                 variant="primary"
                 onClick={saveStatus}
-                disabled={actionPending || nextStatus === selected.status}
+                disabled={actionPending || !canMutate || nextStatus === selected.status}
               >
                 {actionPending ? (
                   <span
@@ -1104,6 +1122,7 @@ export default function PostsWorkspace() {
             </>
           }
         >
+          <ActionLockNotice message={actionLockNotice} />
           {actionError && (
             <p
               role="alert"
@@ -1116,7 +1135,7 @@ export default function PostsWorkspace() {
             <span className="font-[400]">{selected.postCode || selected.id}:</span>{' '}
             <span className="font-[400]">{selected.title}</span>
           </p>
-          <fieldset disabled={actionPending}>
+          <fieldset disabled={actionPending || !canMutate}>
             <legend className="mb-2 text-small text-ink-muted">
               Chọn trạng thái mới cho bài đăng
             </legend>
@@ -1161,7 +1180,7 @@ export default function PostsWorkspace() {
                   rows={4}
                   maxLength={1000}
                   value={statusReason}
-                  disabled={actionPending}
+                  disabled={actionPending || !canMutate}
                   onChange={(event) => {
                     setStatusReason(event.target.value)
                     setStatusReasonError('')
@@ -1182,6 +1201,8 @@ export default function PostsWorkspace() {
           onSubmit={saveVisibility}
           submitting={actionPending}
           serverError={actionError}
+          lockNotice={actionLockNotice}
+          canAct={canMutate}
           onClose={() => {
             if (!actionPending) setModal(null)
           }}

@@ -36,4 +36,5 @@ module.exports = {
   AuditLog: require('./AuditLog'),
   SystemConfig: require('./SystemConfig'),
   QuickReply: require('./QuickReply'),
+  BackofficeActionLock: require('./BackofficeActionLock'),
 }
