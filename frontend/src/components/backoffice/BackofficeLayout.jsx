@@ -163,10 +163,19 @@ export default function BackofficeLayout({
             collapsed && 'lg:flex-col lg:px-0'
           )}
         >
-          <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary text-caption font-bold">
-            {(user?.username || 'AD').slice(0, 2).toUpperCase()}
+          <div className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-lg bg-primary text-caption font-bold">
+            {user?.avatarUrl ? (
+              <img src={user.avatarUrl} alt="" className="size-full object-cover" />
+            ) : (
+              (user?.username || 'AD').slice(0, 2).toUpperCase()
+            )}
           </div>
-          <strong className={cx('min-w-0 flex-1 truncate text-caption', collapsed && 'lg:hidden')}>
+          <strong
+            className={cx(
+              'min-w-0 flex-1 truncate text-caption uppercase',
+              collapsed && 'lg:hidden'
+            )}
+          >
             {user?.username || 'admin'}
           </strong>
           <button

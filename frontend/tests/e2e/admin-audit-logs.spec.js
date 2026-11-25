@@ -157,7 +157,7 @@ test.describe('Nhật ký thao tác của admin', () => {
     await rows(page).first().getByRole('link', { name: 'Xem tài khoản', exact: true }).click()
     await expect(page).toHaveURL(new RegExp(`/admin/users\\?user=${id}$`))
     const accountRow = page
-      .getByRole('region', { name: 'Bảng người dùng, cuộn ngang để xem thêm' })
+      .getByRole('region', { name: 'Bảng người dùng' })
       .getByRole('row')
       .filter({ has: page.getByRole('button', { name: account.username, exact: true }) })
     await expect(accountRow).toBeVisible()
@@ -422,7 +422,7 @@ test.describe('Nhật ký thao tác của admin', () => {
       ['Đến ngày', 'to'],
     ]) {
       const response = waitForAudit(page, { [key]: '2026-11-11' })
-      await filters(page).getByLabel(label, { exact: true }).fill('2026-11-11')
+      await filters(page).getByRole('textbox', { name: label, exact: true }).fill('2026-11-11')
       expect((await response).ok()).toBeTruthy()
     }
     const queried = waitForAudit(page, { q: 'Ảnh' })
@@ -448,9 +448,7 @@ test.describe('Nhật ký thao tác của admin', () => {
       rows(page).first().getByRole('link', { name: 'Xem bài đăng', exact: true })
     ).toHaveAttribute('href', '/admin/posts?post=000000000000000000000001')
     expect(requests.at(-1)).toEqual({ page: '1' })
-    await expect(
-      filters(page).getByRole('button', { name: 'Xuất CSV', exact: true })
-    ).toBeDisabled()
+    await expect(filters(page).getByRole('button', { name: 'Xuất CSV', exact: true })).toBeEnabled()
 
     const genericActions = [
       ['create', 'Category', 'Thêm danh mục'],
@@ -586,8 +584,8 @@ test.describe('Nhật ký thao tác của admin', () => {
     const requests = await mockJournal(page)
     await openAudit(page)
     await expect(rows(page)).toHaveCount(2)
-    const from = filters(page).getByLabel('Từ ngày', { exact: true })
-    const to = filters(page).getByLabel('Đến ngày', { exact: true })
+    const from = filters(page).getByRole('textbox', { name: /^Từ ngày/ })
+    const to = filters(page).getByRole('textbox', { name: /^Đến ngày/ })
     const first = waitForAudit(page, { from: '2026-11-12' })
     await from.fill('2026-11-12')
     expect((await first).ok()).toBeTruthy()

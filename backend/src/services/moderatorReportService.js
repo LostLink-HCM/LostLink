@@ -186,6 +186,7 @@ const listReports = async ({
   to,
   queueStatus = 'open',
   page = 1,
+  allRows = false,
 }) => {
   const filter = {
     status: { $in: queueStatus === 'processed' ? PROCESSED_STATUSES : OPEN_STATUSES },
@@ -199,7 +200,6 @@ const listReports = async ({
     }),
   }
   await addSearch(filter, q)
-  const pageSize = await pageSizeOf()
   // The queue is grouped by target. Keep individual Report documents so that
   // moderators can still inspect every submission in the detail view.
   const reports = await populatedReports(
@@ -231,13 +231,16 @@ const listReports = async ({
     )
   }
   const total = groups.length
+  const pageSize = allRows ? Math.max(total, 1) : await pageSizeOf()
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const targetIndex = targetId
     ? groups.findIndex((group) => groupKeyOf(group[0]) === `${targetType}:${targetId}`)
     : -1
-  const requestedPage = targetIndex >= 0 ? Math.floor(targetIndex / pageSize) + 1 : page
+  const requestedPage = !allRows && targetIndex >= 0 ? Math.floor(targetIndex / pageSize) + 1 : page
   const currentPage = Math.min(requestedPage, totalPages)
-  const pageGroups = groups.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const pageGroups = allRows
+    ? groups
+    : groups.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   const warningRows = await Report.aggregate([
     {
       $match: {

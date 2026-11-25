@@ -1,4 +1,5 @@
 import { api } from '../api'
+import { downloadCsvFromApi } from '../csv'
 
 export const REPORT_REASON_LABELS = {
   spam: 'Spam / Quảng cáo',
@@ -106,6 +107,21 @@ export async function listModeratorReports(filters = {}) {
     ...response.data,
     items: response.data.items.map(normalizeReport),
   }
+}
+
+export function downloadModeratorReportsCsv(filters = {}) {
+  return downloadCsvFromApi(
+    '/moderator/reports/export.csv',
+    {
+      q: filters.query?.trim(),
+      targetType: filters.targetType,
+      severity: filters.severity,
+      queueStatus: filters.queueStatus === 'open' ? '' : filters.queueStatus,
+      from: filters.from,
+      to: filters.to,
+    },
+    'LostLink_Hang_doi_report.csv'
+  )
 }
 
 export async function getModeratorReport(id) {

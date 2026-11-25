@@ -120,7 +120,7 @@ describe('Dashboard admin - API', () => {
     assert.equal((await api.get(`${PATH}?from=${today}&to=${today}`)).status, 200)
   })
 
-  test('tổng hợp bài đăng, match thành công, report, lượt khóa và kỳ so sánh theo ngày VN', async () => {
+  test('tổng hợp bài đăng và match thành công theo ngày VN; không trả report hoặc lượt khóa', async () => {
     const { today } = await seedCurrentMetrics()
     const response = await api.get(`${PATH}?from=${today}&to=${today}`)
     assert.equal(response.status, 200)
@@ -132,25 +132,27 @@ describe('Dashboard admin - API', () => {
         posts: data.totals.posts,
         matches: data.totals.matches,
         successful: data.totals.successful,
-        reports: data.totals.reports,
-        locks: data.totals.locks,
       },
-      { lost: 1, found: 3, posts: 4, matches: 1, successful: 1, reports: 2, locks: 1 }
+      { lost: 1, found: 3, posts: 4, matches: 1, successful: 1 }
     )
+    assert.equal('reports' in data.totals, false)
+    assert.equal('locks' in data.totals, false)
     assert.equal(data.totals.rate, 100)
     assert.equal(data.previous.posts, 1)
+    assert.equal('reports' in data.previous, false)
+    assert.equal('locks' in data.previous, false)
     assert.equal(data.previousRange.from, addDays(today, -1))
     assert.deepEqual(
-      data.daily.map(({ lost, found, matches, successful, reports, locks }) => ({
+      data.daily.map(({ lost, found, matches, successful }) => ({
         lost,
         found,
         matches,
         successful,
-        reports,
-        locks,
       })),
-      [{ lost: 1, found: 3, matches: 1, successful: 1, reports: 2, locks: 1 }]
+      [{ lost: 1, found: 3, matches: 1, successful: 1 }]
     )
+    assert.equal('reports' in data.daily[0], false)
+    assert.equal('locks' in data.daily[0], false)
     assert.equal(data.areas[0].name, 'Quận 1')
     assert.equal(data.areas[0].rank, 1)
     assert.equal(data.areas.find((row) => row.name === 'Quận 7').rank, 2)
@@ -162,7 +164,7 @@ describe('Dashboard admin - API', () => {
     assert.equal(data.areaRanking.find((row) => row.name === 'Quận 12').posts, 0)
   })
 
-  test('lọc theo khu vực chỉ tính bài đăng, match và report gắn với khu vực; lượt khóa vẫn toàn hệ thống', async () => {
+  test('lọc theo khu vực chỉ tính bài đăng và match thuộc khu vực đã chọn', async () => {
     const { today } = await seedCurrentMetrics()
     const response = await api.get(
       `${PATH}?from=${today}&to=${today}&area=${encodeURIComponent('Quận 7')}`
@@ -171,8 +173,8 @@ describe('Dashboard admin - API', () => {
     const { data } = response.body
     assert.equal(data.totals.posts, 1)
     assert.equal(data.totals.matches, 0)
-    assert.equal(data.totals.reports, 0)
-    assert.equal(data.totals.locks, 1)
+    assert.equal('reports' in data.totals, false)
+    assert.equal('locks' in data.totals, false)
     assert.deepEqual(
       data.areas.map((row) => row.name),
       ['Quận 7']

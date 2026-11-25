@@ -12,6 +12,14 @@ const {
 const router = Router()
 
 router.get(
+  '/posts/export.csv',
+  protect,
+  requireRole('moderator'),
+  listPendingPostsRules,
+  validate,
+  ctrl.exportPendingPosts
+)
+router.get(
   '/posts',
   protect,
   requireRole('moderator'),

@@ -1,6 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { RequireRole } from '../../auth/guards.jsx'
-import ComingSoon from './ComingSoonPage.jsx'
 import Messages from './MessagesPage.jsx'
 import ModeratorLayout from './ModeratorLayout.jsx'
 import Notifications from './NotificationsPage.jsx'
@@ -19,13 +18,13 @@ export default function ModeratorRoutes() {
           </RequireRole>
         }
       >
-        <Route index element={<Posts />} />
+        <Route index element={<Navigate to="/moderator/posts" replace />} />
+        <Route path="posts" element={<Posts />} />
         <Route path="review" element={<Review />} />
         <Route path="reports" element={<Reports />} />
-        <Route path="dashboard" element={<ComingSoon />} />
         <Route path="messages" element={<Messages />} />
         <Route path="notifications" element={<Notifications />} />
-        <Route path="*" element={<Navigate to="/moderator" replace />} />
+        <Route path="*" element={<Navigate to="/moderator/posts" replace />} />
       </Route>
     </Routes>
   )

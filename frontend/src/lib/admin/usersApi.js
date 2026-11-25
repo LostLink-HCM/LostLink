@@ -1,4 +1,5 @@
 import { api } from '../api'
+import { downloadCsvFromApi } from '../csv'
 
 const AVATAR_TONES = ['blue', 'purple', 'teal', 'amber']
 const ACTION_PATHS = {
@@ -30,6 +31,19 @@ export async function listAdminUsers({ query = '', role = '', status = '', sort 
     ...data,
     items: data.items.map(toAdminUser),
   }
+}
+
+export function downloadAdminUsersCsv({
+  query = '',
+  role = '',
+  status = '',
+  sort = 'newest',
+} = {}) {
+  return downloadCsvFromApi(
+    '/admin/users/export.csv',
+    { q: query.trim(), role, status, sort },
+    'LostLink_Danh_sach_nguoi_dung.csv'
+  )
 }
 
 export async function getAdminUser(id) {

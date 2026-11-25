@@ -6,8 +6,7 @@ import useSystemSettings from '../../hooks/useSystemSettings'
 import { listModeratorPendingPosts } from '../../lib/moderator/reviewPosts'
 
 const navigation = [
-  { path: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
-  { path: '', label: 'Tất cả bài đăng', icon: 'list' },
+  { path: '/posts', label: 'Tất cả bài đăng', icon: 'list' },
   { path: '/review', label: 'Kiểm duyệt bài', icon: 'check' },
   { path: '/reports', label: 'Hàng đợi report', icon: 'flag' },
   { path: '/messages', label: 'Tin nhắn', icon: 'chat' },
@@ -60,7 +59,8 @@ export default function ModeratorLayout() {
   return (
     <BackofficeLayout
       basePath="/moderator"
-      activeFallbackPath=""
+      homePath="/posts"
+      activeFallbackPath="/posts"
       navigation={navigation}
       sidebarLabel="Điều hướng moderator"
       brandLabel="LostLink"

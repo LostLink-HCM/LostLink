@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Icon from '../../common/Icon'
 import Button from '../../backoffice/Button'
 import IconButton from '../../backoffice/IconButton'
@@ -23,7 +23,16 @@ const fromForm = (relations, sourceCategoryId) =>
     ratio: Number(ratioPercent) / 100,
   }))
 
-function RelationGroup({ relation, index, candidates, takenIds, onChange, onRemove }) {
+function RelationGroup({
+  relation,
+  index,
+  candidates,
+  takenIds,
+  highlighted,
+  groupRef,
+  onChange,
+  onRemove,
+}) {
   const members = candidates.filter((category) => relation.memberCategoryIds.includes(category.id))
   const toggle = (categoryId) => {
     const isSelected = relation.memberCategoryIds.includes(categoryId)
@@ -41,7 +50,13 @@ function RelationGroup({ relation, index, candidates, takenIds, onChange, onRemo
   }
 
   return (
-    <article className="rounded-xl border border-line-soft bg-primary-faint p-3.5">
+    <article
+      ref={groupRef}
+      className={cx(
+        'py-4 first:pt-0 last:pb-0',
+        highlighted && 'rounded-lg bg-[#f7fafd] px-3 ring-2 ring-[#3976bd]/40'
+      )}
+    >
       <header className="flex flex-wrap items-center justify-between gap-3">
         <strong className="text-small font-semibold text-ink-secondary">Nhóm {index + 1}</strong>
         <div className="flex items-center gap-2">
@@ -90,7 +105,7 @@ function RelationGroup({ relation, index, candidates, takenIds, onChange, onRemo
         </ul>
       )}
 
-      <details className="mt-3 rounded-xl border border-line-soft bg-surface">
+      <details className="mt-3 rounded-lg border border-[#c4d2e2] bg-white">
         <summary className="cursor-pointer rounded-xl px-3 py-2 text-small font-semibold text-primary outline-none hover:bg-primary-faint focus-visible:ring-2 focus-visible:ring-focus/30">
           Chọn danh mục
         </summary>
@@ -133,12 +148,75 @@ export default function RelationsTab({ category, categories, onSave }) {
   const [relations, setRelations] = useState(saved)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [highlightedRelationId, setHighlightedRelationId] = useState(null)
+  const highlightTimer = useRef(null)
+  const relationRefs = useRef(new Map())
+  const pendingRelationScrollId = useRef(null)
   const dirty = !isSame(fromForm(relations, category.id), category.relations)
   const candidates = categories.filter((item) => item.id !== category.id)
   const takenIds = new Set(relations.flatMap((relation) => relation.memberCategoryIds))
   const change = (next) => {
     setError('')
     setRelations(next)
+  }
+
+  useEffect(() => () => clearTimeout(highlightTimer.current), [])
+
+  useEffect(() => {
+    const id = pendingRelationScrollId.current
+    const group = id ? relationRefs.current.get(id) : null
+    if (!group) return
+
+    const frame = requestAnimationFrame(() => {
+      group.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      pendingRelationScrollId.current = null
+    })
+
+    return () => cancelAnimationFrame(frame)
+  }, [relations.length])
+
+  const highlightEmptyRelation = (id) => {
+    clearTimeout(highlightTimer.current)
+    setHighlightedRelationId(id)
+    highlightTimer.current = setTimeout(() => setHighlightedRelationId(null), 3000)
+    requestAnimationFrame(() =>
+      relationRefs.current.get(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    )
+  }
+
+  const clearRelationHighlight = () => {
+    clearTimeout(highlightTimer.current)
+    highlightTimer.current = null
+    setHighlightedRelationId(null)
+  }
+
+  const addRelation = () => {
+    const emptyRelation = relations.find((relation) => relation.memberCategoryIds.length === 0)
+    if (emptyRelation) {
+      highlightEmptyRelation(emptyRelation.id)
+      return
+    }
+
+    const nextRelation = {
+      id: makeId('relation'),
+      sourceCategoryId: category.id,
+      memberCategoryIds: [],
+      ratioPercent: DEFAULT_RELATION_RATIO * 100,
+    }
+    pendingRelationScrollId.current = nextRelation.id
+    change([...relations, nextRelation])
+  }
+
+  const updateRelation = (index, next) => {
+    if (next.memberCategoryIds.length > 0 && highlightedRelationId === next.id) {
+      clearRelationHighlight()
+    }
+    change(relations.map((item, itemIndex) => (itemIndex === index ? next : item)))
+  }
+
+  const removeRelation = (id) => {
+    if (highlightedRelationId === id) clearRelationHighlight()
+    change(relations.filter((item) => item.id !== id))
   }
 
   const submit = async (event) => {
@@ -160,7 +238,7 @@ export default function RelationsTab({ category, categories, onSave }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="m-0 flex items-start gap-2.5 rounded-2xl bg-linear-to-r from-primary-soft to-primary-faint px-4 py-3 text-small leading-relaxed text-primary">
+      <p className="m-0 flex items-start gap-2.5 rounded-lg border border-[#d5e0ec] bg-[#edf3fa] px-4 py-3 text-small leading-relaxed text-[#24476b]">
         <Icon name="info" size={16} className="mt-0.5 shrink-0" />
         <span>
           Bài mất thuộc danh mục này sẽ được ghép với bài nhặt thuộc các danh mục bên dưới. Trùng
@@ -177,27 +255,13 @@ export default function RelationsTab({ category, categories, onSave }) {
         <Panel
           title="Danh mục liên quan"
           action={
-            <Button
-              className="text-caption"
-              icon="plus"
-              onClick={() =>
-                change([
-                  ...relations,
-                  {
-                    id: makeId('relation'),
-                    sourceCategoryId: category.id,
-                    memberCategoryIds: [],
-                    ratioPercent: DEFAULT_RELATION_RATIO * 100,
-                  },
-                ])
-              }
-            >
+            <Button className="text-caption" icon="plus" onClick={addRelation}>
               Thêm nhóm
             </Button>
           }
         >
           {relations.length ? (
-            <div className="space-y-3 p-4.5 max-sm:p-3">
+            <div className="divide-y divide-[#c4d2e2]">
               {relations.map((relation, index) => (
                 <RelationGroup
                   key={relation.id}
@@ -205,10 +269,13 @@ export default function RelationsTab({ category, categories, onSave }) {
                   index={index}
                   candidates={candidates}
                   takenIds={takenIds}
-                  onChange={(next) =>
-                    change(relations.map((item, i) => (i === index ? next : item)))
-                  }
-                  onRemove={() => change(relations.filter((_, i) => i !== index))}
+                  highlighted={highlightedRelationId === relation.id}
+                  groupRef={(node) => {
+                    if (node) relationRefs.current.set(relation.id, node)
+                    else relationRefs.current.delete(relation.id)
+                  }}
+                  onChange={(next) => updateRelation(index, next)}
+                  onRemove={() => removeRelation(relation.id)}
                 />
               ))}
             </div>

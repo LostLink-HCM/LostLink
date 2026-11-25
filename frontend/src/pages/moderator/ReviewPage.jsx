@@ -16,15 +16,15 @@ import TypeBadge from '../../components/backoffice/TypeBadge'
 import { REJECT_REASONS } from '../../lib/moderator/moderation'
 import {
   approveModeratorPendingPost,
+  downloadModeratorPendingPostsCsv,
   getModeratorPendingPost,
   listModeratorPendingPosts,
   rejectModeratorPendingPost,
 } from '../../lib/moderator/reviewPosts'
-import { downloadCsv } from '../../lib/csv'
 import usePaginatedFilter from '../../hooks/usePaginatedFilter'
 import useBackofficePageSize from '../../hooks/useBackofficePageSize'
 import useLinkedHighlight from '../../hooks/useLinkedHighlight'
-import { linkedHighlight } from '../../components/backoffice/classes'
+import { cx, linkedHighlight } from '../../components/backoffice/classes'
 
 const EMPTY_FILTERS = { category: '', type: '', district: '', from: '', to: '', query: '' }
 
@@ -75,6 +75,7 @@ export default function Review() {
   const [error, setError] = useState('')
   const [actionError, setActionError] = useState('')
   const [decisionLoading, setDecisionLoading] = useState(false)
+  const [csvExporting, setCsvExporting] = useState(false)
   const [notice, setNotice] = useState('')
   const [detailPost, setDetailPost] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -255,23 +256,17 @@ export default function Review() {
       setDecisionLoading(false)
     }
   }
-  const exportCsv = () => {
-    downloadCsv('LostLink_Bai_dang_cho_duyet.csv', [
-      ['ID', 'Tiêu đề', 'Người đăng', 'Điểm uy tín', 'Danh mục', 'Loại tin', 'Thời gian', 'Vị trí'],
-      ...filtered.map((post) => [
-        post.postCode || post.id,
-        post.title,
-        post.author,
-        post.reputation,
-        post.category,
-        post.type === 'lost' ? 'Mất đồ' : 'Nhặt được',
-        post.dateTime,
-        post.location,
-      ]),
-    ])
-    setNotice(`Đã xuất ${filtered.length} bài đăng chờ duyệt ra CSV.`)
+  const exportCsv = async () => {
+    setCsvExporting(true)
+    try {
+      await downloadModeratorPendingPostsCsv(filters)
+      setNotice('Đã tải file CSV bài đăng chờ duyệt.')
+    } catch (exportError) {
+      setNotice(exportError.message)
+    } finally {
+      setCsvExporting(false)
+    }
   }
-
   return (
     <div className="px-6 py-5 text-small text-ink max-xl:px-5 max-sm:px-4 max-sm:py-4">
       <section
@@ -298,7 +293,7 @@ export default function Review() {
                 value={filters.category}
                 onChange={(e) => changeFilter('category', e.target.value)}
               >
-                <option value="">Tất cả danh mục</option>
+                <option value="">Tất cả</option>
                 {[
                   ...new Map(
                     posts
@@ -320,7 +315,7 @@ export default function Review() {
                 value={filters.type}
                 onChange={(e) => changeFilter('type', e.target.value)}
               >
-                <option value="">Tất cả loại tin</option>
+                <option value="">Tất cả</option>
                 <option value="lost">Mất đồ</option>
                 <option value="found">Nhặt được</option>
               </Select>
@@ -333,7 +328,7 @@ export default function Review() {
                 value={filters.district}
                 onChange={(e) => changeFilter('district', e.target.value)}
               >
-                <option value="">Tất cả khu vực</option>
+                <option value="">Tất cả</option>
                 {[...new Set(posts.map((post) => post.district).filter(Boolean))].map(
                   (district) => (
                     <option key={district}>{district}</option>
@@ -348,7 +343,8 @@ export default function Review() {
             <IconButton
               icon="reset"
               label="Đặt lại bộ lọc và tải lại danh sách"
-              bordered
+              tone="view"
+              colored
               size={36}
               onClick={() => {
                 resetFilters()
@@ -358,9 +354,19 @@ export default function Review() {
                 void reloadReviewPosts()
               }}
             />
-            <Button variant="primary" onClick={exportCsv} disabled={!filtered.length}>
-              <Icon name="download" />
-              Xuất CSV
+            <Button
+              variant="primary"
+              onClick={exportCsv}
+              disabled={csvExporting || !filtered.length}
+            >
+              {csvExporting ? (
+                'Đang xuất…'
+              ) : (
+                <>
+                  <Icon name="download" />
+                  Xuất CSV
+                </>
+              )}
             </Button>
           </div>
         </DateRange>
@@ -400,6 +406,8 @@ export default function Review() {
       <DataTable
         caption="Bài đăng chờ kiểm duyệt"
         minWidth="min-w-[800px]"
+        containerClassName="!border-[#b3c7df] !shadow-[0_10px_26px_rgba(34,65,100,0.14)]"
+        headingClassName="!border-b-2 !border-b-[#c5d5e7] !bg-[#edf3fa] !text-[#244d78] !text-small"
         columns={[
           ['ID', 'w-[12%]'],
           ['Bài đăng chờ duyệt', 'w-[28%]'],
@@ -424,7 +432,10 @@ export default function Review() {
             <tr
               key={post.id}
               ref={post.id === highlightedPostId ? highlight.targetRef : null}
-              className={post.id === highlightedPostId ? linkedHighlight : 'hover:bg-surface-muted'}
+              className={cx(
+                'transition-colors duration-150',
+                post.id === highlightedPostId ? linkedHighlight : 'hover:bg-[#edf4fc]'
+              )}
             >
               <td className={cell}>
                 <span className="whitespace-nowrap text-caption font-semibold text-primary">
@@ -455,18 +466,21 @@ export default function Review() {
                   <IconButton
                     icon="eye"
                     tone="view"
+                    colorOnly
                     label={`Đọc bài ${code}`}
                     onClick={() => openDetail(post.id)}
                   />
                   <IconButton
                     icon="check"
                     tone="success"
+                    colorOnly
                     label={`Duyệt bài ${code}`}
                     onClick={() => openApprove(post.id)}
                   />
                   <IconButton
                     icon="close"
                     tone="danger"
+                    colorOnly
                     label={`Từ chối bài ${code}`}
                     onClick={() => openReject(post.id)}
                   />

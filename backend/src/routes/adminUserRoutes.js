@@ -12,6 +12,7 @@ const {
 const router = Router()
 
 router.use(protect, requireRole('admin'))
+router.get('/users/export.csv', listUsersRules, validate, ctrl.exportUsers)
 router.get('/users', listUsersRules, validate, ctrl.listUsers)
 router.get('/users/:id', userPathRules, validate, ctrl.getUser)
 router.patch('/users/:id/lock', userPathRules, actionReasonRules(true), validate, ctrl.lockUser)

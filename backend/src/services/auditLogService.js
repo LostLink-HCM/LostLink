@@ -112,11 +112,10 @@ const referencesOf = async (logs) => {
   return Object.fromEntries(results)
 }
 
-const listAuditLogs = async ({ q = '', actorRole, action, entityType, from, to, page = 1 }) => {
-  const config = await SystemConfig.findOne({ key: 'paginationPageSize' }).select('value').lean()
-  const pageSize = config ? Number(config.value) : DEFAULT_SETTINGS.paginationPageSize
-  if (settingError('paginationPageSize', pageSize))
-    throw new ApiError(500, 'Cấu hình phân trang không hợp lệ.', undefined, 'SETTINGS_INVALID')
+const listAuditLogs = async (
+  { q = '', actorRole, action, entityType, from, to, page = 1 },
+  { allRows = false } = {}
+) => {
   const filter = {
     ...(actorRole && { actorRole }),
     ...(action && { action }),
@@ -127,13 +126,18 @@ const listAuditLogs = async ({ q = '', actorRole, action, entityType, from, to, 
   }
   await addSearch(filter, q)
   const total = await AuditLog.countDocuments(filter)
+  let pageSize = Math.max(total, 1)
+  if (!allRows) {
+    const config = await SystemConfig.findOne({ key: 'paginationPageSize' }).select('value').lean()
+    pageSize = config ? Number(config.value) : DEFAULT_SETTINGS.paginationPageSize
+    if (settingError('paginationPageSize', pageSize))
+      throw new ApiError(500, 'Cấu hình phân trang không hợp lệ.', undefined, 'SETTINGS_INVALID')
+  }
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
-  const currentPage = Math.min(page, totalPages)
-  const logs = await AuditLog.find(filter)
-    .sort({ createdAt: -1, _id: -1 })
-    .skip((currentPage - 1) * pageSize)
-    .limit(pageSize)
-    .lean()
+  const currentPage = allRows ? 1 : Math.min(page, totalPages)
+  let logsQuery = AuditLog.find(filter).sort({ createdAt: -1, _id: -1 })
+  if (!allRows) logsQuery = logsQuery.skip((currentPage - 1) * pageSize).limit(pageSize)
+  const logs = await logsQuery.lean()
   const references = await referencesOf(logs)
   const items = logs.map((log) => {
     const actor = references.User.get(String(log.actor))

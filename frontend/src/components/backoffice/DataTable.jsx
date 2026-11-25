@@ -21,6 +21,8 @@ export default function DataTable({
   minWidth,
   ariaLabel,
   variant = 'default',
+  containerClassName,
+  headingClassName,
   empty,
   children,
 }) {
@@ -28,7 +30,11 @@ export default function DataTable({
 
   return (
     <div
-      className={cx('overflow-x-auto rounded-xl border bg-surface', styles.container)}
+      className={cx(
+        'overflow-x-auto rounded-xl border bg-surface',
+        styles.container,
+        containerClassName
+      )}
       tabIndex={ariaLabel ? 0 : undefined}
       role={ariaLabel ? 'region' : undefined}
       aria-label={ariaLabel}
@@ -46,7 +52,12 @@ export default function DataTable({
               <th
                 key={label}
                 scope="col"
-                className={cx('border-b font-semibold', styles.heading, headingClass)}
+                className={cx(
+                  'border-b font-semibold',
+                  styles.heading,
+                  headingClassName,
+                  headingClass
+                )}
               >
                 {label}
               </th>

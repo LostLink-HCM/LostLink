@@ -72,7 +72,7 @@ export default function CategoryList({ categories, total, loading = false, selec
   }
 
   return (
-    <div className="w-full max-w-[400px]">
+    <div className="w-full max-w-[320px]">
       <div>
         <div className="mb-2 flex items-baseline gap-3">
           <label
