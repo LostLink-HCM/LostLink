@@ -2,8 +2,7 @@ import { createAccount, expect, loginThroughUi, test } from '../helpers/auth.js'
 import { bearer, tokenOf } from '../helpers/posts.js'
 
 const ADMIN = { email: 'admin@lostlink.vn', password: 'Admin@123' }
-const tableRegion = (page) =>
-  page.getByRole('region', { name: 'Bảng người dùng, cuộn ngang để xem thêm' })
+const tableRegion = (page) => page.getByRole('region', { name: 'Bảng người dùng' })
 const userRow = (page, account) =>
   tableRegion(page)
     .getByRole('row')
