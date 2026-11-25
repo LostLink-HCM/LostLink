@@ -368,9 +368,9 @@ export default function NotificationsWorkspace({ onUnreadCountChange, role }) {
           <IconButton
             icon="reset"
             label="Đặt lại bộ lọc"
-            tone={role === 'moderator' ? 'view' : 'neutral'}
-            colored={role === 'moderator'}
-            size={32}
+            tone="view"
+            colored
+            size={36}
             onClick={resetFilters}
           />
         </DateRange>

@@ -150,6 +150,18 @@ async function mockMessagesApi(page, { contacts = [], threads = [] } = {}) {
     return route.continue()
   }
   await page.route(/\/api\/backoffice\/conversations(?:\/[^?]*)?(?:\?.*)?$/, routeHandler)
+  await page.route(/\/api\/backoffice\/action-locks(?:\/[^?]*)?$/, async (route) => {
+    const request = route.request()
+    const data =
+      request.method() === 'POST'
+        ? { acquired: true, changed: true, token: request.postDataJSON().token }
+        : { released: true }
+    await route.fulfill({
+      status: 200,
+      headers: CORS,
+      json: { success: true, data },
+    })
+  })
   return { requests }
 }
 

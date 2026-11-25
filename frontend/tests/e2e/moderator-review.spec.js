@@ -40,6 +40,7 @@ test.describe('Kiểm duyệt bài đăng của moderator', () => {
     const search = page.getByRole('searchbox', { name: 'Tìm kiếm' })
     await search.fill(approvedTitle)
     await expect(page.getByRole('button', { name: approvedTitle })).toBeVisible()
+    await expect(page.getByRole('button', { name: `Đọc bài ${approved.code}` })).toHaveCount(0)
     await expect(page.getByRole('button', { name: rejectedTitle })).toHaveCount(0)
 
     await page.getByRole('button', { name: approvedTitle }).click()

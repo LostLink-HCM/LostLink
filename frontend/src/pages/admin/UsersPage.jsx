@@ -995,18 +995,6 @@ export default function Users() {
             </td>
             <td className="border-b border-[#e2eaf3] px-1.5 py-3">
               <div className="flex min-w-0 flex-nowrap items-center justify-center gap-1">
-                <button
-                  type="button"
-                  title="Xem hồ sơ người dùng"
-                  className={cx(
-                    'inline-flex min-h-8 cursor-pointer items-center justify-center gap-1 whitespace-nowrap rounded-md border border-transparent bg-transparent px-1 py-1.5 text-small font-medium text-primary transition-opacity hover:opacity-75 disabled:cursor-not-allowed disabled:opacity-40',
-                    focusRing
-                  )}
-                  onClick={() => openProfile(account.id)}
-                >
-                  <Icon name="eye" size={13} />
-                  Hồ sơ
-                </button>
                 <UserActions
                   account={account}
                   actor={actor}

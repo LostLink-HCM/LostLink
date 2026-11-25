@@ -804,13 +804,6 @@ export default function PostsWorkspace() {
             <td className={cell}>
               <div className="flex flex-wrap gap-1.5">
                 <IconButton
-                  icon="eye"
-                  tone="view"
-                  colorOnly
-                  label="Xem chi tiết bài đăng"
-                  onClick={() => openDetail(post.id)}
-                />
-                <IconButton
                   icon="edit"
                   tone="edit"
                   colorOnly

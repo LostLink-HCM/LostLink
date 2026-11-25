@@ -36,12 +36,11 @@ export default function AdminLayout() {
   return (
     <BackofficeLayout
       basePath="/admin"
-      homePath="/dashboard"
       activeFallbackPath="/dashboard"
       navigation={navigation}
       sidebarLabel="Điều hướng admin"
       brandLabel="LostLink"
-      brandAriaLabel="LostLink - Dashboard admin"
+      brandAriaLabel="LostLink - Trang chủ"
       pendingPath="/messages"
       pendingCount={unreadMessages}
       pendingCounts={{ '/messages': unreadMessages, '/notifications': unreadNotifications }}

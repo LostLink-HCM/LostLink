@@ -450,7 +450,7 @@ export default function Review() {
               <td className={cell}>
                 <button
                   type="button"
-                  className="mb-1.5 block cursor-pointer text-left text-small font-semibold leading-relaxed text-ink hover:text-primary"
+                  className="mb-1.5 block cursor-pointer text-left text-small font-semibold leading-relaxed text-ink hover:text-primary hover:underline underline-offset-4"
                   onClick={() => openDetail(post.id)}
                 >
                   {post.title}
@@ -468,13 +468,6 @@ export default function Review() {
               </td>
               <td className={cell}>
                 <div className="flex flex-wrap gap-1.5">
-                  <IconButton
-                    icon="eye"
-                    tone="view"
-                    colorOnly
-                    label={`Đọc bài ${code}`}
-                    onClick={() => openDetail(post.id)}
-                  />
                   <IconButton
                     icon="check"
                     tone="success"
