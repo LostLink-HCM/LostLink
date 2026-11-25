@@ -336,7 +336,7 @@ export default function NotificationsWorkspace({ onUnreadCountChange, role }) {
             onChange={(event) => setType(event.target.value)}
             className="h-9 cursor-pointer appearance-none rounded-lg border border-line bg-surface px-2.5 pr-8 text-caption text-ink-secondary outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-focus/30"
           >
-            <option value="all">Tất cả loại</option>
+            <option value="all">Tất cả</option>
             {Object.entries(filterTypes).map(([value, metadata]) => (
               <option key={value} value={value}>
                 {metadata.label}
@@ -368,7 +368,8 @@ export default function NotificationsWorkspace({ onUnreadCountChange, role }) {
           <IconButton
             icon="reset"
             label="Đặt lại bộ lọc"
-            bordered
+            tone={role === 'moderator' ? 'view' : 'neutral'}
+            colored={role === 'moderator'}
             size={32}
             onClick={resetFilters}
           />

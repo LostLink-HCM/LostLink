@@ -162,18 +162,3 @@ export function applyUserAction(state, { id, action, reason = '', actor, now = D
     error: '',
   }
 }
-
-export function usersToRows(users) {
-  return [
-    ['LostLink - Danh sách người dùng'],
-    ['Tên người dùng', 'Email', 'Vai trò', 'Trạng thái', 'Ngày tham gia', 'Mã tài khoản'],
-    ...users.map((user) => [
-      user.name,
-      user.email,
-      USER_ROLES[user.role],
-      USER_STATUSES[user.status],
-      new Date(user.createdAt).toLocaleDateString('vi-VN'),
-      user.id,
-    ]),
-  ]
-}

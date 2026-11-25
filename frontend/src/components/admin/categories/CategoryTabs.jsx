@@ -4,16 +4,11 @@ import { cx, focusRing } from '../../backoffice/classes'
 
 // Mỗi tab một sắc của thang ramp, đậm dần sang nhạt theo thứ tự tab
 const CATEGORY_TABS = [
-  { key: 'general', label: 'Thông tin chung', icon: 'info', tone: 'bg-ramp-1 text-white' },
-  { key: 'attributes', label: 'Thuộc tính', icon: 'list', tone: 'bg-ramp-2 text-white' },
-  { key: 'relations', label: 'Quan hệ', icon: 'link', tone: 'bg-ramp-3 text-white' },
-  {
-    key: 'algorithm',
-    label: 'Cấu hình thuật toán',
-    icon: 'activity',
-    tone: 'bg-ramp-4 text-ramp-1',
-  },
-  { key: 'questions', label: 'Câu hỏi xác minh', icon: 'chat', tone: 'bg-ramp-5 text-ramp-1' },
+  { key: 'general', label: 'Thông tin chung', icon: 'info' },
+  { key: 'attributes', label: 'Thuộc tính', icon: 'list' },
+  { key: 'relations', label: 'Quan hệ', icon: 'link' },
+  { key: 'algorithm', label: 'Cấu hình thuật toán', icon: 'activity' },
+  { key: 'questions', label: 'Câu hỏi xác minh', icon: 'chat' },
 ]
 
 export default function CategoryTabs({ value, onChange }) {
@@ -31,7 +26,7 @@ export default function CategoryTabs({ value, onChange }) {
     <div
       role="tablist"
       aria-label="Nhóm cấu hình danh mục"
-      className="grid [grid-template-columns:repeat(5,minmax(150px,1fr))] gap-1 overflow-x-auto rounded-2xl bg-white/80 p-1.5 ring-1 ring-line-soft"
+      className="flex gap-1 overflow-x-auto border-b border-[#c4d2e2]"
     >
       {CATEGORY_TABS.map((tab, index) => {
         const active = tab.key === value
@@ -50,17 +45,19 @@ export default function CategoryTabs({ value, onChange }) {
             onClick={() => onChange(tab.key)}
             onKeyDown={(event) => move(event, index)}
             className={cx(
-              'flex min-w-0 cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-left text-small font-semibold transition duration-200',
+              'flex min-w-0 shrink-0 cursor-pointer items-center gap-2.5 border-b-2 px-4 py-2.5 text-left text-small font-semibold transition-colors',
               active
-                ? cx('shadow-raised', tab.tone)
-                : 'text-ink-muted hover:bg-primary-subtle hover:text-primary',
+                ? 'border-[#3976bd] text-[#24476b]'
+                : 'border-transparent text-[#71839a] hover:text-[#24476b]',
               focusRing
             )}
           >
             <span
               className={cx(
-                'grid size-7 shrink-0 place-items-center rounded-full transition-colors',
-                active ? 'bg-white/25' : tab.tone
+                'grid size-7 shrink-0 place-items-center rounded-full border transition-colors',
+                active
+                  ? 'border-[#d5e0ec] bg-[#edf3fa] text-[#3976bd]'
+                  : 'border-[#e3ebf3] bg-[#f7fafd] text-[#71839a]'
               )}
             >
               <Icon name={tab.icon} size={14} />

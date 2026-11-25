@@ -41,6 +41,7 @@ export default function CreateCategoryDialog({ categories, onSubmit, onClose }) 
     <Dialog
       title="Thêm danh mục"
       onClose={onClose}
+      scrollableContent
       footer={
         <>
           <Button onClick={onClose} disabled={submitting || imageUploading}>

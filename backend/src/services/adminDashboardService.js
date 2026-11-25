@@ -1,5 +1,5 @@
 const { DISTRICTS } = require('../config/areas')
-const { AuditLog, MatchSuggestion, Post, Report, VerificationAttempt } = require('../models')
+const { MatchSuggestion, Post, VerificationAttempt } = require('../models')
 const { startOfVnDay } = require('../utils/vnTime')
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -8,7 +8,7 @@ const DISTRICT_SET = new Set(DISTRICTS)
 const shiftDate = (date, days) =>
   new Date(Date.parse(`${date}T00:00:00.000Z`) + days * DAY_MS).toISOString().slice(0, 10)
 
-const emptyTotals = () => ({ lost: 0, found: 0, matches: 0, successful: 0, reports: 0, locks: 0 })
+const emptyTotals = () => ({ lost: 0, found: 0, matches: 0, successful: 0 })
 
 const createRateTrendBuckets = (from, to) => {
   const days =
@@ -124,49 +124,6 @@ const aggregateMatches = (start, end, area) =>
         },
       },
     },
-  ])
-
-const aggregateReports = (start, end, area) =>
-  Report.aggregate([
-    { $match: { createdAt: { $gte: start, $lt: end } } },
-    {
-      $lookup: {
-        from: 'posts',
-        localField: 'targetPost',
-        foreignField: '_id',
-        as: 'targetPostDoc',
-      },
-    },
-    { $unwind: { path: '$targetPostDoc', preserveNullAndEmptyArrays: true } },
-    ...(area ? [{ $match: { targetType: 'post', 'targetPostDoc.area': area } }] : []),
-    {
-      $project: {
-        day: {
-          $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: 'Asia/Ho_Chi_Minh' },
-        },
-        area: { $ifNull: ['$targetPostDoc.area', ''] },
-      },
-    },
-    { $group: { _id: { day: '$day', area: '$area' }, count: { $sum: 1 } } },
-  ])
-
-const aggregateLocks = (start, end) =>
-  AuditLog.aggregate([
-    {
-      $match: {
-        entityType: 'User',
-        action: 'lock',
-        createdAt: { $gte: start, $lt: end },
-      },
-    },
-    {
-      $project: {
-        day: {
-          $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: 'Asia/Ho_Chi_Minh' },
-        },
-      },
-    },
-    { $group: { _id: '$day', count: { $sum: 1 } } },
   ])
 
 const firstStatusAt = (history, status) =>
@@ -318,8 +275,6 @@ const listAdminDashboard = async ({ from, to, area = '' }) => {
   const [
     posts,
     matches,
-    reports,
-    locks,
     areaOptions,
     approvedCandidates,
     verification,
@@ -328,8 +283,6 @@ const listAdminDashboard = async ({ from, to, area = '' }) => {
   ] = await Promise.all([
     aggregatePosts(previousStart, currentEnd),
     aggregateMatches(previousStart, currentEnd, area),
-    aggregateReports(previousStart, currentEnd, area),
-    aggregateLocks(previousStart, currentEnd),
     listDashboardAreas(),
     collectApprovedPosts(approvedCandidatesStart, currentEnd, area),
     collectVerificationStats(startOfVnDay(from), currentEnd, area),
@@ -449,42 +402,6 @@ const listAdminDashboard = async ({ from, to, area = '' }) => {
       previousTotals.successful += row.successful
       if (matchArea) previousAreas.get(matchArea).successful += row.successful
     }
-  }
-
-  for (const row of reports) {
-    const { day, area: reportArea } = row._id
-    if (isCurrent(day)) {
-      currentTotals.reports += row.count
-      if (area && reportArea) {
-        addToPeriod(currentTotals, areas, reportArea, 'reports', row.count)
-      } else if (!area) {
-        const dayRow = dailyByDate.get(day)
-        if (dayRow) dayRow.reports += row.count
-        if (reportArea) {
-          if (!areas.has(reportArea)) areas.set(reportArea, emptyTotals())
-          areas.get(reportArea).reports += row.count
-        }
-      }
-      if (area) {
-        const dayRow = dailyByDate.get(day)
-        if (dayRow) dayRow.reports += row.count
-      }
-    } else if (isPrevious(day)) {
-      previousTotals.reports += row.count
-      if (reportArea) {
-        if (!previousAreas.has(reportArea)) previousAreas.set(reportArea, emptyTotals())
-        previousAreas.get(reportArea).reports += row.count
-      }
-    }
-  }
-
-  const lockMap = new Map(locks.map((row) => [row._id, row.count]))
-  for (const [day, count] of lockMap) {
-    if (isCurrent(day)) {
-      currentTotals.locks += count
-      const dayRow = dailyByDate.get(day)
-      if (dayRow) dayRow.locks += count
-    } else if (isPrevious(day)) previousTotals.locks += count
   }
 
   const totals = totalsWithDerived(currentTotals, days)

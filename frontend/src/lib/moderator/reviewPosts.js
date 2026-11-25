@@ -1,4 +1,5 @@
 import { api } from '../api'
+import { downloadCsvFromApi } from '../csv'
 
 const formatDateTime = (value) => {
   const date = new Date(value)
@@ -45,16 +46,9 @@ const toReviewPost = (post) => ({
 })
 
 export async function listModeratorPendingPosts(filters = {}) {
-  const params = new URLSearchParams()
-  const queryFilters = {
-    q: filters.query?.trim(),
-    category: filters.category,
-    type: filters.type,
-    area: filters.district,
-    from: filters.from,
-    to: filters.to,
-  }
+  const queryFilters = pendingPostQueryFilters(filters)
 
+  const params = new URLSearchParams()
   for (const [key, value] of Object.entries(queryFilters)) {
     if (value) params.set(key, value)
   }
@@ -62,6 +56,23 @@ export async function listModeratorPendingPosts(filters = {}) {
   const query = params.toString()
   const response = await api.get(`/moderator/posts${query ? `?${query}` : ''}`)
   return response.data.items.map(toReviewPost)
+}
+
+const pendingPostQueryFilters = (filters = {}) => ({
+  q: filters.query?.trim(),
+  category: filters.category,
+  type: filters.type,
+  area: filters.district,
+  from: filters.from,
+  to: filters.to,
+})
+
+export function downloadModeratorPendingPostsCsv(filters = {}) {
+  return downloadCsvFromApi(
+    '/moderator/posts/export.csv',
+    pendingPostQueryFilters(filters),
+    'LostLink_Bai_dang_cho_duyet.csv'
+  )
 }
 
 export async function getModeratorPendingPost(id) {
