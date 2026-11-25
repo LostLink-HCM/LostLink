@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import { acceptClaim, declineClaim, sendContactRequest } from '../../api/claims'
 import {
+  answerCounterpart,
   closeConversation,
   confirmReturn,
   getConversation,
@@ -20,6 +21,9 @@ import { cardClass } from '../../components/user/Card'
 import { cx } from '../../components/user/classes'
 import AttachedPost from '../../components/user/messages/AttachedPost'
 import Composer from '../../components/user/messages/Composer'
+import CounterpartAsk from '../../components/user/messages/CounterpartAsk'
+import PendingTrade from '../../components/user/messages/PendingTrade'
+import PostSwitcher from '../../components/user/messages/PostSwitcher'
 import ThreadList from '../../components/user/messages/ThreadList'
 import TradePanel from '../../components/user/messages/TradePanel'
 import PostMenu from '../../components/user/post/PostMenu'
@@ -28,10 +32,14 @@ import { postPath } from '../../lib/user/homeFeed'
 import {
   appendMessage,
   canClose,
+  counterpartAsks,
   dayLabel,
   filterThreads,
+  groupThreads,
   isClosedByMe,
   isSameDay,
+  pendingTrades,
+  samePeerThreads,
   threadNotes,
   timeLabel,
   toMessage,
@@ -47,6 +55,8 @@ const STATUS_LINES = {
   incoming: ['Đang chờ bạn duyệt', 'text-warning', 'bg-warning'],
   returned: ['Đã trao trả', 'text-success', 'bg-success'],
   declined: ['Yêu cầu đã bị từ chối', 'text-ink-muted', 'bg-ink-subtle'],
+  expired: ['Yêu cầu đã hết hiệu lực', 'text-ink-muted', 'bg-ink-subtle'],
+  ended: ['Bài đã kết thúc', 'text-ink-muted', 'bg-ink-subtle'],
   locked: ['Hội thoại đã khoá', 'text-ink-muted', 'bg-ink-subtle'],
 }
 
@@ -167,6 +177,14 @@ function Conversation({ thread, messages, now }) {
       {thread.status === 'declined' && (
         <SystemNote tone="muted">Yêu cầu trò chuyện đã bị từ chối</SystemNote>
       )}
+      {thread.status === 'expired' && (
+        <SystemNote tone="muted">Bài đã kết thúc, yêu cầu trò chuyện không còn hiệu lực</SystemNote>
+      )}
+      {thread.status === 'ended' && (
+        <SystemNote tone="muted">
+          {thread.post?.status === 'returned' ? 'Bài đã được trao trả' : 'Người đăng đã đóng bài'}
+        </SystemNote>
+      )}
     </>
   )
 }
@@ -256,13 +274,18 @@ export default function MessagesPage() {
 
   // Hội thoại mình đã đóng tách sang mục Đã đóng
   const [folder, setFolder] = useState(active && isClosedByMe(active) ? 'closed' : 'open')
-  const visible = useMemo(
+  const groups = useMemo(
     () =>
-      filterThreads(threads, query).filter(
-        (thread) => isClosedByMe(thread) === (folder === 'closed')
+      groupThreads(
+        filterThreads(threads, query).filter(
+          (thread) => isClosedByMe(thread) === (folder === 'closed')
+        )
       ),
     [threads, query, folder]
   )
+  const peerThreads = active ? samePeerThreads(threads, active) : []
+  const pending = active ? pendingTrades(threads, active) : []
+  const asks = active ? counterpartAsks(threads, active) : []
   const closedUnread = threads.reduce(
     (count, thread) => count + (isClosedByMe(thread) ? thread.unread : 0),
     0
@@ -279,6 +302,12 @@ export default function MessagesPage() {
     setMobileConversation(true)
     setShowInfo(false)
     setError('')
+  }
+
+  const switchTo = (id) => {
+    const thread = threads.find((item) => item.id === id)
+    if (thread) setFolder(isClosedByMe(thread) ? 'closed' : 'open')
+    select(id)
   }
 
   const updateDraft = (text) => {
@@ -356,10 +385,10 @@ export default function MessagesPage() {
   }
 
   // Thao tác trên hội thoại (xác nhận, đóng, mở lại): server trả hội thoại mới
-  const act = async (request, onDone) => {
+  const act = async (request, onDone, target = active) => {
     setDialog(null)
     const err = await run(async () => {
-      const { data } = await request(active.id)
+      const { data } = await request(target.id)
       inbox.putConversation(data)
       onDone(data)
     })
@@ -369,18 +398,57 @@ export default function MessagesPage() {
     }
   }
 
+  const openDialog = (kind, target = active) => setDialog({ kind, target })
+  const dialogTarget = dialog?.target
+  const fromCard = dialogTarget && dialogTarget.id !== active?.id
+
   const confirm = () =>
-    act(confirmReturn, (data) => {
-      // Cả hai đã xác nhận thì chuyển sang đánh giá và gửi lời cảm ơn
-      if (data.returned) navigate(`/messages/${data.id}/review`)
-      else notify(`Đã ghi nhận, LostLink sẽ nhắc ${active.peer.name} xác nhận.`)
-    })
+    act(
+      confirmReturn,
+      (data) => {
+        if (fromCard) {
+          notify(
+            data.returned
+              ? `Hai bên đã xác nhận trao trả bài “${dialogTarget.post.title}”.`
+              : `Đã ghi nhận, LostLink sẽ nhắc ${dialogTarget.peer.name} xác nhận.`
+          )
+          return
+        }
+        // Cả hai đã xác nhận thì chuyển sang đánh giá và gửi lời cảm ơn
+        if (data.returned) navigate(`/messages/${data.id}/review`)
+        else notify(`Đã ghi nhận, LostLink sẽ nhắc ${active.peer.name} xác nhận.`)
+      },
+      dialogTarget
+    )
 
   const close = () =>
-    act(closeConversation, () => {
-      setFolder('closed')
-      notify('Đã đóng hội thoại.')
-    })
+    act(
+      closeConversation,
+      () => {
+        if (fromCard) {
+          notify(`Đã đóng hội thoại về bài “${dialogTarget.post.title}”.`)
+          return
+        }
+        setFolder('closed')
+        notify('Đã đóng hội thoại.')
+      },
+      dialogTarget
+    )
+
+  const answer = (thread, same) =>
+    act(
+      (id) => answerCounterpart(id, same),
+      () => {
+        const title = thread.counterpartAsk.title
+        if (!same) {
+          notify(`Đã ghi nhận, bài “${title}” vẫn giữ nguyên.`)
+          return
+        }
+        notify(`Bài “${title}” đã chuyển sang Đã trao trả.`)
+        inbox.reload().catch(() => {})
+      },
+      thread
+    )
 
   const reopen = () =>
     act(reopenConversation, () => {
@@ -419,7 +487,7 @@ export default function MessagesPage() {
           label: 'Đóng hội thoại',
           icon: 'close',
           tone: 'danger',
-          onClick: () => setDialog('close'),
+          onClick: () => openDialog('close'),
         },
       ].filter(Boolean)
     : []
@@ -428,7 +496,7 @@ export default function MessagesPage() {
     <TradePanel
       thread={active}
       busy={busy}
-      onConfirm={() => setDialog('confirm')}
+      onConfirm={() => openDialog('confirm')}
       onReview={() => navigate(`/messages/${active.id}/review`)}
     />
   )
@@ -450,7 +518,7 @@ export default function MessagesPage() {
           )}
         >
           <ThreadList
-            threads={visible}
+            groups={groups}
             activeId={activeId}
             drafts={drafts}
             query={query}
@@ -507,6 +575,26 @@ export default function MessagesPage() {
                 />
               </div>
             </header>
+
+            <PostSwitcher threads={peerThreads} activeId={active.id} onSelect={switchTo} />
+            {pending.map((thread) => (
+              <PendingTrade
+                key={thread.id}
+                thread={thread}
+                busy={busy}
+                onConfirm={() => openDialog('confirm', thread)}
+                onMismatch={() => openDialog('close', thread)}
+                onOpen={() => switchTo(thread.id)}
+              />
+            ))}
+            {asks.map((thread) => (
+              <CounterpartAsk
+                key={thread.id}
+                thread={thread}
+                busy={busy}
+                onAnswer={(same) => answer(thread, same)}
+              />
+            ))}
 
             {showInfo && (
               <div
@@ -584,7 +672,7 @@ export default function MessagesPage() {
         </aside>
       </div>
 
-      {dialog === 'confirm' && (
+      {dialog?.kind === 'confirm' && (
         <Dialog
           title="Xác nhận món đồ đã được trao trả?"
           size="sm"
@@ -599,15 +687,21 @@ export default function MessagesPage() {
           }
         >
           <p className="m-0 text-small leading-relaxed text-ink-secondary">
-            Chỉ xác nhận khi món đồ đã thực sự được trao tận tay. Khi cả bạn và {active.peer.name}{' '}
-            cùng xác nhận, bài đăng chuyển sang Đã trao trả và không hoàn tác được.
+            {fromCard && (
+              <>
+                Bài <strong className="text-ink">“{dialogTarget.post.title}”</strong>.{' '}
+              </>
+            )}
+            Chỉ xác nhận khi món đồ đã thực sự được trao tận tay. Khi cả bạn và{' '}
+            {dialogTarget.peer.name} cùng xác nhận, bài đăng chuyển sang Đã trao trả và không hoàn
+            tác được.
           </p>
         </Dialog>
       )}
 
-      {dialog === 'close' && (
+      {dialog?.kind === 'close' && (
         <Dialog
-          title="Đóng hội thoại?"
+          title={fromCard ? 'Món đồ không khớp?' : 'Đóng hội thoại?'}
           size="sm"
           onClose={() => setDialog(null)}
           footer={
@@ -620,6 +714,12 @@ export default function MessagesPage() {
           }
         >
           <p className="m-0 text-small leading-relaxed text-ink-secondary">
+            {fromCard && (
+              <>
+                Hội thoại về bài <strong className="text-ink">“{dialogTarget.post.title}”</strong>{' '}
+                sẽ được đóng.{' '}
+              </>
+            )}
             Bên kia vẫn nhắn được nhưng bạn sẽ không nhận thông báo. Bạn có thể mở lại bất cứ lúc
             nào ở mục Đã đóng.
           </p>

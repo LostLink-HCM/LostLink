@@ -35,6 +35,20 @@ export const peerOf = (post) => peerNamed(post.author, 'user', post.authorAvatar
 
 const ownsPost = (post, receiver) => (post.type === 'found') !== Boolean(receiver)
 
+const ENDED_POST_STATUSES = ['returned', 'closed']
+const conversationStatus = (item) => {
+  if (item.status === 'locked') return 'locked'
+  if (item.returned) return 'returned'
+  if (item.kind === 'trade' && ENDED_POST_STATUSES.includes(item.post?.status)) return 'ended'
+  return 'open'
+}
+
+const claimStatus = (claim, outgoing) => {
+  if (claim.status === 'rejected') return 'declined'
+  if (claim.status === 'expired') return 'expired'
+  return outgoing ? 'pending' : 'incoming'
+}
+
 export function conversationThread(item) {
   const support = item.kind === 'support'
   return {
@@ -48,7 +62,7 @@ export function conversationThread(item) {
         ? peerNamed(item.peer.username, 'user', item.peer.avatarUrl ?? null)
         : { ...peerNamed(DELETED_ACCOUNT), deleted: true },
     post: item.post ? { ...item.post, mine: ownsPost(item.post, item.receiver) } : null,
-    status: item.status === 'locked' ? 'locked' : item.returned ? 'returned' : 'open',
+    status: conversationStatus(item),
     receiver: item.receiver,
     closedBy: item.closedBy,
     confirmed: item.confirmed,
@@ -57,13 +71,15 @@ export function conversationThread(item) {
     lastMessage: item.lastMessage ?? null,
     unread: item.unread ?? 0,
     activity: item.lastMessageAt ?? item.createdAt,
+    startedAt: item.createdAt,
     review: item.review ?? null,
+    counterpartAsk: item.counterpartAsk ?? null,
   }
 }
 
 export function claimThread(claim) {
   const outgoing = claim.direction === 'outgoing'
-  const status = claim.status === 'rejected' ? 'declined' : outgoing ? 'pending' : 'incoming'
+  const status = claimStatus(claim, outgoing)
   return {
     id: `claim-${claim.id}`,
     type: 'claim',
@@ -75,6 +91,7 @@ export function claimThread(claim) {
     closedBy: null,
     unread: status === 'incoming' ? 1 : 0,
     activity: claim.respondedAt ?? claim.createdAt,
+    startedAt: claim.createdAt,
     intro: {
       id: `claim-${claim.id}-intro`,
       sender: outgoing ? 'me' : 'peer',
@@ -95,6 +112,7 @@ export function requestThread(post, now = Date.now()) {
     closedBy: null,
     unread: 0,
     activity: new Date(now).toISOString(),
+    startedAt: new Date(now).toISOString(),
   }
 }
 
@@ -133,6 +151,44 @@ export function filterThreads(threads, query) {
     .filter((thread) => !needle || normalize(text(thread)).includes(needle))
     .sort((left, right) => Date.parse(lastActivity(right)) - Date.parse(lastActivity(left)))
 }
+
+const peerKey = (thread) =>
+  thread.kind === 'trade' && !thread.peer.deleted ? `peer:${thread.peer.name}` : thread.id
+
+export function groupThreads(threads) {
+  const groups = new Map()
+  for (const thread of threads) {
+    const key = peerKey(thread)
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(thread)
+  }
+  return [...groups].map(([key, items]) => ({
+    key,
+    lead: items[0],
+    threads: items,
+    unread: items.reduce((count, item) => count + item.unread, 0),
+  }))
+}
+
+export const samePeerThreads = (threads, thread) =>
+  filterThreads(
+    threads.filter((item) => peerKey(item) === peerKey(thread)),
+    ''
+  )
+
+export const pendingTrades = (threads, thread) =>
+  samePeerThreads(threads, thread).filter(
+    (item) =>
+      item.id !== thread.id &&
+      item.type === 'conversation' &&
+      item.status === 'open' &&
+      !item.closedBy &&
+      item.post?.status === 'contacted' &&
+      Date.parse(item.startedAt) < Date.parse(thread.startedAt)
+  )
+
+export const counterpartAsks = (threads, thread) =>
+  samePeerThreads(threads, thread).filter((item) => item.counterpartAsk)
 
 export const closedBy = (thread) => thread.closedBy ?? null
 export const isClosedByMe = (thread) => thread.closedBy === 'me'

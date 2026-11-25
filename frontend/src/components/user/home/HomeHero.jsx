@@ -60,8 +60,8 @@ export default function HomeHero({ search, category, onFilter, onSearchPassed, h
             </>
           ) : (
             <>
-              Đánh rơi hay nhặt được, LostLink giúp{' '}
-              <span className="whitespace-nowrap text-au-accent">kết nối</span> bạn
+              LostLink - Tìm đồ thất lạc,{' '}
+              <span className="whitespace-nowrap text-au-accent">kết nối trao trả</span>
             </>
           )}
         </p>

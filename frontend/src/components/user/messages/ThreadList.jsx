@@ -5,21 +5,7 @@ import Button from '../Button'
 import Avatar from '../Avatar'
 import CountBadge from '../CountBadge'
 import MobileBackButton from '../MobileBackButton'
-
-const STATUS_TAGS = {
-  request: ['Chưa gửi', 'bg-warning-soft text-warning'],
-  incoming: ['Yêu cầu mới', 'bg-warning-soft text-warning'],
-  pending: ['Chờ đồng ý', 'bg-neutral-soft text-neutral'],
-  returned: ['Đã trao trả', 'bg-success-soft text-success'],
-  declined: ['Đã từ chối', 'bg-neutral-soft text-neutral'],
-  locked: ['Đã khoá', 'bg-neutral-soft text-neutral'],
-}
-
-// Mình đóng thì nằm ở mục Đã đóng, người kia đóng thì vẫn ở mục Đang mở
-const CLOSED_TAGS = {
-  me: ['Đã đóng', 'bg-neutral-soft text-neutral'],
-  peer: ['Không khớp', 'bg-neutral-soft text-neutral'],
-}
+import { threadTag } from './threadTag'
 
 const FOLDERS = [
   ['open', 'Đang mở'],
@@ -27,7 +13,7 @@ const FOLDERS = [
 ]
 
 export default function ThreadList({
-  threads,
+  groups,
   activeId,
   drafts,
   query,
@@ -80,7 +66,7 @@ export default function ThreadList({
             >
               {label}
               {value === 'closed' && closedUnread > 0 && (
-                <CountBadge count={closedUnread} tone="primary" size="sm">
+                <CountBadge count={closedUnread} size="sm">
                   <span className="sr-only"> tin chưa đọc</span>
                 </CountBadge>
               )}
@@ -93,19 +79,21 @@ export default function ThreadList({
         className={cx(
           // relative: giữ nhãn ẩn (sr-only) trong khung cuộn, không kéo dài cả trang
           'relative m-0 min-h-0 flex-1 list-none overflow-y-auto px-2 pb-3 [scrollbar-width:thin]',
-          !threads.length && 'hidden'
+          !groups.length && 'hidden'
         )}
       >
-        {threads.map((thread) => {
-          const active = thread.id === activeId
-          const closer = closedBy(thread)
-          const tag = closer ? CLOSED_TAGS[closer] : STATUS_TAGS[thread.status]
+        {groups.map((group) => {
+          const current = group.threads.find((item) => item.id === activeId)
+          const thread = current ?? group.lead
+          const active = Boolean(current)
+          const tag = threadTag(thread)
+          const others = group.threads.length - 1
           const draft =
-            ['open', 'returned', 'request'].includes(thread.status) &&
-            closer !== 'me' &&
+            ['open', 'returned', 'ended', 'request'].includes(thread.status) &&
+            closedBy(thread) !== 'me' &&
             drafts[thread.id]
           return (
-            <li key={thread.id}>
+            <li key={group.key}>
               <button
                 type="button"
                 aria-current={active ? 'true' : undefined}
@@ -122,7 +110,7 @@ export default function ThreadList({
                     <strong
                       className={cx(
                         'truncate text-small text-ink',
-                        thread.unread ? 'font-bold' : 'font-semibold'
+                        group.unread ? 'font-bold' : 'font-semibold'
                       )}
                     >
                       {thread.peer.label ?? thread.peer.name}
@@ -134,11 +122,18 @@ export default function ThreadList({
                       {previewTime(lastActivity(thread), now)}
                     </time>
                   </span>
-                  <span className="mt-0.5 block truncate text-tiny text-ink-subtle">
-                    {thread.post?.title ??
-                      (thread.kind === 'support'
-                        ? 'Khiếu nại, giao dịch bị treo, sự cố'
-                        : 'Bài đăng đã bị xoá')}
+                  <span className="mt-0.5 flex items-center gap-1.5 text-tiny text-ink-subtle">
+                    <span className="min-w-0 truncate">
+                      {thread.post?.title ??
+                        (thread.kind === 'support'
+                          ? 'Khiếu nại, giao dịch bị treo, sự cố'
+                          : 'Bài đăng đã bị xoá')}
+                    </span>
+                    {others > 0 && (
+                      <span className="shrink-0 rounded-full bg-line-subtle px-1.5 py-px text-micro font-semibold text-ink-secondary">
+                        +{others} bài
+                      </span>
+                    )}
                   </span>
                   <span className="mt-1 flex items-center gap-1.5">
                     {tag && (
@@ -154,18 +149,13 @@ export default function ThreadList({
                     <span
                       className={cx(
                         'min-w-0 flex-1 truncate text-caption',
-                        thread.unread ? 'font-semibold text-ink' : 'text-ink-muted'
+                        group.unread ? 'font-semibold text-ink' : 'text-ink-muted'
                       )}
                     >
                       {draft ? `Bản nháp: ${draft}` : threadPreview(thread)}
                     </span>
-                    {thread.unread > 0 && (
-                      <CountBadge
-                        count={thread.unread}
-                        tone="primary"
-                        size="sm"
-                        className="shrink-0"
-                      >
+                    {group.unread > 0 && (
+                      <CountBadge count={group.unread} size="sm" className="shrink-0">
                         <span className="sr-only"> tin chưa đọc</span>
                       </CountBadge>
                     )}
@@ -177,7 +167,7 @@ export default function ThreadList({
         })}
       </ul>
 
-      {!threads.length && (
+      {!groups.length && (
         <div className="flex flex-1 flex-col items-center px-5 py-10 text-center text-ink-subtle">
           {query ? (
             <Icon name="chat" size={30} />
