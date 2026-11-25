@@ -42,7 +42,7 @@ function ValueSummary({ values }) {
   const sorted = byFrequency(values)
 
   return (
-    <ul className="m-0 max-h-36 min-w-0 list-none space-y-1 overflow-y-auto p-0 pr-1 text-small">
+    <ul className="m-0 min-w-0 list-none space-y-1 p-0 text-small">
       {sorted.map((attributeValue) => (
         <li
           key={attributeValue.id}
@@ -659,12 +659,12 @@ export default function AttributesTab({
                     key={attribute.id}
                     className="border-b border-line-subtle transition-colors last:border-b-0 hover:bg-[#f7fafd]"
                   >
-                    <td className="w-[22%] px-3.5 py-3.5 align-top">
-                      <strong className="block text-body font-semibold text-primary">
+                    <td className="w-[17%] px-3.5 py-3.5 align-top">
+                      <strong className="block break-words text-body font-semibold text-primary">
                         {attribute.name}
                       </strong>
                     </td>
-                    <td className="px-3.5 py-3.5 align-top">
+                    <td className="w-[25%] px-3.5 py-3.5 align-top">
                       <ValueSummary values={attribute.values} />
                     </td>
                     <td className="w-[16%] px-3.5 py-3.5 align-top">

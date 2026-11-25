@@ -12,7 +12,6 @@ const sidebarButton =
 export default function BackofficeLayout({
   basePath,
   navigation,
-  homePath = '',
   activeFallbackPath,
   sidebarLabel,
   brandLabel,
@@ -37,7 +36,7 @@ export default function BackofficeLayout({
     navigation.find((item) => item.path === activeFallbackPath) ||
     navigation[0]
   const closeSidebar = () => setSidebarOpen(false)
-  const homeHref = `${basePath}${homePath}`
+  const homeHref = '/'
 
   const navigateFromSidebar = (event, to) => {
     if (
@@ -146,7 +145,7 @@ export default function BackofficeLayout({
               {(pendingCounts[item.path] ?? (item.path === pendingPath ? pendingCount : 0)) > 0 && (
                 <span
                   className={cx(
-                    'ml-auto rounded-md bg-primary/60 px-1.5 text-caption text-primary-soft',
+                    'ml-auto rounded-md bg-white/10 px-1.5 text-caption text-red-400',
                     collapsed && 'lg:hidden'
                   )}
                 >

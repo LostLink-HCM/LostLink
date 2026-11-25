@@ -5,6 +5,7 @@ import DataTable, { cell } from '../../components/backoffice/DataTable'
 import DateRange from '../../components/backoffice/DateRange'
 import DetailList from '../../components/backoffice/DetailList'
 import Dialog from '../../components/backoffice/Dialog'
+import ActionLockNotice from '../../components/backoffice/ActionLockNotice'
 import EmptyState from '../../components/backoffice/EmptyState'
 import Field, { Input, Select, Textarea } from '../../components/backoffice/Field'
 import Icon from '../../components/common/Icon'
@@ -22,6 +23,7 @@ import {
 import { postPath } from '../../lib/user/homeFeed'
 import { profilePath } from '../../lib/user/profiles'
 import useLinkedHighlight from '../../hooks/useLinkedHighlight'
+import useBackofficeActionLock from '../../hooks/useBackofficeActionLock'
 import { cx, linkedHighlight } from '../../components/backoffice/classes'
 
 const EMPTY_FILTERS = {
@@ -251,6 +253,14 @@ export default function Reports() {
     if (detail?.id === modal.id) return detail
     return items.find((report) => report.id === modal.id) || null
   }, [detail, items, modal])
+  const lockResourceType = selected?.targetType === 'post' ? 'post' : 'user'
+  const lockRequired = Boolean(selected?.queueStatus !== 'processed' && selected?.target?.id)
+  const lockResourceId = lockRequired ? selected.target.id : null
+  const actionLock = useBackofficeActionLock(
+    lockResourceId ? lockResourceType : null,
+    lockResourceId
+  )
+  const canResolve = !lockRequired || actionLock.canAct
   const action = modal?.action ? REPORT_ACTIONS[modal.action] : null
 
   const changeFilter = (key, value) => {
@@ -293,7 +303,7 @@ export default function Reports() {
 
   const executeAction = async (event) => {
     event?.preventDefault()
-    if (!selected || !action || actionLoading) return
+    if (!selected || !action || actionLoading || !canResolve) return
     const trimmedReason = reason.trim()
     if (modal.action !== 'dismiss' && !trimmedReason) {
       setActionError('Vui lòng nhập lý do xử lý.')
@@ -567,12 +577,14 @@ export default function Reports() {
                   <ReportActions
                     report={selected}
                     onAction={(nextAction) => confirmAction(selected.id, nextAction)}
+                    disabled={!canResolve}
                   />
                 )}
               </>
             )
           }
         >
+          {selected && <ActionLockNotice message={lockRequired ? actionLock.notice : ''} />}
           {detailLoading && (
             <p className="py-8 text-center text-ink-muted">Đang tải chi tiết report…</p>
           )}
@@ -672,7 +684,11 @@ export default function Reports() {
               <Button onClick={() => setModal(null)} disabled={actionLoading}>
                 Hủy
               </Button>
-              <Button variant={action.tone} onClick={executeAction} disabled={actionLoading}>
+              <Button
+                variant={action.tone}
+                onClick={executeAction}
+                disabled={actionLoading || !canResolve}
+              >
                 {actionLoading
                   ? 'Đang xử lý…'
                   : modal.action === 'warn'
@@ -688,6 +704,7 @@ export default function Reports() {
             </>
           }
         >
+          <ActionLockNotice message={lockRequired ? actionLock.notice : ''} />
           {!['warn', 'hide', 'lock', 'dismiss'].includes(modal.action) && (
             <p className="mb-2 text-lead font-semibold leading-relaxed">{action.description}</p>
           )}
@@ -716,6 +733,7 @@ export default function Reports() {
                 <Textarea
                   {...props}
                   value={reason}
+                  disabled={!canResolve}
                   onChange={(event) => setReason(event.target.value)}
                   placeholder={
                     modal.action === 'warn'

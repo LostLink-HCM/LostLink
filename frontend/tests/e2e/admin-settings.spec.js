@@ -170,7 +170,11 @@ test.describe('Cấu hình hệ thống của admin', () => {
   }) => {
     await page.goto('/admin/users')
     await loginThroughUi(page, ADMIN)
-    await expect(page.getByRole('button', { name: 'Hồ sơ', exact: true })).toHaveCount(4)
+    const usersTable = page.getByRole('region', {
+      name: 'Bảng người dùng',
+    })
+    await expect(usersTable.getByRole('row').nth(1)).toBeVisible()
+    await expect(usersTable.getByRole('button', { name: 'Hồ sơ', exact: true })).toHaveCount(0)
     expect(settings.requests.filter(({ path }) => path === '/api/admin/settings')).toHaveLength(0)
     expect(
       settings.requests.filter(({ path }) => path === '/api/admin/settings/matching')
@@ -214,7 +218,8 @@ test.describe('Cấu hình hệ thống của admin', () => {
     await confirmSave(page, 'pagination')
     expect(settings.writes()[1].body).toEqual({ paginationPageSize: 3 })
     await sidebar(page, 'Người dùng & quyền').click()
-    await expect(page.getByRole('button', { name: 'Hồ sơ', exact: true })).toHaveCount(3)
+    await expect(usersTable.getByRole('row').nth(1)).toBeVisible()
+    await expect(usersTable.getByRole('button', { name: 'Hồ sơ', exact: true })).toHaveCount(0)
     expect(settings.requests.filter(({ path }) => path === '/api/admin/settings')).toHaveLength(1)
   })
 

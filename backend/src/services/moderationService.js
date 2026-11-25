@@ -7,6 +7,7 @@ const { suppressPendingPost } = require('./backofficeNotificationEvents')
 const { escapeRegex, lowercaseText, normalizeText } = require('../utils/text')
 const { endOfVnDay, startOfVnDay } = require('../utils/vnTime')
 const { updatePostWithAudit } = require('./postAuditService')
+const { assertAvailableForMutation } = require('./backofficeActionLockService')
 
 const categoryNotFound = () =>
   new ApiError(
@@ -137,6 +138,7 @@ const afterApproved = async (postId) => {
 }
 
 const changePendingPostStatus = async ({ id, moderator, status, note = '' }) => {
+  await assertAvailableForMutation({ resourceType: 'post', resourceId: id, actor: moderator })
   const moderatorId = moderator._id
   const changedAt = new Date()
   const post = await updatePostWithAudit({

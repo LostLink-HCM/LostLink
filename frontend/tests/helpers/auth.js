@@ -15,7 +15,11 @@ const ipFor = (testInfo) => {
 
 export const test = base.extend({
   context: async ({ context }, provide, testInfo) => {
-    await context.setExtraHTTPHeaders({ 'X-Forwarded-For': ipFor(testInfo) })
+    await context.route(/^http:\/\/localhost:\d+\/api\//, (route) =>
+      route.continue({
+        headers: { ...route.request().headers(), 'x-forwarded-for': ipFor(testInfo) },
+      })
+    )
     await context.addInitScript(() =>
       localStorage.setItem('ll-feedback-hidden-at', String(Date.now()))
     )

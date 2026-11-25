@@ -15,6 +15,7 @@ const returnService = require('./returnService')
 const { endTradesOf } = require('./postManageService')
 const { ACTIVE_MATCH_STATES, isPublic } = require('./postService')
 const { updatePostWithAudit } = require('./postAuditService')
+const { assertAvailableForMutation } = require('./backofficeActionLockService')
 
 const MATCHABLE_STATUSES = ['searching', 'contacted']
 const FINAL_STATUSES = ['closed', 'returned']
@@ -298,6 +299,7 @@ const notifyFollowersOfFinalStatus = async (post, actor, status, changedAt) => {
 }
 
 const updateStatus = async (id, actor, status, reason = '') => {
+  await assertAvailableForMutation({ resourceType: 'post', resourceId: id, actor })
   const current = await Post.findById(id)
   if (!current) throw postNotFound()
   if (current.status === status) {
@@ -361,6 +363,7 @@ const updateStatus = async (id, actor, status, reason = '') => {
 }
 
 const updateVisibility = async (id, actor, isHidden, reason = '') => {
+  await assertAvailableForMutation({ resourceType: 'post', resourceId: id, actor })
   const current = await Post.findById(id).select('code isHidden hiddenReason')
   if (!current) throw postNotFound()
   if (current.isHidden === isHidden && (!isHidden || current.hiddenReason === reason)) {

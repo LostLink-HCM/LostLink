@@ -7,8 +7,9 @@ import {
   percentChange,
   rangeError,
 } from '../../lib/admin/dashboard'
-import { downloadAdminDashboardCsv, getAdminDashboard } from '../../api/adminDashboard'
+import { getAdminDashboard } from '../../api/adminDashboard'
 import Icon from '../../components/common/Icon'
+import IconButton from '../../components/backoffice/IconButton'
 import { cx, focusRing } from '../../components/backoffice/classes'
 
 const number = formatNumber
@@ -635,9 +636,6 @@ function Panel({ title, description, icon, headingIcon, badge, children, classNa
 export default function Dashboard() {
   const [today] = useState(localDate)
   const [filters, setFilters] = useState(() => ({ ...periodRange(7, today), area: '' }))
-  const [notice, setNotice] = useState('')
-  const [exportError, setExportError] = useState('')
-  const [csvExporting, setCsvExporting] = useState(false)
   const [loadedReport, setLoadedReport] = useState(null)
   const [requestError, setRequestError] = useState('')
   const [retryCount, setRetryCount] = useState(0)
@@ -672,30 +670,11 @@ export default function Dashboard() {
 
   const setFilter = (key, value) => {
     setFilters((current) => ({ ...current, [key]: value }))
-    setNotice('')
-    setExportError('')
     setRequestError('')
   }
   const reset = () => {
     setFilters({ ...periodRange(7, today), area: '' })
-    setNotice('')
-    setExportError('')
     setRequestError('')
-  }
-  const exportReport = async () => {
-    if (!report?.hasData || csvExporting) return
-    setCsvExporting(true)
-    setExportError('')
-    try {
-      await downloadAdminDashboardCsv(filters)
-      setNotice(
-        `Đã tải báo cáo CSV · ${formatDate(filters.from)} – ${formatDate(filters.to)} · ${areaName(filters.area, areaOptions)}.`
-      )
-    } catch (error) {
-      setExportError(error.message || 'Không thể xuất báo cáo Dashboard.')
-    } finally {
-      setCsvExporting(false)
-    }
   }
 
   const total = report?.totals
@@ -770,58 +749,18 @@ export default function Dashboard() {
             ))}
           </select>
         </label>
-        <div className="flex gap-[9px] max-[1200px]:justify-end max-[600px]:col-span-full">
-          <button
-            type="button"
-            aria-label="Đặt lại bộ lọc Dashboard"
+        <div className="flex justify-end max-[1200px]:col-span-2 max-[600px]:col-span-full">
+          <IconButton
+            icon="reset"
+            label="Đặt lại bộ lọc Dashboard"
             title="Đặt lại về 7 ngày gần nhất"
+            tone="view"
+            colored
+            size={36}
             onClick={reset}
-            className={cx(
-              'inline-flex size-[42px] cursor-pointer items-center justify-center rounded-[7px] border border-[#c6d6e7] bg-white p-0 text-primary hover:bg-primary-subtle',
-              focusRing
-            )}
-          >
-            <Icon name="reset" size={17} />
-          </button>
-          <button
-            type="button"
-            disabled={csvExporting || !report?.hasData}
-            onClick={exportReport}
-            className={cx(
-              'inline-flex min-h-[42px] cursor-pointer items-center justify-center gap-2 rounded-[7px] border border-primary bg-primary px-3.5 text-[13px] font-semibold whitespace-nowrap text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45',
-              focusRing
-            )}
-          >
-            {csvExporting ? (
-              'Đang xuất…'
-            ) : (
-              <>
-                <Icon name="download" size={17} />
-                Xuất CSV
-              </>
-            )}
-          </button>
+          />
         </div>
       </section>
-
-      {exportError && (
-        <p
-          className="mb-5 rounded-[7px] border border-danger-soft bg-danger-soft px-3 py-2 text-sm text-danger-ink"
-          role="alert"
-        >
-          Không thể xuất CSV. {exportError}
-        </p>
-      )}
-
-      {notice && (
-        <p
-          role="status"
-          className="mb-5 flex items-center gap-2 rounded-[7px] border border-[#bde3d6] bg-[#effaf5] px-[15px] py-3 text-sm text-[#24775f]"
-        >
-          <Icon name="check" size={16} />
-          {notice}
-        </p>
-      )}
 
       {error ? (
         <div

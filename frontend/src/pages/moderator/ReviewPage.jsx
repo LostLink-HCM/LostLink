@@ -6,6 +6,7 @@ import DataTable, { cell } from '../../components/backoffice/DataTable'
 import DateRange from '../../components/backoffice/DateRange'
 import DetailList from '../../components/backoffice/DetailList'
 import Dialog from '../../components/backoffice/Dialog'
+import ActionLockNotice from '../../components/backoffice/ActionLockNotice'
 import EmptyState from '../../components/backoffice/EmptyState'
 import Field, { Input, Select, Textarea } from '../../components/backoffice/Field'
 import Icon from '../../components/common/Icon'
@@ -24,6 +25,7 @@ import {
 import usePaginatedFilter from '../../hooks/usePaginatedFilter'
 import useBackofficePageSize from '../../hooks/useBackofficePageSize'
 import useLinkedHighlight from '../../hooks/useLinkedHighlight'
+import useBackofficeActionLock from '../../hooks/useBackofficeActionLock'
 import { cx, linkedHighlight } from '../../components/backoffice/classes'
 
 const EMPTY_FILTERS = { category: '', type: '', district: '', from: '', to: '', query: '' }
@@ -161,6 +163,7 @@ export default function Review() {
     modal && posts.find((post) => post.id === modal.id && post.status === 'pending')
   const selected =
     modal?.kind === 'detail' && detailPost?.id === modal.id ? detailPost : listSelected
+  const actionLock = useBackofficeActionLock(modal?.id ? 'post' : null, modal?.id || null)
   const changeFilter = (key, value) => {
     const nextFilters = { ...filters, [key]: value }
     const nextHasActiveFilters = Boolean(
@@ -220,6 +223,7 @@ export default function Review() {
     }
   }
   const approve = async (id) => {
+    if (!actionLock.canAct) return
     const postCode = posts.find((post) => post.id === id)?.postCode || id
     setDecisionLoading(true)
     setActionError('')
@@ -236,6 +240,7 @@ export default function Review() {
   }
   const reject = async (event) => {
     event.preventDefault()
+    if (!actionLock.canAct) return
     const detail = reason === 'other' ? customReason.trim() : reason
     if (!detail) {
       setError('Vui lòng nhập lý do từ chối cụ thể.')
@@ -445,7 +450,7 @@ export default function Review() {
               <td className={cell}>
                 <button
                   type="button"
-                  className="mb-1.5 block cursor-pointer text-left text-small font-semibold leading-relaxed text-ink hover:text-primary"
+                  className="mb-1.5 block cursor-pointer text-left text-small font-semibold leading-relaxed text-ink hover:text-primary hover:underline underline-offset-4"
                   onClick={() => openDetail(post.id)}
                 >
                   {post.title}
@@ -463,13 +468,6 @@ export default function Review() {
               </td>
               <td className={cell}>
                 <div className="flex flex-wrap gap-1.5">
-                  <IconButton
-                    icon="eye"
-                    tone="view"
-                    colorOnly
-                    label={`Đọc bài ${code}`}
-                    onClick={() => openDetail(post.id)}
-                  />
                   <IconButton
                     icon="check"
                     tone="success"
@@ -509,15 +507,24 @@ export default function Review() {
           footer={
             <>
               <Button onClick={() => setModal(null)}>Đóng</Button>
-              <Button variant="danger" onClick={() => openReject(selected.id)}>
+              <Button
+                variant="danger"
+                disabled={!actionLock.canAct}
+                onClick={() => openReject(selected.id)}
+              >
                 Từ chối
               </Button>
-              <Button variant="success" onClick={() => openApprove(selected.id, true)}>
+              <Button
+                variant="success"
+                disabled={!actionLock.canAct}
+                onClick={() => openApprove(selected.id, true)}
+              >
                 Duyệt
               </Button>
             </>
           }
         >
+          <ActionLockNotice message={actionLock.notice} />
           <h3 className="mb-1 text-lead font-bold leading-snug text-primary [overflow-wrap:anywhere]">
             {selected.title}
           </h3>
@@ -632,7 +639,7 @@ export default function Review() {
               </Button>
               <Button
                 variant="success"
-                disabled={decisionLoading}
+                disabled={decisionLoading || !actionLock.canAct}
                 onClick={() => void approve(selected.id)}
               >
                 {decisionLoading ? 'Đang duyệt…' : 'Duyệt'}
@@ -640,6 +647,7 @@ export default function Review() {
             </>
           }
         >
+          <ActionLockNotice message={actionLock.notice} />
           <p className="text-body leading-relaxed">
             Bạn có chắc muốn duyệt bài đăng{' '}
             <strong className="font-semibold">{selected.postCode || selected.id}</strong> không?
@@ -672,13 +680,14 @@ export default function Review() {
                 variant="danger"
                 type="submit"
                 form="mod-reject-form"
-                disabled={decisionLoading}
+                disabled={decisionLoading || !actionLock.canAct}
               >
                 {decisionLoading ? 'Đang từ chối…' : 'Từ chối'}
               </Button>
             </>
           }
         >
+          <ActionLockNotice message={actionLock.notice} />
           <p className="mb-4 text-lead font-semibold leading-relaxed [overflow-wrap:anywhere]">
             Bạn có chắc muốn từ chối bài đăng <strong>{selected.postCode || selected.id}</strong>{' '}
             không?
@@ -689,7 +698,7 @@ export default function Review() {
                 <Select
                   {...a}
                   value={reason}
-                  disabled={decisionLoading}
+                  disabled={decisionLoading || !actionLock.canAct}
                   onChange={(e) => {
                     setReason(e.target.value)
                     setError('')
@@ -710,7 +719,7 @@ export default function Review() {
                     {...a}
                     aria-label="Lý do từ chối"
                     value={customReason}
-                    disabled={decisionLoading}
+                    disabled={decisionLoading || !actionLock.canAct}
                     onChange={(e) => {
                       setCustomReason(e.target.value)
                       setError('')

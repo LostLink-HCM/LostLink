@@ -87,8 +87,8 @@ for (const manager of MANAGERS) {
 
       await filters.getByRole('searchbox', { name: 'Tìm kiếm' }).fill(`${prefix} không tồn tại`)
       await expect(page.getByText('Không tìm thấy bài đăng phù hợp', { exact: true })).toBeVisible()
-      await filters.getByRole('textbox', { name: 'Từ ngày', exact: true }).fill('2026-11-12')
-      await filters.getByRole('textbox', { name: 'Đến ngày', exact: true }).fill('2026-11-10')
+      await filters.getByRole('textbox', { name: 'Từ ngày', exact: true }).fill('12/11/2026')
+      await filters.getByRole('textbox', { name: 'Đến ngày', exact: true }).fill('10/11/2026')
       await expect(page.getByText('Khoảng thời gian chưa hợp lệ', { exact: true })).toBeVisible()
 
       await filters.getByRole('button', { name: 'Đặt lại bộ lọc', exact: true }).click()
@@ -123,7 +123,10 @@ for (const manager of MANAGERS) {
 
       await page.reload()
       await searchFor(page, post.title)
-      await rowOf(page, post.title).getByRole('button', { name: 'Xem chi tiết bài đăng' }).click()
+      await expect(
+        rowOf(page, post.title).getByRole('button', { name: 'Xem chi tiết bài đăng', exact: true })
+      ).toHaveCount(0)
+      await rowOf(page, post.title).getByRole('button', { name: post.title, exact: true }).click()
       const detail = page.getByRole('dialog', { name: 'Chi tiết bài đăng' })
       await expect(detail.getByText('Ví da màu nâu, bên trong có thẻ sinh viên.')).toBeVisible()
       await detail.getByRole('button', { name: 'Xem lịch sử trạng thái' }).click()
@@ -161,7 +164,7 @@ for (const manager of MANAGERS) {
 
       await page.reload()
       await searchFor(page, post.title)
-      await rowOf(page, post.title).getByRole('button', { name: 'Xem chi tiết bài đăng' }).click()
+      await rowOf(page, post.title).getByRole('button', { name: post.title, exact: true }).click()
       const detail = page.getByRole('dialog', { name: 'Chi tiết bài đăng' })
       await expect(
         detail

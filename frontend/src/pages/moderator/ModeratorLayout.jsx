@@ -59,12 +59,11 @@ export default function ModeratorLayout() {
   return (
     <BackofficeLayout
       basePath="/moderator"
-      homePath="/posts"
       activeFallbackPath="/posts"
       navigation={navigation}
       sidebarLabel="Điều hướng moderator"
       brandLabel="LostLink"
-      brandAriaLabel="LostLink - Bài đăng"
+      brandAriaLabel="LostLink - Trang chủ"
       pendingPath="/review"
       pendingCount={pendingCount}
       pendingCounts={{ '/messages': unreadMessages, '/notifications': unreadNotifications }}

@@ -74,7 +74,8 @@ test.describe('Người dùng & quyền của admin', () => {
     await filters.getByRole('searchbox', { name: 'Tìm kiếm' }).fill(account.username)
     const row = userRow(page, account)
     await expect(row).toBeVisible()
-    await row.getByRole('button', { name: 'Hồ sơ', exact: true }).click()
+    await expect(row.getByRole('button', { name: 'Hồ sơ', exact: true })).toHaveCount(0)
+    await row.getByRole('button', { name: account.username, exact: true }).click()
 
     const profile = page.getByRole('dialog', { name: 'Hồ sơ người dùng' })
     await expect(profile.getByText(account.username, { exact: true })).toBeVisible()

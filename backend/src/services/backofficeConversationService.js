@@ -1,7 +1,8 @@
 const mongoose = require('mongoose')
-const { Conversation, Message, User } = require('../models')
+const { BackofficeActionLock, Conversation, Message, User } = require('../models')
 const { emitToRole, emitToUsers, emitToUsersAndRole } = require('../socket')
 const { createMessage } = require('./messageWriteService')
+const { renewOwned } = require('./backofficeActionLockService')
 const {
   userSupportKey,
   internalSupportKey,
@@ -34,6 +35,19 @@ const conversationScope = (user) =>
 
 const isSharedUserSupport = (conversation) =>
   conversation.kind === 'support' && (conversation.supportType ?? 'user') === 'user'
+
+const processingData = (lock, user) =>
+  lock
+    ? {
+        moderator: {
+          id: idOf(lock.lockedBy),
+          username: lock.lockedBy?.username ?? '',
+        },
+        ownedByMe: idOf(lock.lockedBy) === idOf(user),
+        startedAt: lock.createdAt,
+        expiresAt: lock.expiresAt,
+      }
+    : null
 
 const safeRegex = (text) => new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
 
@@ -140,6 +154,13 @@ const listConversations = async (user, filters = {}) => {
         let: {
           conversationId: '$_id',
           readAt: { $ifNull: ['$_backofficeState.lastReadAt', new Date(0)] },
+          sharedSupport: {
+            $and: [
+              { $eq: ['$kind', 'support'] },
+              { $eq: [{ $ifNull: ['$supportType', 'user'] }, 'user'] },
+              { $eq: [user.role, 'moderator'] },
+            ],
+          },
         },
         pipeline: [
           {
@@ -147,12 +168,34 @@ const listConversations = async (user, filters = {}) => {
               $expr: {
                 $and: [
                   { $eq: ['$conversation', '$$conversationId'] },
-                  { $ne: ['$sender', user._id] },
                   { $gt: ['$sentAt', '$$readAt'] },
                 ],
               },
             },
           },
+          ...(user.role === 'moderator'
+            ? [
+                {
+                  $lookup: {
+                    from: 'users',
+                    localField: 'sender',
+                    foreignField: '_id',
+                    as: '_sender',
+                  },
+                },
+                {
+                  $match: {
+                    $expr: {
+                      $cond: [
+                        '$$sharedSupport',
+                        { $eq: [{ $arrayElemAt: ['$_sender.role', 0] }, 'user'] },
+                        { $ne: ['$sender', user._id] },
+                      ],
+                    },
+                  },
+                },
+              ]
+            : [{ $match: { $expr: { $ne: ['$sender', user._id] } } }]),
           { $count: 'count' },
         ],
         as: '_unreadRows',
@@ -191,6 +234,54 @@ const listConversations = async (user, filters = {}) => {
     },
   ]
 
+  if (user.role === 'moderator') {
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'backoffice_action_locks',
+          let: { conversationId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$resourceType', 'conversation'] },
+                    { $eq: ['$resourceId', '$$conversationId'] },
+                    { $gt: ['$expiresAt', new Date()] },
+                  ],
+                },
+              },
+            },
+            { $limit: 1 },
+          ],
+          as: '_processingRows',
+        },
+      },
+      {
+        $addFields: {
+          _processingLock: { $arrayElemAt: ['$_processingRows', 0] },
+        },
+      },
+      {
+        $addFields: {
+          unread: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: [{ $ifNull: ['$supportType', 'user'] }, 'user'] },
+                  { $ne: [{ $ifNull: ['$_processingLock.lockedBy', null] }, null] },
+                  { $ne: ['$_processingLock.lockedBy', user._id] },
+                ],
+              },
+              0,
+              '$unread',
+            ],
+          },
+        },
+      }
+    )
+  }
+
   if (filters.peerRole) pipeline.push({ $match: { '_peer.role': filters.peerRole } })
   if (filters.unreadOnly) pipeline.push({ $match: { unread: { $gt: 0 } } })
   if (filters.q) {
@@ -210,21 +301,57 @@ const listConversations = async (user, filters = {}) => {
 
   const [result] = await Conversation.aggregate(pipeline)
   const rows = result?.items ?? []
+  const conversationIds = rows.map((conversation) => conversation._id)
+  const senderIds = rows.map((conversation) => conversation._lastMessage?.sender).filter(Boolean)
+  const [locks, senders] = await Promise.all([
+    user.role === 'moderator' && conversationIds.length
+      ? BackofficeActionLock.find({
+          resourceType: 'conversation',
+          resourceId: { $in: conversationIds },
+          expiresAt: { $gt: new Date() },
+        })
+          .populate('lockedBy', 'username role')
+          .lean()
+      : [],
+    senderIds.length
+      ? User.find({ _id: { $in: senderIds } })
+          .select('username role avatarUrl')
+          .lean()
+      : [],
+  ])
+  const lockByConversation = new Map(locks.map((lock) => [idOf(lock.resourceId), lock]))
+  const senderById = new Map(senders.map((sender) => [idOf(sender), sender]))
   const contacts = new Map()
   const threads = rows.map((conversation) => {
     const peer = contactData(conversation._peer)
     contacts.set(peer.id, peer)
     const last = conversation._lastMessage
+    const lastSender = last && senderById.get(idOf(last.sender))
+    const processing = isSharedUserSupport(conversation)
+      ? processingData(lockByConversation.get(idOf(conversation)), user)
+      : null
     return {
       id: idOf(conversation),
       contactId: peer.id,
-      unread: conversation.unread,
+      supportType: conversation.supportType ?? 'user',
+      unread: processing && !processing.ownedByMe ? 0 : conversation.unread,
       priority: conversation.priority,
+      processing,
+      needsResponse: Boolean(
+        isSharedUserSupport(conversation) && last && lastSender?.role === 'user'
+      ),
       createdAt: conversation.createdAt,
       lastMessage: last
         ? {
             id: idOf(last),
-            sender: idOf(last.sender) === idOf(user) ? 'me' : 'peer',
+            sender:
+              idOf(last.sender) === idOf(user)
+                ? 'me'
+                : isSharedUserSupport(conversation) && lastSender?.role === 'moderator'
+                  ? 'staff'
+                  : 'peer',
+            senderRole: lastSender?.role ?? null,
+            senderName: lastSender?.username ?? '',
             text: last.body || '',
             image: last.imageUrl || null,
             createdAt: last.sentAt,
@@ -296,7 +423,7 @@ const findConversation = async (id, user) => {
   return conversation
 }
 
-const threadDetails = (conversation, user, peer, messages, hasMore) => ({
+const threadDetails = (conversation, user, peer, messages, hasMore, processing) => ({
   id: idOf(conversation),
   kind: 'support',
   supportType: conversation.supportType ?? 'user',
@@ -312,6 +439,7 @@ const threadDetails = (conversation, user, peer, messages, hasMore) => ({
   ),
   createdAt: conversation.createdAt,
   lastMessageAt: conversation.lastMessageAt,
+  processing,
   context: null,
   messages,
   hasMore,
@@ -319,11 +447,20 @@ const threadDetails = (conversation, user, peer, messages, hasMore) => ({
 
 const getConversation = async (id, user, { before } = {}) => {
   const conversation = await findConversation(id, user)
-  const participants = await User.find({
-    _id: { $in: conversation.participants.map((item) => item.user) },
-  })
-    .select('username email avatarUrl role')
-    .lean()
+  const [participants, lock] = await Promise.all([
+    User.find({ _id: { $in: conversation.participants.map((item) => item.user) } })
+      .select('username email avatarUrl role')
+      .lean(),
+    user.role === 'moderator' && isSharedUserSupport(conversation)
+      ? BackofficeActionLock.findOne({
+          resourceType: 'conversation',
+          resourceId: conversation._id,
+          expiresAt: { $gt: new Date() },
+        })
+          .populate('lockedBy', 'username role')
+          .lean()
+      : null,
+  ])
   const peer = isSharedUserSupport(conversation)
     ? participants.find((participant) => participant.role === 'user')
     : participants.find((participant) => idOf(participant) !== idOf(user))
@@ -360,22 +497,33 @@ const getConversation = async (id, user, { before } = {}) => {
   })
     .sort({ sentAt: -1, _id: -1 })
     .limit(HISTORY_SIZE + 1)
-    .populate('sender', 'username')
+    .populate('sender', 'username avatarUrl role')
     .lean()
   const hasMore = rows.length > HISTORY_SIZE
   const messages = rows
     .slice(0, HISTORY_SIZE)
     .reverse()
-    .map((message) => ({
-      id: idOf(message),
-      sender: idOf(message.sender) === idOf(user) ? 'me' : 'peer',
-      senderId: idOf(message.sender),
-      senderName: message.sender?.username ?? '',
-      text: message.body,
-      image: message.imageUrl || null,
-      createdAt: message.sentAt,
-    }))
-  return { thread: threadDetails(conversation, user, peer, messages, hasMore) }
+    .map((message) => {
+      const isOwnMessage = idOf(message.sender) === idOf(user)
+      const isOtherModerator =
+        user.role === 'moderator' &&
+        isSharedUserSupport(conversation) &&
+        message.sender?.role === 'moderator'
+      return {
+        id: idOf(message),
+        sender: isOwnMessage ? 'me' : isOtherModerator ? 'staff' : 'peer',
+        senderId: idOf(message.sender),
+        senderName: message.sender?.username ?? '',
+        senderRole: message.sender?.role ?? null,
+        senderAvatarUrl: message.sender?.avatarUrl || null,
+        text: message.body,
+        image: message.imageUrl || null,
+        createdAt: message.sentAt,
+      }
+    })
+  return {
+    thread: threadDetails(conversation, user, peer, messages, hasMore, processingData(lock, user)),
+  }
 }
 
 const markConversation = async (id, user, field, value) => {
@@ -430,10 +578,18 @@ const markUnread = (id, user) => markConversation(id, user, 'markedUnread', true
 const setPriority = async (id, user, isFlagged) =>
   markConversation(id, user, 'isFlagged', isFlagged)
 
-const sendMessage = async (id, user, { body = '' }, file) => {
+const sendMessage = async (id, user, { body = '', lockToken }, file) => {
   const conversation = await findConversation(id, user)
   if (conversation.status === 'locked') {
     throw ApiError.conflict('Không thể nhắn tin trong hội thoại này.', 'CONVERSATION_LOCKED')
+  }
+  if (user.role === 'moderator' && isSharedUserSupport(conversation)) {
+    await renewOwned({
+      resourceType: 'conversation',
+      resourceId: conversation._id,
+      token: lockToken,
+      actor: user,
+    })
   }
   const message = await createMessage({
     conversationId: conversation._id,
@@ -471,6 +627,9 @@ const sendMessage = async (id, user, { body = '' }, file) => {
     sender: 'me',
     senderId: idOf(user),
     senderName: user.username,
+    senderRole: user.role,
+    senderAvatarUrl: user.avatarUrl || null,
+    supportType: conversation.supportType ?? 'user',
     text: message.body,
     image: message.imageUrl || null,
     createdAt: message.sentAt,

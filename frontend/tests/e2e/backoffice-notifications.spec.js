@@ -232,8 +232,8 @@ test.describe('Thông báo backoffice của admin và moderator', () => {
     await page.getByRole('tab', { name: /Chưa đọc/ }).click()
     await page.getByLabel('Lọc theo loại thông báo').selectOption('report')
     await page.getByPlaceholder('Tìm trong thông báo').fill('ví màu nâu')
-    await page.getByRole('textbox', { name: 'Từ ngày', exact: true }).fill('2026-11-21')
-    await page.getByRole('textbox', { name: 'Đến ngày', exact: true }).fill('2026-11-21')
+    await page.getByRole('textbox', { name: 'Từ ngày', exact: true }).fill('21/11/2026')
+    await page.getByRole('textbox', { name: 'Đến ngày', exact: true }).fill('21/11/2026')
 
     await expect(page.getByRole('heading', { name: 'Report cần xử lý' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Bài đăng chờ duyệt' })).toHaveCount(0)
