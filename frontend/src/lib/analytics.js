@@ -72,7 +72,10 @@ export function initializeAnalytics() {
   if (!measurementId || initialized || typeof window === 'undefined') return
 
   window.dataLayer = window.dataLayer || []
-  window.gtag = (...args) => window.dataLayer.push(args)
+  // gtag.js only reads Arguments objects, plain arrays are ignored
+  window.gtag = function gtag() {
+    window.dataLayer.push(arguments)
+  }
   window.gtag('js', new Date())
   window.gtag('config', measurementId, { send_page_view: false })
 
