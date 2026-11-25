@@ -4,7 +4,7 @@ const { Schema } = mongoose
 
 const backofficeActionLockSchema = new Schema(
   {
-    resourceType: { type: String, enum: ['post', 'user'], required: true },
+    resourceType: { type: String, enum: ['post', 'user', 'conversation'], required: true },
     resourceId: { type: Schema.Types.ObjectId, required: true },
     lockedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     token: { type: String, required: true },

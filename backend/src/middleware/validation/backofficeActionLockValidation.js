@@ -1,6 +1,6 @@
 const { body, param } = require('express-validator')
 
-const RESOURCE_TYPES = ['post', 'user']
+const RESOURCE_TYPES = ['post', 'user', 'conversation']
 
 const acquireRules = [
   body('resourceType')

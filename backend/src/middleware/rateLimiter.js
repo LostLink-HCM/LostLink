@@ -19,7 +19,17 @@ const limiter = (limit, options = {}) =>
 const authLimiter = limiter(20)
 
 // API chung 300 yêu cầu/15 phút/IP. Bỏ qua health check để Render theo dõi liên tục được
-const apiLimiter = limiter(300, { skip: (req) => req.path === '/health' })
+const apiLimiter = limiter(300, {
+  skip: (req) =>
+    req.path === '/health' ||
+    /^\/backoffice\/(?:conversations|action-locks)(?:\/|$)/.test(req.path),
+})
+
+// Hội thoại và khóa thao tác được giới hạn riêng theo tài khoản để không dùng chung
+// hạn mức IP của các trang khác. Các thao tác gửi tin vẫn có messageLimiter chặt hơn.
+const backofficeInteractiveLimiter = limiter(1200, {
+  keyGenerator: (req) => `user:${req.user.id}`,
+})
 
 // API bản đồ 200 yêu cầu/15 phút/tài khoản, đủ cho gõ gợi ý địa chỉ (frontend đã debounce)
 // mà không để một tài khoản tiêu hết hạn mức transaction VietMap. Dùng sau protect
@@ -71,6 +81,7 @@ module.exports = {
   avatarLimiter,
   messageLimiter,
   authLimiter,
+  backofficeInteractiveLimiter,
   claimLimiter,
   apiLimiter,
   geoLimiter,

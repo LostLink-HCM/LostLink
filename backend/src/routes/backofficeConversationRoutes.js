@@ -2,7 +2,7 @@ const { Router } = require('express')
 const ctrl = require('../controllers/backofficeConversationController')
 const { protect, requireRole } = require('../middleware/authMiddleware')
 const { parseMessageForm } = require('../middleware/postForm')
-const { messageLimiter } = require('../middleware/rateLimiter')
+const { backofficeInteractiveLimiter, messageLimiter } = require('../middleware/rateLimiter')
 const validate = require('../middleware/validate')
 const { rejectInvalidConversationId } = require('../middleware/validation/conversationValidation')
 const {
@@ -16,7 +16,7 @@ const {
 } = require('../middleware/validation/backofficeConversationValidation')
 
 const router = Router()
-router.use(protect, requireRole('admin', 'moderator'))
+router.use(protect, requireRole('admin', 'moderator'), backofficeInteractiveLimiter)
 
 router.get('/', listRules, validate, ctrl.list)
 router.get('/contacts', contactsRules, validate, ctrl.contacts)

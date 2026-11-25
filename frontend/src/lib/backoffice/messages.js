@@ -56,7 +56,7 @@ export function mergeConversation(state, thread) {
   }
 }
 
-export function appendRemoteMessage(state, message) {
+export function appendRemoteMessage(state, message, { countAsUnread = true } = {}) {
   if (!message?.conversationId) return state
   return {
     ...state,
@@ -66,7 +66,12 @@ export function appendRemoteMessage(state, message) {
       return {
         ...thread,
         lastMessage: message,
-        unread: message.sender === 'me' || state.activeId === thread.id ? 0 : thread.unread + 1,
+        unread:
+          message.sender === 'me' || state.activeId === thread.id
+            ? 0
+            : countAsUnread
+              ? thread.unread + 1
+              : thread.unread,
         messages: [...thread.messages, message],
       }
     }),

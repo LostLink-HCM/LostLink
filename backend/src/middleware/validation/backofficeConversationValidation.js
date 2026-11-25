@@ -26,6 +26,7 @@ const messageRules = [
     .bail()
     .isLength({ max: 2000 })
     .withMessage('Tin nhắn tối đa 2.000 ký tự.'),
+  body('lockToken').optional().isString().isLength({ min: 16, max: 100 }),
 ]
 
 const historyRules = [

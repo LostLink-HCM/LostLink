@@ -5,6 +5,7 @@ import {
 } from '../api/backofficeActionLocks'
 
 const HEARTBEAT_MS = 5000
+const CONVERSATION_HEARTBEAT_MS = 30_000
 const RELEASE_DELAY_MS = 80
 
 const createToken = () =>
@@ -14,10 +15,14 @@ const createToken = () =>
 const release = ({ resourceType, resourceId, token }) =>
   releaseBackofficeActionLock(resourceType, resourceId, token).catch(() => {})
 
-export default function useBackofficeActionLock(resourceType, resourceId) {
+export default function useBackofficeActionLock(
+  resourceType,
+  resourceId,
+  releaseWhenHidden = false
+) {
   const resourceKey = resourceType && resourceId ? `${resourceType}:${resourceId}` : ''
   const [token] = useState(createToken)
-  const [state, setState] = useState({ key: '', status: 'idle', holder: null })
+  const [state, setState] = useState({ key: '', status: 'idle', holder: null, token: null })
   const pendingRelease = useRef(null)
 
   useEffect(() => {
@@ -33,32 +38,73 @@ export default function useBackofficeActionLock(resourceType, resourceId) {
     const lock = { resourceType, resourceId, token, key: resourceKey }
     let active = true
     let requesting = false
+    let interval = null
+    let releasingOnHide = Promise.resolve()
+    const heartbeatMs = resourceType === 'conversation' ? CONVERSATION_HEARTBEAT_MS : HEARTBEAT_MS
 
     const refresh = async () => {
-      if (requesting) return
+      if (requesting || (releaseWhenHidden && document.visibilityState === 'hidden')) return
       requesting = true
       try {
         const result = await acquireBackofficeActionLock(resourceType, resourceId, token)
-        if (active) {
+        lock.token = result.token || token
+        if (!active) {
+          await release(lock)
+        } else if (releaseWhenHidden && document.visibilityState === 'hidden') {
+          await release(lock)
+          setState({ key: resourceKey, status: 'idle', holder: null })
+        } else {
           setState({
             key: resourceKey,
             status: result.acquired ? 'owned' : 'busy',
             holder: result.lockedBy || null,
+            token: lock.token,
           })
         }
       } catch (error) {
-        if (active) setState({ key: resourceKey, status: 'error', error, holder: null })
+        if (active && (!releaseWhenHidden || document.visibilityState !== 'hidden')) {
+          setState({ key: resourceKey, status: 'error', error, holder: null })
+        }
       } finally {
         requesting = false
       }
     }
 
+    const startHeartbeat = () => {
+      if (interval === null) interval = window.setInterval(refresh, heartbeatMs)
+    }
+    const stopHeartbeat = () => {
+      if (interval !== null) {
+        window.clearInterval(interval)
+        interval = null
+      }
+    }
+    const onVisibilityChange = () => {
+      if (!releaseWhenHidden) return
+      if (document.visibilityState === 'hidden') {
+        stopHeartbeat()
+        setState({ key: resourceKey, status: 'idle', holder: null })
+        releasingOnHide = release(lock)
+        return
+      }
+      void releasingOnHide.finally(() => {
+        if (!active || document.visibilityState === 'hidden') return
+        void refresh()
+        startHeartbeat()
+      })
+    }
+
     void refresh()
-    const interval = window.setInterval(refresh, HEARTBEAT_MS)
+    if (!releaseWhenHidden || document.visibilityState !== 'hidden') startHeartbeat()
+    if (releaseWhenHidden) {
+      document.addEventListener('visibilitychange', onVisibilityChange)
+      if (document.visibilityState === 'hidden') onVisibilityChange()
+    }
 
     return () => {
       active = false
-      window.clearInterval(interval)
+      stopHeartbeat()
+      if (releaseWhenHidden) document.removeEventListener('visibilitychange', onVisibilityChange)
       const releaseOnClose = {
         ...lock,
         timer: window.setTimeout(() => {
@@ -70,16 +116,17 @@ export default function useBackofficeActionLock(resourceType, resourceId) {
       }
       pendingRelease.current = releaseOnClose
     }
-  }, [resourceKey, resourceType, resourceId, token])
+  }, [resourceKey, resourceType, resourceId, token, releaseWhenHidden])
 
   const current =
     state.key === resourceKey
       ? state
-      : { key: resourceKey, status: resourceKey ? 'checking' : 'idle', holder: null }
+      : { key: resourceKey, status: resourceKey ? 'checking' : 'idle', holder: null, token }
 
   return {
     status: current.status,
     holder: current.holder,
+    token: current.token || token,
     canAct: current.status === 'owned',
     notice:
       current.status === 'busy'
@@ -87,7 +134,9 @@ export default function useBackofficeActionLock(resourceType, resourceId) {
         : current.status === 'checking'
           ? 'Đang kiểm tra trạng thái chỉnh sửa…'
           : current.status === 'error'
-            ? 'Không thể xác nhận quyền thao tác. Vui lòng thử lại.'
+            ? current.error?.status === 429 && resourceType === 'conversation'
+              ? 'Tạm thời chưa thể xác nhận quyền phản hồi do giới hạn yêu cầu. Hệ thống sẽ tự kiểm tra lại.'
+              : 'Không thể xác nhận quyền thao tác. Vui lòng thử lại.'
             : '',
   }
 }

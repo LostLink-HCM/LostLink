@@ -32,9 +32,9 @@ export const markBackofficeConversationUnread = (id) =>
 export const setBackofficeConversationPriority = (id, value) =>
   dataOf(api.patch(`/backoffice/conversations/${encodeURIComponent(id)}/priority`, { value }))
 
-export const sendBackofficeMessage = (id, { body = '', image = null }) => {
+export const sendBackofficeMessage = (id, { body = '', image = null, lockToken }) => {
   const form = new FormData()
-  form.append('data', JSON.stringify({ body }))
+  form.append('data', JSON.stringify({ body, ...(lockToken && { lockToken }) }))
   if (image) form.append('image', image)
   return dataOf(api.post(`/backoffice/conversations/${encodeURIComponent(id)}/messages`, form))
 }

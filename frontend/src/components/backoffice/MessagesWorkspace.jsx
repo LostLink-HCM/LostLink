@@ -15,6 +15,7 @@ import {
   setBackofficeConversationPriority,
 } from '../../api/backofficeMessages'
 import { onSocket } from '../../lib/socket'
+import useBackofficeActionLock from '../../hooks/useBackofficeActionLock'
 import {
   MESSAGE_LIMIT,
   appendRemoteMessage,
@@ -27,6 +28,8 @@ import {
   replaceThread,
 } from '../../lib/backoffice/messages'
 
+const MODERATOR_SYNC_INTERVAL_MS = 60_000
+
 const avatarColors = {
   blue: 'bg-[#dfeafa] text-[#35679e]',
   purple: 'bg-[#ede8fa] text-[#7553ae]',
@@ -36,6 +39,7 @@ const avatarColors = {
 }
 
 const dateKey = (value) => new Date(value).toLocaleDateString('vi-VN')
+const capitalizeFirst = (value) => (value ? `${value[0].toUpperCase()}${value.slice(1)}` : '')
 const timeLabel = (value) =>
   new Date(value).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
 const dayLabel = (value) => (dateKey(value) === dateKey(Date.now()) ? 'Hôm nay' : dateKey(value))
@@ -265,6 +269,11 @@ export default function MessagesWorkspace({
     }
   }, [filterKey, hasRemoteFilters, query, role, unreadOnly])
 
+  const refreshInboxView = useCallback(() => {
+    if (hasRemoteFilters) void refreshFilteredInbox()
+    else void refreshInbox()
+  }, [hasRemoteFilters, refreshFilteredInbox, refreshInbox])
+
   useEffect(() => {
     if (!hasRemoteFilters) return undefined
     const timer = setTimeout(() => void refreshFilteredInbox(), query.trim() ? 250 : 0)
@@ -275,10 +284,9 @@ export default function MessagesWorkspace({
     async (id) => {
       const data = await getBackofficeConversation(id)
       setMessageState((previous) => mergeConversation(previous, data.thread))
-      void refreshFilteredInbox()
       return data.thread
     },
-    [refreshFilteredInbox, setMessageState]
+    [setMessageState]
   )
 
   useEffect(() => {
@@ -298,28 +306,48 @@ export default function MessagesWorkspace({
       if (!activeEffect) return
       const incoming = {
         ...message,
-        sender: message.senderId
-          ? String(message.senderId) === String(user?.id)
-            ? 'me'
-            : 'peer'
-          : message.sender === 'me'
-            ? 'me'
-            : 'peer',
         text: message.text ?? message.body ?? '',
         image: message.image ?? null,
         createdAt: message.createdAt ?? message.sentAt,
       }
-      setMessageState((previous) => appendRemoteMessage(previous, incoming))
-      void refreshInbox()
-      void refreshFilteredInbox()
+      setMessageState((previous) => {
+        const thread = previous.threads.find((item) => item.id === message.conversationId)
+        const isOwnMessage = message.senderId
+          ? String(message.senderId) === String(user?.id)
+          : message.sender === 'me'
+        const isOtherModerator =
+          workspaceRole === 'moderator' &&
+          (message.supportType ?? thread?.supportType) === 'user' &&
+          message.senderRole === 'moderator'
+        const updated = appendRemoteMessage(
+          previous,
+          {
+            ...incoming,
+            sender: isOwnMessage ? 'me' : isOtherModerator ? 'staff' : 'peer',
+          },
+          { countAsUnread: !isOtherModerator }
+        )
+        return workspaceRole === 'moderator'
+          ? {
+              ...updated,
+              threads: updated.threads.map((thread) =>
+                thread.processing && !thread.processing.ownedByMe
+                  ? { ...thread, unread: 0 }
+                  : thread
+              ),
+            }
+          : updated
+      })
+      refreshInboxView()
       if (activeIdRef.current === message.conversationId) {
         void loadThread(message.conversationId).catch((error) => setActionError(error.message))
       }
     })
-    const unsubscribeUpdate = onSocket('conversation:updated', () => {
-      if (activeEffect) {
-        void refreshInbox()
-        void refreshFilteredInbox()
+    const unsubscribeUpdate = onSocket('conversation:updated', ({ conversationId } = {}) => {
+      if (!activeEffect) return
+      refreshInboxView()
+      if (conversationId && String(activeIdRef.current) === String(conversationId)) {
+        void loadThread(conversationId).catch((error) => setActionError(error.message))
       }
     })
     return () => {
@@ -327,7 +355,18 @@ export default function MessagesWorkspace({
       unsubscribeMessage()
       unsubscribeUpdate()
     }
-  }, [loadThread, refreshInbox, refreshFilteredInbox, setMessageState, user?.id])
+  }, [loadThread, refreshInboxView, setMessageState, user?.id, workspaceRole])
+
+  useEffect(() => {
+    if (workspaceRole !== 'moderator') return undefined
+    const interval = window.setInterval(() => {
+      refreshInboxView()
+      if (activeIdRef.current) {
+        void loadThread(activeIdRef.current).catch((error) => setActionError(error.message))
+      }
+    }, MODERATOR_SYNC_INTERVAL_MS)
+    return () => window.clearInterval(interval)
+  }, [loadThread, refreshInboxView, workspaceRole])
 
   const retryInbox = async () => {
     setLoading(true)
@@ -362,9 +401,33 @@ export default function MessagesWorkspace({
   const filtered = filterThreads(visibleState, { role, query, unreadOnly })
   const active = visibleThreads.find((thread) => thread.id === messageState.activeId)
   const contact = active && visibleContacts.find((entry) => entry.id === active.contactId)
+  const requiresReplyLock =
+    workspaceRole === 'moderator' && (active?.supportType === 'user' || contact?.role === 'user')
   const draft = messageState.drafts[active?.id] || ''
+  const keepReplyLockWhileHidden = Boolean(draft.trim() || selectedImage || sending)
+  const shouldHoldReplyLock = requiresReplyLock && keepReplyLockWhileHidden
+  const replyLock = useBackofficeActionLock(
+    shouldHoldReplyLock ? 'conversation' : null,
+    shouldHoldReplyLock ? active.id : null,
+    !keepReplyLockWhileHidden
+  )
+  const anotherModeratorProcessing = Boolean(
+    requiresReplyLock &&
+    replyLock.status !== 'owned' &&
+    active?.processing &&
+    !active.processing.ownedByMe
+  )
+  const lockIsBusy = replyLock.status === 'busy' || anotherModeratorProcessing
+  const canCompose =
+    !requiresReplyLock ||
+    (!lockIsBusy &&
+      replyLock.status !== 'error' &&
+      (!shouldHoldReplyLock || replyLock.status === 'owned' || replyLock.status === 'checking'))
+  const canReply =
+    !requiresReplyLock || (!lockIsBusy && (!shouldHoldReplyLock || replyLock.status === 'owned'))
+  const lockHolderUsername = replyLock.holder?.username || active?.processing?.moderator?.username
+  const lockHolderLabel = capitalizeFirst(lockHolderUsername) || 'Moderator khác'
   const unreadCount = visibleThreads.reduce((count, thread) => count + thread.unread, 0)
-
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [active?.id, active?.messages.length, mobileConversation])
@@ -410,12 +473,23 @@ export default function MessagesWorkspace({
   const send = async (event) => {
     event.preventDefault()
     const text = draft.trim()
-    if (!active || !contact || (!text && !selectedImage) || text.length > MESSAGE_LIMIT || sending)
+    if (
+      !active ||
+      !contact ||
+      !canReply ||
+      (!text && !selectedImage) ||
+      text.length > MESSAGE_LIMIT ||
+      sending
+    )
       return
     setActionError('')
     setSending(true)
     try {
-      const message = await sendBackofficeMessage(active.id, { body: text, image: selectedImage })
+      const message = await sendBackofficeMessage(active.id, {
+        body: text,
+        image: selectedImage,
+        ...(requiresReplyLock && { lockToken: replyLock.token }),
+      })
       setMessageState((previous) => {
         const appended = appendRemoteMessage(previous, message)
         return {
@@ -462,10 +536,17 @@ export default function MessagesWorkspace({
       await markBackofficeConversationUnread(active.id)
       setMessageState((previous) => markThreadUnread(previous, active.id))
       setAnnouncement(`Đã đánh dấu hội thoại với ${contactName(contact)} là chưa đọc.`)
-      setMobileConversation(false)
+      leaveConversation()
       void refreshFilteredInbox()
     } catch (error) {
       setActionError(error.message)
+    }
+  }
+
+  const leaveConversation = () => {
+    setMobileConversation(false)
+    if (window.matchMedia('(max-width: 700px)').matches) {
+      setMessageState((previous) => ({ ...previous, activeId: null }))
     }
   }
 
@@ -504,7 +585,7 @@ export default function MessagesWorkspace({
           </Button>
         </div>
       )}
-      {actionError && (
+      {actionError && actionError !== loadError && (
         <div
           role="alert"
           className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-small text-red-800"
@@ -626,6 +707,14 @@ export default function MessagesWorkspace({
                         {previewTime(last?.createdAt || thread.createdAt)}
                       </time>
                     </span>
+                    {thread.processing && (
+                      <small className="mt-1 block truncate text-[10px] font-medium text-primary">
+                        Đang xử lý bởi{' '}
+                        {thread.processing.ownedByMe
+                          ? 'bạn'
+                          : capitalizeFirst(thread.processing.moderator.username || 'Moderator')}
+                      </small>
+                    )}
                     <span className="mt-1.5 flex items-center gap-1.5">
                       {thread.priority && <Icon name="flag" size={12} />}
                     </span>
@@ -635,13 +724,11 @@ export default function MessagesWorkspace({
                         thread.unread && 'font-semibold text-ink-secondary'
                       )}
                     >
-                      {messageState.drafts[thread.id]
-                        ? `Bản nháp: ${messageState.drafts[thread.id]}`
-                        : last
-                          ? last.image && !last.text
-                            ? 'Đã gửi một ảnh'
-                            : last.text
-                          : 'Bắt đầu cuộc trò chuyện'}
+                      {last
+                        ? last.image && !last.text
+                          ? `${last.sender === 'staff' ? `${last.senderName || 'Moderator'}: ` : ''}Đã gửi một ảnh`
+                          : `${last.sender === 'staff' ? `${last.senderName || 'Moderator'}: ` : ''}${last.text}`
+                        : 'Bắt đầu cuộc trò chuyện'}
                     </span>
                   </span>
                   {thread.unread > 0 && (
@@ -697,7 +784,7 @@ export default function MessagesWorkspace({
                 icon="back"
                 label="Về danh sách hội thoại"
                 className="hidden max-[700px]:inline-flex"
-                onClick={() => setMobileConversation(false)}
+                onClick={leaveConversation}
               />
               <Avatar contact={contact} />
               <div className="min-w-0 flex-1">
@@ -723,6 +810,19 @@ export default function MessagesWorkspace({
                 />
               </div>
             </header>
+
+            {requiresReplyLock && !canReply && (
+              <p
+                role="status"
+                className="border-b border-line-subtle px-5 py-2.5 text-caption font-medium text-warning max-sm:px-3"
+              >
+                {lockIsBusy
+                  ? `Bạn không thể gửi tin nhắn vì ${lockHolderLabel} đang xử lý hội thoại này`
+                  : replyLock.status === 'checking'
+                    ? 'Đang xác nhận quyền phản hồi hội thoại…'
+                    : 'Chưa xác nhận được quyền phản hồi. Vui lòng thử lại.'}
+              </p>
+            )}
 
             {showInfo && (
               <div
@@ -758,78 +858,98 @@ export default function MessagesWorkspace({
               className="min-h-25 flex-1 overflow-y-auto overscroll-contain px-6 py-3 pb-5
                 max-xl:px-4 max-sm:px-3"
             >
-              {active.messages.map((message, index) => (
-                <Fragment key={message.id}>
-                  {(index === 0 ||
-                    dateKey(active.messages[index - 1].createdAt) !==
-                      dateKey(message.createdAt)) && (
-                    <div
-                      className="my-3 flex items-center gap-3 text-[10px] text-ink-subtle
+              {active.messages.map((message, index) => {
+                const outgoing = message.sender === 'me' || message.sender === 'staff'
+                return (
+                  <Fragment key={message.id}>
+                    {(index === 0 ||
+                      dateKey(active.messages[index - 1].createdAt) !==
+                        dateKey(message.createdAt)) && (
+                      <div
+                        className="my-3 flex items-center gap-3 text-[10px] text-ink-subtle
                         before:h-px before:flex-1 before:bg-line-subtle after:h-px
                         after:flex-1 after:bg-line-subtle"
-                    >
-                      <span>{dayLabel(message.createdAt)}</span>
-                    </div>
-                  )}
-                  <article
-                    className={cx(
-                      'mb-5 flex items-start gap-2.5',
-                      message.sender === 'me' && 'flex-row-reverse'
+                      >
+                        <span>{dayLabel(message.createdAt)}</span>
+                      </div>
                     )}
-                  >
-                    {message.sender === 'me' ? (
-                      <Avatar small moderator label={user?.username || workspaceRole} />
-                    ) : (
-                      <Avatar contact={contact} small />
-                    )}
-                    <div
+                    <article
                       className={cx(
-                        'min-w-0 max-w-[min(76%,560px)]',
-                        message.sender === 'me' && 'flex flex-col items-end'
+                        'mb-5 flex items-start gap-2.5',
+                        outgoing && 'flex-row-reverse'
                       )}
                     >
+                      {message.sender === 'me' ? (
+                        <Avatar small moderator label={user?.username || workspaceRole} />
+                      ) : message.sender === 'staff' ? (
+                        <Avatar
+                          contact={{
+                            role: 'moderator',
+                            avatarUrl: message.senderAvatarUrl,
+                            initials: message.senderName,
+                          }}
+                          small
+                        />
+                      ) : (
+                        <Avatar contact={contact} small />
+                      )}
                       <div
                         className={cx(
-                          'mb-1.5 mt-0.5 flex flex-wrap items-center gap-2',
-                          message.sender === 'me' && 'justify-end'
+                          'min-w-0 max-w-[min(76%,560px)]',
+                          outgoing && 'flex flex-col items-end'
                         )}
                       >
-                        <time className="text-caption text-ink-muted" dateTime={message.createdAt}>
-                          {timeLabel(message.createdAt)}
-                        </time>
-                      </div>
-                      <div
-                        className={cx(
-                          'whitespace-pre-wrap break-words rounded-lg border px-3 py-2.5',
-                          'text-body leading-relaxed',
-                          message.sender === 'me'
-                            ? 'rounded-tr-none border-[#a9c3df] border-r-2 border-r-[#709cca]' +
-                                ' bg-[#e5effb] text-[#20486f]'
-                            : contact.role !== 'user'
-                              ? 'rounded-tl-none border-[#d0c2e3] bg-[#f3eef9] text-[#55426f]'
-                              : 'rounded-tl-none border-[#ccd8e5] bg-[#f1f5fa] text-ink'
-                        )}
-                      >
-                        {message.image && (
-                          <button
-                            type="button"
-                            aria-label="Xem ảnh tin nhắn"
-                            className="mb-2 block overflow-hidden rounded-md"
-                            onClick={() => setImagePreview(message.image)}
+                        <div
+                          className={cx(
+                            'mb-1.5 mt-0.5 flex flex-wrap items-center gap-2',
+                            outgoing && 'justify-end'
+                          )}
+                        >
+                          {message.sender === 'staff' && message.senderName && (
+                            <small className="text-caption font-medium text-ink-muted">
+                              {message.senderName}
+                            </small>
+                          )}
+                          <time
+                            className="text-caption text-ink-muted"
+                            dateTime={message.createdAt}
                           >
-                            <img
-                              src={message.image}
-                              alt="Ảnh đính kèm trong tin nhắn"
-                              className="max-h-64 max-w-full object-contain"
-                            />
-                          </button>
-                        )}
-                        {message.text && <p>{message.text}</p>}
+                            {timeLabel(message.createdAt)}
+                          </time>
+                        </div>
+                        <div
+                          className={cx(
+                            'whitespace-pre-wrap break-words rounded-lg border px-3 py-2.5',
+                            'text-body leading-relaxed',
+                            outgoing
+                              ? 'rounded-tr-none border-[#a9c3df] border-r-2 border-r-[#709cca]' +
+                                  ' bg-[#e5effb] text-[#20486f]'
+                              : contact.role !== 'user'
+                                ? 'rounded-tl-none border-[#d0c2e3] bg-[#f3eef9] text-[#55426f]'
+                                : 'rounded-tl-none border-[#ccd8e5] bg-[#f1f5fa] text-ink'
+                          )}
+                        >
+                          {message.image && (
+                            <button
+                              type="button"
+                              aria-label="Xem ảnh tin nhắn"
+                              className="mb-2 block overflow-hidden rounded-md"
+                              onClick={() => setImagePreview(message.image)}
+                            >
+                              <img
+                                src={message.image}
+                                alt="Ảnh đính kèm trong tin nhắn"
+                                className="max-h-64 max-w-full object-contain"
+                              />
+                            </button>
+                          )}
+                          {message.text && <p>{message.text}</p>}
+                        </div>
                       </div>
-                    </div>
-                  </article>
-                </Fragment>
-              ))}
+                    </article>
+                  </Fragment>
+                )
+              })}
               {!active.messages.length && (
                 <div
                   className="flex h-full min-h-50 flex-col items-center justify-center gap-3
@@ -853,6 +973,7 @@ export default function MessagesWorkspace({
                   className="inline-flex items-center gap-1.5 text-caption font-semibold
                     text-ink-muted hover:text-primary"
                   aria-expanded={showReplies}
+                  disabled={!canCompose}
                   onClick={() => setShowReplies((value) => !value)}
                 >
                   <Icon name="reply" size={15} />
@@ -871,7 +992,7 @@ export default function MessagesWorkspace({
                 </button>
               </div>
 
-              {showReplies && (
+              {showReplies && canCompose && (
                 <div
                   className="mb-2.5 max-h-35 overflow-y-auto rounded-lg border border-line
                     bg-surface-muted p-1.5"
@@ -918,6 +1039,7 @@ export default function MessagesWorkspace({
                   wrap="soft"
                   maxLength={MESSAGE_LIMIT}
                   value={draft}
+                  disabled={!canCompose}
                   onChange={(event) => updateDraft(event.target.value)}
                   placeholder="Viết tin nhắn"
                   className="block max-h-35 min-h-14 w-full resize-none break-words bg-transparent text-small
@@ -961,14 +1083,14 @@ export default function MessagesWorkspace({
                   <IconButton
                     icon="image"
                     label="Đính kèm ảnh"
-                    disabled={sending}
+                    disabled={sending || !canCompose}
                     onClick={() => imageInputRef.current?.click()}
                   />
                   <Button
                     type="submit"
                     variant="primary"
                     size="sm"
-                    disabled={(!draft.trim() && !selectedImage) || sending}
+                    disabled={(!draft.trim() && !selectedImage) || sending || !canReply}
                   >
                     <Icon name="send" size={16} />
                     {sending ? 'Đang gửi…' : 'Gửi'}
