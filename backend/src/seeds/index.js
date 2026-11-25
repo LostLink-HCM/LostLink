@@ -17,6 +17,7 @@ const { seedMemberReputation, seedReputation } = require('./reputationSeed')
 const { seedReviews } = require('./reviewSeed')
 const { seedSystemSettings } = require('./systemSettingsSeed')
 const {
+  seedMemberStatuses,
   seedMissingMembers,
   seedUsers,
   seedUserUpdateDates,
@@ -37,51 +38,56 @@ const categoryMOnly = process.argv.includes('--category-m-only')
 const dashboardOnly = process.argv.includes('--dashboard-only')
 // Chỉ gán ảnh đại diện mẫu, chạy được trên production vì không đè ảnh người dùng tự tải lên
 const avatarsOnly = process.argv.includes('--avatars-only')
-const seeders = dashboardOnly
-  ? [seedAdminDashboard]
-  : categoryMOnly
-    ? [seedCategoryMReliability]
-    : categoriesOnly
-      ? [seedCategories]
-      : messagesOnly
-        ? [seedBackofficeMessages]
-        : backofficeNotificationsOnly
-          ? [seedBackofficeNotifications]
-          : reportsOnly
-            ? [seedReports]
-            : auditOnly
-              ? [seedAuditLogs]
-              : avatarsOnly
-                ? [seedAvatars]
-                : settingsOnly
-                  ? [seedSystemSettings]
-                  : demo
-                    ? [
-                        seedMissingMembers,
-                        seedCategories,
-                        seedPosts,
-                        seedMemberReputation,
-                        seedNotifications,
-                      ]
-                    : [
-                        seedUsers,
-                        seedAvatars,
-                        seedSystemSettings,
-                        seedCategories,
-                        seedPosts,
-                        seedAdminDashboard,
-                        seedReports,
-                        seedConversations,
-                        // Lời cảm ơn gắn với cuộc trao đổi đã seed, điểm uy tín tính sau khi có lời cảm ơn
-                        seedReviews,
-                        seedReputation,
-                        seedBackofficeMessages,
-                        seedNotifications,
-                        seedBackofficeNotifications,
-                        seedUserActivityDates,
-                        seedUserUpdateDates,
-                        seedAuditLogs,
-                      ]
+const leaderboardOnly = process.argv.includes('--leaderboard-only')
+const seeders = leaderboardOnly
+  ? [seedMemberStatuses, seedReviews, seedMemberReputation]
+  : dashboardOnly
+    ? [seedAdminDashboard]
+    : categoryMOnly
+      ? [seedCategoryMReliability]
+      : categoriesOnly
+        ? [seedCategories]
+        : messagesOnly
+          ? [seedBackofficeMessages]
+          : backofficeNotificationsOnly
+            ? [seedBackofficeNotifications]
+            : reportsOnly
+              ? [seedReports]
+              : auditOnly
+                ? [seedAuditLogs]
+                : avatarsOnly
+                  ? [seedAvatars]
+                  : settingsOnly
+                    ? [seedSystemSettings]
+                    : demo
+                      ? [
+                          seedMissingMembers,
+                          seedMemberStatuses,
+                          seedCategories,
+                          seedPosts,
+                          seedReviews,
+                          seedMemberReputation,
+                          seedNotifications,
+                        ]
+                      : [
+                          seedUsers,
+                          seedAvatars,
+                          seedSystemSettings,
+                          seedCategories,
+                          seedPosts,
+                          seedAdminDashboard,
+                          seedReports,
+                          seedConversations,
+                          // Lời cảm ơn gắn với cuộc trao đổi đã seed, điểm uy tín tính sau khi có lời cảm ơn
+                          seedReviews,
+                          seedReputation,
+                          seedBackofficeMessages,
+                          seedNotifications,
+                          seedBackofficeNotifications,
+                          seedUserActivityDates,
+                          seedUserUpdateDates,
+                          seedAuditLogs,
+                        ]
 
 // Kiểm tra tài khoản không tự tạo được trước khi ghi, thiếu thì dừng khi chưa đổi gì trong DB.
 // Tác giả bài mẫu còn thiếu sẽ do seedMissingMembers tạo, findSeedAccounts kiểm lại trong seedPosts
@@ -91,6 +97,21 @@ const checkAccounts = async () => {
 }
 
 async function run() {
+  if (
+    leaderboardOnly &&
+    (demo ||
+      dashboardOnly ||
+      categoriesOnly ||
+      settingsOnly ||
+      auditOnly ||
+      avatarsOnly ||
+      reportsOnly ||
+      messagesOnly ||
+      categoryMOnly ||
+      backofficeNotificationsOnly)
+  ) {
+    throw new Error('Không kết hợp --leaderboard-only với chế độ seed khác')
+  }
   if (
     dashboardOnly &&
     (demo ||
@@ -161,36 +182,38 @@ async function run() {
   if (backofficeNotificationsOnly && env.nodeEnv === 'production') {
     throw new Error('Backoffice notification seeding is disabled in production.')
   }
-  if (!demo && !settingsOnly && !avatarsOnly && env.nodeEnv === 'production') {
+  if (!demo && !settingsOnly && !avatarsOnly && !leaderboardOnly && env.nodeEnv === 'production') {
     throw new Error('Không chạy seed đầy đủ trên production, dùng npm run seed:demo')
   }
 
   await connectDatabase()
   const { host, name } = mongoose.connection
-  const mode = dashboardOnly
-    ? 'Dashboard admin'
-    : backofficeNotificationsOnly
-      ? 'backoffice notifications'
-      : categoriesOnly
-        ? 'danh mục'
-        : categoryMOnly
-          ? 'dữ liệu độ tin cậy m'
-          : reportsOnly
-            ? 'báo cáo'
-            : messagesOnly
-              ? 'tin nhắn backoffice'
-              : auditOnly
-                ? 'nhật ký thao tác'
-                : avatarsOnly
-                  ? 'ảnh đại diện'
-                  : settingsOnly
-                    ? 'cấu hình hệ thống'
-                    : demo
-                      ? 'demo'
-                      : 'đầy đủ'
+  const mode = leaderboardOnly
+    ? 'bảng vinh danh'
+    : dashboardOnly
+      ? 'Dashboard admin'
+      : backofficeNotificationsOnly
+        ? 'backoffice notifications'
+        : categoriesOnly
+          ? 'danh mục'
+          : categoryMOnly
+            ? 'dữ liệu độ tin cậy m'
+            : reportsOnly
+              ? 'báo cáo'
+              : messagesOnly
+                ? 'tin nhắn backoffice'
+                : auditOnly
+                  ? 'nhật ký thao tác'
+                  : avatarsOnly
+                    ? 'ảnh đại diện'
+                    : settingsOnly
+                      ? 'cấu hình hệ thống'
+                      : demo
+                        ? 'demo'
+                        : 'đầy đủ'
   console.log(`Seed ${mode} vào ${host}/${name}`)
 
-  if (demo) await checkAccounts()
+  if (demo || leaderboardOnly) await checkAccounts()
   for (const seed of seeders) {
     console.log(`• ${seed.name}`)
     await seed()

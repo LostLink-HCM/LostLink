@@ -5,6 +5,7 @@ import Icon from '../../common/Icon'
 import { cardClass } from '../Card'
 import { cx, focusRing, tagClass } from '../classes'
 import LikeButton from './LikeButton'
+import SaveButton from './SaveButton'
 import TypeTag from './TypeTag'
 
 const Dot = () => (
@@ -34,6 +35,8 @@ export default function PostCard({
   liked,
   likeCount,
   onToggleLike,
+  saved,
+  onToggleSave,
   now,
   rank,
   seen,
@@ -51,34 +54,41 @@ export default function PostCard({
         'relative flex gap-3.5 p-3.5 transition hover:border-line-strong hover:shadow-[0_10px_28px_-14px_rgb(22_35_58/0.25)] sm:gap-4.5 sm:p-4'
       )}
     >
-      {/* Bài đã xem làm mờ ảnh để cuộn nhanh vẫn phân biệt được */}
-      <div
-        className={cx(
-          'relative min-h-28 w-24 shrink-0 self-stretch sm:min-h-30 sm:w-40',
-          seen && 'opacity-75'
-        )}
-      >
-        {post.images[0] ? (
-          <img
-            src={post.images[0]}
-            alt=""
-            loading="lazy"
-            className={cx(imageClass, 'object-cover')}
+      <div className="flex w-24 shrink-0 flex-col gap-2.5 sm:w-40">
+        <div className={cx('relative min-h-24 flex-1 sm:min-h-28', seen && 'opacity-75')}>
+          {post.images[0] ? (
+            <img
+              src={post.images[0]}
+              alt=""
+              loading="lazy"
+              className={cx(imageClass, 'object-cover')}
+            />
+          ) : (
+            <img
+              src={`/images/categories/${post.categorySlug ?? 'khac'}.svg`}
+              alt=""
+              loading="lazy"
+              className={cx(imageClass, 'bg-primary-subtle object-contain p-4 sm:p-7')}
+            />
+          )}
+        </div>
+        <div className="flex items-center justify-center gap-1.5">
+          <LikeButton
+            liked={liked}
+            count={likeCount}
+            onClick={onToggleLike}
+            size="sm"
+            className="relative z-10"
           />
-        ) : (
-          // Bài không có ảnh: hiện ảnh minh họa của danh mục
-          <img
-            src={`/images/categories/${post.categorySlug ?? 'khac'}.svg`}
-            alt=""
-            loading="lazy"
-            className={cx(imageClass, 'bg-primary-subtle object-contain p-4 sm:p-7')}
-          />
-        )}
+          {onToggleSave && (
+            <SaveButton saved={saved} onClick={onToggleSave} size="sm" className="relative z-10" />
+          )}
+        </div>
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Thông tin bên trái tự xuống dòng khi hẹp, nhãn loại tin luôn nằm ở góc phải */}
-        <div className="mb-1.5 flex items-start gap-2 text-tiny text-ink-subtle">
+        <div className="mb-2 flex items-start gap-2 text-tiny text-ink-subtle">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
             {rank && <RankBadge rank={rank} />}
             {/* Nằm trên lớp link phủ cả thẻ để bấm được vào tên người đăng */}
@@ -117,7 +127,7 @@ export default function PostCard({
               </span>
             )}
             {/* Cùng chiều rộng với "Nhặt được" để nhãn Đã xem thẳng cột giữa các card */}
-            <TypeTag type={post.type} className="min-w-19 justify-center" />
+            <TypeTag type={post.type} className="w-24 justify-center" />
             {tags}
             {menu}
           </span>
@@ -126,7 +136,7 @@ export default function PostCard({
         {/* Bài đã xem: tiêu đề nhạt hơn, giống link đã bấm */}
         <h3
           className={cx(
-            'm-0 mb-1 text-lead leading-snug font-bold tracking-tight sm:text-title',
+            'm-0 mb-2 text-lead leading-snug font-bold tracking-tight sm:text-title',
             seen ? 'text-ink-muted' : 'text-ink'
           )}
         >
@@ -142,31 +152,38 @@ export default function PostCard({
             {post.title}
           </Link>
         </h3>
-        <p className="m-0 mb-2.5 line-clamp-2 text-small text-ink-muted">{post.desc}</p>
+        <p className="m-0 mb-3 line-clamp-2 text-small leading-relaxed text-ink-muted">
+          {post.desc}
+        </p>
 
-        {/* Một dòng gọn: thích, nơi, thời điểm, bình luận và lượt xem */}
-        <div className="mt-auto flex items-center gap-x-3.5 text-tiny text-ink-subtle">
-          <LikeButton
-            liked={liked}
-            count={likeCount}
-            onClick={onToggleLike}
-            className="relative z-10 h-7 px-2.5"
-          />
-          {/* Ngày mất/nhặt quan trọng hơn lượt xem nên luôn hiện; thiếu chỗ thì ẩn lượt xem trước */}
+        <div className="mt-auto flex min-h-8 items-center gap-x-4 text-tiny text-ink-subtle">
           {post.timeWindow && (
-            <span className="flex shrink-0 items-center gap-1 whitespace-nowrap">
-              <Icon name="calendar" size={12} className="shrink-0" />
-              {post.timeWindow}
+            <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap sm:shrink-0">
+              <Icon name="calendar" size={14} className="shrink-0" />
+              <span className="truncate">{post.timeWindow}</span>
             </span>
           )}
-          <span className="flex min-w-0 shrink items-center gap-1 max-sm:hidden">
-            <Icon name="pin" size={12} className="shrink-0" />
+          <span className="flex min-w-0 flex-1 items-center gap-1.5 max-sm:hidden">
+            <Icon name="pin" size={14} className="shrink-0" />
             <span className="truncate">{placeLines(post).join(' → ')}</span>
           </span>
-          {/* Luôn sát góc phải, thẳng hàng với nhãn loại tin dù địa điểm dài hay ngắn */}
-          <span className="ml-auto shrink-0 whitespace-nowrap max-lg:hidden">
-            {comments > 0 && `${formatCount(comments)} bình luận · `}
-            {formatCount(post.views)} lượt xem
+          <span className="ml-auto flex shrink-0 items-center gap-3.5 font-medium whitespace-nowrap text-ink-muted max-sm:hidden">
+            {comments > 0 && (
+              <span
+                className="flex items-center gap-1.5"
+                title={`${formatCount(comments)} bình luận`}
+              >
+                <Icon name="comment" size={15} />
+                {formatCount(comments)}
+              </span>
+            )}
+            <span
+              className="flex items-center gap-1.5"
+              title={`${formatCount(post.views)} lượt xem`}
+            >
+              <Icon name="eye" size={15} />
+              {formatCount(post.views)}
+            </span>
           </span>
         </div>
         {footer && <div className="relative z-10 mt-3">{footer}</div>}

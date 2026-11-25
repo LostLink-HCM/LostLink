@@ -211,6 +211,41 @@ const seedUserActivityDates = async () => {
   console.log(`  ✓ ${updated} tài khoản mẫu được bổ sung thời điểm truy cập gần nhất`)
 }
 
+const replaceStatusLogs = async (user, member, actor) => {
+  if (!member.restrictionReason) return
+  await AuditLog.deleteMany({
+    entityType: 'User',
+    entityId: user._id,
+    'detail.seedSource': 'user-seed',
+  })
+  await createSeedLog({ user, actor, action: 'restrict', reason: member.restrictionReason })
+  if (member.status === 'locked') {
+    await createSeedLog({
+      user,
+      actor,
+      action: 'lock',
+      reason: member.lockReason,
+      previousStatus: member.previousStatus,
+    })
+  }
+}
+
+const seedMemberStatuses = async () => {
+  const actor = await User.findOne({ role: 'admin' }).select('_id')
+  let updated = 0
+  for (const m of SEED_MEMBERS.filter((item) => item.status)) {
+    const user = await User.findOneAndUpdate(
+      { email: m.email, username: m.username },
+      { $set: { status: m.status, lockReason: m.lockReason || '' } },
+      { returnDocument: 'after' }
+    )
+    if (!user) continue
+    await replaceStatusLogs(user, m, actor)
+    updated += 1
+  }
+  console.log(`  ✓ đồng bộ trạng thái của ${updated} thành viên mẫu bị hạn chế/khóa`)
+}
+
 const seedUsers = async () => {
   for (const u of SEED_USERS) {
     const passwordHash = await bcrypt.hash(u.password, BCRYPT_ROUNDS)
@@ -229,24 +264,7 @@ const seedUsers = async () => {
       lockReason: m.lockReason,
     })
     console.log(`  ✓ ${'user'.padEnd(9)} ${m.email}  (mật khẩu: ${MEMBER_PASSWORD})`)
-
-    if (!m.restrictionReason) continue
-    // Seed đầy đủ đặt lại trạng thái mẫu; thay lịch sử mẫu để lần khóa gần nhất khớp trạng thái.
-    await AuditLog.deleteMany({
-      entityType: 'User',
-      entityId: user._id,
-      'detail.seedSource': 'user-seed',
-    })
-    await createSeedLog({ user, actor, action: 'restrict', reason: m.restrictionReason })
-    if (m.status === 'locked') {
-      await createSeedLog({
-        user,
-        actor,
-        action: 'lock',
-        reason: m.lockReason,
-        previousStatus: m.previousStatus,
-      })
-    }
+    await replaceStatusLogs(user, m, actor)
   }
 
   const badge = await Badge.findOneAndUpdate(
@@ -284,6 +302,7 @@ const seedMissingMembers = async () => {
 module.exports = {
   seedUsers,
   seedMissingMembers,
+  seedMemberStatuses,
   seedUserManagementHistory,
   seedUserUpdateDates,
   seedUserActivityDates,

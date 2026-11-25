@@ -22,10 +22,12 @@ import AttachedPost from '../../components/user/messages/AttachedPost'
 import Composer from '../../components/user/messages/Composer'
 import ThreadList from '../../components/user/messages/ThreadList'
 import TradePanel from '../../components/user/messages/TradePanel'
+import PostMenu from '../../components/user/post/PostMenu'
 import { checkImages } from '../../lib/user/composePost'
 import { postPath } from '../../lib/user/homeFeed'
 import {
   appendMessage,
+  canClose,
   dayLabel,
   filterThreads,
   isClosedByMe,
@@ -398,13 +400,36 @@ export default function MessagesPage() {
   }
 
   const trade = active?.kind === 'trade'
+  const chatActions = active
+    ? [
+        trade &&
+          !active.peer.deleted && {
+            label: 'Xem trang cá nhân',
+            icon: 'user',
+            onClick: () => navigate(profilePath(active.peer.name)),
+          },
+        trade &&
+          !active.peer.deleted && {
+            label: `Báo cáo ${active.peer.name}`,
+            icon: 'flag',
+            tone: 'danger',
+            onClick: () => navigate(`/users/${active.peer.name}/report`),
+          },
+        canClose(active) && {
+          label: 'Đóng hội thoại',
+          icon: 'close',
+          tone: 'danger',
+          onClick: () => setDialog('close'),
+        },
+      ].filter(Boolean)
+    : []
+
   const tradePanel = active && (
     <TradePanel
       thread={active}
       busy={busy}
       onConfirm={() => setDialog('confirm')}
       onReview={() => navigate(`/messages/${active.id}/review`)}
-      onClose={() => setDialog('close')}
     />
   )
 
@@ -469,20 +494,8 @@ export default function MessagesPage() {
                 </p>
               </div>
               <div className="flex shrink-0 gap-1">
-                {trade && !active.peer.deleted && (
-                  <>
-                    <IconButton
-                      icon="user"
-                      label="Xem trang cá nhân"
-                      onClick={() => navigate(profilePath(active.peer.name))}
-                    />
-                    <IconButton
-                      icon="flag"
-                      label={`Báo cáo ${active.peer.name}`}
-                      tone="danger"
-                      onClick={() => navigate(`/users/${active.peer.name}/report`)}
-                    />
-                  </>
+                {chatActions.length > 0 && (
+                  <PostMenu label="Tuỳ chọn hội thoại" actions={chatActions} />
                 )}
                 <IconButton
                   icon="info"
@@ -506,7 +519,7 @@ export default function MessagesPage() {
 
             <div
               ref={scrollRef}
-              className="relative flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain bg-surface-muted/60 px-4 py-4 sm:px-6"
+              className="relative flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain bg-surface-muted/60 px-4 py-4 [scrollbar-width:thin] sm:px-6"
             >
               {trade && (
                 <AttachedPost
@@ -565,7 +578,7 @@ export default function MessagesPage() {
 
         <aside
           aria-label="Trao trả và chỗ hẹn"
-          className="relative hidden min-h-0 flex-col gap-3 overflow-y-auto xl:flex"
+          className="relative hidden min-h-0 flex-col gap-3 overflow-y-auto [scrollbar-width:thin] xl:flex"
         >
           {tradePanel}
         </aside>

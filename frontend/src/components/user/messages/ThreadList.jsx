@@ -92,7 +92,7 @@ export default function ThreadList({
       <ul
         className={cx(
           // relative: giữ nhãn ẩn (sr-only) trong khung cuộn, không kéo dài cả trang
-          'relative m-0 min-h-0 flex-1 list-none overflow-y-auto px-2 pb-3',
+          'relative m-0 min-h-0 flex-1 list-none overflow-y-auto px-2 pb-3 [scrollbar-width:thin]',
           !threads.length && 'hidden'
         )}
       >
@@ -179,7 +179,15 @@ export default function ThreadList({
 
       {!threads.length && (
         <div className="flex flex-1 flex-col items-center px-5 py-10 text-center text-ink-subtle">
-          <Icon name="chat" size={30} />
+          {query ? (
+            <Icon name="chat" size={30} />
+          ) : (
+            <img
+              src="/images/categories/thiet-bi-dien-tu.png"
+              alt=""
+              className="size-16 drop-shadow-[0_8px_10px_rgb(15_23_42/0.15)]"
+            />
+          )}
           <p className="m-0 mt-3 text-small font-semibold text-ink-secondary">
             {query
               ? 'Không có hội thoại phù hợp'
