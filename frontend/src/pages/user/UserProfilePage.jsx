@@ -192,7 +192,7 @@ export default function UserProfilePage({ username }) {
 
       <ProfileHeader
         profile={profile}
-        stats={profileStats(profile, posts.length, data.rating.average)}
+        stats={profileStats(posts.length, data.rating.average)}
         actions={actions}
       >
         {blocked && (

@@ -72,15 +72,19 @@ describe('UC01 - Xem danh sách tin mới', () => {
     assert.deepEqual(titles(res).sort(), ['Trao trả 2 ngày trước', 'Đang tìm', 'Đã liên hệ'].sort())
   })
 
-  test('mặc định 7 ngày qua, mới nhất trước', async () => {
+  test('mặc định không giới hạn thời gian, bài mới đăng trước', async () => {
     await makePost({ title: 'Hai giờ trước', hoursAgo: 2 })
-    await makePost({ title: 'Năm ngày trước', hoursAgo: 5 * 24 })
-    await makePost({ title: 'Mới đăng', hoursAgo: 0.1 })
     await makePost({ title: 'Tám ngày trước', hoursAgo: 8 * 24 })
+    // Mới đăng nhưng mất từ một tháng trước vẫn đứng đầu
+    await makePost({
+      title: 'Mới đăng, mất tháng trước',
+      hoursAgo: 0.1,
+      timeFrom: new Date(Date.now() - 30 * 24 * HOUR),
+    })
 
     const res = await list()
 
-    assert.deepEqual(titles(res), ['Mới đăng', 'Hai giờ trước', 'Năm ngày trước'])
+    assert.deepEqual(titles(res), ['Mới đăng, mất tháng trước', 'Hai giờ trước', 'Tám ngày trước'])
   })
 
   test('card chỉ có dữ liệu công khai, không lộ vị trí chính xác hay đồ bên trong', async () => {
@@ -205,29 +209,42 @@ describe('UC02 - Lọc và tìm kiếm bài đăng', () => {
     assert.deepEqual(titles(res), ['Mất ví Quận 1'])
   })
 
-  test('khoảng 24 giờ qua và 30 ngày qua', async () => {
-    await makePost({ title: 'Mười giờ trước', hoursAgo: 10 })
-    await makePost({ title: 'Hai ngày trước', hoursAgo: 48 })
-    await makePost({ title: 'Hai mươi ngày trước', hoursAgo: 20 * 24 })
-    await makePost({ title: 'Bốn mươi ngày trước', hoursAgo: 40 * 24 })
+  test('24 giờ qua và 30 ngày qua tính theo thời điểm mất/nhặt, không theo ngày đăng', async () => {
+    const lostAgo = (hours) => new Date(Date.now() - hours * HOUR)
+    await makePost({ title: 'Mất mười giờ trước', timeFrom: lostAgo(10) })
+    // Khoảng mất bắt đầu từ hai ngày trước, kéo tới năm giờ trước: giao với 24 giờ qua
+    await makePost({ title: 'Mất từ hai ngày trước', timeFrom: lostAgo(48), timeTo: lostAgo(5) })
+    await makePost({ title: 'Mất hai mươi ngày trước', timeFrom: lostAgo(20 * 24) })
+    // Mới đăng nhưng mất đã bốn mươi ngày
+    await makePost({ title: 'Mất bốn mươi ngày trước', timeFrom: lostAgo(40 * 24), hoursAgo: 1 })
 
-    assert.deepEqual(titles(await list('?range=24h')), ['Mười giờ trước'])
+    assert.deepEqual(titles(await list('?range=24h')).sort(), [
+      'Mất mười giờ trước',
+      'Mất từ hai ngày trước',
+    ])
     assert.equal((await list('?range=30d')).body.data.total, 3)
+    assert.equal((await list('?range=all')).body.data.total, 4)
   })
 
-  test('Từ ngày - Đến ngày tính theo giờ Việt Nam (UTC+7)', async () => {
+  test('Từ ngày - Đến ngày: khoảng mất/nhặt giao với khoảng lọc, theo giờ Việt Nam (UTC+7)', async () => {
     // 23:30 ngày 02/11 và 00:30 ngày 03/11 theo giờ Việt Nam
-    await makePost({ title: 'Tối 02/11', createdAt: new Date('2026-11-02T16:30:00Z') })
-    await makePost({ title: 'Rạng sáng 03/11', createdAt: new Date('2026-11-02T17:30:00Z') })
-    await makePost({ title: 'Trưa 01/11', createdAt: new Date('2026-11-01T05:00:00Z') })
+    await makePost({ title: 'Tối 02/11', timeFrom: new Date('2026-11-02T16:30:00Z') })
+    await makePost({ title: 'Rạng sáng 03/11', timeFrom: new Date('2026-11-02T17:30:00Z') })
+    await makePost({ title: 'Trưa 01/11', timeFrom: new Date('2026-11-01T05:00:00Z') })
+    // Từ trưa 31/10 tới sáng 02/11: chỉ phần cuối khoảng chạm ngày 02/11
+    await makePost({
+      title: '31/10 - 02/11',
+      timeFrom: new Date('2026-10-31T05:00:00Z'),
+      timeTo: new Date('2026-11-02T01:00:00Z'),
+    })
 
     const oneDay = await list('?range=custom&from=2026-11-02&to=2026-11-02')
     const fromOnly = await list('?range=custom&from=2026-11-03')
-    const toOnly = await list('?range=custom&to=2026-11-01')
+    const toOnly = await list('?range=custom&to=2026-10-31')
 
-    assert.deepEqual(titles(oneDay), ['Tối 02/11'])
+    assert.deepEqual(titles(oneDay).sort(), ['31/10 - 02/11', 'Tối 02/11'])
     assert.deepEqual(titles(fromOnly), ['Rạng sáng 03/11'])
-    assert.deepEqual(titles(toOnly), ['Trưa 01/11'])
+    assert.deepEqual(titles(toOnly), ['31/10 - 02/11'])
   })
 
   test('tìm từ khóa không phân biệt dấu, bài phải chứa đủ mọi từ', async () => {
@@ -307,6 +324,7 @@ describe('UC02 - Lọc và tìm kiếm bài đăng', () => {
         'Từ ngày phải trước hoặc bằng Đến ngày.',
       ],
       ['?range=custom&from=2026-02-30', 'from', 'Ngày không hợp lệ, định dạng đúng là YYYY-MM-DD.'],
+      ['?range=custom&to=2999-01-01', 'to', 'Không chọn ngày trong tương lai.'],
       ['?type=sold', 'type', 'Loại tin không hợp lệ.'],
       ['?type=lost&type=found', 'type', 'Loại tin không hợp lệ.'],
       ['?area=Hà%20Nội', 'area', 'Khu vực không hợp lệ.'],
@@ -350,7 +368,7 @@ describe('UC03 - Xem tin hot', () => {
     ])
   })
 
-  test('dùng chung bộ lọc với Trang chủ', async () => {
+  test('dùng chung bộ lọc với Trang chủ, chỉ xét bài đăng trong 7 ngày', async () => {
     await makePost({ title: 'Ví hot', viewCount: 1000 })
     await makePost({ title: 'Chó hot hơn', category: pet._id, viewCount: 5000 })
     await makePost({ title: 'Ví cũ rất hot', viewCount: 9000, hoursAgo: 10 * 24 })

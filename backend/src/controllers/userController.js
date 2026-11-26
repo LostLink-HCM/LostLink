@@ -37,6 +37,11 @@ const listBlocks = asyncHandler(async (req, res) => {
   res.json({ success: true, data })
 })
 
+const listFollowing = asyncHandler(async (req, res) => {
+  const data = await relationService.listFollowing(req.user)
+  res.json({ success: true, data })
+})
+
 // Theo dõi, chặn người dùng: PUT bật, DELETE tắt
 const relation = (action) =>
   asyncHandler(async (req, res) => {
@@ -51,6 +56,7 @@ module.exports = {
   updateProfile,
   changeAvatar,
   listBlocks,
+  listFollowing,
   follow: relation('follow'),
   unfollow: relation('unfollow'),
   block: relation('block'),

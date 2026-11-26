@@ -260,3 +260,32 @@ test.describe('UC20 - Xem hồ sơ người dùng khác', () => {
     await expect(page.getByText('Không tìm thấy người dùng')).toBeVisible()
   })
 })
+
+test.describe('UC21 - Danh sách người đang theo dõi', () => {
+  test('hồ sơ của mình hiện số đang theo dõi; bỏ theo dõi trong hộp thoại rồi theo dõi lại được', async ({
+    page,
+    api,
+  }) => {
+    const me = await createAccount(api)
+    const other = await createAccount(api)
+    const token = await tokenOf(api, me)
+    const follow = await api.put(`users/${other.username}/follow`, { headers: bearer(token) })
+    expect(follow.status()).toBe(200)
+
+    await openMyProfile(page, me)
+    await page.getByRole('button', { name: '1 đang theo dõi' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Đang theo dõi' })
+    const row = dialog.getByRole('listitem').filter({ hasText: other.username })
+    await expect(row).toBeVisible()
+
+    await row.getByRole('button', { name: 'Bỏ theo dõi' }).click()
+    await expect(row.getByText('Đã bỏ theo dõi')).toBeVisible()
+    await row.getByRole('button', { name: 'Theo dõi lại' }).click()
+    await expect(row.getByRole('button', { name: 'Bỏ theo dõi' })).toBeVisible()
+    await row.getByRole('button', { name: 'Bỏ theo dõi' }).click()
+    await expect(row.getByRole('button', { name: 'Theo dõi lại' })).toBeVisible()
+
+    await dialog.getByRole('button', { name: 'Đóng' }).click()
+    await expect(page.getByRole('button', { name: '0 đang theo dõi' })).toBeVisible()
+  })
+})

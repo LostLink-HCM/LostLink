@@ -156,6 +156,47 @@ describe('UC22 - Chặn / bỏ chặn người dùng', () => {
   })
 })
 
+describe('UC21 - Danh sách người đang theo dõi', () => {
+  test('chỉ liệt kê người mình theo dõi, mới nhất trước, bỏ tài khoản chờ xoá; hồ sơ trả kèm số đếm', async () => {
+    const third = await createUser({ username: 'nguoithu3', email: 'third@example.com' })
+    const leaving = await createUser({ username: 'sapxoa', email: 'leaving@example.com' })
+    await UserFollow.create({
+      follower: viewer._id,
+      following: owner._id,
+      createdAt: new Date(Date.now() - 60 * 1000),
+    })
+    await UserFollow.create({ follower: viewer._id, following: third._id })
+    await UserFollow.create({ follower: viewer._id, following: leaving._id })
+    await leaving.updateOne({ deleteRequestedAt: new Date() })
+    // Người khác theo dõi mình thì không nằm trong danh sách của mình
+    await UserFollow.create({ follower: owner._id, following: viewer._id })
+
+    const res = await api.get('/api/users/me/following')
+    assert.equal(res.status, 200, JSON.stringify(res.body))
+    assert.deepEqual(
+      res.body.data.items.map((item) => item.username),
+      ['nguoithu3', 'Hoang.Nam']
+    )
+    assert.deepEqual(Object.keys(res.body.data.items[0]).sort(), [
+      'avatarUrl',
+      'followedAt',
+      'username',
+    ])
+    assert.equal((await api.get('/api/users/me')).body.data.followingCount, 2)
+
+    await api.delete('/api/users/nguoithu3/follow')
+    assert.deepEqual(
+      (await api.get('/api/users/me/following')).body.data.items.map((item) => item.username),
+      ['Hoang.Nam']
+    )
+    assert.equal((await api.get('/api/users/me')).body.data.followingCount, 1)
+  })
+
+  test('chưa đăng nhập thì không xem được', async () => {
+    assert.equal((await newClient().get('/api/users/me/following')).status, 401)
+  })
+})
+
 describe('UC22 - Danh sách người đã chặn', () => {
   test('chỉ liệt kê người mình chặn, chặn gần nhất trước, bỏ chặn thì mất khỏi danh sách', async () => {
     const third = await createUser({ username: 'nguoithu3', email: 'third@example.com' })

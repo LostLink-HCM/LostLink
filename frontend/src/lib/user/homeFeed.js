@@ -1,21 +1,23 @@
 export const TIME_RANGES = [
-  { value: '24h', label: '24 giờ qua', hours: 24 },
-  { value: '7d', label: '7 ngày qua', hours: 24 * 7 },
-  { value: '30d', label: '30 ngày qua', hours: 24 * 30 },
+  { value: 'all', label: 'Tất cả', short: 'Tất cả' },
+  { value: '24h', label: '24 giờ qua', short: '24 giờ', hours: 24 },
+  { value: '7d', label: '7 ngày qua', short: '7 ngày', hours: 24 * 7 },
+  { value: '30d', label: '30 ngày qua', short: '30 ngày', hours: 24 * 30 },
 ]
 
-// Mặc định theo tất cả danh mục, 7 ngày qua
+// Mặc định theo tất cả danh mục, không giới hạn thời gian
 export const DEFAULT_FILTERS = {
   type: '',
   category: '',
   area: '',
-  range: '7d',
+  range: 'all',
   from: '',
   to: '',
 }
 
 export const TYPE_LABELS = { lost: 'Mất đồ', found: 'Nhặt được' }
 
+export const EVENT_TIME_LABELS = { lost: 'Mất lúc', found: 'Nhặt lúc' }
 // Loại tin trên URL chi tiết bài: /mat-do/<slug>, /nhat-duoc/<slug>
 export const TYPE_PATHS = { lost: 'mat-do', found: 'nhat-duoc' }
 
@@ -32,9 +34,11 @@ export const normalize = (text) =>
     .toLowerCase()
     .trim()
 
-export function validateFilters({ range, from, to }) {
+export function validateFilters({ range, from, to }, now = Date.now()) {
   if (range !== 'custom') return ''
   if (!from && !to) return 'Vui lòng chọn Từ ngày hoặc Đến ngày.'
+  const today = todayVnKey(now)
+  if (from > today || to > today) return 'Không chọn ngày trong tương lai.'
   if (from && to && from > to) return 'Từ ngày phải trước hoặc bằng Đến ngày.'
   return ''
 }
@@ -103,6 +107,8 @@ export const isDefaultView = (filters, keyword) =>
 
 // Ngày theo giờ Việt Nam dạng yyyy-mm-dd để so sánh hôm nay/hôm qua
 const vnDayKey = (date) => new Intl.DateTimeFormat('en-CA', { timeZone: VN_TIME_ZONE }).format(date)
+
+export const todayVnKey = (now = Date.now()) => vnDayKey(new Date(now))
 
 const vnClock = (date) =>
   new Intl.DateTimeFormat('vi-VN', {

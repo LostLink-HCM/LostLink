@@ -25,6 +25,14 @@ describe('validateFilters: bộ lọc khoảng ngày tự chọn', () => {
     )
     expect(validateFilters({ range: 'custom', from: '2026-11-10', to: '2026-11-10' })).toBe('')
   })
+
+  it('không cho chọn ngày sau hôm nay theo giờ Việt Nam', () => {
+    const now = Date.parse('2026-11-12T18:00:00Z')
+    expect(validateFilters({ range: 'custom', from: '2026-11-13', to: '' }, now)).toBe('')
+    expect(validateFilters({ range: 'custom', from: '', to: '2026-11-14' }, now)).toBe(
+      'Không chọn ngày trong tương lai.'
+    )
+  })
 })
 
 describe('buildPostQuery: tham số gửi API /api/posts', () => {
@@ -35,7 +43,7 @@ describe('buildPostQuery: tham số gửi API /api/posts', () => {
       type: '',
       category: 'vi-tien',
       area: '',
-      range: '7d',
+      range: 'all',
       from: '',
       to: '',
       q: 'ví da',

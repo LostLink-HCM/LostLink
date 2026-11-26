@@ -4,6 +4,7 @@ import { profilePath } from '../../../lib/user/profiles'
 import Icon from '../../common/Icon'
 import { cardClass } from '../Card'
 import { cx, focusRing, tagClass } from '../classes'
+import EventTime from './EventTime'
 import LikeButton from './LikeButton'
 import SaveButton from './SaveButton'
 import TypeTag from './TypeTag'
@@ -156,18 +157,15 @@ export default function PostCard({
           {post.desc}
         </p>
 
-        <div className="mt-auto flex min-h-8 items-center gap-x-4 text-tiny text-ink-subtle">
+        <div className="mt-auto flex min-h-8 items-center gap-x-2.5 gap-y-1.5 text-tiny text-ink-subtle max-sm:flex-wrap sm:gap-x-4">
           {post.timeWindow && (
-            <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap sm:shrink-0">
-              <Icon name="calendar" size={14} className="shrink-0" />
-              <span className="truncate">{post.timeWindow}</span>
-            </span>
+            <EventTime type={post.type} value={post.timeWindow} className="shrink-0" />
           )}
           <span className="flex min-w-0 flex-1 items-center gap-1.5 max-sm:hidden">
             <Icon name="pin" size={14} className="shrink-0" />
             <span className="truncate">{placeLines(post).join(' → ')}</span>
           </span>
-          <span className="ml-auto flex shrink-0 items-center gap-3.5 font-medium whitespace-nowrap text-ink-muted max-sm:hidden">
+          <span className="ml-auto flex shrink-0 items-center gap-2.5 font-medium whitespace-nowrap text-ink-muted sm:gap-3.5">
             {comments > 0 && (
               <span
                 className="flex items-center gap-1.5"

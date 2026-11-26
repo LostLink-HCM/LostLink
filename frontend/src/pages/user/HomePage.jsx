@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import Icon from '../../components/common/Icon'
@@ -9,6 +9,7 @@ import { PeekCat, PeekDog } from '../../components/user/mascots/PeekPets'
 import SleepingCat from '../../components/user/mascots/SleepingCat'
 import { cx, focusRing } from '../../components/user/classes'
 import FeedFilters from '../../components/user/home/FeedFilters'
+import FilterHandle from '../../components/user/home/FilterHandle'
 import HomeHero from '../../components/user/home/HomeHero'
 import PostCard from '../../components/user/home/PostCard'
 import RightRail from '../../components/user/home/RightRail'
@@ -29,18 +30,31 @@ export default function HomePage({ hot = false }) {
   const { draft, setDraft, applied, setApplied } = filters
   const [filterError, setFilterError] = useState('')
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [filterBarPassed, setFilterBarPassed] = useState(false)
+  const filterBarRef = useCallback((bar) => {
+    if (!bar) return undefined
+    const observer = new IntersectionObserver(([entry]) =>
+      setFilterBarPassed(!entry.isIntersecting && entry.boundingClientRect.top < 0)
+    )
+    observer.observe(bar)
+    return () => observer.disconnect()
+  }, [])
+  const swipeStart = useRef(null)
 
   // Lọc, tìm kiếm, sắp xếp và ẩn bài của người đã chặn đều làm ở server
   const feed = usePostFeed({ filters: applied, keyword, hot, viewerId: user?.id })
 
+  useLayoutEffect(() => {
+    if (feed.restoredScrollY != null) window.scrollTo(0, feed.restoredScrollY)
+  }, [feed.restoredScrollY])
+
   // Áp dụng/xóa bộ lọc hoặc tìm từ khóa khi đang cuộn giữa danh sách thì đưa về đầu trang
-  // để thấy kết quả mới từ bài đầu tiên. Bỏ qua lần hiển thị đầu tiên của trang
-  const firstRender = useRef(true)
+  // để thấy kết quả mới từ bài đầu tiên
+  const lastQuery = useRef(JSON.stringify([applied, keyword]))
   useEffect(() => {
-    if (firstRender.current) {
-      firstRender.current = false
-      return
-    }
+    const query = JSON.stringify([applied, keyword])
+    if (query === lastQuery.current) return
+    lastQuery.current = query
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' })
   }, [applied, keyword])
@@ -100,7 +114,7 @@ export default function HomePage({ hot = false }) {
       <div className="mx-auto max-w-360 px-4 pt-4 pb-10 sm:px-6 lg:px-10 lg:pt-5">
         <h1 className="sr-only">{hot ? 'Tin hot gần đây' : 'Bài đăng mới trên LostLink'}</h1>
 
-        <div className="mb-4 flex items-center gap-2 lg:hidden">
+        <div ref={filterBarRef} className="mb-4 flex items-center gap-2 lg:hidden">
           {keyword && (
             <button
               type="button"
@@ -156,6 +170,12 @@ export default function HomePage({ hot = false }) {
         </main>
       </div>
 
+      <FilterHandle
+        visible={filterBarPassed && !drawerOpen}
+        activeCount={countActiveFilters(applied)}
+        onOpen={() => setDrawerOpen(true)}
+      />
+
       {drawerOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
@@ -168,6 +188,18 @@ export default function HomePage({ hot = false }) {
             role="dialog"
             aria-modal="true"
             aria-label="Bộ lọc bài đăng"
+            onTouchStart={(e) => {
+              const { clientX, clientY } = e.touches[0]
+              swipeStart.current = { x: clientX, y: clientY }
+            }}
+            onTouchEnd={(e) => {
+              const start = swipeStart.current
+              swipeStart.current = null
+              if (!start) return
+              const { clientX, clientY } = e.changedTouches[0]
+              const dx = clientX - start.x
+              if (dx < -60 && Math.abs(clientY - start.y) < Math.abs(dx) / 2) setDrawerOpen(false)
+            }}
             className="absolute inset-y-0 left-0 flex w-[86%] max-w-85 flex-col rounded-r-3xl bg-surface shadow-dialog motion-safe:animate-ll-fade"
           >
             <div className="flex justify-end px-3 pt-3">

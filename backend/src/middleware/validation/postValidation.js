@@ -1,17 +1,15 @@
 const { body, param, query, validationResult } = require('express-validator')
-
 const { AREAS } = require('../../config/areas')
 const Post = require('../../models/Post')
 const ApiError = require('../../utils/ApiError')
 const { lowercaseText } = require('../../utils/text')
 const { DAY_PART_HOURS, isVnDate, todayVn, vnTimeRange } = require('../../utils/vnTime')
 
-// Tham số để trống (?type=) coi như không gửi. Mỗi tham số phải là một chuỗi:
-// gửi lặp (?type=lost&type=found) sẽ thành mảng và bị từ chối
 const optionalString = (field, message) =>
   query(field).optional({ values: 'falsy' }).isString().withMessage(message).bail().trim()
 
 const DATE_MESSAGE = 'Ngày không hợp lệ, định dạng đúng là YYYY-MM-DD.'
+const FUTURE_DATE_MESSAGE = 'Không chọn ngày trong tương lai.'
 
 const listPostsRules = [
   optionalString('type', 'Loại tin không hợp lệ.')
@@ -22,10 +20,17 @@ const listPostsRules = [
     .withMessage('Danh mục không hợp lệ.'),
   optionalString('area', 'Khu vực không hợp lệ.').isIn(AREAS).withMessage('Khu vực không hợp lệ.'),
   optionalString('range', 'Khoảng thời gian không hợp lệ.')
-    .isIn(['24h', '7d', '30d', 'custom'])
+    .isIn(['all', '24h', '7d', '30d', 'custom'])
     .withMessage('Khoảng thời gian không hợp lệ.'),
-  optionalString('from', DATE_MESSAGE).custom(isVnDate).withMessage(DATE_MESSAGE),
-  optionalString('to', DATE_MESSAGE).custom(isVnDate).withMessage(DATE_MESSAGE),
+  // Lọc theo thời điểm mất/nhặt nên không chọn ngày sau hôm nay
+  ...['from', 'to'].map((field) =>
+    optionalString(field, DATE_MESSAGE)
+      .custom(isVnDate)
+      .withMessage(DATE_MESSAGE)
+      .bail()
+      .custom((value) => value <= todayVn())
+      .withMessage(FUTURE_DATE_MESSAGE)
+  ),
   // khoảng tự chọn phải có ít nhất một mốc và Từ ngày không sau Đến ngày
   query('range').custom((range, { req }) => {
     if (range !== 'custom') return true

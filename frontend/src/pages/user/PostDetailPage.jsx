@@ -11,6 +11,7 @@ import Card from '../../components/user/Card'
 import EmptyState from '../../components/user/EmptyState'
 import Note from '../../components/user/Note'
 import { cx, focusRing } from '../../components/user/classes'
+import EventTime from '../../components/user/home/EventTime'
 import LikeButton from '../../components/user/home/LikeButton'
 import TypeTag from '../../components/user/home/TypeTag'
 import CommentSection from '../../components/user/post/CommentSection'
@@ -20,6 +21,7 @@ import PostMenu from '../../components/user/post/PostMenu'
 import { ClosePostDialog, DeletePostDialog } from '../../components/user/post/PostManageDialogs'
 import PostStatusTag from '../../components/user/post/PostStatusTag'
 import { useMatchCount } from '../../hooks/useMatchCount'
+import { markFeedPostViewed } from '../../hooks/usePostFeed'
 import { formatCount, placeLabel, placeLines, timeAgo, toDetailPost } from '../../lib/user/homeFeed'
 import { isMatchable } from '../../lib/user/matches'
 import { profilePath } from '../../lib/user/profiles'
@@ -165,6 +167,10 @@ function PostDetail({ post, onChanged }) {
   const lost = post.type === 'lost'
   const isMine = post.viewer.isOwner
   const canClaim = !isMine && post.status !== 'returned'
+
+  useEffect(() => {
+    if (!isMine) markFeedPostViewed(post.id, post.views)
+  }, [isMine, post.id, post.views])
   const claimLabel = lost ? 'Tôi đang giữ món này' : 'Đây là đồ của tôi'
 
   // Xem hồ sơ cần đăng nhập, Guest được đưa sang đăng nhập rồi quay lại bài này
@@ -419,31 +425,30 @@ function PostDetail({ post, onChanged }) {
               </section>
             )}
 
-            <p className="m-0 mb-3 text-small text-ink-secondary">
-              {lost ? 'Thời điểm mất' : 'Thời điểm nhặt'}:{' '}
-              <span className="font-semibold text-ink">{post.timeWindow}</span>
-            </p>
-            <a
-              href={mapUrl(`${placeLabel(post)}, TP. Hồ Chí Minh`)}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Xem trên bản đồ"
-              className={cx(
-                'mb-5 inline-flex max-w-full items-center gap-1.5 rounded-2xl border border-line bg-surface-muted px-3 py-1.5 text-caption text-ink-secondary no-underline transition-colors hover:border-primary/40 hover:text-primary',
-                focusRing
-              )}
-            >
-              <Icon name="pin" size={14} className="shrink-0" />
-              {/* Đoạn đường hiện hai dòng Từ / Đến; bấm vào mở bản đồ tại điểm đầu */}
-              <span className="flex min-w-0 flex-col">
-                {placeLines(post).map((line) => (
-                  <span key={line} className="truncate">
-                    {line}
-                  </span>
-                ))}
-              </span>
-              <span className="sr-only">(mở bản đồ trong tab mới)</span>
-            </a>
+            <div className="mb-5 flex flex-wrap items-center gap-2">
+              <EventTime type={post.type} value={post.timeWindow} size="md" />
+              <a
+                href={mapUrl(`${placeLabel(post)}, TP. Hồ Chí Minh`)}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Xem trên bản đồ"
+                className={cx(
+                  'inline-flex max-w-full items-center gap-1.5 rounded-2xl border border-line bg-surface-muted px-3 py-1.5 text-caption text-ink-secondary no-underline transition-colors hover:border-primary/40 hover:text-primary',
+                  focusRing
+                )}
+              >
+                <Icon name="pin" size={14} className="shrink-0" />
+                {/* Đoạn đường hiện hai dòng Từ / Đến; bấm vào mở bản đồ tại điểm đầu */}
+                <span className="flex min-w-0 flex-col">
+                  {placeLines(post).map((line) => (
+                    <span key={line} className="truncate">
+                      {line}
+                    </span>
+                  ))}
+                </span>
+                <span className="sr-only">(mở bản đồ trong tab mới)</span>
+              </a>
+            </div>
 
             {/* Hàng nút tương tác: Thích, số bình luận, chia sẻ. Lưu và Theo dõi ở menu ⋯ */}
             <div className="flex flex-wrap items-center gap-1 border-t border-line-subtle pt-3">
