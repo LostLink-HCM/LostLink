@@ -21,6 +21,7 @@ export const getSavedPosts = () => api.get('/users/me/saved')
 const userPath = (username) => `/users/${encodeURIComponent(username)}`
 
 export const listBlockedUsers = () => api.get('/users/me/blocks')
+export const listFollowing = () => api.get('/users/me/following')
 export const followUser = (username) => api.put(`${userPath(username)}/follow`)
 export const unfollowUser = (username) => api.delete(`${userPath(username)}/follow`)
 export const blockUser = (username) => api.put(`${userPath(username)}/block`)

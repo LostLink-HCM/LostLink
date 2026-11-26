@@ -93,4 +93,35 @@ const listBlocks = async (viewer) => {
   }
 }
 
-module.exports = { listBlocks, follow, unfollow, block, blockUser, unblock, isBlocked }
+const FOLLOWING_MAX = 200
+const listFollowing = async (viewer) => {
+  const follows = await UserFollow.find({ follower: viewer._id })
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(FOLLOWING_MAX)
+    .populate({
+      path: 'following',
+      match: { deleteRequestedAt: null },
+      select: 'username avatarUrl',
+    })
+    .lean()
+  return {
+    items: follows
+      .filter((item) => item.following)
+      .map((item) => ({
+        username: item.following.username,
+        avatarUrl: item.following.avatarUrl || null,
+        followedAt: item.createdAt,
+      })),
+  }
+}
+
+module.exports = {
+  listBlocks,
+  listFollowing,
+  follow,
+  unfollow,
+  block,
+  blockUser,
+  unblock,
+  isBlocked,
+}

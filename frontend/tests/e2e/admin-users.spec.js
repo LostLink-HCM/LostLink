@@ -181,7 +181,7 @@ test.describe('Người dùng & quyền của admin', () => {
         })
         return
       }
-      await route.continue()
+      await route.fallback()
     })
 
     await page.goto('/admin/users')

@@ -22,7 +22,7 @@ test.beforeEach(async ({ page }) => {
     const request = route.request()
     const { hostname } = new URL(request.url())
     const external = hostname !== 'localhost' && hostname !== '127.0.0.1'
-    return request.resourceType() === 'image' && external ? route.abort() : route.continue()
+    return request.resourceType() === 'image' && external ? route.abort() : route.fallback()
   })
 })
 
@@ -72,7 +72,7 @@ test.describe('UC04 - Xem chi tiết bài đăng', () => {
     let failed = false
     // Lần gọi đầu giả lập lỗi server, lần thử lại thì cho qua
     await page.route(/\/api\/posts\/found\//, (route) => {
-      if (failed) return route.continue()
+      if (failed) return route.fallback()
       failed = true
       return route.fulfill({
         status: 500,

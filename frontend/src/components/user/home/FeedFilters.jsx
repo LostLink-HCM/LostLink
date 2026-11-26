@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AREAS } from '../../../data/homeFeed'
 import { useFeedCategories } from '../../../hooks/useFeedCategories'
-import { TIME_RANGES, TYPE_LABELS } from '../../../lib/user/homeFeed'
+import { TIME_RANGES, TYPE_LABELS, todayVnKey } from '../../../lib/user/homeFeed'
 import Icon from '../../common/Icon'
 import Button from '../Button'
 import { cx, focusRing } from '../classes'
@@ -50,20 +50,9 @@ const typeButtonTones = {
 const legendClass =
   'mb-1.5 p-0 text-micro font-semibold tracking-[0.06em] text-ink-subtle uppercase'
 
-const chipClass = (active) =>
-  cx(
-    'flex cursor-pointer items-center justify-center rounded-xl border px-2 text-caption transition-colors disabled:cursor-not-allowed disabled:opacity-45',
-    active
-      ? 'border-primary/35 bg-primary-soft font-semibold text-primary'
-      : 'border-transparent bg-line-subtle font-medium text-ink-secondary hover:bg-primary-subtle',
-    focusRing
-  )
-
 const dateClass =
-  'h-9 rounded-lg border border-line bg-surface px-2 text-caption outline-none focus-visible:border-primary aria-invalid:border-danger'
+  'h-8 rounded-lg border border-line bg-surface px-2 text-caption outline-none focus-visible:border-primary aria-invalid:border-danger'
 
-// Chọn chip (loại tin, danh mục, khu vực, khoảng thời gian) là lọc ngay. Riêng khoảng ngày tự chọn
-// nằm ở bản nháp, pendingDates bật nút "Áp dụng khoảng ngày" để xác nhận rồi mới lọc
 export default function FeedFilters({
   draft,
   activeCount = 0,
@@ -214,19 +203,29 @@ export default function FeedFilters({
         />
 
         <fieldset className="m-0 border-0 p-0">
-          <legend className={legendClass}>Khoảng thời gian</legend>
-          <div className="mb-2 grid grid-cols-3 gap-1.5">
-            {TIME_RANGES.map((range) => (
-              <button
-                key={range.value}
-                type="button"
-                aria-pressed={draft.range === range.value}
-                onClick={() => onChange({ range: range.value, from: '', to: '' })}
-                className={cx('h-9 whitespace-nowrap', chipClass(draft.range === range.value))}
-              >
-                {range.label}
-              </button>
-            ))}
+          <legend className={legendClass}>Xảy ra trong</legend>
+          <div className="mb-2.5 grid grid-cols-4 gap-0.5 rounded-xl bg-line-subtle p-0.5">
+            {TIME_RANGES.map((range) => {
+              const active = draft.range === range.value
+              return (
+                <button
+                  key={range.value}
+                  type="button"
+                  aria-pressed={active}
+                  aria-label={range.label}
+                  onClick={() => onChange({ range: range.value, from: '', to: '' })}
+                  className={cx(
+                    'h-8 cursor-pointer rounded-[10px] border-0 px-1 text-caption whitespace-nowrap transition-colors',
+                    active
+                      ? 'bg-surface font-semibold text-primary shadow-[0_1px_3px_rgb(22_35_58/0.14)]'
+                      : 'bg-transparent font-medium text-ink-secondary hover:text-primary',
+                    focusRing
+                  )}
+                >
+                  {range.short}
+                </button>
+              )
+            })}
           </div>
           <div ref={dateBoxRef}>
             <div className="grid grid-cols-2 gap-2">
@@ -259,7 +258,7 @@ export default function FeedFilters({
                 label={`Chọn ${DATE_LABELS[picking].toLowerCase()}`}
                 value={draft[picking]}
                 min={picking === 'to' ? draft.from || undefined : undefined}
-                max={picking === 'from' ? draft.to || undefined : undefined}
+                max={(picking === 'from' && draft.to) || todayVnKey()}
                 rangeFrom={draft.from}
                 rangeTo={draft.to}
                 onPick={pickDate}

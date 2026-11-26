@@ -74,7 +74,7 @@ const mockReports = async (page, { items = [], detail, pageSize = 10 } = {}) => 
       })
       return
     }
-    if (request.method() !== 'GET') return route.continue()
+    if (request.method() !== 'GET') return route.fallback()
     if (id && id !== 'reports') {
       await route.fulfill({
         status: 200,

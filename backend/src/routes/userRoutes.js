@@ -30,6 +30,7 @@ router.put('/me/avatar', protect, avatarLimiter, parseAvatarForm, ctrl.changeAva
 router.post('/me/activity', protect, ctrl.recordActivity)
 router.get('/me/saved', protect, interactionCtrl.getSavedPosts)
 router.get('/me/blocks', protect, ctrl.listBlocks)
+router.get('/me/following', protect, ctrl.listFollowing)
 
 // Khu vực theo dõi: thêm, bật/tắt, xoá
 const byArea = [protect, areaIdRules, rejectInvalidAreaId]

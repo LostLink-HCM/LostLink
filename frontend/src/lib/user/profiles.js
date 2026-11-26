@@ -28,12 +28,8 @@ export const toProfileView = (profile, isMe) => ({
   isMe,
 })
 
-export const profileStats = (profile, postCount, rating) =>
-  [
-    `${postCount} bài`,
-    `${profile.returned} món đã trao trả`,
-    rating != null && `★ ${formatRating(rating)}`,
-  ].filter(Boolean)
+export const profileStats = (postCount, rating) =>
+  [`${postCount} bài`, rating != null && `★ ${formatRating(rating)}`].filter(Boolean)
 
 // Lời cảm ơn từ API → dữ liệu ReviewList
 export const toReviewItems = (reviews) =>

@@ -5,10 +5,12 @@ import Icon from '../../components/common/Icon'
 import BackLink from '../../components/user/BackLink'
 import { buttonClass } from '../../components/user/buttonClass'
 import EmptyState from '../../components/user/EmptyState'
+import { cx, focusRing } from '../../components/user/classes'
 import PostCard from '../../components/user/home/PostCard'
 import { ClosePostDialog, DeletePostDialog } from '../../components/user/post/PostManageDialogs'
 import PostMenu from '../../components/user/post/PostMenu'
 import PostStatusTag from '../../components/user/post/PostStatusTag'
+import FollowingDialog from '../../components/user/profile/FollowingDialog'
 import ProfileHeader from '../../components/user/profile/ProfileHeader'
 import {
   ProfileAside,
@@ -68,6 +70,7 @@ export default function MyProfilePage() {
   const [tab, setTab] = useState('')
   // { kind: 'close' | 'delete', post }
   const [dialog, setDialog] = useState(null)
+  const [followingOpen, setFollowingOpen] = useState(false)
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -142,7 +145,20 @@ export default function MyProfilePage() {
 
       <ProfileHeader
         profile={profile}
-        stats={profileStats(profile, data.posts.length, data.rating.average)}
+        stats={[
+          ...profileStats(data.posts.length, data.rating.average),
+          <button
+            key="following"
+            type="button"
+            onClick={() => setFollowingOpen(true)}
+            className={cx(
+              'cursor-pointer rounded border-0 bg-transparent p-0 font-semibold text-primary hover:underline',
+              focusRing
+            )}
+          >
+            {data.followingCount} đang theo dõi
+          </button>,
+        ]}
         actions={
           <Link to="/settings/profile" className={buttonClass()}>
             <Icon name="edit" size={15} />
@@ -176,6 +192,15 @@ export default function MyProfilePage() {
         />
       </div>
 
+      {followingOpen && (
+        <FollowingDialog
+          notify={notify}
+          onClose={(changed) => {
+            setFollowingOpen(false)
+            if (changed) reload()
+          }}
+        />
+      )}
       {dialog?.kind === 'close' && (
         <ClosePostDialog
           post={dialog.post}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigationType } from 'react-router-dom'
 import { listPosts } from '../api/posts'
 import { buildPostQuery, toFeedPost } from '../lib/user/homeFeed'
 
@@ -16,32 +17,81 @@ const toPage = (res) => {
   }
 }
 
+const EMPTY_FEED = {
+  key: null,
+  items: [],
+  total: 0,
+  page: 0,
+  hasMore: false,
+  error: '',
+  // Mã lỗi từ server, vd CATEGORY_NOT_FOUND khi danh mục đang lọc vừa bị xoá
+  errorCode: '',
+  loadingMore: false,
+}
+
+const SAVED_TTL_MS = 10 * 60 * 1000
+const SAVED_MAX = 4
+const saved = new Map()
+
+const remember = (key, entry) => {
+  saved.delete(key)
+  saved.set(key, { ...entry, savedAt: Date.now() })
+  if (saved.size > SAVED_MAX) saved.delete(saved.keys().next().value)
+}
+
+export const markFeedPostViewed = (postId, views) => {
+  for (const entry of saved.values()) {
+    entry.feed = {
+      ...entry.feed,
+      items: entry.feed.items.map((item) =>
+        item.id === postId
+          ? { ...item, views, viewer: item.viewer ? { ...item.viewer, seen: true } : item.viewer }
+          : item
+      ),
+    }
+  }
+}
+
+const restorable = (key, navigationType) => {
+  const entry = saved.get(key)
+  return navigationType === 'POP' && entry && Date.now() - entry.savedAt < SAVED_TTL_MS
+    ? entry
+    : null
+}
+
 // Danh sách bài công khai từ server, tải lại khi đổi bộ lọc, từ khóa, cách sắp xếp
 // hoặc người đăng nhập (người đã đăng nhập không thấy bài của người mình đã chặn)
 export default function usePostFeed({ filters, keyword, hot, viewerId }) {
   // Kết quả đang hiển thị thuộc về bộ lọc nào. Khác bộ lọc hiện tại nghĩa là đang tải
   const key = JSON.stringify([filters, keyword, hot, viewerId ?? null])
-  const [feed, setFeed] = useState({
-    key: null,
-    items: [],
-    total: 0,
-    page: 0,
-    hasMore: false,
-    error: '',
-    // Mã lỗi từ server, vd CATEGORY_NOT_FOUND khi danh mục đang lọc vừa bị xoá
-    errorCode: '',
-    loadingMore: false,
-  })
+  const navigationType = useNavigationType()
+  const [restored] = useState(() => restorable(key, navigationType))
+  const [feed, setFeed] = useState(() => (restored ? restored.feed : EMPTY_FEED))
   const [retry, setRetry] = useState(0)
   // Chỉ nhận kết quả của lần gọi mới nhất, bỏ kết quả về muộn của lần gọi cũ
   const latest = useRef(0)
+  const feedRef = useRef(feed)
+  useEffect(() => {
+    feedRef.current = feed
+  })
 
   const fetchPage = useCallback(
     (page) => listPosts(buildPostQuery(filters, keyword, { hot, page })),
     [filters, keyword, hot]
   )
 
+  useEffect(
+    () => () => {
+      const current = feedRef.current
+      if (current.key && current.page > 0 && !current.error) {
+        remember(current.key, { feed: { ...current, loadingMore: false }, scrollY: window.scrollY })
+      }
+    },
+    []
+  )
+
   useEffect(() => {
+    if (feedRef.current.key === key) return
     const requestId = ++latest.current
     fetchPage(1)
       .then((res) => {
@@ -111,5 +161,13 @@ export default function usePostFeed({ filters, keyword, hot, viewerId }) {
   else if (feed.page === 0 && feed.error) status = 'error'
   else if (feed.loadingMore) status = 'loadingMore'
 
-  return { ...feed, status, canLoadMore, reload, loadMore, retryMore }
+  return {
+    ...feed,
+    status,
+    canLoadMore,
+    reload,
+    loadMore,
+    retryMore,
+    restoredScrollY: restored?.scrollY ?? null,
+  }
 }

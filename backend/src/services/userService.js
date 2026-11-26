@@ -83,12 +83,17 @@ const reviewsAbout = async (userId) => {
   }
 }
 
-// Hồ sơ của mình kèm bài của tôi và lời cảm ơn. Email, trạng thái tài khoản đã có ở /auth/me
+const followingCountOf = async (userId) => {
+  const ids = await UserFollow.find({ follower: userId }).distinct('following')
+  return User.countDocuments({ _id: { $in: ids }, deleteRequestedAt: null })
+}
+
 const getMyProfile = async (viewer) => {
-  const [user, posts, feedback] = await Promise.all([
+  const [user, posts, feedback, followingCount] = await Promise.all([
     findProfileUser({ _id: viewer._id }),
     findPosts({ owner: viewer._id, status: { $in: [...LISTED_STATUSES, ...REVIEWING_STATUSES] } }),
     reviewsAbout(viewer._id),
+    followingCountOf(viewer._id),
   ])
 
   const talks = await activeTalksOf(posts.map((post) => post._id))
@@ -104,6 +109,7 @@ const getMyProfile = async (viewer) => {
       viewer
     ),
     reviewingPosts: posts.filter((post) => REVIEWING_STATUSES.includes(post.status)).map(toMyPost),
+    followingCount,
     ...feedback,
   }
 }

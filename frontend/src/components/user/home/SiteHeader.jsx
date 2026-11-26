@@ -151,7 +151,7 @@ export default function SiteHeader({
               aria-label="Tìm bài đăng"
               onClick={() => setSearchOpen(true)}
               className={cx(
-                'grid size-9 cursor-pointer place-items-center rounded-full border border-white/25 bg-white/10 text-white transition-colors hover:bg-white/18 lg:hidden',
+                'grid size-9 cursor-pointer place-items-center rounded-full border border-white bg-white text-primary shadow-[0_2px_8px_-3px_rgb(5_11_22/0.45)] transition-colors hover:bg-primary-soft lg:hidden',
                 reveal,
                 focusRing
               )}

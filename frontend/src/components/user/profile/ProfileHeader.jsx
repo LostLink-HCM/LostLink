@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuarterRank } from '../../../hooks/useQuarterRank'
 import { joinedLabel } from '../../../lib/user/profiles'
@@ -14,7 +15,7 @@ const badgeTones = {
 }
 
 // Phần đầu hồ sơ: ảnh đại diện, tên, huy hiệu, giới thiệu và các nút hành động
-// stats: vài số liệu nhỏ hiện dưới tên (số bài, món đã trao trả, đánh giá)
+// stats: vài số liệu nhỏ hiện dưới tên (số bài, đánh giá, số đang theo dõi), có thể là nút bấm
 export default function ProfileHeader({ profile, stats = [], actions, children }) {
   const meta = [joinedLabel(profile.joinedAt)].filter(Boolean)
   // Top 5 bảng vinh danh quý này có khung ảnh theo hạng như ở bảng vinh danh
@@ -80,7 +81,12 @@ export default function ProfileHeader({ profile, stats = [], actions, children }
           )}
           {stats.length > 0 && (
             <p className="m-0 mb-1 text-small font-medium text-ink-secondary">
-              {stats.join(' · ')}
+              {stats.map((item, index) => (
+                <Fragment key={index}>
+                  {index > 0 && ' · '}
+                  {item}
+                </Fragment>
+              ))}
             </p>
           )}
           {meta.length > 0 && <p className="m-0 text-tiny text-ink-subtle">{meta.join(' · ')}</p>}

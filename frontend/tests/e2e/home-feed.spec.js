@@ -1,4 +1,4 @@
-import { expect, test } from '../helpers/auth.js'
+import { createAccount, expect, loginThroughUi, test } from '../helpers/auth.js'
 
 const feed = (page) => page.getByRole('region', { name: 'Danh sách bài đăng' })
 const cards = (page) => feed(page).getByRole('article')
@@ -39,11 +39,48 @@ test.beforeEach(async ({ page }) => {
     const request = route.request()
     const { hostname } = new URL(request.url())
     const external = hostname !== 'localhost' && hostname !== '127.0.0.1'
-    return request.resourceType() === 'image' && external ? route.abort() : route.continue()
+    return request.resourceType() === 'image' && external ? route.abort() : route.fallback()
   })
 })
 
+const DETAIL_TEST_TITLES = [
+  'Mất ví Louis Vuitton Monogram cỡ nhỏ gần Takashimaya',
+  'Nhặt được chìa khóa nhà có móc hình ngôi nhà',
+  'Mất thẻ sinh viên trong bao nhựa trắng, dây đeo họa tiết lá',
+]
+
 test.describe('UC01 - Xem danh sách tin mới', () => {
+  test('mở bài rồi quay lại: giữ danh sách và vị trí cuộn, không tải lại, bài vừa mở hiện Đã xem', async ({
+    page,
+    api,
+  }) => {
+    const account = await createAccount(api)
+    await page.goto('/login')
+    await loginThroughUi(page, account)
+    await expect(cards(page)).toHaveCount(PAGE_SIZE)
+
+    const titles = await cardTitles(page)
+    const title = titles.slice(4).find((item) => !DETAIL_TEST_TITLES.includes(item))
+    const card = cards(page).filter({ hasText: title })
+    await card.scrollIntoViewIfNeeded()
+    await expect(card.getByText('Đã xem')).toHaveCount(0)
+    const scrollY = await page.evaluate(() => window.scrollY)
+    expect(scrollY).toBeGreaterThan(0)
+
+    let feedRequests = 0
+    page.on('request', (request) => {
+      if (/\/api\/posts\?/.test(request.url())) feedRequests += 1
+    })
+    await card.getByRole('link', { name: title }).click()
+    await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible()
+    await page.goBack()
+
+    await expect(card.getByText('Đã xem')).toBeVisible()
+    await expect(cards(page)).toHaveCount(PAGE_SIZE)
+    expect(await page.evaluate(() => window.scrollY)).toBe(scrollY)
+    expect(feedRequests).toBe(0)
+  })
+
   test('hiện trang đầu, cuộn gần cuối thì tự tải tiếp tới khi hết bài', async ({ page, api }) => {
     const { total } = await listFromApi(api)
     expect(total).toBeGreaterThan(12)

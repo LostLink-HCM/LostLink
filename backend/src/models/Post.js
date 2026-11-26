@@ -249,6 +249,7 @@ postSchema.pre('validate', function computeDerivedFields() {
 postSchema.index({ status: 1, isHidden: 1, createdAt: -1 })
 postSchema.index({ status: 1, isHidden: 1, hotScore: -1, createdAt: -1 })
 postSchema.index({ type: 1, status: 1, createdAt: -1 })
+postSchema.index({ status: 1, isHidden: 1, timeFrom: -1 })
 postSchema.index({ locExact: '2dsphere' })
 
 const Post = mongoose.model('Post', postSchema)

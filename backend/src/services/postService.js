@@ -26,6 +26,7 @@ const { notifyPendingPost } = require('./backofficeNotificationEvents')
 
 const HOUR = 60 * 60 * 1000
 const RANGE_HOURS = { '24h': 24, '7d': 24 * 7, '30d': 24 * 30 }
+const HOT_WINDOW_MS = 7 * 24 * HOUR
 // Bài đã trao trả vẫn hiện thêm 7 ngày rồi tự ẩn
 const RETURNED_LISTED_MS = 7 * 24 * HOUR
 const EXCERPT_MAX = 160
@@ -75,12 +76,15 @@ const isPublic = (post, now, statuses = DETAIL_STATUSES) => {
   return post.status === 'returned' && Boolean(returnedAt) && returnedAt >= now - RETURNED_LISTED_MS
 }
 
-const createdAtCondition = ({ range = '7d', from, to }, now) => {
-  if (range !== 'custom') return { $gte: new Date(now - RANGE_HOURS[range] * HOUR) }
-  const condition = {}
-  if (from) condition.$gte = startOfVnDay(from)
-  if (to) condition.$lte = endOfVnDay(to)
-  return condition
+const eventTimeConditions = ({ range = 'all', from, to }, now) => {
+  if (range === 'all') return []
+  const start =
+    range === 'custom' ? from && startOfVnDay(from) : new Date(now - RANGE_HOURS[range] * HOUR)
+  const end = range === 'custom' && to ? endOfVnDay(to) : null
+  const conditions = []
+  if (start) conditions.push({ $or: [{ timeFrom: { $gte: start } }, { timeTo: { $gte: start } }] })
+  if (end) conditions.push({ timeFrom: { $lte: end } })
+  return conditions
 }
 
 // Bài phải chứa đủ mọi từ khóa, mỗi từ khóa khớp ở đầu một từ ("an" không khớp "thanh").
@@ -201,7 +205,8 @@ const listPublicPosts = async (params, viewer = null) => {
   const now = Date.now()
   const { type, category, area, q, sort = 'new', page = 1, limit = 12 } = params
 
-  const conditions = [publicCondition(now), { createdAt: createdAtCondition(params, now) }]
+  const conditions = [publicCondition(now), ...eventTimeConditions(params, now)]
+  if (sort === 'hot') conditions.push({ createdAt: { $gte: new Date(now - HOT_WINDOW_MS) } })
   if (type) conditions.push({ type })
   if (area) conditions.push({ area })
   if (category) conditions.push({ category: await findCategoryId(category) })
