@@ -39,7 +39,7 @@ test.beforeEach(async ({ page }) => {
     const request = route.request()
     const { hostname } = new URL(request.url())
     const external = hostname !== 'localhost' && hostname !== '127.0.0.1'
-    return request.resourceType() === 'image' && external ? route.abort() : route.continue()
+    return request.resourceType() === 'image' && external ? route.abort() : route.fallback()
   })
 })
 

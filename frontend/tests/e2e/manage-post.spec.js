@@ -26,7 +26,7 @@ test.beforeEach(async ({ page }) => {
     const request = route.request()
     const { hostname } = new URL(request.url())
     const external = hostname !== 'localhost' && hostname !== '127.0.0.1'
-    return external && request.resourceType() !== 'document' ? route.abort() : route.continue()
+    return external && request.resourceType() !== 'document' ? route.abort() : route.fallback()
   })
 })
 

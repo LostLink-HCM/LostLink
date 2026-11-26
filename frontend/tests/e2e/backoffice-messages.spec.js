@@ -147,7 +147,7 @@ async function mockMessagesApi(page, { contacts = [], threads = [] } = {}) {
       const peer = knownContacts.find((item) => item.id === selected?.contactId)
       return send({ thread: detail(id, peer) })
     }
-    return route.continue()
+    return route.fallback()
   }
   await page.route(/\/api\/backoffice\/conversations(?:\/[^?]*)?(?:\?.*)?$/, routeHandler)
   await page.route(/\/api\/backoffice\/action-locks(?:\/[^?]*)?$/, async (route) => {
