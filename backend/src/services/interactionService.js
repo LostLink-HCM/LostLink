@@ -1,9 +1,11 @@
-const { Notification, Post, PostFollow, PostLike, SavedPost } = require('../models')
+const { Notification, Post, PostFollow, PostLike, SavedPost, UserBlock } = require('../models')
 const { notify } = require('./notificationService')
 const { isPublic, postNotFound, toPostCard, withViewerState } = require('./postService')
+const ApiError = require('../utils/ApiError')
 const createOnce = require('../utils/createOnce')
 
 const SAVED_MAX = 100
+const LIKERS_MAX = 200
 
 // Thích, lưu, theo dõi chỉ với bài công khai
 const findPublicPost = async (id) => {
@@ -54,6 +56,35 @@ const unlike = async (id, user) => {
   const { deletedCount } = await PostLike.deleteOne({ user: user._id, post: id })
   if (deletedCount) await changeLikes(id, -1)
   return { liked: false, likes: await likeCountOf(id) }
+}
+
+const blockedWith = async (userId) => {
+  const blocks = await UserBlock.find({ $or: [{ blocker: userId }, { blocked: userId }] })
+    .select('blocker blocked')
+    .lean()
+  return blocks.map((block) => (block.blocker.equals(userId) ? block.blocked : block.blocker))
+}
+
+const listLikers = async (id, user) => {
+  const post = await Post.findById(id).select('owner').lean()
+  if (!post) throw postNotFound()
+  if (!post.owner.equals(user._id)) {
+    throw ApiError.forbidden('Chỉ chủ bài xem được ai đã thích bài này.', 'NOT_POST_OWNER')
+  }
+  const likes = await PostLike.find({ post: post._id, user: { $nin: await blockedWith(user._id) } })
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(LIKERS_MAX)
+    .populate({ path: 'user', match: { deleteRequestedAt: null }, select: 'username avatarUrl' })
+    .lean()
+  return {
+    items: likes
+      .filter((item) => item.user)
+      .map((item) => ({
+        username: item.user.username,
+        avatarUrl: item.user.avatarUrl || null,
+        likedAt: item.createdAt,
+      })),
+  }
 }
 
 const save = async (id, user) => {
@@ -113,4 +144,13 @@ const getSavedPosts = async (user) => {
   return { items: items.map((item) => cardById.get(String(item.id)) ?? item) }
 }
 
-module.exports = { like, unlike, save, unsave, follow, unfollow, getSavedPosts }
+module.exports = {
+  like,
+  unlike,
+  listLikers,
+  save,
+  unsave,
+  follow,
+  unfollow,
+  getSavedPosts,
+}

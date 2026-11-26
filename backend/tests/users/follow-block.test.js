@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const { beforeEach, describe, test } = require('node:test')
 
-const { Conversation, Notification, UserBlock, UserFollow } = require('../../src/models')
+const { Conversation, Notification, Post, UserBlock, UserFollow } = require('../../src/models')
 const { createUser, loginAs, newClient } = require('../helpers/auth')
 const { useTestDb } = require('../helpers/db')
 const { authed, createWalletCategory, makePost } = require('../helpers/posts')
@@ -84,6 +84,30 @@ describe('UC21 - Theo dõi / bỏ theo dõi người dùng', () => {
     assert.equal(items[0].type, 'following_post')
     assert.equal(items[0].actor.username, 'Hoang.Nam')
     assert.equal(items[0].post.title, 'Nhặt được ví')
+  })
+
+  test('bài sửa rồi được duyệt lại thì người theo dõi không nhận thông báo lần nữa', async () => {
+    await api.put('/api/users/Hoang.Nam/follow')
+    await createUser({ username: 'kiemduyet', email: 'mod@example.com', role: 'moderator' })
+    const mod = await loginAs('mod@example.com')
+    const modApi = authed(mod.client, mod.accessToken)
+    const post = await makePost(owner, wallet.category, {
+      title: 'Nhặt được ví',
+      status: 'pending',
+    })
+
+    assert.equal((await modApi.post(`/api/moderator/posts/${post._id}/approve`)).status, 200)
+    await Post.updateOne(
+      { _id: post._id },
+      {
+        $set: { status: 'pending' },
+        $push: { statusHistory: { status: 'pending', changedBy: owner._id } },
+      }
+    )
+    const res = await modApi.post(`/api/moderator/posts/${post._id}/approve`)
+    assert.equal(res.status, 200, JSON.stringify(res.body))
+
+    assert.equal(await Notification.countDocuments({ user: viewer._id, type: 'following_post' }), 1)
   })
 
   test('chưa đăng nhập thì không theo dõi được', async () => {

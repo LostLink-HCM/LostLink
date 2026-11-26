@@ -13,6 +13,7 @@ export default function LikeButton({
   count,
   onClick,
   withLabel = false,
+  showCount = true,
   variant = 'outline',
   size = 'md',
   className,
@@ -70,7 +71,7 @@ export default function LikeButton({
           ))}
       </span>
       {withLabel && `${liked ? 'Đã thích' : 'Thích'} · `}
-      {formatCount(count)}
+      {showCount && formatCount(count)}
     </button>
   )
 }

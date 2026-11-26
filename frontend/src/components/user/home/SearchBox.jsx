@@ -9,10 +9,10 @@ const TONES = {
     clear: 'text-ink-subtle hover:bg-line-subtle hover:text-ink',
   },
   sky: {
-    icon: 'text-primary',
+    icon: 'text-ink-subtle',
     input:
-      'h-9 border-white bg-white text-primary shadow-[0_2px_8px_-3px_rgb(5_11_22/0.45)] placeholder:text-primary/60 focus:border-primary',
-    clear: 'text-primary/70 hover:bg-primary-soft hover:text-primary',
+      'h-9 border-white bg-white text-ink shadow-[0_2px_8px_-3px_rgb(5_11_22/0.45)] placeholder:text-ink-subtle focus:border-primary',
+    clear: 'text-ink-subtle hover:bg-line-subtle hover:text-ink',
   },
 }
 

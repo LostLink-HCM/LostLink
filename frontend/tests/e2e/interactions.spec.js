@@ -28,14 +28,6 @@ async function openOthersPost(page, api, title) {
   return { owner, ownerToken, viewer, post }
 }
 
-// Lưu, Theo dõi, Báo cáo nằm trong menu ⋯ ở góc thẻ bài
-async function openPostMenu(page, title) {
-  await page.getByRole('button', { name: `Tuỳ chọn bài ${title}` }).click()
-  const menu = page.getByRole('menu', { name: `Thao tác với bài ${title}` })
-  await expect(menu).toBeVisible()
-  return menu
-}
-
 test.describe('UC31, UC32, UC34 - Thích, lưu, theo dõi bài', () => {
   test('thích, lưu, theo dõi được lưu trên server, tải lại trang vẫn giữ', async ({
     page,
@@ -43,18 +35,53 @@ test.describe('UC31, UC32, UC34 - Thích, lưu, theo dõi bài', () => {
   }) => {
     const title = 'Mất ví da nâu ở công viên Tao Đàn'
     await openOthersPost(page, api, title)
+    await expect(page.getByRole('button', { name: /người đã thích/ })).toHaveCount(0)
     await page.getByRole('button', { name: /Thích/ }).first().click()
-    await (await openPostMenu(page, title)).getByRole('menuitem', { name: 'Lưu bài' }).click()
+    await page.getByRole('button', { name: 'Lưu', exact: true }).click()
     await expect(page.getByText('Đã lưu bài.')).toBeVisible()
-    await (await openPostMenu(page, title)).getByRole('menuitem', { name: 'Theo dõi bài' }).click()
+    await page.getByRole('button', { name: 'Theo dõi', exact: true }).click()
     await expect(page.getByText('Đã theo dõi bài đăng.')).toBeVisible()
 
     await page.reload()
-    const menu = await openPostMenu(page, title)
-    await expect(menu.getByRole('menuitem', { name: 'Bỏ lưu bài' })).toBeVisible()
-    await expect(menu.getByRole('menuitem', { name: 'Bỏ theo dõi' })).toBeVisible()
-    await page.keyboard.press('Escape')
+    await expect(
+      page.getByRole('button', { name: 'Đã lưu', exact: true, pressed: true })
+    ).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Đang theo dõi', pressed: true })).toBeVisible()
     await expect(page.getByRole('button', { name: /Bỏ thích|Đã thích/ }).first()).toBeVisible()
+  })
+})
+
+test.describe('Người đã thích bài', () => {
+  test('chủ bài bấm số tim để xem ai đã thích, người khác chỉ thấy con số', async ({
+    page,
+    api,
+  }) => {
+    const title = 'Mất ví da đen ở công viên Lê Văn Tám'
+    const owner = await createAccount(api)
+    const ownerToken = await tokenOf(api, owner)
+    const post = await createPost(api, ownerToken, { title })
+    const fan = await createAccount(api)
+    const blocked = await createAccount(api)
+    for (const account of [fan, blocked]) {
+      const liked = await api.put(`posts/${post.id}/like`, {
+        headers: bearer(await tokenOf(api, account)),
+      })
+      expect(liked.status()).toBe(200)
+    }
+    const block = await api.put(`users/${blocked.username}/block`, { headers: bearer(ownerToken) })
+    expect(block.status()).toBe(200)
+
+    await page.goto('/login')
+    await loginThroughUi(page, owner)
+    await expect(page).toHaveURL(/\/$/)
+    await page.goto(`/mat-do/${post.slug}`)
+    await page.getByRole('button', { name: 'Xem 2 người đã thích' }).click()
+    const dialog = page.getByRole('dialog', { name: '2 người đã thích' })
+    await expect(dialog.getByRole('link', { name: fan.username })).toBeVisible()
+    await expect(dialog.getByRole('link', { name: blocked.username })).toHaveCount(0)
+    await expect(dialog.getByText('và 1 người khác')).toBeVisible()
+    await dialog.getByRole('link', { name: fan.username }).click()
+    await expect(page).toHaveURL(new RegExp(`/users/${fan.username}$`))
   })
 })
 
@@ -65,7 +92,7 @@ test.describe('UC33 - Bài đã lưu', () => {
   }) => {
     const title = 'Mất ví vải xanh ở nhà sách Nguyễn Văn Cừ'
     await openOthersPost(page, api, title)
-    await (await openPostMenu(page, title)).getByRole('menuitem', { name: 'Lưu bài' }).click()
+    await page.getByRole('button', { name: 'Lưu', exact: true }).click()
     await expect(page.getByText('Đã lưu bài.')).toBeVisible()
 
     await page.getByRole('button', { name: 'Menu tài khoản' }).click()

@@ -40,6 +40,7 @@ export const changePostStatus = (id, status) => api.patch(`/posts/${id}/status`,
 
 export const likePost = (id) => api.put(`/posts/${id}/like`)
 export const unlikePost = (id) => api.delete(`/posts/${id}/like`)
+export const listPostLikers = (id) => api.get(`/posts/${id}/likes`)
 export const savePost = (id) => api.put(`/posts/${id}/save`)
 export const unsavePost = (id) => api.delete(`/posts/${id}/save`)
 export const followPost = (id) => api.put(`/posts/${id}/follow`)

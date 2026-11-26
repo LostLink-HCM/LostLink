@@ -181,14 +181,18 @@ const changePendingPostStatus = async ({ id, moderator, status, note = '' }) => 
   })
 
   if (status === 'searching') {
-    const followers = await UserFollow.find({ following: post.owner }).distinct('follower')
-    await notify(followers, {
-      type: 'following_post',
-      actor: post.owner,
-      refType: 'Post',
-      refId: post._id,
-      text: post.title,
-    })
+    const firstApproval =
+      post.statusHistory.filter((entry) => entry.status === 'searching').length === 1
+    if (firstApproval) {
+      const followers = await UserFollow.find({ following: post.owner }).distinct('follower')
+      await notify(followers, {
+        type: 'following_post',
+        actor: post.owner,
+        refType: 'Post',
+        refId: post._id,
+        text: post.title,
+      })
+    }
     await afterApproved(post._id)
   }
 

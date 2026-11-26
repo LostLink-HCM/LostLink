@@ -31,27 +31,30 @@ function CategoryArt({ icon, name, size }) {
 
 const typeButtonTones = {
   all: {
-    base: 'bg-neutral-soft text-ink-secondary',
-    idle: 'border-transparent hover:border-line-strong',
-    active: 'border-ink-subtle ring-3 ring-ink-subtle/12',
+    idle: 'border-line bg-surface text-ink-secondary hover:border-line-strong hover:text-ink',
+    active:
+      'border-primary bg-primary text-white shadow-[0_4px_12px_-4px_color-mix(in_srgb,var(--color-primary)_60%,transparent)]',
   },
   lost: {
-    base: 'bg-danger-soft text-danger-ink',
-    idle: 'border-danger/18 hover:border-danger/40',
-    active: 'border-danger/70 ring-3 ring-danger/12',
+    idle: 'border-danger/20 bg-danger-soft text-danger-ink hover:border-danger/45',
+    active:
+      'border-danger bg-danger text-white shadow-[0_4px_12px_-4px_color-mix(in_srgb,var(--color-danger)_60%,transparent)]',
   },
   found: {
-    base: 'bg-success-soft text-success',
-    idle: 'border-success/18 hover:border-success/40',
-    active: 'border-success/70 ring-3 ring-success/12',
+    idle: 'border-success/20 bg-success-soft text-success hover:border-success/45',
+    active:
+      'border-success bg-success text-white shadow-[0_4px_12px_-4px_color-mix(in_srgb,var(--color-success)_60%,transparent)]',
   },
 }
 
 const legendClass =
   'mb-1.5 p-0 text-micro font-semibold tracking-[0.06em] text-ink-subtle uppercase'
 
-const dateClass =
-  'h-8 rounded-lg border border-line bg-surface px-2 text-caption outline-none focus-visible:border-primary aria-invalid:border-danger'
+const dateClass = (filled) =>
+  cx(
+    'h-8 rounded-lg border px-2 text-caption outline-none focus-visible:border-primary aria-invalid:border-danger',
+    filled ? 'border-primary/60 bg-primary-soft font-semibold' : 'border-line bg-surface'
+  )
 
 export default function FeedFilters({
   draft,
@@ -165,9 +168,7 @@ export default function FeedFilters({
                   aria-pressed={active}
                   onClick={() => onChange({ type: value })}
                   className={cx(
-                    // Cùng khuôn với các chip khác trong bộ lọc, giữ màu riêng của từng loại tin
                     'h-9 cursor-pointer rounded-xl border px-1 text-caption whitespace-nowrap transition',
-                    tone.base,
                     active ? cx('font-semibold', tone.active) : cx('font-medium', tone.idle),
                     focusRing
                   )}
@@ -217,8 +218,8 @@ export default function FeedFilters({
                   className={cx(
                     'h-8 cursor-pointer rounded-[10px] border-0 px-1 text-caption whitespace-nowrap transition-colors',
                     active
-                      ? 'bg-surface font-semibold text-primary shadow-[0_1px_3px_rgb(22_35_58/0.14)]'
-                      : 'bg-transparent font-medium text-ink-secondary hover:text-primary',
+                      ? 'bg-primary font-semibold text-white shadow-[0_2px_8px_-2px_color-mix(in_srgb,var(--color-primary)_60%,transparent)]'
+                      : 'bg-transparent font-medium text-ink-secondary hover:bg-surface hover:text-primary',
                     focusRing
                   )}
                 >
@@ -245,7 +246,7 @@ export default function FeedFilters({
                     onToggle={() => setPicking((current) => (current === key ? null : key))}
                     invalid={Boolean(error)}
                     describedBy={error ? `${idPrefix}-error` : undefined}
-                    className={dateClass}
+                    className={dateClass(Boolean(draft[key]))}
                   />
                 </div>
               ))}

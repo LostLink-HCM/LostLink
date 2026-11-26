@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../../../auth/AuthContext'
 import { cx } from '../classes'
-import { hidesTabBar } from '../../../lib/user/navigation'
+import { isFeedPath } from '../../../lib/user/navigation'
 import SlidingTabs from './SlidingTabs'
 
 const SCROLL_STEP = 8
@@ -49,10 +49,11 @@ export default function MobileTabBar({
   unreadMessages = 0,
   unreadNotifications = 0,
   pendingMatches = 0,
+  off = false,
 }) {
   const { user } = useAuth()
   const { pathname } = useLocation()
-  const hidden = useAutoHide(false)
+  const hidden = useAutoHide(!isFeedPath(pathname))
 
   const tabs = [
     { to: '/', end: true, label: 'Trang chủ', icon: 'home' },
@@ -80,7 +81,7 @@ export default function MobileTabBar({
     },
   ].filter(Boolean)
 
-  if (hidesTabBar(pathname)) return null
+  if (off) return null
 
   return (
     <div
