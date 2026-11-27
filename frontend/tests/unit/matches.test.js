@@ -2,8 +2,13 @@ import { describe, expect, it } from 'vitest'
 
 import {
   compareRows,
+  contactAction,
+  contactThreadId,
   evidenceLabel,
   findGroup,
+  pendingCount,
+  rejectedLast,
+  rejectedStatus,
   sortGroups,
   sortedEvidence,
   splitEvidence,
@@ -158,5 +163,46 @@ describe('UC05 - Thống kê cộng đồng', () => {
     expect(
       communityStatItems({ posted: 0, returned: 0, matchRate: 0, avgReturnDays: null })[3].value
     ).toBe('–')
+  })
+})
+
+describe('manh mối đã xác nhận: bước liên hệ', () => {
+  it('nhãn nút theo bước, chưa có bước thì coi như chưa liên hệ, sai câu hỏi xác minh thì không còn nút', () => {
+    expect(contactAction({ step: 'chat' }, 'minh').label).toBe('Đến hội thoại')
+    expect(contactAction({ step: 'requested' }, 'minh').status).toBe(
+      'Đã gửi lời giới thiệu, chờ minh đồng ý'
+    )
+    expect(contactAction({ step: 'incoming' }, 'minh').label).toBe('Xem yêu cầu')
+    expect(contactAction(null, 'minh').label).toBe('Tiếp tục liên hệ')
+    expect(contactAction({ step: 'verify_failed' }, 'minh').label).toBeNull()
+  })
+
+  it('mở thẳng hội thoại hoặc yêu cầu, chưa liên hệ thì không có', () => {
+    expect(contactThreadId({ step: 'chat', conversationId: 'c1' })).toBe('c1')
+    expect(contactThreadId({ step: 'declined', claimId: 'k1' })).toBe('claim-k1')
+    expect(contactThreadId({ step: 'start' })).toBeNull()
+    expect(contactThreadId(null)).toBeNull()
+  })
+})
+
+describe('manh mối đã xác nhận không phải', () => {
+  const item = (id, extra = {}) => ({ match: { id, confirmed: false, rejectedBy: null, ...extra } })
+
+  it('không tính vào số chưa phản hồi', () => {
+    const group = {
+      items: [item(1), item(2, { rejectedBy: 'peer' }), item(3, { confirmed: true })],
+    }
+    expect(pendingCount(group)).toBe(1)
+  })
+
+  it('xuống cuối mục, còn lại giữ thứ tự', () => {
+    const items = [item(1, { rejectedBy: 'me' }), item(2), item(3, { rejectedBy: 'peer' }), item(4)]
+    expect(rejectedLast(items).map((entry) => entry.match.id)).toEqual([2, 4, 1, 3])
+  })
+
+  it('ghi rõ bên nào đã từ chối', () => {
+    expect(rejectedStatus('me', 'Lan')).toBe('Bạn đã xác nhận không phải')
+    expect(rejectedStatus('peer', 'Lan')).toBe('Lan đã xác nhận không phải')
+    expect(rejectedStatus('unknown', 'Lan')).toBe('Manh mối này đã được xác nhận không phải')
   })
 })

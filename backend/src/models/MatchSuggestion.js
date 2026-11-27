@@ -44,6 +44,8 @@ const matchSuggestionSchema = new Schema(
     },
     confirmedLost: { type: Boolean, default: false },
     confirmedFound: { type: Boolean, default: false },
+    // Phía bấm Không phải (lost/found), để hai bên biết ai đã từ chối
+    rejectedSide: { type: String, enum: ['lost', 'found'] },
   },
   { timestamps: true, collection: 'match_suggestions' }
 )

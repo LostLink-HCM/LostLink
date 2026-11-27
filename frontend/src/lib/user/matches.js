@@ -70,6 +70,37 @@ export function compareRows(mine, other, place) {
   return rows
 }
 
+const CONTACT_STEPS = {
+  start: () => ({ status: 'Bạn đã xác nhận manh mối này', label: 'Tiếp tục liên hệ' }),
+  requested: (peer) => ({
+    status: `Đã gửi lời giới thiệu, chờ ${peer} đồng ý`,
+    label: 'Xem yêu cầu đã gửi',
+  }),
+  incoming: (peer) => ({
+    status: `${peer} đã gửi yêu cầu trò chuyện cho bạn`,
+    label: 'Xem yêu cầu',
+  }),
+  declined: (peer) => ({
+    status: `${peer} đã từ chối yêu cầu trò chuyện`,
+    label: 'Xem yêu cầu đã gửi',
+  }),
+  chat: () => ({ status: 'Hai bên đã có hội thoại', label: 'Đến hội thoại' }),
+  verify_failed: () => ({
+    status: 'Bạn đã trả lời sai câu hỏi xác minh nên không thể liên hệ qua bài này',
+    label: null,
+  }),
+}
+
+export const contactAction = (contact, peer) =>
+  (CONTACT_STEPS[contact?.step] ?? CONTACT_STEPS.start)(peer)
+
+// Đã xác nhận thì mở thẳng hội thoại hoặc yêu cầu; chưa liên hệ thì null (đi theo luồng nhận đồ)
+export const contactThreadId = (contact) => {
+  if (contact?.conversationId) return contact.conversationId
+  if (contact?.claimId) return `claim-${contact.claimId}`
+  return null
+}
+
 // Bài theo id hoặc slug trên URL, không có thì bài đầu tiên có gợi ý
 export const findGroup = (groups, key) =>
   groups.find((group) => key && [String(group.post.id), group.post.slug].includes(key)) ??
@@ -77,7 +108,23 @@ export const findGroup = (groups, key) =>
   groups[0]
 
 // Số gợi ý chưa phản hồi của một bài, cùng cách đếm với huy hiệu tab Manh mối
-export const pendingCount = (group) => group.items.filter((item) => !item.match.confirmed).length
+export const pendingCount = (group) =>
+  group.items.filter((item) => !item.match.confirmed && !item.match.rejectedBy).length
+
+// Dòng trạng thái của manh mối đã bị từ chối (API trả rejectedBy)
+const REJECTED_STATUS = {
+  me: () => 'Bạn đã xác nhận không phải',
+  peer: (peer) => `${peer} đã xác nhận không phải`,
+}
+
+export const rejectedStatus = (rejectedBy, peer) =>
+  REJECTED_STATUS[rejectedBy]?.(peer) ?? 'Manh mối này đã được xác nhận không phải'
+
+// Manh mối đã bị từ chối xuống cuối, còn lại giữ thứ tự
+export const rejectedLast = (items) =>
+  [...items].sort(
+    (a, b) => Number(Boolean(a.match.rejectedBy)) - Number(Boolean(b.match.rejectedBy))
+  )
 
 // Bài nhiều gợi ý chưa phản hồi lên trước, rồi theo tổng số gợi ý; bằng nhau giữ thứ tự mới nhất
 export const sortGroups = (groups) =>

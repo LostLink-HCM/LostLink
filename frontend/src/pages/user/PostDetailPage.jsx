@@ -88,7 +88,11 @@ function BackToList() {
   const { state } = useLocation()
   const navigate = useNavigate()
   const from = state?.from
-  const label = from?.startsWith('/trending') ? 'Quay lại Tin hot' : 'Quay lại danh sách'
+  const label = from?.startsWith('/trending')
+    ? 'Quay lại Tin hot'
+    : from?.startsWith('/matches')
+      ? 'Quay lại Manh mối'
+      : 'Quay lại danh sách'
 
   return from ? (
     <BackLink onClick={() => navigate(-1)}>{label}</BackLink>
