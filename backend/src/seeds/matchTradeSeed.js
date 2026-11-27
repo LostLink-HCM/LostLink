@@ -212,8 +212,8 @@ const seedPair = async (pair, users, moderator, now) => {
     conversation: conversation._id,
     createdAt: new Date(openedAt - 30 * MINUTE),
   })
-  await markContacted(target, openedAt)
-  await markContacted(own, openedAt)
+  await markContacted(target, openedAt, claimant._id)
+  await markContacted(own, openedAt, claimant._id)
   return `${pair.lost.author} mất ↔ ${pair.found.author} nhặt`
 }
 

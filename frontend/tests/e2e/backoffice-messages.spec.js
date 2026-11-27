@@ -72,7 +72,15 @@ const detail = (id, peer, fields = {}) => ({
   ...fields,
 })
 
+// Ảnh tin nhắn giả lập: trả ảnh thật có kích thước để thẻ ảnh luôn hiện, không phụ thuộc mạng
+const MESSAGE_IMAGE = 'https://images.example.test/message.png'
+const IMAGE_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="#ccd8e5"/></svg>'
+
 async function mockMessagesApi(page, { contacts = [], threads = [] } = {}) {
+  await page.route(MESSAGE_IMAGE, (route) =>
+    route.fulfill({ status: 200, contentType: 'image/svg+xml', body: IMAGE_SVG })
+  )
   const requests = []
   const inbox = [...threads]
   const knownContacts = [...contacts]
@@ -123,7 +131,7 @@ async function mockMessagesApi(page, { contacts = [], threads = [] } = {}) {
         senderId: ADMIN_ID,
         senderName: 'admin',
         text,
-        image: image ? 'https://images.example.test/message.png' : null,
+        image: image ? MESSAGE_IMAGE : null,
         createdAt: '2026-11-19T08:20:00.000Z',
       }
       const existing = inbox.find((item) => item.id === conversationId)
@@ -297,6 +305,10 @@ test.describe('Tin nhắn của Admin và Moderator', () => {
     })
     await page.getByRole('button', { name: 'Gửi', exact: true }).click()
     const attached = page.getByRole('button', { name: 'Xem ảnh tin nhắn' })
+    // Chờ ảnh tải xong (có kích thước) rồi mới bấm
+    await expect
+      .poll(() => attached.getByRole('img').evaluate((image) => image.naturalWidth))
+      .toBeGreaterThan(0)
     await expect(attached).toBeVisible()
     await attached.click()
     await expect(page.getByRole('dialog', { name: 'Ảnh trong tin nhắn' })).toBeVisible()
