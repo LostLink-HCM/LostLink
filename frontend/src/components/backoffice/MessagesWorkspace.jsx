@@ -559,10 +559,12 @@ export default function MessagesWorkspace({
   }
 
   const leaveConversation = () => {
+    activeIdRef.current = null
+    setMessageState((previous) => ({ ...previous, activeId: null }))
     setMobileConversation(false)
-    if (window.matchMedia('(max-width: 700px)').matches) {
-      setMessageState((previous) => ({ ...previous, activeId: null }))
-    }
+    setShowReplies(false)
+    setShowInfo(false)
+    setActionError('')
   }
 
   const chooseImage = (file) => {
@@ -808,12 +810,7 @@ export default function MessagesWorkspace({
               className="flex items-center gap-3 border-b border-line-strong px-5 py-4
                 max-xl:px-4 max-sm:px-3"
             >
-              <IconButton
-                icon="back"
-                label="Về danh sách hội thoại"
-                className="hidden max-[700px]:inline-flex"
-                onClick={leaveConversation}
-              />
+              <IconButton icon="back" label="Về danh sách hội thoại" onClick={leaveConversation} />
               <Avatar contact={contact} />
               <div className="min-w-0 flex-1">
                 <strong className="block min-w-0 truncate text-lead font-semibold text-ink">

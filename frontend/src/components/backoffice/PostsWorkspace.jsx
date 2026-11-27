@@ -17,6 +17,8 @@ import ActionLockNotice from './ActionLockNotice'
 import {
   EMPTY_FILTERS,
   STATUS_LABELS,
+  canTransitionPostStatus,
+  getAllowedPostStatusTransitions,
   hasInvalidRange,
   validateHideReason,
 } from '../../lib/backoffice/posts'
@@ -346,6 +348,7 @@ export default function PostsWorkspace() {
   )
   const actionLockNotice = lockRequired ? actionLock.notice : ''
   const canMutate = !lockRequired || actionLock.canAct
+  const allowedStatusTransitions = getAllowedPostStatusTransitions(selected?.status)
   const detailLoading = Boolean(detailId && !detailIsCurrent)
   const detailError = detailIsCurrent ? detailState.error : ''
   const matchingPosts = detailPost ? getMatchesForPost(detailPost) : []
@@ -483,6 +486,10 @@ export default function PostsWorkspace() {
     if (!selected || actionPending || !canMutate) return
     if (nextStatus === selected.status) {
       setActionError('Vui lòng chọn trạng thái khác với trạng thái hiện tại.')
+      return
+    }
+    if (!canTransitionPostStatus(selected.status, nextStatus)) {
+      setActionError('Không thể chuyển bài đăng sang trạng thái đã chọn.')
       return
     }
     const normalizedReason =
@@ -744,6 +751,8 @@ export default function PostsWorkspace() {
               {post.publicDetailAvailable && post.slug ? (
                 <Link
                   to={postPath(post)}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="whitespace-nowrap text-caption font-semibold text-primary hover:underline underline-offset-4"
                 >
                   {post.postCode}
@@ -1106,7 +1115,12 @@ export default function PostsWorkspace() {
               <Button
                 variant="primary"
                 onClick={saveStatus}
-                disabled={actionPending || !canMutate || nextStatus === selected.status}
+                disabled={
+                  actionPending ||
+                  !canMutate ||
+                  nextStatus === selected.status ||
+                  !canTransitionPostStatus(selected.status, nextStatus)
+                }
               >
                 {actionPending ? (
                   <span
@@ -1140,13 +1154,18 @@ export default function PostsWorkspace() {
               {Object.entries(STATUS_LABELS).map(([value, label]) => (
                 <label
                   key={value}
-                  className="flex cursor-pointer items-center gap-3 rounded-lg border border-line p-2.5 has-checked:border-primary has-checked:bg-primary-subtle has-focus-visible:outline-2 has-focus-visible:outline-focus"
+                  className={`flex items-center gap-3 rounded-lg border p-2.5 transition-colors has-focus-visible:outline-2 has-focus-visible:outline-focus ${
+                    canTransitionPostStatus(selected.status, value)
+                      ? 'cursor-pointer border-primary/40 bg-primary-subtle/55 shadow-[0_2px_8px_rgba(25,52,82,0.08)] hover:border-primary/70 hover:bg-primary-subtle has-checked:border-primary has-checked:bg-primary-subtle'
+                      : 'cursor-not-allowed border-line bg-surface'
+                  }`}
                 >
                   <input
                     type="radio"
                     name="postStatus"
                     value={value}
                     checked={nextStatus === value}
+                    disabled={!canTransitionPostStatus(selected.status, value)}
                     onChange={() => {
                       setNextStatus(value)
                       if (value !== 'rejected') {
@@ -1156,7 +1175,18 @@ export default function PostsWorkspace() {
                       setStatusReasonError('')
                       setActionError('')
                     }}
-                    className="accent-primary"
+                    className="size-4 shrink-0 appearance-none rounded-full border-2 border-ink-muted bg-white transition-colors checked:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed"
+                    style={{
+                      opacity:
+                        canTransitionPostStatus(selected.status, value) || nextStatus === value
+                          ? 1
+                          : 0.35,
+                      ...(nextStatus === value && {
+                        borderColor: 'var(--color-primary)',
+                        background:
+                          'radial-gradient(circle, var(--color-primary) 0 42%, white 46%)',
+                      }),
+                    }}
                   />
                   <Badge tone={STATUS_TONES[value]}>
                     <span className="text-primary">{label}</span>
@@ -1165,6 +1195,13 @@ export default function PostsWorkspace() {
               ))}
             </div>
           </fieldset>
+          {allowedStatusTransitions.length === 0 && (
+            <p className="mt-3 text-small text-ink-muted">
+              {selected.status === 'rejected'
+                ? 'Người đăng cần chỉnh sửa và gửi lại bài để tiếp tục xét duyệt.'
+                : 'Bài đăng đã kết thúc; không thể đổi trạng thái tại đây.'}
+            </p>
+          )}
           {nextStatus === 'rejected' && (
             <div className="mt-3">
               <Field label="Lý do từ chối">

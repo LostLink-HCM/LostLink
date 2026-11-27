@@ -20,6 +20,14 @@ const { assertAvailableForMutation } = require('./backofficeActionLockService')
 
 const MATCHABLE_STATUSES = ['searching', 'contacted']
 const FINAL_STATUSES = ['closed', 'returned']
+const ALLOWED_STATUS_TRANSITIONS = {
+  pending: ['searching', 'rejected'],
+  searching: ['rejected'],
+  contacted: ['rejected'],
+  rejected: [],
+  returned: [],
+  closed: [],
+}
 const MANAGEMENT_POST_FIELDS =
   'code slug title type status statusHistory.status statusHistory.changedAt category owner area placeName placeNameTo locType description images isHidden hiddenReason viewCount likeCount commentCount createdAt'
 
@@ -310,6 +318,12 @@ const updateStatus = async (id, actor, status, reason = '') => {
       status: current.status,
       changedAt: current.statusHistory?.at(-1)?.changedAt ?? null,
     }
+  }
+  if (!ALLOWED_STATUS_TRANSITIONS[current.status]?.includes(status)) {
+    throw ApiError.conflict(
+      'Không thể chuyển trạng thái bài đăng theo quy tắc quản lý hiện tại.',
+      'POST_STATUS_TRANSITION_NOT_ALLOWED'
+    )
   }
 
   const previousStatus = current.status
