@@ -18,6 +18,7 @@ const getSavedPosts = asyncHandler(async (req, res) => {
 module.exports = {
   like: handle('like'),
   unlike: handle('unlike'),
+  listLikers: handle('listLikers'),
   save: handle('save'),
   unsave: handle('unsave'),
   follow: handle('follow'),

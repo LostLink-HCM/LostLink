@@ -2,23 +2,7 @@ import { OUTLINE } from '../../auth/scene/theme'
 
 const FLIGHT = 'M66 28 C 330 -8, 780 -8, 1044 28'
 
-function Apex({ hot }) {
-  if (hot) {
-    return (
-      <svg
-        viewBox="-24 -12 48 24"
-        className="absolute top-[4%] left-1/2 h-6 w-12 -translate-x-1/2 -translate-y-1/2"
-      >
-        <path
-          d="M12 0A7 7 0 0 1 5 7C-2 7-10 4-20 0C-10-4-2-7 5-7A7 7 0 0 1 12 0Z"
-          fill="#f97316"
-          {...OUTLINE}
-          strokeWidth="1.5"
-        />
-        <path d="M9 0A4 4 0 0 1 5 4C1 4-4 2-9 0C-4-2 1-4 5-4A4 4 0 0 1 9 0Z" fill="#fde047" />
-      </svg>
-    )
-  }
+function PaperPlane() {
   return (
     <svg
       viewBox="-24 -12 48 24"
@@ -30,7 +14,7 @@ function Apex({ hot }) {
   )
 }
 
-export default function BannerScene({ hot = false }) {
+export default function BannerScene() {
   return (
     <div
       aria-hidden="true"
@@ -48,7 +32,7 @@ export default function BannerScene({ hot = false }) {
           vectorEffect="non-scaling-stroke"
         />
       </svg>
-      <Apex hot={hot} />
+      <PaperPlane />
     </div>
   )
 }

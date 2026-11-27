@@ -1,4 +1,3 @@
-const NO_TAB_BAR = ['/messages', '/notifications']
+const FEED_PATHS = ['/', '/trending']
 
-export const hidesTabBar = (pathname) =>
-  NO_TAB_BAR.some((path) => pathname === path || pathname.startsWith(`${path}/`))
+export const isFeedPath = (pathname) => FEED_PATHS.includes(pathname)

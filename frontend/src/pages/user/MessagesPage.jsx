@@ -249,7 +249,7 @@ export default function MessagesPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { now, notify, inbox } = useOutletContext()
+  const { now, notify, inbox, setChatOpen } = useOutletContext()
   const { threads, activeId, drafts } = inbox
   const [query, setQuery] = useState('')
   // Vào từ bài đăng thì mobile mở thẳng hội thoại
@@ -296,6 +296,12 @@ export default function MessagesPage() {
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [active?.id, messages.length, active?.status, mobileConversation])
+
+  const chatShown = mobileConversation && Boolean(active)
+  useEffect(() => {
+    setChatOpen?.(chatShown)
+    return () => setChatOpen?.(false)
+  }, [chatShown, setChatOpen])
 
   const select = (id) => {
     inbox.open(id)
@@ -505,7 +511,10 @@ export default function MessagesPage() {
     <div className="mx-auto max-w-360 px-4 pt-5 pb-6 sm:px-6 lg:px-10">
       <div
         className={cx(
-          'grid h-[calc(100dvh-7.5rem-env(safe-area-inset-bottom))] min-h-130 grid-cols-1 gap-4 lg:h-[calc(100dvh-7.5rem)]',
+          'grid min-h-130 grid-cols-1 gap-4 lg:h-[calc(100dvh-7.5rem)]',
+          chatShown || !setChatOpen
+            ? 'h-[calc(100dvh-7.5rem-env(safe-area-inset-bottom))]'
+            : 'h-[calc(100dvh-12rem-env(safe-area-inset-bottom))]',
           'md:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)_300px]'
         )}
       >
