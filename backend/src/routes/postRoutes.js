@@ -46,6 +46,7 @@ router.get('/', optionalAuth, listPostsRules, validate, ctrl.listPosts)
 router.get('/:id/edit', protect, postIdRules, rejectInvalidPostPath, ctrl.getPostForEdit)
 // Đối tượng bị báo cáo kèm báo cáo mình đã gửi
 router.get('/:id/report', protect, postIdRules, rejectInvalidPostPath, reportCtrl.getPostReport)
+router.get('/:id/likes', protect, postIdRules, rejectInvalidPostPath, interactionCtrl.listLikers)
 
 const claimGuard = [
   protect,

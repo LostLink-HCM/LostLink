@@ -70,7 +70,7 @@ export default function SlidingTabs({ items, layout = 'bar', label, className })
     const observer = new ResizeObserver(measure)
     observer.observe(nav)
     return () => observer.disconnect()
-  }, [pathname])
+  }, [pathname, items.length])
 
   useLayoutEffect(() => {
     if (!pill || ready) return undefined

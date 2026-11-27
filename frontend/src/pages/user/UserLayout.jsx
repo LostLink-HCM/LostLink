@@ -9,7 +9,7 @@ import SiteHeader from '../../components/user/home/SiteHeader'
 import { FORM_PENDING, openFeedbackForm } from '../../lib/user/feedback'
 import { DEFAULT_FILTERS } from '../../lib/user/homeFeed'
 import { inboxUnread } from '../../lib/user/messages'
-import { hidesTabBar } from '../../lib/user/navigation'
+import { isFeedPath } from '../../lib/user/navigation'
 import { useBrowserNotifications } from '../../hooks/useBrowserNotifications'
 import { useInbox } from '../../hooks/useInbox'
 import { usePendingMatches } from '../../hooks/usePendingMatches'
@@ -25,7 +25,6 @@ const userTheme = [
 ].join(' ')
 
 const TOAST_MS = 3000
-const FEED_PATHS = ['/', '/trending']
 
 export default function UserLayout() {
   const { user } = useAuth()
@@ -39,6 +38,8 @@ export default function UserLayout() {
   const [applied, setApplied] = useState(DEFAULT_FILTERS)
   const [toast, setToast] = useState('')
   const [heroSearchPassed, setHeroSearchPassed] = useState(false)
+  const [chatOpen, setChatOpen] = useState(false)
+  const showTabBar = !chatOpen
   const openFeedback = useCallback(() => {
     if (!openFeedbackForm()) setToast(FORM_PENDING)
   }, [])
@@ -97,7 +98,7 @@ export default function UserLayout() {
     // Tìm từ trang khác thì quay về trang chủ để xem kết quả, đang ở Tin hot thì lọc ngay tại đó
     onSearch: (value) => {
       setKeyword(value)
-      if (!FEED_PATHS.includes(location.pathname)) navigate('/')
+      if (!isFeedPath(location.pathname)) navigate('/')
     },
     onClear: () => {
       setSearchInput('')
@@ -112,7 +113,7 @@ export default function UserLayout() {
         // user-tone: nút và chip cả khu người dùng đổi tông theo giờ như header (xem tailwind.css)
         'user-tone relative isolate min-h-dvh bg-canvas font-sans text-ink',
         // Chừa chỗ cho thanh tab dưới đáy, trang không có thanh thì thôi
-        !hidesTabBar(location.pathname) && 'max-lg:pb-[calc(4.5rem+env(safe-area-inset-bottom))]',
+        showTabBar && 'max-lg:pb-[calc(4.5rem+env(safe-area-inset-bottom))]',
         userTheme
       )}
     >
@@ -128,7 +129,7 @@ export default function UserLayout() {
         unreadNotifications={unreadNotifications}
         pendingMatches={matchBadge.pending}
         onFeedback={openFeedback}
-        hero={FEED_PATHS.includes(location.pathname)}
+        hero={isFeedPath(location.pathname)}
         heroSearchPassed={heroSearchPassed}
       />
 
@@ -149,12 +150,14 @@ export default function UserLayout() {
           interactions,
           notify: setToast,
           setHeroSearchPassed,
+          setChatOpen,
         }}
       />
       <MobileTabBar
         unreadMessages={unreadMessages}
         unreadNotifications={unreadNotifications}
         pendingMatches={matchBadge.pending}
+        off={!showTabBar}
       />
 
       {/* Khách cũng góp ý được vì biểu mẫu không cần tài khoản */}

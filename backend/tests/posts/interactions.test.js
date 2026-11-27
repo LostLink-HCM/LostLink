@@ -1,7 +1,14 @@
 const assert = require('node:assert/strict')
 const { beforeEach, describe, test } = require('node:test')
 
-const { Notification, Post, PostFollow, PostLike, SavedPost } = require('../../src/models')
+const {
+  Notification,
+  Post,
+  PostFollow,
+  PostLike,
+  SavedPost,
+  UserBlock,
+} = require('../../src/models')
 const { createUser, loginAs, newClient } = require('../helpers/auth')
 const { useTestDb } = require('../helpers/db')
 const { authed, createWalletCategory, makePost } = require('../helpers/posts')
@@ -163,5 +170,47 @@ describe('UC34 - Theo dõi / bỏ theo dõi bài đăng', () => {
     const hidden = await makePost(owner, wallet.category, { title: 'Ẩn', isHidden: true })
     assert.equal((await put(`/api/posts/${closed._id}/follow`)).status, 200)
     assert.equal((await put(`/api/posts/${hidden._id}/follow`)).status, 404)
+  })
+})
+
+describe('Danh sách người đã thích bài', () => {
+  test('chủ bài xem được ai đã thích, mới nhất trước, bỏ tài khoản chờ xoá và người có quan hệ chặn', async () => {
+    const post = await makePost(owner, wallet.category)
+    const second = await createUser({ username: 'nguoithu2', email: 'second@example.com' })
+    const leaving = await createUser({ username: 'sapxoa', email: 'leaving@example.com' })
+    const blocked = await createUser({ username: 'bichan', email: 'blocked@example.com' })
+    const blocker = await createUser({ username: 'dachan', email: 'blocker@example.com' })
+    await PostLike.create({ user: viewer._id, post: post._id, createdAt: new Date('2026-11-20') })
+    await PostLike.create({ user: second._id, post: post._id, createdAt: new Date('2026-11-25') })
+    for (const user of [leaving, blocked, blocker]) {
+      await PostLike.create({ user: user._id, post: post._id })
+    }
+    await leaving.updateOne({ deleteRequestedAt: new Date() })
+    await UserBlock.create({ blocker: owner._id, blocked: blocked._id })
+    await UserBlock.create({ blocker: blocker._id, blocked: owner._id })
+
+    const self = await loginAs('owner@example.com')
+    const res = await authed(self.client, self.accessToken).get(`/api/posts/${post._id}/likes`)
+    assert.equal(res.status, 200, JSON.stringify(res.body))
+    assert.deepEqual(
+      res.body.data.items.map((item) => item.username),
+      ['nguoithu2', viewer.username]
+    )
+    assert.deepEqual(Object.keys(res.body.data.items[0]).sort(), [
+      'avatarUrl',
+      'likedAt',
+      'username',
+    ])
+  })
+
+  test('người khác, khách hoặc bài không tồn tại thì không xem được', async () => {
+    const post = await makePost(owner, wallet.category)
+    await put(`/api/posts/${post._id}/like`)
+
+    const other = await api.get(`/api/posts/${post._id}/likes`)
+    assert.equal(other.status, 403)
+    assert.equal(other.body.code, 'NOT_POST_OWNER')
+    assert.equal((await newClient().get(`/api/posts/${post._id}/likes`)).status, 401)
+    assert.equal((await api.get('/api/posts/6a0000000000000000000000/likes')).status, 404)
   })
 })

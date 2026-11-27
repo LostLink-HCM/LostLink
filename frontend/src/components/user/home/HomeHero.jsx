@@ -3,6 +3,7 @@ import { useFeedCategoryList } from '../../../hooks/useFeedCategories'
 import Icon from '../../common/Icon'
 import { buttonClass } from '../buttonClass'
 import { cx, focusRing } from '../classes'
+import { PeekCat, PeekDog } from '../mascots/PeekPets'
 import CategoryIcon from './CategoryIcon'
 import BannerScene from './BannerScene'
 import { SKY_STARS } from './skyStars'
@@ -32,7 +33,7 @@ export default function HomeHero({ search, category, onFilter, onSearchPassed, h
 
   return (
     <section aria-label="Tìm đồ thất lạc">
-      <div className="relative overflow-hidden rounded-b-[28px] bg-au-sky-1 bg-linear-to-r from-au-sky-1 via-au-sky-2 to-au-sky-3 px-4 pt-7 pb-5 max-lg:-mt-4 sm:rounded-b-[44px] sm:px-6 sm:pt-9 sm:pb-7 lg:pt-6 lg:pb-6">
+      <div className="relative overflow-hidden rounded-b-[28px] bg-au-sky-1 bg-linear-to-r from-au-sky-1 via-au-sky-2 to-au-sky-3 px-4 pt-7 pb-5 max-lg:-mt-4 sm:rounded-b-[44px] sm:px-6 sm:pt-9 sm:pb-7 lg:rounded-none lg:pt-6 lg:pb-14">
         <Ribbons />
         <span
           aria-hidden="true"
@@ -43,15 +44,8 @@ export default function HomeHero({ search, category, onFilter, onSearchPassed, h
           className="pointer-events-none absolute inset-0 opacity-(--au-star-opacity)"
           style={{ backgroundImage: SKY_STARS }}
         />
-        <BannerScene hot={hot} />
-        {hot && (
-          <p className="relative m-0 mb-2 flex justify-center">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/14 px-3 py-1 text-caption font-semibold text-white ring-1 ring-white/25 backdrop-blur-[2px] ring-inset">
-              <span aria-hidden="true">🔥</span>
-              Tin hot
-            </span>
-          </p>
-        )}
+        {!hot && <BannerScene />}
+        <MobileWaves />
         <p className="relative m-0 text-center text-lg leading-snug font-bold tracking-tight text-balance text-white sm:text-display lg:text-[28px]">
           {hot ? (
             <>
@@ -73,8 +67,73 @@ export default function HomeHero({ search, category, onFilter, onSearchPassed, h
         <div className="relative mx-auto mt-3 max-w-212">
           <CategoryStrip value={category} onPick={(value) => onFilter({ category: value })} />
         </div>
+
+        <Waves />
       </div>
     </section>
+  )
+}
+
+function MobileWaves() {
+  return (
+    <svg
+      viewBox="0 0 240 52"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-x-0 bottom-0 h-12 w-full sm:h-16 lg:hidden"
+    >
+      <path
+        d="M-10 28 C50 10 110 40 170 22 C200 14 225 18 250 14 L250 52 L-10 52Z"
+        className="fill-white"
+        opacity="0.1"
+      />
+      <path
+        d="M-10 38 C60 22 120 48 180 32 C210 25 230 28 250 26 L250 52 L-10 52Z"
+        className="fill-au-sun"
+        opacity="0.16"
+      />
+    </svg>
+  )
+}
+
+const waveClass = 'pointer-events-none absolute inset-x-0 -bottom-px hidden h-14 w-full lg:block'
+const ghostClass =
+  'pointer-events-none absolute bottom-3.5 hidden h-18 w-auto opacity-[0.3] brightness-0 invert xl:block'
+
+function Waves() {
+  return (
+    <>
+      <svg
+        viewBox="0 0 1200 70"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+        className={waveClass}
+      >
+        <path
+          d="M0 30 C150 5 300 55 480 32 C660 8 820 50 980 28 C1080 15 1150 22 1200 18 L1200 70 L0 70Z"
+          className="fill-white"
+          opacity="0.12"
+        />
+        <path
+          d="M0 44 C180 18 340 62 540 40 C720 20 900 60 1060 38 C1120 30 1170 34 1200 32 L1200 70 L0 70Z"
+          className="fill-au-sun"
+          opacity="0.18"
+        />
+      </svg>
+      <PeekCat aria-hidden="true" className={cx(ghostClass, 'left-16 2xl:left-24')} />
+      <PeekDog aria-hidden="true" className={cx(ghostClass, 'right-16 2xl:right-24')} />
+      <svg
+        viewBox="0 0 1200 70"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+        className={waveClass}
+      >
+        <path
+          d="M0 56 C200 34 380 70 600 52 C800 36 980 66 1200 48 L1200 70 L0 70Z"
+          className="fill-canvas"
+        />
+      </svg>
+    </>
   )
 }
 
@@ -192,13 +251,15 @@ function CategoryThumb({ icon, name, active }) {
   }
 
   return (
-    <span
-      className={cx(
-        'grid size-10 place-items-center rounded-2xl transition sm:size-12',
-        active ? 'bg-primary text-white' : 'bg-primary-soft text-primary'
-      )}
-    >
-      <CategoryIcon name={name} size={22} />
+    <span className="grid size-11 place-items-center sm:size-14">
+      <span
+        className={cx(
+          'grid size-10 place-items-center rounded-2xl transition-[translate,background-color] duration-200 group-hover:-translate-y-1 sm:size-12',
+          active ? 'bg-primary text-white' : 'bg-primary-soft text-primary'
+        )}
+      >
+        <CategoryIcon name={name} size={22} />
+      </span>
     </span>
   )
 }

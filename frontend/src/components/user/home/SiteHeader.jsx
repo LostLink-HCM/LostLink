@@ -163,11 +163,10 @@ export default function SiteHeader({
             <>
               <Link
                 to="/posts/new"
-                aria-label="Đăng bài"
-                className={cx(ctaClass, 'max-sm:px-2.5', focusRing)}
+                className={cx(ctaClass, 'max-sm:gap-1.5 max-sm:px-3', focusRing)}
               >
                 <Icon name="compose" size={16} />
-                <span className="hidden sm:inline">Đăng bài</span>
+                Đăng bài
               </Link>
               <UserMenu onFeedback={onFeedback} />
             </>

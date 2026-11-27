@@ -15,6 +15,7 @@ import EventTime from '../../components/user/home/EventTime'
 import LikeButton from '../../components/user/home/LikeButton'
 import TypeTag from '../../components/user/home/TypeTag'
 import CommentSection from '../../components/user/post/CommentSection'
+import LikersDialog from '../../components/user/post/LikersDialog'
 import PostActionSheet from '../../components/user/post/PostActionSheet'
 import PostGallery from '../../components/user/post/PostGallery'
 import PostMenu from '../../components/user/post/PostMenu'
@@ -298,18 +299,7 @@ function PostDetail({ post, onChanged }) {
     navigate(profilePath(user.username))
   }
 
-  // Lưu, Theo dõi, Báo cáo bài của người khác nằm trong menu ⋯ (desktop) và bảng ⋯ (mobile)
   const viewerActions = [
-    {
-      label: isSaved ? 'Bỏ lưu bài' : 'Lưu bài',
-      icon: 'bookmark',
-      onClick: () => interactions.toggleSaved(post),
-    },
-    {
-      label: isFollowed ? 'Bỏ theo dõi' : 'Theo dõi bài',
-      icon: 'bell',
-      onClick: () => interactions.toggleFollowed(post),
-    },
     { label: 'Báo cáo bài đăng này', icon: 'flag', tone: 'danger', onClick: report },
   ]
 
@@ -450,14 +440,62 @@ function PostDetail({ post, onChanged }) {
               </a>
             </div>
 
-            {/* Hàng nút tương tác: Thích, số bình luận, chia sẻ. Lưu và Theo dõi ở menu ⋯ */}
             <div className="flex flex-wrap items-center gap-1 border-t border-line-subtle pt-3">
               <LikeButton
                 liked={isLiked}
                 count={likeCount}
                 onClick={() => interactions.toggleLike(post)}
                 variant="ghost"
+                showCount={!isMine}
               />
+              {isMine && (
+                <button
+                  type="button"
+                  disabled={!likeCount}
+                  aria-label={`Xem ${formatCount(likeCount)} người đã thích`}
+                  onClick={() => setDialog('likers')}
+                  className={cx(
+                    '-ml-1 cursor-pointer rounded-full border-0 bg-transparent px-1.5 py-1 text-caption font-semibold text-ink-secondary hover:text-primary hover:underline disabled:cursor-default disabled:no-underline disabled:hover:text-ink-secondary',
+                    focusRing
+                  )}
+                >
+                  {formatCount(likeCount)}
+                </button>
+              )}
+              {!isMine && (
+                <>
+                  <button
+                    type="button"
+                    aria-pressed={isSaved}
+                    onClick={() => interactions.toggleSaved(post)}
+                    className={cx(
+                      'inline-flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border-0 px-3 text-caption font-semibold transition-colors',
+                      isSaved
+                        ? 'bg-amber-100 text-amber-700'
+                        : 'bg-transparent text-ink-secondary hover:bg-amber-50 hover:text-amber-600',
+                      focusRing
+                    )}
+                  >
+                    <Icon
+                      name="bookmark"
+                      size={18}
+                      className={cx(isSaved && 'text-amber-500 [&_path]:fill-current')}
+                    />
+                    <span className="max-sm:sr-only">{isSaved ? 'Đã lưu' : 'Lưu'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={isFollowed}
+                    onClick={() => interactions.toggleFollowed(post)}
+                    className={actionClass(isFollowed)}
+                  >
+                    <Icon name="bell" size={18} />
+                    <span className="max-sm:sr-only">
+                      {isFollowed ? 'Đang theo dõi' : 'Theo dõi'}
+                    </span>
+                  </button>
+                </>
+              )}
               <button
                 type="button"
                 onClick={toComments}
@@ -583,6 +621,9 @@ function PostDetail({ post, onChanged }) {
           onDone={deleted}
           onFailed={changeFailed}
         />
+      )}
+      {dialog === 'likers' && (
+        <LikersDialog postId={post.id} count={likeCount} onClose={() => setDialog(null)} />
       )}
     </div>
   )
