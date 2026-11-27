@@ -3,7 +3,8 @@ import { useAuth } from '../../auth/AuthContext'
 import MessagesWorkspace from '../../components/backoffice/MessagesWorkspace'
 
 export default function Messages() {
-  const { messageState, setMessageState, quickReplies } = useOutletContext()
+  const { messageState, setMessageState, quickReplies, refreshMessageUnreadCount } =
+    useOutletContext()
   const { user } = useAuth()
   const workspaceRole = user?.role === 'admin' ? 'admin' : 'moderator'
 
@@ -14,6 +15,7 @@ export default function Messages() {
       workspaceRole={workspaceRole}
       user={user}
       quickReplies={quickReplies}
+      refreshUnreadMessageCount={refreshMessageUnreadCount}
     />
   )
 }

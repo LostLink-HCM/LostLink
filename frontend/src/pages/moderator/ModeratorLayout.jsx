@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import BackofficeLayout from '../../components/backoffice/BackofficeLayout'
 import { createEmptyMessageState } from '../../lib/backoffice/messages'
 import useBackofficeUnreadCount from '../../hooks/useBackofficeUnreadCount'
+import useBackofficeMessageUnreadCount from '../../hooks/useBackofficeMessageUnreadCount'
 import useSystemSettings from '../../hooks/useSystemSettings'
 import { listModeratorPendingPosts } from '../../lib/moderator/reviewPosts'
 
@@ -20,6 +21,10 @@ export default function ModeratorLayout() {
   const [messageState, setMessageState] = useState(createEmptyMessageState)
   const { unreadCount: unreadNotifications, setUnreadCount: setNotificationUnreadCount } =
     useBackofficeUnreadCount()
+  const {
+    unreadCount: unreadMessages,
+    refreshUnreadCount: refreshMessageUnreadCount,
+  } = useBackofficeMessageUnreadCount()
   const settings = useSystemSettings()
   const loadReviewPosts = useCallback(async () => {
     setReviewLoading(true)
@@ -54,8 +59,6 @@ export default function ModeratorLayout() {
   }, [])
 
   const pendingCount = reviewPosts.length
-  const unreadMessages = messageState.threads.reduce((total, thread) => total + thread.unread, 0)
-
   return (
     <BackofficeLayout
       basePath="/moderator"
@@ -75,6 +78,7 @@ export default function ModeratorLayout() {
         reloadReviewPosts: loadReviewPosts,
         messageState,
         setMessageState,
+        refreshMessageUnreadCount,
         setNotificationUnreadCount,
         ...settings,
       }}

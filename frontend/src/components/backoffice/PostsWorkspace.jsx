@@ -33,6 +33,7 @@ import useBackofficePageSize from '../../hooks/useBackofficePageSize'
 import useLinkedHighlight from '../../hooks/useLinkedHighlight'
 import useBackofficeActionLock from '../../hooks/useBackofficeActionLock'
 import { cx, linkedHighlight } from './classes'
+import { REJECT_REASONS } from '../../lib/moderator/moderation'
 
 const STATUS_TONES = {
   pending: 'warning',
@@ -253,6 +254,7 @@ export default function PostsWorkspace() {
   const [modal, setModal] = useState(null)
   const [nextStatus, setNextStatus] = useState('')
   const [statusReason, setStatusReason] = useState('')
+  const [customStatusReason, setCustomStatusReason] = useState('')
   const [statusReasonError, setStatusReasonError] = useState('')
   const statusReasonRef = useRef(null)
   const [actionError, setActionError] = useState('')
@@ -483,7 +485,8 @@ export default function PostsWorkspace() {
       setActionError('Vui lòng chọn trạng thái khác với trạng thái hiện tại.')
       return
     }
-    const normalizedReason = statusReason.trim()
+    const normalizedReason =
+      statusReason === 'other' ? customStatusReason.trim() : statusReason.trim()
     if (nextStatus === 'rejected' && !normalizedReason) {
       setStatusReasonError('Vui lòng nhập lý do từ chối.')
       statusReasonRef.current?.focus()
@@ -810,7 +813,8 @@ export default function PostsWorkspace() {
                   label="Cập nhật trạng thái bài đăng"
                   onClick={() => {
                     setNextStatus(post.status)
-                    setStatusReason('')
+                    setStatusReason(REJECT_REASONS[0])
+                    setCustomStatusReason('')
                     setStatusReasonError('')
                     setActionError('')
                     setModal({ kind: 'edit', id: post.id })
@@ -1145,7 +1149,10 @@ export default function PostsWorkspace() {
                     checked={nextStatus === value}
                     onChange={() => {
                       setNextStatus(value)
-                      if (value !== 'rejected') setStatusReason('')
+                      if (value !== 'rejected') {
+                        setStatusReason(REJECT_REASONS[0])
+                        setCustomStatusReason('')
+                      }
                       setStatusReasonError('')
                       setActionError('')
                     }}
@@ -1159,30 +1166,52 @@ export default function PostsWorkspace() {
             </div>
           </fieldset>
           {nextStatus === 'rejected' && (
-            <Field
-              label="Lý do từ chối"
-              required
-              error={statusReasonError}
-              hint={`${statusReason.length}/1000 ký tự`}
-              className="mt-3"
-            >
-              {(a) => (
-                <Textarea
-                  {...a}
-                  ref={statusReasonRef}
-                  rows={4}
-                  maxLength={1000}
-                  value={statusReason}
-                  disabled={actionPending || !canMutate}
-                  onChange={(event) => {
-                    setStatusReason(event.target.value)
-                    setStatusReasonError('')
-                    setActionError('')
-                  }}
-                  placeholder="Nhập lý do từ chối bài đăng…"
-                />
+            <div className="mt-3">
+              <Field label="Lý do từ chối">
+                {(a) => (
+                  <Select
+                    {...a}
+                    value={statusReason}
+                    disabled={actionPending || !canMutate}
+                    onChange={(event) => {
+                      setStatusReason(event.target.value)
+                      setStatusReasonError('')
+                      setActionError('')
+                    }}
+                  >
+                    {REJECT_REASONS.map((reason) => (
+                      <option key={reason}>{reason}</option>
+                    ))}
+                    <option value="other">Lý do khác</option>
+                  </Select>
+                )}
+              </Field>
+              {statusReason === 'other' && (
+                <Field
+                  error={statusReasonError}
+                  hint={`${customStatusReason.length}/1000 ký tự`}
+                  className="mt-3"
+                >
+                  {(a) => (
+                    <Textarea
+                      {...a}
+                      ref={statusReasonRef}
+                      aria-label="Lý do từ chối"
+                      rows={4}
+                      maxLength={1000}
+                      value={customStatusReason}
+                      disabled={actionPending || !canMutate}
+                      onChange={(event) => {
+                        setCustomStatusReason(event.target.value)
+                        setStatusReasonError('')
+                        setActionError('')
+                      }}
+                      placeholder="Nhập lý do không duyệt bài đăng…"
+                    />
+                  )}
+                </Field>
               )}
-            </Field>
+            </div>
           )}
         </Dialog>
       )}

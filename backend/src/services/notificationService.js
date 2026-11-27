@@ -24,6 +24,8 @@ const GROUPS = {
     'comment',
     'post_approved',
     'post_rejected',
+    'post_hidden',
+    'post_unhidden',
     'category_archived',
     'post_closed',
     'post_deleted',
@@ -32,7 +34,15 @@ const GROUPS = {
     'following_post',
     'stale',
   ],
-  system: ['report_result', 'report_flagged', 'warning', 'badge', 'tip'],
+  system: [
+    'report_result',
+    'report_flagged',
+    'moderator_granted',
+    'moderator_revoked',
+    'warning',
+    'badge',
+    'tip',
+  ],
 }
 const PREVIEW_MAX = 120
 

@@ -14,6 +14,9 @@ const dataOf = (request) => request.then((response) => response.data)
 export const listBackofficeConversations = (filters = {}) =>
   dataOf(api.get(`/backoffice/conversations${queryString(filters)}`))
 
+export const getBackofficeMessageUnreadCount = () =>
+  dataOf(api.get('/backoffice/conversations/unread-count'))
+
 export const listBackofficeContacts = (filters = {}) =>
   dataOf(api.get(`/backoffice/conversations/contacts${queryString(filters)}`))
 

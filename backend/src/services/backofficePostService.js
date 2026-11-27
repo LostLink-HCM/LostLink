@@ -10,6 +10,7 @@ const {
 const ApiError = require('../utils/ApiError')
 const { escapeRegex, lowercaseText, normalizeText } = require('../utils/text')
 const { endOfVnDay, startOfVnDay } = require('../utils/vnTime')
+const { notify } = require('./notificationService')
 const { syncPostMatchNotices } = require('./matchingService')
 const returnService = require('./returnService')
 const { endTradesOf } = require('./postManageService')
@@ -336,6 +337,24 @@ const updateStatus = async (id, actor, status, reason = '') => {
   })
   if (!updated) throw statusChanged()
 
+  if (status === 'rejected') {
+    await notify([updated.owner], {
+      type: 'post_rejected',
+      actor: actor._id,
+      refType: 'Post',
+      refId: updated._id,
+      text: reason,
+    })
+  } else if (status === 'searching') {
+    await notify([updated.owner], {
+      type: 'post_approved',
+      actor: actor._id,
+      refType: 'Post',
+      refId: updated._id,
+      text: updated.title,
+    })
+  }
+
   const effects = []
   if (!MATCHABLE_STATUSES.includes(status)) {
     effects.push(
@@ -364,7 +383,7 @@ const updateStatus = async (id, actor, status, reason = '') => {
 
 const updateVisibility = async (id, actor, isHidden, reason = '') => {
   await assertAvailableForMutation({ resourceType: 'post', resourceId: id, actor })
-  const current = await Post.findById(id).select('code isHidden hiddenReason')
+  const current = await Post.findById(id).select('code title owner isHidden hiddenReason')
   if (!current) throw postNotFound()
   if (current.isHidden === isHidden && (!isHidden || current.hiddenReason === reason)) {
     return {
@@ -387,6 +406,24 @@ const updateVisibility = async (id, actor, isHidden, reason = '') => {
     changedAt: new Date(),
   })
   if (!post) throw statusChanged()
+  if (isHidden) {
+    await notify([post.owner], {
+      type: 'post_hidden',
+      actor: actor._id,
+      refType: 'Post',
+      refId: post._id,
+      text: reason,
+      body: reason,
+    })
+  } else {
+    await notify([post.owner], {
+      type: 'post_unhidden',
+      actor: actor._id,
+      refType: 'Post',
+      refId: post._id,
+      text: post.title,
+    })
+  }
   await syncPostMatchNotices(post._id)
 
   return {
