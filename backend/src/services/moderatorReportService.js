@@ -618,10 +618,7 @@ const resolveReport = async (id, moderator, action, reason = '') => {
           actor: moderator._id,
           refType: 'User',
           refId: targetUser._id,
-          text:
-            action === 'lock'
-              ? `Tài khoản của bạn đã bị khóa. Lý do: ${reason}`
-              : reason,
+          text: action === 'lock' ? `Tài khoản của bạn đã bị khóa. Lý do: ${reason}` : reason,
         })
       }
       if (action === 'hide') {

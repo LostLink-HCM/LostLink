@@ -9,6 +9,10 @@ const {
   statusRules,
   visibilityRules,
 } = require('../middleware/validation/backofficePostValidation')
+const {
+  pendingPostPathRules,
+  rejectPendingPostBodyRules,
+} = require('../middleware/validation/moderationValidation')
 
 const router = Router()
 
@@ -16,6 +20,14 @@ router.use(protect, requireRole('admin', 'moderator'))
 router.get('/posts/export.csv', listPostsRules, validate, ctrl.exportPosts)
 router.get('/posts', listPostsRules, validate, ctrl.listPosts)
 router.get('/posts/:id', postPathRules, validate, ctrl.getPost)
+router.post('/posts/:id/approve', pendingPostPathRules, validate, ctrl.approvePendingPost)
+router.post(
+  '/posts/:id/reject',
+  pendingPostPathRules,
+  rejectPendingPostBodyRules,
+  validate,
+  ctrl.rejectPendingPost
+)
 router.patch('/posts/:id/status', postPathRules, statusRules, validate, ctrl.updateStatus)
 router.patch(
   '/posts/:id/visibility',

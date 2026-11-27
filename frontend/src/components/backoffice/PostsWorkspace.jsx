@@ -748,33 +748,29 @@ export default function PostsWorkspace() {
             )}
           >
             <td className={cell}>
-              {post.publicDetailAvailable && post.slug ? (
+              <span className="whitespace-nowrap text-caption font-semibold text-primary">
+                {post.postCode}
+              </span>
+            </td>
+            <td className={cell}>
+              {post.detailAvailable && post.slug ? (
                 <Link
                   to={postPath(post)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="whitespace-nowrap text-caption font-semibold text-primary hover:underline underline-offset-4"
+                  className="mb-1.5 block cursor-pointer text-left text-small font-semibold leading-relaxed text-ink hover:text-primary hover:underline underline-offset-4"
                 >
-                  {post.postCode}
+                  {post.title}
                 </Link>
               ) : (
                 <button
                   type="button"
-                  className="cursor-pointer whitespace-nowrap text-caption font-semibold text-primary hover:underline underline-offset-4"
+                  className="mb-1.5 block cursor-pointer text-left text-small font-semibold leading-relaxed text-ink hover:text-primary hover:underline underline-offset-4"
                   onClick={showUnavailablePostToast}
                 >
-                  {post.postCode}
+                  {post.title}
                 </button>
               )}
-            </td>
-            <td className={cell}>
-              <button
-                type="button"
-                className="mb-1.5 block cursor-pointer text-left text-small font-semibold leading-relaxed text-ink hover:text-primary hover:underline underline-offset-4"
-                onClick={() => openDetail(post.id)}
-              >
-                {post.title}
-              </button>
               <Badge>{post.category}</Badge>
             </td>
             <td className={cell}>

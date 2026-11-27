@@ -103,12 +103,12 @@ const createPost = async (definition, owner, moderator, category, createdAt) => 
   return post
 }
 
-const markContacted = (post, at) =>
+const markContacted = (post, at, changedBy) =>
   Post.updateOne(
     { _id: post._id },
     {
       $set: { status: 'contacted', updatedAt: at },
-      $push: { statusHistory: { status: 'contacted', changedBy: null, changedAt: at } },
+      $push: { statusHistory: { status: 'contacted', changedBy, changedAt: at } },
     }
   )
 
@@ -196,8 +196,8 @@ const seedTradePair = async () => {
     conversation: conversation._id,
     createdAt: new Date(openedAt - 30 * MINUTE),
   })
-  await markContacted(found, openedAt)
-  await markContacted(lost, openedAt)
+  await markContacted(found, openedAt, users.user01._id)
+  await markContacted(lost, openedAt, users.user01._id)
 
   await Claim.create([
     {

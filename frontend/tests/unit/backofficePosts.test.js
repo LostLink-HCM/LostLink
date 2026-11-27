@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../src/lib/api', () => ({
-  api: { get: vi.fn(), patch: vi.fn() },
+  api: { get: vi.fn(), patch: vi.fn(), post: vi.fn() },
 }))
 
 import { api } from '../../src/lib/api'
@@ -14,6 +14,8 @@ import {
   getBackofficePost,
   listBackofficePosts,
   toBackofficePost,
+  approveBackofficePendingPost,
+  rejectBackofficePendingPost,
   updateBackofficePostStatus,
   updateBackofficePostVisibility,
 } from '../../src/lib/backoffice/postsApi.js'
@@ -90,6 +92,8 @@ describe('Quản lý tất cả bài đăng - xử lý dữ liệu frontend', ()
     const post = toBackofficePost({
       id: 'post-1',
       code: 'L121126001',
+      slug: 'mat-vi-nau',
+      detailAvailable: true,
       title: 'Ví nâu',
       type: 'lost',
       status: 'searching',
@@ -104,7 +108,14 @@ describe('Quản lý tất cả bài đăng - xử lý dữ liệu frontend', ()
       counts: { views: 7, comments: 2, matches: 1 },
       images: ['a.jpg', 'b.jpg'],
       description: 'Ví da màu nâu',
-      statusHistory: [{ status: 'rejected', note: 'Thiếu ảnh', changedAt: '2026-11-11T17:00:00Z' }],
+      statusHistory: [
+        {
+          status: 'rejected',
+          note: 'Thiếu ảnh',
+          changedAt: '2026-11-11T17:00:00Z',
+          changedBy: 'moderator01',
+        },
+      ],
       matchingPosts: [
         {
           id: 'match-1',
@@ -115,6 +126,8 @@ describe('Quản lý tất cả bài đăng - xử lý dữ liệu frontend', ()
     })
     expect(post).toMatchObject({
       postCode: 'L121126001',
+      slug: 'mat-vi-nau',
+      detailAvailable: true,
       category: 'Ví & tiền',
       categorySlug: 'vi-tien',
       dateTime: '12/11/2026 09:30',
@@ -128,7 +141,14 @@ describe('Quản lý tất cả bài đăng - xử lý dữ liệu frontend', ()
       matches: 1,
       desc: 'Ví da màu nâu',
       images: ['a.jpg', 'b.jpg'],
-      statusHistory: [{ status: 'rejected', dateTime: '12/11/2026 00:00', reason: 'Thiếu ảnh' }],
+      statusHistory: [
+        {
+          status: 'rejected',
+          dateTime: '12/11/2026 00:00',
+          reason: 'Thiếu ảnh',
+          changedBy: 'moderator01',
+        },
+      ],
       matchingPosts: [
         {
           id: 'match-1',
@@ -154,6 +174,8 @@ describe('Quản lý tất cả bài đăng - xử lý dữ liệu frontend', ()
       statusHistory: [],
       matchingPosts: [],
       hidden: false,
+      slug: '',
+      detailAvailable: false,
     })
     expect(toBackofficePost({ coverImage: 'cover.jpg' }).images).toEqual(['cover.jpg'])
     expect(toBackofficePost({ images: [], coverImage: 'old.jpg' }).images).toEqual([])
@@ -214,5 +236,29 @@ describe('Quản lý tất cả bài đăng - xử lý dữ liệu frontend', ()
     await expect(getBackofficePost('post-1')).rejects.toBe(error)
     await expect(updateBackofficePostStatus('post-1', 'closed')).rejects.toBe(error)
     await expect(updateBackofficePostVisibility('post-1', false)).rejects.toBe(error)
+  })
+
+  it('gửi quyết định duyệt hoặc từ chối bài chờ duyệt qua API backoffice', async () => {
+    api.post
+      .mockResolvedValueOnce({ data: { id: 'post-1', status: 'searching' } })
+      .mockResolvedValueOnce({ data: { id: 'post-2', status: 'rejected' } })
+
+    await expect(approveBackofficePendingPost('post-1')).resolves.toEqual({
+      id: 'post-1',
+      status: 'searching',
+    })
+    await expect(rejectBackofficePendingPost('post-2', 'Ảnh không rõ')).resolves.toEqual({
+      id: 'post-2',
+      status: 'rejected',
+    })
+    expect(api.post).toHaveBeenNthCalledWith(1, '/backoffice/posts/post-1/approve', {})
+    expect(api.post).toHaveBeenNthCalledWith(2, '/backoffice/posts/post-2/reject', {
+      reason: 'Ảnh không rõ',
+    })
+
+    const error = new Error('Bài đăng đã được xử lý.')
+    api.post.mockRejectedValue(error)
+    await expect(approveBackofficePendingPost('post-1')).rejects.toBe(error)
+    await expect(rejectBackofficePendingPost('post-1', 'Ảnh không rõ')).rejects.toBe(error)
   })
 })

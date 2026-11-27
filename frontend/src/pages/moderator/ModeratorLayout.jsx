@@ -21,10 +21,8 @@ export default function ModeratorLayout() {
   const [messageState, setMessageState] = useState(createEmptyMessageState)
   const { unreadCount: unreadNotifications, setUnreadCount: setNotificationUnreadCount } =
     useBackofficeUnreadCount()
-  const {
-    unreadCount: unreadMessages,
-    refreshUnreadCount: refreshMessageUnreadCount,
-  } = useBackofficeMessageUnreadCount()
+  const { unreadCount: unreadMessages, refreshUnreadCount: refreshMessageUnreadCount } =
+    useBackofficeMessageUnreadCount()
   const settings = useSystemSettings()
   const loadReviewPosts = useCallback(async () => {
     setReviewLoading(true)

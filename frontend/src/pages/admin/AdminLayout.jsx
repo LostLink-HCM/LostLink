@@ -31,10 +31,8 @@ export default function AdminLayout() {
   const [messageState, setMessageState] = useState(createEmptyMessageState)
   const { unreadCount: unreadNotifications, setUnreadCount: setNotificationUnreadCount } =
     useBackofficeUnreadCount()
-  const {
-    unreadCount: unreadMessages,
-    refreshUnreadCount: refreshMessageUnreadCount,
-  } = useBackofficeMessageUnreadCount()
+  const { unreadCount: unreadMessages, refreshUnreadCount: refreshMessageUnreadCount } =
+    useBackofficeMessageUnreadCount()
   const settings = useSystemSettings()
 
   return (

@@ -14,7 +14,7 @@ const { notify } = require('./notificationService')
 const { syncPostMatchNotices } = require('./matchingService')
 const returnService = require('./returnService')
 const { endTradesOf } = require('./postManageService')
-const { ACTIVE_MATCH_STATES, isPublic } = require('./postService')
+const { ACTIVE_MATCH_STATES } = require('./postService')
 const { updatePostWithAudit } = require('./postAuditService')
 const { assertAvailableForMutation } = require('./backofficeActionLockService')
 
@@ -105,7 +105,7 @@ const toPost = (post, matchCount = 0) => {
     id: String(post._id),
     code: post.code,
     slug: post.slug || '',
-    publicDetailAvailable: Boolean(post.slug && isPublic(post, Date.now())),
+    detailAvailable: Boolean(post.slug),
     title: post.title,
     type: post.type,
     status: post.status,
@@ -239,7 +239,9 @@ const matchPostPopulate = (path) => ({
 })
 
 const getPost = async (id) => {
-  const post = await populatedPostQuery(Post.findById(id)).lean()
+  const post = await populatedPostQuery(Post.findById(id))
+    .populate({ path: 'statusHistory.changedBy', select: 'username role' })
+    .lean()
   if (!post) throw postNotFound()
 
   const [matches, saves] = await Promise.all([
@@ -280,10 +282,11 @@ const getPost = async (id) => {
     counts: { ...summary.counts, saves },
     description: post.description || '',
     images: orderedImageUrls(post.images),
-    statusHistory: (post.statusHistory || []).map(({ status, note, changedAt }) => ({
+    statusHistory: (post.statusHistory || []).map(({ status, note, changedAt, changedBy }) => ({
       status,
       note: note || '',
       changedAt,
+      changedBy: changedBy?.username || null,
     })),
     matchingPosts,
   }

@@ -21,13 +21,35 @@ import PostGallery from '../../components/user/post/PostGallery'
 import PostMenu from '../../components/user/post/PostMenu'
 import { ClosePostDialog, DeletePostDialog } from '../../components/user/post/PostManageDialogs'
 import PostStatusTag from '../../components/user/post/PostStatusTag'
+import BackofficeActionLockNotice from '../../components/backoffice/ActionLockNotice'
+import BackofficeButton from '../../components/backoffice/Button'
+import BackofficeDialog from '../../components/backoffice/Dialog'
+import Field, { Select, Textarea } from '../../components/backoffice/Field'
+import { SKY_STARS } from '../../components/user/home/skyStars'
 import { useMatchCount } from '../../hooks/useMatchCount'
 import { markFeedPostViewed } from '../../hooks/usePostFeed'
-import { formatCount, placeLabel, placeLines, timeAgo, toDetailPost } from '../../lib/user/homeFeed'
+import useBackofficeActionLock from '../../hooks/useBackofficeActionLock'
+import {
+  formatCount,
+  placeLabel,
+  placeLines,
+  postPath,
+  timeAgo,
+  toDetailPost,
+} from '../../lib/user/homeFeed'
 import { isMatchable } from '../../lib/user/matches'
 import { profilePath } from '../../lib/user/profiles'
+import {
+  approveBackofficePendingPost,
+  getBackofficePost,
+  rejectBackofficePendingPost,
+} from '../../lib/backoffice/postsApi'
+import { STATUS_LABELS } from '../../lib/backoffice/posts'
+import { REJECT_REASONS } from '../../lib/moderator/moderation'
 
 const formatDate = (iso, options) => new Date(iso).toLocaleDateString('vi-VN', options)
+const formatMatchingPercent = (score) =>
+  `${(score * 100).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}%`
 
 // Mở vị trí trên Google Maps ở tab mới
 const mapUrl = (place) =>
@@ -152,6 +174,12 @@ function PostDetail({ post, onChanged }) {
   const closeSheet = useCallback(() => setSheetOpen(false), [])
   // Hộp thoại của chủ bài: null | 'close' | 'delete'
   const [dialog, setDialog] = useState(null)
+  const [reviewDialog, setReviewDialog] = useState(null)
+  const [reviewReason, setReviewReason] = useState(REJECT_REASONS[0])
+  const [customReviewReason, setCustomReviewReason] = useState('')
+  const [reviewError, setReviewError] = useState('')
+  const [reviewActionError, setReviewActionError] = useState('')
+  const [reviewLoading, setReviewLoading] = useState(false)
 
   const { interactions } = ctx
   const {
@@ -164,14 +192,59 @@ function PostDetail({ post, onChanged }) {
   // Bình luận từ server, thêm/sửa/xoá cập nhật ngay trên trang
   const [comments, setComments] = useState(post.comments)
   const [commentCount, setCommentCount] = useState(post.commentCount)
+  const isMine = post.viewer.isOwner
+  const canViewModerationMatches = ['admin', 'moderator'].includes(user?.role)
+  const canReviewPendingPost = canViewModerationMatches && post.status === 'pending'
+  const reviewLock = useBackofficeActionLock(
+    reviewDialog && canReviewPendingPost ? 'post' : null,
+    reviewDialog && canReviewPendingPost ? post.id : null
+  )
+  const canViewStatusHistory = isMine || canViewModerationMatches
+  const [moderationMatchesState, setModerationMatchesState] = useState(null)
+
+  useEffect(() => {
+    if (!canViewModerationMatches) return undefined
+
+    let active = true
+    getBackofficePost(post.id)
+      .then((detail) => {
+        if (active) {
+          setModerationMatchesState({
+            postId: post.id,
+            matches: detail.matchingPosts,
+            statusHistory: detail.statusHistory,
+            error: false,
+          })
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setModerationMatchesState({
+            postId: post.id,
+            matches: [],
+            statusHistory: [],
+            error: true,
+          })
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [canViewModerationMatches, post.id])
+
+  const moderationMatches =
+    moderationMatchesState?.postId === post.id ? moderationMatchesState : null
+  const statusHistory = canViewModerationMatches
+    ? moderationMatches?.statusHistory
+    : post.statusHistory
 
   const lost = post.type === 'lost'
-  const isMine = post.viewer.isOwner
   const canClaim = !isMine && post.status !== 'returned'
 
   useEffect(() => {
-    if (!isMine) markFeedPostViewed(post.id, post.views)
-  }, [isMine, post.id, post.views])
+    if (!isMine && !canViewModerationMatches) markFeedPostViewed(post.id, post.views)
+  }, [canViewModerationMatches, isMine, post.id, post.views])
   const claimLabel = lost ? 'Tôi đang giữ món này' : 'Đây là đồ của tôi'
 
   // Xem hồ sơ cần đăng nhập, Guest được đưa sang đăng nhập rồi quay lại bài này
@@ -249,6 +322,53 @@ function PostDetail({ post, onChanged }) {
     setDialog(null)
     notify(message)
     if (error.status === 409) onChanged()
+  }
+  const openRejectReview = () => {
+    setReviewReason(REJECT_REASONS[0])
+    setCustomReviewReason('')
+    setReviewError('')
+    setReviewActionError('')
+    setReviewDialog('reject')
+  }
+  const approvePendingPost = async () => {
+    if (!reviewLock.canAct) return
+    setReviewLoading(true)
+    setReviewActionError('')
+    try {
+      await approveBackofficePendingPost(post.id)
+      setReviewDialog(null)
+      notify('Đã duyệt bài đăng.')
+      onChanged()
+    } catch (error) {
+      setReviewActionError(error.message || 'Không thể duyệt bài đăng, vui lòng thử lại.')
+      if (error.status === 409) onChanged()
+    } finally {
+      setReviewLoading(false)
+    }
+  }
+  const rejectPendingPost = async (event) => {
+    event.preventDefault()
+    if (!reviewLock.canAct) return
+    const reason = reviewReason === 'other' ? customReviewReason.trim() : reviewReason
+    if (!reason) {
+      setReviewError('Vui lòng nhập lý do từ chối cụ thể.')
+      return
+    }
+
+    setReviewLoading(true)
+    setReviewError('')
+    setReviewActionError('')
+    try {
+      await rejectBackofficePendingPost(post.id, reason)
+      setReviewDialog(null)
+      notify('Đã từ chối bài đăng.')
+      onChanged()
+    } catch (error) {
+      setReviewActionError(error.message || 'Không thể từ chối bài đăng, vui lòng thử lại.')
+      if (error.status === 409) onChanged()
+    } finally {
+      setReviewLoading(false)
+    }
   }
   // Trả về lỗi để hiện dưới ô nhập, rỗng là thành công
   const commentError = (error) =>
@@ -440,6 +560,32 @@ function PostDetail({ post, onChanged }) {
               </a>
             </div>
 
+            {canReviewPendingPost && (
+              <section aria-label="Thao tác kiểm duyệt" className="mb-3">
+                <BackofficeActionLockNotice message={reviewLock.notice} />
+                <div className="flex flex-wrap justify-end gap-2">
+                  <BackofficeButton
+                    variant="success"
+                    disabled={reviewLoading}
+                    onClick={() => {
+                      setReviewActionError('')
+                      setReviewDialog('approve')
+                    }}
+                  >
+                    Duyệt
+                  </BackofficeButton>
+                  <BackofficeButton
+                    variant="danger"
+                    disabled={reviewLoading}
+                    onClick={openRejectReview}
+                  >
+                    Từ chối
+                  </BackofficeButton>
+                </div>
+              </section>
+            )}
+
+            {/* Hàng nút tương tác: Thích, số bình luận, chia sẻ. Lưu và Theo dõi ở menu ⋯ */}
             <div className="flex flex-wrap items-center gap-1 border-t border-line-subtle pt-3">
               <LikeButton
                 liked={isLiked}
@@ -515,6 +661,55 @@ function PostDetail({ post, onChanged }) {
               </span>
             </div>
           </Card>
+
+          {canViewStatusHistory && (
+            <Card as="section" aria-labelledby="status-history-heading" className="p-5 lg:p-6">
+              <h2 id="status-history-heading" className="m-0 mb-4 text-lead font-bold text-ink">
+                Lịch sử trạng thái
+              </h2>
+              {canViewModerationMatches && !moderationMatches ? (
+                <p role="status" className="text-small text-ink-muted">
+                  Đang tải lịch sử trạng thái…
+                </p>
+              ) : canViewModerationMatches && moderationMatches?.error ? (
+                <p role="status" className="text-small text-ink-muted">
+                  Không tải được lịch sử trạng thái.
+                </p>
+              ) : statusHistory?.length ? (
+                <ol className="grid gap-3">
+                  {statusHistory.map((entry, index) => (
+                    <li
+                      key={`${entry.status}-${entry.dateTime}-${index}`}
+                      className="border-l-2 border-primary-soft pl-3"
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                        <span className="inline-flex flex-wrap items-baseline gap-x-1 text-small">
+                          <span className="font-semibold text-primary">
+                            {STATUS_LABELS[entry.status] || entry.status}
+                          </span>
+                          <span className="text-ink-muted">- {entry.changedBy}</span>
+                        </span>
+                        {entry.dateTime && (
+                          <time className="text-caption text-ink-muted">{entry.dateTime}</time>
+                        )}
+                      </div>
+                      {entry.status === 'rejected' && (
+                        <p className="mt-1 whitespace-pre-wrap text-small leading-relaxed text-ink-secondary [overflow-wrap:anywhere]">
+                          Lý do: {entry.reason || 'Chưa có lý do được lưu.'}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="text-small text-ink-muted">
+                  {post.status === 'rejected'
+                    ? 'Bài đăng đang bị từ chối nhưng chưa có lý do được lưu.'
+                    : 'Chưa có lịch sử trạng thái.'}
+                </p>
+              )}
+            </Card>
+          )}
         </div>
 
         <aside
@@ -587,6 +782,77 @@ function PostDetail({ post, onChanged }) {
               Xem trang cá nhân
             </Button>
           </Card>
+
+          {canViewModerationMatches && (
+            <Card
+              as="section"
+              padding="md"
+              aria-label="Manh mối gợi ý"
+              className="relative isolate overflow-hidden border-white/25 bg-au-sky-1 bg-linear-to-r from-au-sky-1 via-au-sky-2 to-au-sky-3 text-white shadow-[0_12px_30px_rgba(27,55,100,0.25)] transition-colors duration-1000"
+            >
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 rounded-[inherit] opacity-(--au-star-opacity)"
+                style={{ backgroundImage: SKY_STARS }}
+              />
+              <div className="relative z-10">
+                <div className="mb-4 flex items-center gap-2.5">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-white/20 bg-white/15 text-white">
+                    <Icon name="link" size={19} />
+                  </span>
+                  <h2 className="m-0 text-body font-bold text-white">Manh mối gợi ý</h2>
+                </div>
+                {!moderationMatches ? (
+                  <p role="status" className="m-0 text-caption text-white/85">
+                    Đang tải danh sách manh mối gợi ý…
+                  </p>
+                ) : moderationMatches.error ? (
+                  <p role="status" className="m-0 text-caption text-white/85">
+                    Không tải được danh sách manh mối gợi ý.
+                  </p>
+                ) : moderationMatches.matches.length === 0 ? (
+                  <p className="m-0 text-caption text-white/85">
+                    Chưa có manh mối nào cho bài đăng này.
+                  </p>
+                ) : (
+                  <ul className="m-0 flex list-none flex-col gap-3 p-0">
+                    {moderationMatches.matches.map(({ id, score, post: matchedPost }) => (
+                      <li
+                        key={id}
+                        className="grid grid-cols-[minmax(0,1fr)_76px] items-center gap-2 rounded-xl border border-white/80 bg-white/95 p-3 shadow-[0_4px_12px_rgba(10,30,60,0.16)] transition-colors hover:border-white hover:bg-white"
+                      >
+                        {matchedPost.detailAvailable && matchedPost.slug ? (
+                          <Link
+                            to={postPath(matchedPost)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="break-words text-caption leading-relaxed font-semibold text-[#1267a3] hover:text-[#084e80] hover:underline"
+                          >
+                            {matchedPost.postCode}: {matchedPost.title}
+                          </Link>
+                        ) : (
+                          <p className="m-0 break-words text-caption leading-relaxed font-semibold text-[#164f7d]">
+                            {matchedPost.postCode}: {matchedPost.title}
+                          </p>
+                        )}
+                        <div
+                          aria-label={`${formatMatchingPercent(score)} khớp`}
+                          className="flex min-h-16 flex-col items-center justify-center rounded-xl border border-[#8bd8c3] bg-gradient-to-b from-[#e4fff6] to-[#d1f7ea] px-1.5 py-2 text-center text-[#087b64] shadow-[0_3px_9px_rgba(15,130,103,0.12)]"
+                        >
+                          <span className="text-lead leading-none font-extrabold">
+                            {formatMatchingPercent(score)}
+                          </span>
+                          <span className="mt-1 text-[11px] leading-none font-semibold tracking-wide uppercase">
+                            khớp
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </Card>
+          )}
         </aside>
 
         {/* id comments: nút "x bình luận" cuộn tới đây */}
@@ -624,6 +890,116 @@ function PostDetail({ post, onChanged }) {
       )}
       {dialog === 'likers' && (
         <LikersDialog postId={post.id} count={likeCount} onClose={() => setDialog(null)} />
+      )}
+      {reviewDialog === 'approve' && (
+        <BackofficeDialog
+          title="Xác nhận"
+          size="sm"
+          onClose={() => {
+            if (!reviewLoading) setReviewDialog(null)
+          }}
+          footer={
+            <>
+              <BackofficeButton disabled={reviewLoading} onClick={() => setReviewDialog(null)}>
+                Hủy
+              </BackofficeButton>
+              <BackofficeButton
+                variant="success"
+                disabled={reviewLoading || !reviewLock.canAct}
+                onClick={() => void approvePendingPost()}
+              >
+                {reviewLoading ? 'Đang duyệt…' : 'Duyệt'}
+              </BackofficeButton>
+            </>
+          }
+        >
+          <BackofficeActionLockNotice message={reviewLock.notice} />
+          <p className="text-body leading-relaxed">Bạn có chắc muốn duyệt bài đăng này không?</p>
+          {reviewActionError && (
+            <p role="alert" className="text-small text-danger-ink">
+              {reviewActionError}
+            </p>
+          )}
+        </BackofficeDialog>
+      )}
+      {reviewDialog === 'reject' && (
+        <BackofficeDialog
+          title="Xác nhận"
+          size="sm"
+          onClose={() => {
+            if (!reviewLoading) setReviewDialog(null)
+          }}
+          footer={
+            <>
+              <BackofficeButton disabled={reviewLoading} onClick={() => setReviewDialog(null)}>
+                Hủy
+              </BackofficeButton>
+              <BackofficeButton
+                variant="danger"
+                type="submit"
+                form="post-detail-reject-form"
+                disabled={reviewLoading || !reviewLock.canAct}
+              >
+                {reviewLoading ? 'Đang từ chối…' : 'Từ chối'}
+              </BackofficeButton>
+            </>
+          }
+        >
+          <BackofficeActionLockNotice message={reviewLock.notice} />
+          <p className="mb-4 text-lead font-semibold leading-relaxed [overflow-wrap:anywhere]">
+            Bạn có chắc muốn từ chối bài đăng này không?
+          </p>
+          <form
+            id="post-detail-reject-form"
+            className="flex flex-col gap-4"
+            onSubmit={rejectPendingPost}
+            noValidate
+          >
+            <Field label="Lý do từ chối">
+              {(fieldProps) => (
+                <Select
+                  {...fieldProps}
+                  value={reviewReason}
+                  disabled={reviewLoading || !reviewLock.canAct}
+                  onChange={(event) => {
+                    setReviewReason(event.target.value)
+                    setReviewError('')
+                    setReviewActionError('')
+                  }}
+                >
+                  {REJECT_REASONS.map((reason) => (
+                    <option key={reason}>{reason}</option>
+                  ))}
+                  <option value="other">Lý do khác</option>
+                </Select>
+              )}
+            </Field>
+            {reviewReason === 'other' && (
+              <Field error={reviewError}>
+                {(fieldProps) => (
+                  <Textarea
+                    {...fieldProps}
+                    aria-label="Lý do từ chối"
+                    value={customReviewReason}
+                    disabled={reviewLoading || !reviewLock.canAct}
+                    onChange={(event) => {
+                      setCustomReviewReason(event.target.value)
+                      setReviewError('')
+                      setReviewActionError('')
+                    }}
+                    maxLength={1000}
+                    placeholder="Nhập lý do không duyệt bài đăng…"
+                  />
+                )}
+              </Field>
+            )}
+            {reviewActionError && (
+              <p role="alert" className="text-small text-danger-ink">
+                {reviewActionError}
+              </p>
+            )}
+          </form>
+        </BackofficeDialog>
       )}
     </div>
   )

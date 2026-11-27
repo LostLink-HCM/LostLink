@@ -505,6 +505,8 @@ export default function Reports() {
                 {targetPath(report) ? (
                   <Link
                     to={targetPath(report)}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="mb-1.5 block text-small font-semibold leading-relaxed text-ink hover:text-primary hover:underline"
                   >
                     {report.targetTitle}

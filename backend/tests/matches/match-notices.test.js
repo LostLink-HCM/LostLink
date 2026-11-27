@@ -97,13 +97,20 @@ describe('UC36 - Manh mối và thông báo khi bài bị ẩn hoặc hết hi�
       assert.equal(await clueCount(api), 0)
       assert.equal(await badge(api), 0)
     }
-    assert.equal((await inbox(finderApi)).unread, before.finder.unread - 1)
+    // Thông báo manh mối bị ẩn, đồng thời chủ bài được nhận thông báo bài đăng bị ẩn.
+    assert.equal((await inbox(finderApi)).unread, before.finder.unread)
 
     assert.equal((await setHidden(found, false)).status, 200)
-    // Cùng thông báo cũ, không tạo thêm, giữ trạng thái đã đọc/chưa đọc
-    assert.deepEqual(await inbox(loserApi), before.loser)
-    assert.deepEqual(await inbox(finderApi), before.finder)
+    // Thông báo manh mối cũ xuất hiện lại; các thông báo ẩn/hiện bài được lưu riêng.
+    const afterLoser = await inbox(loserApi)
+    const afterFinder = await inbox(finderApi)
+    assert.deepEqual(afterLoser.ids, before.loser.ids)
+    assert.equal(afterLoser.unread, before.loser.unread)
+    assert.deepEqual(afterFinder.ids, before.finder.ids)
+    assert.equal(afterFinder.unread, before.finder.unread + 2)
     assert.equal(await Notification.countDocuments({ type: 'match' }), 2)
+    assert.equal(await Notification.countDocuments({ type: 'post_hidden', user: finder._id }), 1)
+    assert.equal(await Notification.countDocuments({ type: 'post_unhidden', user: finder._id }), 1)
     assert.equal(await clueCount(loserApi), 1)
   })
 

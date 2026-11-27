@@ -64,6 +64,7 @@ const addSearchFilter = async (filter, q) => {
 const toReviewPost = (post) => ({
   id: String(post._id),
   code: post.code,
+  slug: post.slug,
   title: post.title,
   type: post.type,
   status: post.status,
