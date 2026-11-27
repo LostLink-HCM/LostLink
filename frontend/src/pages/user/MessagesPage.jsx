@@ -1,6 +1,10 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
-import { acceptClaim, declineClaim, sendContactRequest } from '../../api/claims'
+import {
+  acquireBackofficeActionLock,
+  releaseBackofficeActionLock,
+} from '../../api/backofficeActionLocks'
+import { acceptClaim, sendContactRequest } from '../../api/claims'
 import {
   answerCounterpart,
   closeConversation,
@@ -12,8 +16,8 @@ import {
   sendMessage,
 } from '../../api/conversations'
 import { useAuth } from '../../auth/AuthContext'
+import useBackofficeActionLock from '../../hooks/useBackofficeActionLock'
 import Icon from '../../components/common/Icon'
-import Avatar from '../../components/user/Avatar'
 import Button from '../../components/user/Button'
 import Dialog from '../../components/user/Dialog'
 import IconButton from '../../components/user/IconButton'
@@ -24,7 +28,9 @@ import Composer from '../../components/user/messages/Composer'
 import CounterpartAsk from '../../components/user/messages/CounterpartAsk'
 import PendingTrade from '../../components/user/messages/PendingTrade'
 import PostSwitcher from '../../components/user/messages/PostSwitcher'
+import ThreadAvatar from '../../components/user/messages/ThreadAvatar'
 import ThreadList from '../../components/user/messages/ThreadList'
+import TradeBar from '../../components/user/messages/TradeBar'
 import TradePanel from '../../components/user/messages/TradePanel'
 import PostMenu from '../../components/user/post/PostMenu'
 import { checkImages } from '../../lib/user/composePost'
@@ -70,6 +76,9 @@ const errorText = (error, fallback = FAILED) =>
     : fallback
 
 const statusLine = (thread) => {
+  if (thread.support === 'handler')
+    return ['Yêu cầu hỗ trợ từ người dùng', 'text-primary', 'bg-primary']
+  if (thread.support === 'internal') return ['Trao đổi nội bộ', 'text-ink-muted', 'bg-ink-subtle']
   if (thread.kind === 'support') return ['Hỗ trợ từ LostLink', 'text-primary', 'bg-primary']
   if (thread.closedBy) {
     const who = thread.closedBy === 'me' ? 'Bạn' : thread.peer.name
@@ -148,7 +157,7 @@ function Conversation({ thread, messages, now }) {
           </p>
         </div>
       )}
-      {thread.kind === 'support' && messages.length === 0 && (
+      {thread.support === 'requester' && messages.length === 0 && (
         <SystemNote>Hãy mô tả vấn đề bạn gặp, LostLink sẽ phản hồi sớm nhất có thể.</SystemNote>
       )}
 
@@ -245,10 +254,34 @@ function useConversationDetail(thread, me, putConversation) {
   return { ...detail, loading, append, loadOlder }
 }
 
+// Bài đính kèm: claim đơn phương chỉ có bài chung; đi từ manh mối thì hiện cả hai bài, bài của mình trước
+function AttachedPosts({ thread }) {
+  const linkOf = (post) => ({
+    linkable: Boolean(post?.slug),
+    to: post?.slug ? postPath(post) : undefined,
+  })
+  if (!thread.counterpart) return <AttachedPost post={thread.post} {...linkOf(thread.post)} />
+  const posts = [thread.post, thread.counterpart].sort((a, b) => Number(b?.mine) - Number(a?.mine))
+  return (
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      {posts.map((post) => (
+        <AttachedPost
+          key={post.id}
+          post={post}
+          label={post.mine ? 'Bài của bạn' : `Bài của ${thread.peer.name}`}
+          {...linkOf(post)}
+        />
+      ))}
+    </div>
+  )
+}
+
 export default function MessagesPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user } = useAuth()
+  // Admin/Moderator: không tự liên hệ LostLink, xem yêu cầu hỗ trợ được giao ngay trong danh sách
+  const staff = ['admin', 'moderator'].includes(user?.role)
   const { now, notify, inbox, setChatOpen } = useOutletContext()
   const { threads, activeId, drafts } = inbox
   const [query, setQuery] = useState('')
@@ -259,6 +292,7 @@ export default function MessagesPage() {
   const [showInfo, setShowInfo] = useState(false)
   const [error, setError] = useState('')
   const [dialog, setDialog] = useState(null)
+
   const [busy, setBusy] = useState(false)
   const scrollRef = useRef(null)
   const inputRef = useRef(null)
@@ -291,11 +325,45 @@ export default function MessagesPage() {
     0
   )
   const draft = drafts[active?.id] || ''
+
+  // Moderator trả lời yêu cầu hỗ trợ trong hàng chờ chung: đang gõ thì giữ quyền xử lý như ở
+  // backoffice để Moderator khác thấy, ai đang xử lý thì báo sớm
+  const handling = active?.support === 'handler'
+  const holdLock = handling && Boolean(draft.trim())
+  const replyLock = useBackofficeActionLock(
+    holdLock ? 'conversation' : null,
+    holdLock ? active.id : null,
+    true
+  )
+  const lockNotice =
+    holdLock && replyLock.status === 'busy'
+      ? `${replyLock.holder?.username ?? 'Moderator khác'} đang xử lý yêu cầu này, bạn chưa gửi được.`
+      : ''
+
+  // Xin quyền xử lý ngay trước khi gửi (gửi ảnh không qua ô nhập vẫn cần)
+  const lockFor = async () => {
+    if (!handling) return {}
+    const result = await acquireBackofficeActionLock('conversation', active.id, replyLock.token)
+    if (!result.acquired) {
+      const holder = result.lockedBy?.username ?? 'Moderator khác'
+      throw Object.assign(new Error(`${holder} đang xử lý yêu cầu này.`), { status: 409 })
+    }
+    return { lockToken: result.token }
+  }
   const status = active && statusLine(active)
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [active?.id, messages.length, active?.status, mobileConversation])
+
+  // Báo cho hộp thư hội thoại đang mở ở đây (trang này cũng đánh dấu đã đọc trên server);
+  // rời trang thì thôi, tin mới lại được tính chưa đọc
+  const viewingId = active?.type === 'conversation' ? active.id : null
+  const { setViewing } = inbox
+  useEffect(() => {
+    setViewing(viewingId)
+    return () => setViewing(null)
+  }, [viewingId, setViewing])
 
   const chatShown = mobileConversation && Boolean(active)
   useEffect(() => {
@@ -348,7 +416,7 @@ export default function MessagesPage() {
         notify(`Đã gửi lời giới thiệu, chờ ${active.peer.name} đồng ý.`)
         return
       }
-      const { data } = await sendMessage(active.id, { body: draft.trim() })
+      const { data } = await sendMessage(active.id, { body: draft.trim(), ...(await lockFor()) })
       detail.append(toMessage(data, user.username))
       inbox.setDraft(active.id, '')
     })
@@ -365,30 +433,35 @@ export default function MessagesPage() {
     }
     setError('')
     const err = await run(async () => {
-      const { data } = await sendMessage(active.id, { image: file })
+      const lock = await lockFor()
+      const { data } = await sendMessage(active.id, { image: file, ...lock })
+      // Gửi ảnh khi không gõ gì: trả quyền xử lý ngay cho Moderator khác
+      if (lock.lockToken && !draft.trim()) {
+        releaseBackofficeActionLock('conversation', active.id, lock.lockToken).catch(() => {})
+      }
       detail.append(toMessage(data, user.username))
     })
     if (err) setError(errorText(err, SEND_FAILED))
   }
 
   // Yêu cầu đã hết hiệu lực hoặc được xử lý ở nơi khác (409) thì tải lại danh sách
-  const respond = async (accept) => {
-    const err = await run(async () => {
-      const { data } = await (accept ? acceptClaim : declineClaim)(active.claimId)
-      if (accept) {
-        await inbox.reload()
-        inbox.open(data.conversationId)
-        notify(`Đã mở kênh trò chuyện với ${active.peer.name}.`)
-      } else {
-        inbox.putClaim(data)
-        notify(`Đã từ chối yêu cầu của ${active.peer.name}.`)
-      }
-    })
-    if (err) {
-      notify(errorText(err))
-      if (err.status === 409) inbox.reload().catch(() => {})
-    }
+  const failRespond = (err) => {
+    notify(errorText(err))
+    if (err.status === 409) inbox.reload().catch(() => {})
   }
+
+  const accept = async () => {
+    const err = await run(async () => {
+      const { data } = await acceptClaim(active.claimId)
+      await inbox.reload()
+      inbox.open(data.conversationId)
+      notify(`Đã mở kênh trò chuyện với ${active.peer.name}.`)
+    })
+    if (err) failRespond(err)
+  }
+
+  // Từ chối chưa gửi ngay: thanh dưới hội thoại có nút Hoàn tác, hết hạn mới gửi lên server
+  const decline = () => inbox.declineLater(active.claimId, failRespond)
 
   // Thao tác trên hội thoại (xác nhận, đóng, mở lại): server trả hội thoại mới
   const act = async (request, onDone, target = active) => {
@@ -441,16 +514,32 @@ export default function MessagesPage() {
       dialogTarget
     )
 
-  const answer = (thread, same) =>
+  // Không phải đồ của tôi / không phải chủ món đồ: đóng hội thoại, manh mối giữa hai bài thành Không phải
+  const closeNotMine = () =>
     act(
-      (id) => answerCounterpart(id, same),
+      (id) => closeConversation(id, { notMatch: true }),
       () => {
-        const title = thread.counterpartAsk.title
+        setFolder('closed')
+        notify('Đã đóng hội thoại, LostLink sẽ không gợi ý lại hai bài này cho nhau.')
+      }
+    )
+
+  // Câu hỏi cùng món: một bài thì Đúng/Không, nhiều bài thì chọn một (postId) hoặc bỏ qua
+  const answer = (thread, same, postId) =>
+    act(
+      (id) => answerCounterpart(id, same, postId),
+      () => {
+        const options = thread.counterpartAsk
         if (!same) {
-          notify(`Đã ghi nhận, bài “${title}” vẫn giữ nguyên.`)
+          notify(
+            options.length === 1
+              ? `Đã ghi nhận, bài “${options[0].title}” vẫn giữ nguyên.`
+              : 'Đã ghi nhận, các bài của bạn vẫn giữ nguyên.'
+          )
           return
         }
-        notify(`Bài “${title}” đã chuyển sang Đã trao trả.`)
+        const chosen = options.find((item) => item.id === postId) ?? options[0]
+        notify(`Bài “${chosen.title}” đã chuyển sang Đã trao trả.`)
         inbox.reload().catch(() => {})
       },
       thread
@@ -498,24 +587,16 @@ export default function MessagesPage() {
       ].filter(Boolean)
     : []
 
-  const tradePanel = active && (
-    <TradePanel
-      thread={active}
-      busy={busy}
-      onConfirm={() => openDialog('confirm')}
-      onReview={() => navigate(`/messages/${active.id}/review`)}
-    />
-  )
-
   return (
-    <div className="mx-auto max-w-360 px-4 pt-5 pb-6 sm:px-6 lg:px-10">
+    <div className="mx-auto max-w-360 px-4 pt-5 pb-6 sm:px-6 lg:px-10 lg:pb-5">
       <div
         className={cx(
-          'grid min-h-130 grid-cols-1 gap-4 lg:h-[calc(100dvh-7.5rem)]',
+          // Màn rộng: cao vừa màn hình (thanh trên 4rem, đệm trên và dưới 1.25rem), không sinh thanh cuộn trang
+          'grid min-h-130 grid-cols-1 gap-4 lg:h-[calc(100dvh-6.5rem)]',
           chatShown || !setChatOpen
             ? 'h-[calc(100dvh-7.5rem-env(safe-area-inset-bottom))]'
             : 'h-[calc(100dvh-12rem-env(safe-area-inset-bottom))]',
-          'md:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)_300px]'
+          'md:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]'
         )}
       >
         <section
@@ -536,7 +617,7 @@ export default function MessagesPage() {
             onFolderChange={setFolder}
             closedUnread={closedUnread}
             onOpen={select}
-            onContactModerator={contactModerator}
+            onContactModerator={staff ? undefined : contactModerator}
             busy={busy}
             now={now}
           />
@@ -551,7 +632,7 @@ export default function MessagesPage() {
               !mobileConversation && 'max-md:hidden'
             )}
           >
-            <header className="flex items-center gap-3 border-b border-line px-4 py-3 sm:px-5">
+            <header className="flex items-center gap-3 border-b border-line px-4 py-2 sm:px-5">
               <IconButton
                 icon="back"
                 label="Về danh sách hội thoại"
@@ -559,7 +640,7 @@ export default function MessagesPage() {
                 onClick={() => setMobileConversation(false)}
               />
               <span className="max-sm:hidden">
-                <Avatar initials={active.peer.initials} src={active.peer.avatarUrl} />
+                <ThreadAvatar thread={active} size="md" />
               </span>
               <div className="min-w-0 flex-1">
                 <h2 className="m-0 truncate text-small font-semibold text-ink">
@@ -576,8 +657,8 @@ export default function MessagesPage() {
                 )}
                 <IconButton
                   icon="info"
-                  label="Trao trả và chỗ hẹn"
-                  className={cx('xl:hidden', showInfo && 'bg-primary-soft text-primary')}
+                  label="Thông tin hội thoại và chỗ hẹn"
+                  className={cx(showInfo && 'bg-primary-soft text-primary')}
                   aria-expanded={showInfo}
                   aria-controls="chat-trade-panel"
                   onClick={() => setShowInfo((value) => !value)}
@@ -586,6 +667,14 @@ export default function MessagesPage() {
             </header>
 
             <PostSwitcher threads={peerThreads} activeId={active.id} onSelect={switchTo} />
+            {/* Ngoài vùng cuộn nên luôn nằm ở đầu khung chat */}
+            <TradeBar
+              thread={active}
+              busy={busy}
+              onConfirm={() => openDialog('confirm')}
+              onNotMine={() => openDialog('notMine')}
+              onReview={() => navigate(`/messages/${active.id}/review`)}
+            />
             {pending.map((thread) => (
               <PendingTrade
                 key={thread.id}
@@ -601,16 +690,16 @@ export default function MessagesPage() {
                 key={thread.id}
                 thread={thread}
                 busy={busy}
-                onAnswer={(same) => answer(thread, same)}
+                onAnswer={(same, postId) => answer(thread, same, postId)}
               />
             ))}
 
             {showInfo && (
               <div
                 id="chat-trade-panel"
-                className="flex max-h-[55%] flex-col gap-3 overflow-y-auto border-b border-line bg-surface-muted p-3 xl:hidden"
+                className="grid max-h-[55%] gap-3 overflow-y-auto border-b border-line bg-surface-muted p-3 sm:grid-cols-[repeat(auto-fit,minmax(16rem,1fr))]"
               >
-                {tradePanel}
+                <TradePanel thread={active} />
               </div>
             )}
 
@@ -618,13 +707,7 @@ export default function MessagesPage() {
               ref={scrollRef}
               className="relative flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain bg-surface-muted/60 px-4 py-4 [scrollbar-width:thin] sm:px-6"
             >
-              {trade && (
-                <AttachedPost
-                  post={active.post}
-                  linkable={Boolean(active.post?.slug)}
-                  to={active.post?.slug ? postPath(active.post) : undefined}
-                />
-              )}
+              {trade && <AttachedPosts thread={active} />}
               {detail.hasMore && !detail.loading && (
                 <Button
                   size="sm"
@@ -650,12 +733,14 @@ export default function MessagesPage() {
               busy={busy}
               draft={draft}
               error={error}
+              notice={lockNotice}
               inputRef={inputRef}
               onDraftChange={updateDraft}
               onSend={send}
               onPickImage={sendImage}
-              onAccept={() => respond(true)}
-              onDecline={() => respond(false)}
+              onAccept={accept}
+              onDecline={decline}
+              onUndoDecline={() => inbox.undoDecline(active.claimId)}
               onReopen={reopen}
             />
           </section>
@@ -672,13 +757,6 @@ export default function MessagesPage() {
             </p>
           </div>
         )}
-
-        <aside
-          aria-label="Trao trả và chỗ hẹn"
-          className="relative hidden min-h-0 flex-col gap-3 overflow-y-auto [scrollbar-width:thin] xl:flex"
-        >
-          {tradePanel}
-        </aside>
       </div>
 
       {dialog?.kind === 'confirm' && (
@@ -731,6 +809,34 @@ export default function MessagesPage() {
             )}
             Bên kia vẫn nhắn được nhưng bạn sẽ không nhận thông báo. Bạn có thể mở lại bất cứ lúc
             nào ở mục Đã đóng.
+          </p>
+        </Dialog>
+      )}
+
+      {dialog?.kind === 'notMine' && (
+        <Dialog
+          title={dialogTarget.receiver ? 'Không phải đồ của bạn?' : 'Không phải chủ món đồ?'}
+          size="sm"
+          onClose={() => setDialog(null)}
+          footer={
+            <>
+              <Button onClick={() => setDialog(null)} data-autofocus>
+                Quay lại trò chuyện
+              </Button>
+              <Button variant="danger" onClick={closeNotMine}>
+                Xác nhận không phải
+              </Button>
+            </>
+          }
+        >
+          <p className="m-0 text-small leading-relaxed text-ink-secondary">
+            Hội thoại sẽ được đóng, {dialogTarget.peer.name} vẫn nhắn được nhưng bạn sẽ không nhận
+            thông báo. Bạn có thể mở lại ở mục Đã đóng.
+          </p>
+          <p className="m-0 mt-2 text-small leading-relaxed text-ink-secondary">
+            Manh mối giữa hai bài (nếu có) sẽ chuyển sang{' '}
+            <strong className="text-ink">Không phải</strong> và LostLink không gợi ý lại, phần này
+            không hoàn tác được.
           </p>
         </Dialog>
       )}

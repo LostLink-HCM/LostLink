@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Icon from '../../common/Icon'
 import Button from '../Button'
@@ -12,17 +12,44 @@ const iconButton = cx(
   focusRing
 )
 
+function useSecondsLeft(until) {
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [until])
+  return Math.max(0, Math.ceil((until - now) / 1000))
+}
+function DeclinedUndo({ until, onUndo }) {
+  const seconds = useSecondsLeft(until)
+  return (
+    <div className="flex flex-wrap items-center gap-3 border-t border-line bg-surface-muted px-4 py-3.5 sm:px-5">
+      <p className="m-0 flex min-w-0 flex-1 items-center gap-2 text-caption text-ink-muted">
+        <Icon name="lock" size={15} className="shrink-0" />
+        Bạn đã từ chối yêu cầu trò chuyện.
+      </p>
+      <Button onClick={onUndo}>
+        <Icon name="reset" size={14} />
+        Hoàn tác
+        <span className="font-normal text-ink-subtle tabular-nums">{seconds}s</span>
+      </Button>
+    </div>
+  )
+}
+
 export default function Composer({
   thread,
   busy = false,
   draft,
   error,
+  notice,
   inputRef,
   onDraftChange,
   onSend,
   onPickImage,
   onAccept,
   onDecline,
+  onUndoDecline,
   onReopen,
 }) {
   const galleryRef = useRef(null)
@@ -70,6 +97,10 @@ export default function Composer({
         </div>
       </div>
     )
+  }
+
+  if (status === 'declined' && thread.undoUntil) {
+    return <DeclinedUndo until={thread.undoUntil} onUndo={onUndoDecline} />
   }
 
   if (status === 'declined' || status === 'expired') {
@@ -120,6 +151,15 @@ export default function Composer({
 
   return (
     <div className="border-t border-line px-4 pt-3 pb-4 sm:px-5">
+      {notice && (
+        <p
+          role="status"
+          className="m-0 mb-2.5 flex items-center gap-1.5 text-caption font-medium text-warning"
+        >
+          <Icon name="lock" size={14} className="shrink-0" />
+          {notice}
+        </p>
+      )}
       {!open && (
         <p className="m-0 mb-2.5 text-tiny text-ink-subtle">
           {pending ? 'Đã dùng 1/1 tin nhắn giới thiệu' : 'Còn 1/1 tin nhắn giới thiệu'}

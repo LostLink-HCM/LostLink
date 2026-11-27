@@ -3,7 +3,8 @@ import Icon from '../../common/Icon'
 import TypeTag from '../home/TypeTag'
 import { cx, focusRing } from '../classes'
 
-export default function AttachedPost({ post, linkable, to }) {
+// label: nhãn trên thẻ, mặc định theo bài của mình hay bài liên quan
+export default function AttachedPost({ post, linkable, to, label }) {
   if (!post) {
     return (
       <div className="flex items-center gap-3 rounded-xl border border-dashed border-line bg-surface-muted p-2.5 text-small text-ink-muted">
@@ -17,16 +18,20 @@ export default function AttachedPost({ post, linkable, to }) {
 
   const body = (
     <>
+      {/* Bài không có ảnh dùng ảnh danh mục như thẻ bài ở Trang chủ */}
       <img
-        src={post.image}
+        src={post.image ?? `/images/categories/${post.categorySlug ?? 'khac'}.svg`}
         alt=""
-        className="size-14 shrink-0 rounded-lg bg-line-subtle object-cover"
+        className={cx(
+          'size-14 shrink-0 rounded-lg',
+          post.image ? 'bg-line-subtle object-cover' : 'bg-primary-subtle object-contain p-2'
+        )}
       />
       <span className="min-w-0 flex-1">
         <span className="mb-1 flex items-center gap-2">
           <TypeTag type={post.type} />
           <span className="text-tiny text-ink-subtle">
-            {post.mine ? 'Bài đăng của bạn' : 'Bài đăng liên quan'}
+            {label ?? (post.mine ? 'Bài đăng của bạn' : 'Bài đăng liên quan')}
           </span>
         </span>
         <strong className="block truncate text-small font-semibold text-ink">{post.title}</strong>

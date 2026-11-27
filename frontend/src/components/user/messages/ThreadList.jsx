@@ -1,10 +1,17 @@
 import Icon from '../../common/Icon'
 import { cx, focusRing } from '../classes'
-import { closedBy, lastActivity, previewTime, threadPreview } from '../../../lib/user/messages'
+import {
+  closedBy,
+  lastActivity,
+  previewTime,
+  staffRoleName,
+  supportSubtitle,
+  threadPreview,
+} from '../../../lib/user/messages'
 import Button from '../Button'
-import Avatar from '../Avatar'
 import CountBadge from '../CountBadge'
 import MobileBackButton from '../MobileBackButton'
+import ThreadAvatar from './ThreadAvatar'
 import { threadTag } from './threadTag'
 
 const FOLDERS = [
@@ -34,11 +41,14 @@ export default function ThreadList({
             <MobileBackButton />
             <h1 className="m-0 text-lead font-bold text-ink">Tin nhắn</h1>
           </div>
-          {/* Hỏi LostLink (Moderator trả lời) khi có khiếu nại, giao dịch bị treo hoặc sự cố */}
-          <Button size="sm" disabled={busy} onClick={onContactModerator}>
-            <Icon name="shield" size={14} />
-            Liên hệ LostLink
-          </Button>
+          {/* Hỏi LostLink (Moderator trả lời) khi có khiếu nại, giao dịch bị treo hoặc sự cố.
+              Admin/Moderator không có nút này */}
+          {onContactModerator && (
+            <Button size="sm" disabled={busy} onClick={onContactModerator}>
+              <Icon name="shield" size={14} />
+              Liên hệ LostLink
+            </Button>
+          )}
         </div>
         <label
           className={cx(
@@ -99,12 +109,18 @@ export default function ThreadList({
                 aria-current={active ? 'true' : undefined}
                 onClick={() => onOpen(thread.id)}
                 className={cx(
-                  'mb-0.5 flex w-full cursor-pointer items-center gap-3 rounded-xl border-0 px-3 py-3 text-left transition-colors',
-                  active ? 'bg-primary-soft' : 'bg-transparent hover:bg-surface-muted',
+                  'mb-0.5 flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors',
+                  // Yêu cầu hỗ trợ từ người dùng: viền màu để nổi bật giữa các hội thoại thường
+                  thread.support === 'handler' ? 'border border-primary/40' : 'border-0',
+                  active
+                    ? 'bg-primary-soft'
+                    : thread.support === 'handler'
+                      ? 'bg-primary-faint hover:bg-primary-subtle'
+                      : 'bg-transparent hover:bg-surface-muted',
                   focusRing
                 )}
               >
-                <Avatar initials={thread.peer.initials} src={thread.peer.avatarUrl} />
+                <ThreadAvatar thread={thread} />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-baseline justify-between gap-2">
                     <strong
@@ -125,9 +141,19 @@ export default function ThreadList({
                   <span className="mt-0.5 flex items-center gap-1.5 text-tiny text-ink-subtle">
                     <span className="min-w-0 truncate">
                       {thread.post?.title ??
-                        (thread.kind === 'support'
-                          ? 'Khiếu nại, giao dịch bị treo, sự cố'
-                          : 'Bài đăng đã bị xoá')}
+                        (thread.support === 'internal' ? (
+                          // Tag nền màu chủ đề cho vai trò bên kia để dễ nhận ra Admin/Moderator
+                          <>
+                            Trao đổi nội bộ{' '}
+                            <span className="ml-0.5 rounded-full bg-primary px-1.5 py-px text-micro font-semibold text-white">
+                              {staffRoleName(thread)}
+                            </span>
+                          </>
+                        ) : thread.kind === 'support' ? (
+                          supportSubtitle(thread)
+                        ) : (
+                          'Bài đăng đã bị xoá'
+                        ))}
                     </span>
                     {others > 0 && (
                       <span className="shrink-0 rounded-full bg-line-subtle px-1.5 py-px text-micro font-semibold text-ink-secondary">

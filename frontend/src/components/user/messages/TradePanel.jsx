@@ -1,24 +1,6 @@
-import Icon from '../../common/Icon'
-import Button from '../Button'
+import { Link } from 'react-router-dom'
 import Card from '../Card'
-import { cx } from '../classes'
 import { SAFE_MEETUPS } from '../../../lib/user/messages'
-
-function CheckRow({ done, children }) {
-  return (
-    <div className="flex items-center gap-2.5">
-      <span
-        className={cx(
-          'grid size-4.5 shrink-0 place-items-center rounded-full',
-          done ? 'bg-success text-white' : 'border border-line-strong bg-surface'
-        )}
-      >
-        {done && <Icon name="check" size={12} />}
-      </span>
-      <span className="text-caption text-ink-secondary">{children}</span>
-    </div>
-  )
-}
 
 function InfoCard({ title, children }) {
   return (
@@ -29,8 +11,34 @@ function InfoCard({ title, children }) {
   )
 }
 
-export default function TradePanel({ thread, busy, onConfirm, onReview }) {
-  const { status, peer, confirmed, closedBy } = thread
+// Bảng ⓘ của hội thoại: giải thích theo trạng thái và gợi ý chỗ hẹn. Thao tác trao trả ở TradeBar
+export default function TradePanel({ thread }) {
+  const { status, peer, closedBy } = thread
+
+  if (thread.support === 'handler') {
+    return (
+      <InfoCard title="Yêu cầu hỗ trợ">
+        <p className="m-0">
+          {peer.name} cần LostLink hỗ trợ. Mọi Moderator đều thấy yêu cầu này; khi bạn bắt đầu trả
+          lời, Moderator khác sẽ thấy bạn đang xử lý. Bạn có thể trả lời ngay tại đây hoặc trong{' '}
+          <Link to="/moderator/messages" className="font-semibold text-primary">
+            Quản lý tin nhắn
+          </Link>
+          .
+        </p>
+      </InfoCard>
+    )
+  }
+
+  if (thread.support === 'internal') {
+    return (
+      <InfoCard title="Trao đổi nội bộ">
+        <p className="m-0">
+          Hội thoại giữa Admin và Moderator của LostLink, người dùng không xem được.
+        </p>
+      </InfoCard>
+    )
+  }
 
   if (thread.kind === 'support') {
     return (
@@ -108,71 +116,39 @@ export default function TradePanel({ thread, busy, onConfirm, onReview }) {
     )
   }
 
-  const returned = status === 'returned'
+  if (status === 'returned') {
+    return (
+      <InfoCard title="Đã trao trả">
+        <p className="m-0">
+          Cả hai đã xác nhận nên bài đăng đã chuyển sang Đã trao trả. Gửi lời cảm ơn để ghi nhận{' '}
+          {peer.name} nhé, hai bạn vẫn nhắn tin được.
+        </p>
+      </InfoCard>
+    )
+  }
 
+  // Đang mở: cách xác nhận trao trả và gợi ý chỗ hẹn (nút xác nhận nằm ở dải trao trả)
   return (
     <>
-      <Card as="section" padding="sm">
-        <h2 className="m-0 mb-0.5 text-body font-bold text-ink">
-          {returned ? 'Đã trao trả' : 'Đã nhận được đồ chưa?'}
-        </h2>
-        <p className="m-0 mb-3 text-caption leading-snug text-ink-muted">
-          {returned
-            ? 'Cả hai đã xác nhận. Gửi lời cảm ơn để ghi nhận người kia nhé.'
-            : 'Cả hai cùng xác nhận thì bài đăng mới chuyển sang Đã trao trả.'}
+      <InfoCard title="Xác nhận trao trả">
+        <p className="m-0">
+          Gặp nhau và nhận đồ xong thì cả hai bấm xác nhận ở dải trên đầu hội thoại. Khi cả hai cùng
+          xác nhận, bài đăng chuyển sang Đã trao trả và không hoàn tác được.
         </p>
-        <div className="mb-3 flex flex-col gap-1.5 rounded-lg bg-surface-muted px-3 py-2.5">
-          <CheckRow done={confirmed.peer}>
-            {peer.name} {confirmed.peer ? 'đã xác nhận' : 'chưa xác nhận'}
-          </CheckRow>
-          <CheckRow done={confirmed.me}>
-            Bạn {confirmed.me ? 'đã xác nhận' : 'chưa xác nhận'}
-          </CheckRow>
-        </div>
-        {returned ? (
-          <Button
-            variant={thread.review ? 'secondary' : 'primary'}
-            size="lg"
-            block
-            onClick={onReview}
-          >
-            <Icon name="star" size={16} />
-            {thread.review ? 'Xem lại lời cảm ơn đã gửi' : 'Đánh giá và gửi lời cảm ơn'}
-          </Button>
-        ) : (
-          <Button
-            variant={confirmed.me ? 'secondary' : 'primary'}
-            size="lg"
-            block
-            disabled={confirmed.me || busy}
-            onClick={onConfirm}
-          >
-            {confirmed.me
-              ? 'Bạn đã xác nhận rồi'
-              : thread.receiver
-                ? 'Tôi đã nhận được đồ'
-                : 'Tôi đã trao trả đồ'}
-          </Button>
-        )}
-      </Card>
-
-      {status === 'open' && (
-        <Card as="section" padding="sm">
-          <h2 className="m-0 mb-1 text-body font-bold text-ink">Gợi ý chỗ hẹn an toàn</h2>
-          <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-            {SAFE_MEETUPS.map((place) => (
-              <li
-                key={place.name}
-                title={place.hint}
-                className="flex items-center gap-2 text-caption font-medium text-ink"
-              >
-                <span className="size-1.5 shrink-0 rounded-full bg-primary" />
-                <span className="min-w-0 truncate">{place.name}</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
+      </InfoCard>
+      <InfoCard title="Gợi ý chỗ hẹn an toàn">
+        <ul className="m-0 flex list-none flex-col gap-2 p-0">
+          {SAFE_MEETUPS.map((place) => (
+            <li key={place.name} className="flex items-start gap-2">
+              <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary" />
+              <span>
+                <span className="block font-medium text-ink">{place.name}</span>
+                {place.hint}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </InfoCard>
     </>
   )
 }

@@ -2,6 +2,9 @@ import { normalize } from './homeFeed'
 
 export const MESSAGE_LIMIT = 2000
 
+// Bấm Từ chối yêu cầu trò chuyện: chờ chừng này mới gửi lên server để còn kịp hoàn tác
+export const DECLINE_UNDO_MS = 15_000
+
 const PHONE = /(?:\+84|\b0)(?:[\s.-]?\d){9}\b/
 const EMAIL = /\S+@\S+\.\S+/
 const ADDRESS = /\d+\/\d+|\b(?:so nha|hem|ngo|ngach|kiet|duong so)\s*\d+/
@@ -49,19 +52,48 @@ const claimStatus = (claim, outgoing) => {
   return outgoing ? 'pending' : 'incoming'
 }
 
+// Hội thoại hỗ trợ
+const supportSide = (item) => (item.kind === 'support' ? (item.support ?? 'requester') : null)
+
+const threadPeer = (item, support) => {
+  if (support === 'requester') {
+    return {
+      ...peerNamed(item.peer?.username ?? 'Moderator', 'moderator'),
+      label: 'Hỗ trợ LostLink',
+    }
+  }
+  if (!item.peer) return { ...peerNamed(DELETED_ACCOUNT), deleted: true }
+  const role = support === 'internal' ? item.peer.role : 'user'
+  return peerNamed(item.peer.username, role, item.peer.avatarUrl ?? null)
+}
+
+const ROLE_NAMES = { admin: 'Admin', moderator: 'Moderator' }
+
+// Vai trò của người bên kia trong trao đổi nội bộ
+export const staffRoleName = (thread) => ROLE_NAMES[thread.peer.role] ?? 'Moderator'
+
+// Dòng phụ dưới tên trong danh sách khi hội thoại không gắn với bài đăng
+export function supportSubtitle(thread) {
+  if (thread.support === 'handler') return 'Yêu cầu hỗ trợ'
+  if (thread.support === 'internal') return `Trao đổi nội bộ · ${staffRoleName(thread)}`
+  return 'Khiếu nại, giao dịch bị treo, sự cố'
+}
+
 export function conversationThread(item) {
-  const support = item.kind === 'support'
+  const support = supportSide(item)
   return {
     id: item.id,
     type: 'conversation',
     conversationId: item.id,
     kind: item.kind,
-    peer: support
-      ? { ...peerNamed(item.peer?.username ?? 'Moderator', 'moderator'), label: 'Hỗ trợ LostLink' }
-      : item.peer
-        ? peerNamed(item.peer.username, 'user', item.peer.avatarUrl ?? null)
-        : { ...peerNamed(DELETED_ACCOUNT), deleted: true },
+    support,
+    peer: threadPeer(item, support),
     post: item.post ? { ...item.post, mine: ownsPost(item.post, item.receiver) } : null,
+    // Bài cùng món của người liên hệ (đi từ manh mối): luôn khác phía với bài chung
+    counterpart:
+      item.post && item.counterpart
+        ? { ...item.counterpart, mine: !ownsPost(item.post, item.receiver) }
+        : null,
     status: conversationStatus(item),
     receiver: item.receiver,
     closedBy: item.closedBy,
@@ -118,9 +150,18 @@ export function requestThread(post, now = Date.now()) {
 
 // Gộp ba nguồn thành danh sách hội thoại. Yêu cầu đã được đồng ý có hội thoại riêng nên bỏ qua;
 // lời giới thiệu đang soạn chỉ giữ khi bài đó chưa có yêu cầu hay hội thoại nào
-export function buildThreads({ conversations, claims, requests }) {
+// declining: yêu cầu vừa bấm Từ chối (id → hạn hoàn tác), chưa gửi lên server nhưng hiện như
+// đã từ chối, kèm undoUntil để hiện nút Hoàn tác
+export function buildThreads({ conversations, claims, requests, declining = {} }) {
   const fromConversations = conversations.map(conversationThread)
-  const fromClaims = claims.filter((claim) => claim.status !== 'linked').map(claimThread)
+  const fromClaims = claims
+    .filter((claim) => claim.status !== 'linked')
+    .map((claim) => {
+      const until = declining[claim.id]
+      return until
+        ? { ...claimThread({ ...claim, status: 'rejected' }), undoUntil: until }
+        : claimThread(claim)
+    })
   const taken = new Set(
     [...fromConversations, ...fromClaims].map((thread) => thread.post?.id).filter(Boolean)
   )

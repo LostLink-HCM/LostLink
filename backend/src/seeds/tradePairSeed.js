@@ -226,4 +226,4 @@ const seedTradePair = async () => {
   )
 }
 
-module.exports = { seedTradePair }
+module.exports = { seedTradePair, createPost, markContacted }

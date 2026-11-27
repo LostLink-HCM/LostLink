@@ -20,6 +20,7 @@
     "seed:avatars": "node src/seeds/index.js --avatars-only",
     "seed:leaderboard": "node src/seeds/index.js --leaderboard-only",
     "seed:trade-pair": "node src/seeds/index.js --trade-pair-only",
+    "seed:match-trades": "node src/seeds/index.js --match-trades-only",
     "db:sync-indexes": "node src/scripts/syncIndexes.js",
     "lint": "oxlint --deny-warnings",
     "test": "node --test --test-global-setup=tests/setup/globalSetup.js --require ./tests/setup/env.js --test-timeout=60000 \"tests/**/*.test.js\"",

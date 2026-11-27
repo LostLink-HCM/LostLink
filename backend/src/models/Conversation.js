@@ -79,7 +79,9 @@ const conversationSchema = new Schema(
 
     lastMessageAt: { type: Date, default: null },
     reminderSentAt: { type: Date, default: null },
+    counterpart: { type: Schema.Types.ObjectId, ref: 'Post', default: null },
     counterpartAsk: { type: Schema.Types.ObjectId, ref: 'Post', default: null },
+    counterpartOptions: [{ type: Schema.Types.ObjectId, ref: 'Post' }],
 
     events: [conversationEventSchema],
   },

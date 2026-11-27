@@ -31,7 +31,11 @@ module.exports = {
       ),
     201
   ),
-  closeConversation: send((req) => conversationService.closeConversation(idOf(req), req.user)),
+  closeConversation: send((req) =>
+    conversationService.closeConversation(idOf(req), req.user, {
+      notMatch: req.body?.notMatch === true,
+    })
+  ),
   reopenConversation: send((req) => conversationService.reopenConversation(idOf(req), req.user)),
   confirmReturn: send((req) => conversationService.confirmReturn(idOf(req), req.user)),
   answerCounterpart: send((req) =>
