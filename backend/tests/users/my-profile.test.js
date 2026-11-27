@@ -73,8 +73,11 @@ describe('UC13 - Xem hồ sơ cá nhân', () => {
       status: 'rejected',
       statusHistory: [{ status: 'rejected', note: 'Ảnh không rõ món đồ' }],
     })
-    await makePost(me, wallet.category, { title: 'Đã đóng', status: 'closed' })
-    await makePost(me, wallet.category, { title: 'Đã trao trả', status: 'returned' })
+    const closed = await makePost(me, wallet.category, { title: 'Đã đóng', status: 'closed' })
+    const returned = await makePost(me, wallet.category, {
+      title: 'Đã trao trả',
+      status: 'returned',
+    })
     await makePost(other, wallet.category, { title: 'Bài người khác' })
     await Conversation.create({
       kind: 'trade',
@@ -92,6 +95,12 @@ describe('UC13 - Xem hồ sơ cá nhân', () => {
       data.reviewingPosts.map((post) => post.title).sort(),
       [pending.title, rejected.title].sort()
     )
+    // Đã trao trả, Đã đóng ở mục riêng, không sửa hay đóng được nữa
+    assert.deepEqual(
+      data.finishedPosts.map((post) => post.title).sort(),
+      [closed.title, returned.title].sort()
+    )
+    assert.ok(data.finishedPosts.every((post) => !post.manage.canEdit && !post.manage.canClose))
     const byTitle = Object.fromEntries(
       [...data.posts, ...data.reviewingPosts].map((post) => [post.title, post.manage])
     )

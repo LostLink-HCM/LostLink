@@ -1,17 +1,13 @@
 const { Post, Review, User, UserBlock, UserFollow } = require('../models')
 const ApiError = require('../utils/ApiError')
 const imageService = require('./imageService')
-const {
-  activeTalksOf,
-  ownerControls,
-  publicCondition,
-  toPostCard,
-  withViewerState,
-} = require('./postService')
+const { activeTalksOf, ownerControls, toPostCard, withViewerState } = require('./postService')
 
 // Bài của tôi: Đang tìm, Đã liên hệ; Chờ duyệt, Bị từ chối chỉ chủ bài thấy (tab Chờ duyệt)
 const LISTED_STATUSES = ['searching', 'contacted']
 const REVIEWING_STATUSES = ['pending', 'rejected']
+// Đã trao trả, Đã đóng: chỉ chủ bài thấy trên trang cá nhân của mình, ở cuối danh sách
+const FINISHED_STATUSES = ['returned', 'closed']
 const REVIEWS_MAX = 20
 const ACTIVITY_UPDATE_INTERVAL_MS = 60 * 1000
 const PROFILE_FIELDS = 'username avatarUrl bio reputationScore returnCount badges createdAt'
@@ -91,7 +87,10 @@ const followingCountOf = async (userId) => {
 const getMyProfile = async (viewer) => {
   const [user, posts, feedback, followingCount] = await Promise.all([
     findProfileUser({ _id: viewer._id }),
-    findPosts({ owner: viewer._id, status: { $in: [...LISTED_STATUSES, ...REVIEWING_STATUSES] } }),
+    findPosts({
+      owner: viewer._id,
+      status: { $in: [...LISTED_STATUSES, ...REVIEWING_STATUSES, ...FINISHED_STATUSES] },
+    }),
     reviewsAbout(viewer._id),
     followingCountOf(viewer._id),
   ])
@@ -109,6 +108,10 @@ const getMyProfile = async (viewer) => {
       viewer
     ),
     reviewingPosts: posts.filter((post) => REVIEWING_STATUSES.includes(post.status)).map(toMyPost),
+    finishedPosts: await withViewerState(
+      posts.filter((post) => FINISHED_STATUSES.includes(post.status)).map(toMyPost),
+      viewer
+    ),
     followingCount,
     ...feedback,
   }
@@ -122,7 +125,7 @@ const relationOf = async (viewerId, targetId) => {
   return { following: Boolean(following), blocked: Boolean(blocked) }
 }
 
-// Hồ sơ người khác: thông tin, bài công khai (như Trang chủ) và lời cảm ơn công khai
+// Hồ sơ người khác: thông tin, bài đang tìm hoặc đã liên hệ và lời cảm ơn công khai
 const getUserProfile = async (username, viewer) => {
   // Tài khoản đang chờ xoá không hiện với người khác
   const user = await findProfileUser({ username, deleteRequestedAt: null })
@@ -131,7 +134,10 @@ const getUserProfile = async (username, viewer) => {
 
   const relation = await relationOf(viewer._id, user._id)
   const [posts, feedback] = await Promise.all([
-    relation.blocked ? [] : findPosts({ owner: user._id, ...publicCondition(Date.now()) }),
+    // Chỉ bài đang tìm hoặc đã liên hệ; bài đã trao trả, đã đóng không hiện với người khác
+    relation.blocked
+      ? []
+      : findPosts({ owner: user._id, isHidden: false, status: { $in: LISTED_STATUSES } }),
     reviewsAbout(user._id),
   ])
 
