@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useLocation, useOutletContext, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useOutletContext, useSearchParams } from 'react-router-dom'
 import Badge from '../../components/backoffice/Badge'
 import Button from '../../components/backoffice/Button'
 import DataTable, { cell } from '../../components/backoffice/DataTable'
@@ -15,6 +15,7 @@ import Notice from '../../components/backoffice/Notice'
 import Pagination from '../../components/backoffice/Pagination'
 import TypeBadge from '../../components/backoffice/TypeBadge'
 import { REJECT_REASONS } from '../../lib/moderator/moderation'
+import { postPath } from '../../lib/user/homeFeed'
 import {
   approveModeratorPendingPost,
   downloadModeratorPendingPostsCsv,
@@ -192,11 +193,6 @@ export default function Review() {
     } finally {
       setDetailLoading(false)
     }
-  }
-  const openDetail = (id) => {
-    setDetailPost(null)
-    setModal({ id, kind: 'detail' })
-    void loadDetail(id)
   }
   const openReject = (id) => {
     setReason(REJECT_REASONS[0])
@@ -448,13 +444,14 @@ export default function Review() {
                 </span>
               </td>
               <td className={cell}>
-                <button
-                  type="button"
+                <Link
+                  to={postPath(post)}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="mb-1.5 block cursor-pointer text-left text-small font-semibold leading-relaxed text-ink hover:text-primary hover:underline underline-offset-4"
-                  onClick={() => openDetail(post.id)}
                 >
                   {post.title}
-                </button>
+                </Link>
                 <TypeBadge type={post.type} />
               </td>
               <td className={cell}>

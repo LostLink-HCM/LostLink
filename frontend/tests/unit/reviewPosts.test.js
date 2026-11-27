@@ -22,6 +22,7 @@ describe('Dữ liệu trang kiểm duyệt bài đăng', () => {
           {
             id: 'post-1',
             code: 'LL-001',
+            slug: 'mat-vi-da',
             title: 'Mất ví',
             type: 'lost',
             status: 'pending',
@@ -59,6 +60,7 @@ describe('Dữ liệu trang kiểm duyệt bài đăng', () => {
       {
         id: 'post-1',
         postCode: 'LL-001',
+        slug: 'mat-vi-da',
         category: 'Ví & tiền',
         categorySlug: 'vi-tien',
         dateTime: '12/11/2026 09:30',

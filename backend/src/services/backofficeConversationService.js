@@ -106,7 +106,7 @@ const statePipeline = (user) => {
   ]
 }
 
-const listConversations = async (user, filters = {}) => {
+const listConversations = async (user, filters = {}, { unreadCountOnly = false } = {}) => {
   const page = Number(filters.page ?? 1)
   const limit = Math.min(Number(filters.limit ?? 20), MAX_PAGE_SIZE)
   const pipeline = [
@@ -289,17 +289,22 @@ const listConversations = async (user, filters = {}) => {
     pipeline.push({ $match: { $or: [{ '_peer.username': regex }, { '_peer.email': regex }] } })
   }
 
-  pipeline.push(
-    { $sort: { priority: -1, lastMessageAt: -1, updatedAt: -1, _id: 1 } },
-    {
-      $facet: {
-        items: [{ $skip: (page - 1) * limit }, { $limit: limit }],
-        total: [{ $count: 'count' }],
-      },
-    }
-  )
+  if (unreadCountOnly) {
+    pipeline.push({ $group: { _id: null, unreadCount: { $sum: '$unread' } } })
+  } else {
+    pipeline.push(
+      { $sort: { priority: -1, lastMessageAt: -1, updatedAt: -1, _id: 1 } },
+      {
+        $facet: {
+          items: [{ $skip: (page - 1) * limit }, { $limit: limit }],
+          total: [{ $count: 'count' }],
+        },
+      }
+    )
+  }
 
   const [result] = await Conversation.aggregate(pipeline)
+  if (unreadCountOnly) return { unreadCount: result?.unreadCount ?? 0 }
   const rows = result?.items ?? []
   const conversationIds = rows.map((conversation) => conversation._id)
   const senderIds = rows.map((conversation) => conversation._lastMessage?.sender).filter(Boolean)
@@ -373,6 +378,8 @@ const listConversations = async (user, filters = {}) => {
     },
   }
 }
+
+const unreadMessagesCount = (user) => listConversations(user, {}, { unreadCountOnly: true })
 
 const listContacts = async (user, { q = '', peerRole } = {}) => {
   const roles = user.role === 'admin' ? ['moderator'] : ['user', 'admin']
@@ -731,6 +738,7 @@ const openConversation = async (user, targetUserId) => {
 
 module.exports = {
   listConversations,
+  unreadMessagesCount,
   listContacts,
   getConversation,
   openConversation,

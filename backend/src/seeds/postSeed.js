@@ -116,7 +116,7 @@ const buildHistory = (definition, owner, moderator, createdAt, now) => {
   if (status === 'contacted') {
     history.push({
       status: 'contacted',
-      changedBy: null,
+      changedBy: owner._id,
       changedAt: new Date(reviewedAt.getTime() + HOUR),
     })
   }

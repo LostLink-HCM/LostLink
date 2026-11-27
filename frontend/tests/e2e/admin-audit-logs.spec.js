@@ -187,7 +187,7 @@ test.describe('Nhật ký thao tác của admin', () => {
       .getByRole('table', { name: 'Danh sách bài đăng của cộng đồng' })
       .getByRole('row')
       .filter({
-        has: page.getByRole('button', { name: 'Mất ví kiểm tra liên kết nhật ký', exact: true }),
+        has: page.getByRole('link', { name: 'Mất ví kiểm tra liên kết nhật ký', exact: true }),
       })
     await expect(postRow).toBeVisible()
     await page.mouse.move(0, 0)
@@ -200,13 +200,14 @@ test.describe('Nhật ký thao tác của admin', () => {
     await page.reload()
     await expect(postRow).toHaveCSS('background-color', 'rgb(255, 249, 219)')
     await expect(page.getByRole('dialog', { name: 'Chi tiết bài đăng' })).toHaveCount(0)
+    const postPagePromise = page.waitForEvent('popup')
     await postRow
-      .getByRole('button', { name: 'Mất ví kiểm tra liên kết nhật ký', exact: true })
+      .getByRole('link', { name: 'Mất ví kiểm tra liên kết nhật ký', exact: true })
       .click()
-    const detail = page.getByRole('dialog', { name: 'Chi tiết bài đăng' })
-    await expect(detail).toContainText(post.code)
-    await detail.getByText('Đóng', { exact: true }).click()
-    await expect(page).toHaveURL(new RegExp(`/admin/posts\\?post=${post.id}$`))
+    const postPage = await postPagePromise
+    await expect(postPage).toHaveURL(new RegExp(`/${post.slug}$`))
+    await expect(postPage.getByRole('heading', { level: 1, name: post.title })).toBeVisible()
+    await postPage.close()
 
     const savedSettings = await api.get('admin/settings', { headers: bearer(token) })
     expect(savedSettings.status()).toBe(200)

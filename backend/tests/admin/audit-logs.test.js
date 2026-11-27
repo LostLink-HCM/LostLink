@@ -213,6 +213,10 @@ describe('Nhật ký thao tác - API quản trị', () => {
     const { category } = await createWalletCategory()
     const approved = await makePost(member, category, { status: 'pending', code: 'L101126001' })
     const rejected = await makePost(member, category, { status: 'pending', code: 'L101126002' })
+    const statusUpdated = await makePost(member, category, {
+      status: 'pending',
+      code: 'L101126003',
+    })
     const approvePath = `/api/moderator/posts/${approved.id}/approve`
     const rejectPath = `/api/moderator/posts/${rejected.id}/reject`
     assert.equal((await modApi.post(approvePath, {})).status, 200)
@@ -220,8 +224,9 @@ describe('Nhật ký thao tác - API quản trị', () => {
     assert.equal((await modApi.post(rejectPath, {})).status, 422)
     assert.equal((await modApi.post(rejectPath, { reason: 'Ảnh chưa rõ' })).status, 200)
     const postPath = `/api/backoffice/posts/${approved.id}`
-    for (const status of ['contacted', 'contacted'])
-      assert.equal((await adminApi.patch(postPath + '/status', { status })).status, 200)
+    const statusPath = `/api/backoffice/posts/${statusUpdated.id}/status`
+    for (const status of ['searching', 'searching'])
+      assert.equal((await adminApi.patch(statusPath, { status })).status, 200)
     for (const body of [
       { isHidden: true, reason: 'Thông tin cần xác minh' },
       { isHidden: true, reason: 'Thông tin cần xác minh' },
@@ -241,8 +246,8 @@ describe('Nhật ký thao tác - API quản trị', () => {
     assert.deepEqual(byAction.approve.actor, { id: moderator.id, username: moderator.username })
     assert.equal(byAction.approve.actorRole, 'moderator')
     assert.equal(byAction.approve.detail.displayCode, approved.code)
-    assert.deepEqual(byAction.status.detail.before, { status: 'searching' })
-    assert.deepEqual(byAction.status.detail.after, { status: 'contacted' })
+    assert.deepEqual(byAction.status.detail.before, { status: 'pending' })
+    assert.deepEqual(byAction.status.detail.after, { status: 'searching' })
     assert.equal(byAction.reject.detail.reason, 'Ảnh chưa rõ')
     assert.equal(byAction.hide.detail.before.isHidden, false)
     assert.equal(byAction.hide.detail.after.isHidden, true)
@@ -347,7 +352,7 @@ describe('Nhật ký thao tác - API quản trị', () => {
       throw failure
     })
     for (const change of [
-      () => postService.updateStatus(post.id, admin, 'contacted'),
+      () => postService.updateStatus(post.id, admin, 'rejected', 'Thông tin cần xác minh'),
       () => postService.updateVisibility(post.id, admin, true, 'Thông tin cần xác minh'),
     ]) {
       await assert.rejects(change, failure)

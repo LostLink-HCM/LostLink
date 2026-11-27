@@ -1,4 +1,5 @@
-import { expect, loginThroughUi, test } from '../helpers/auth.js'
+import { createAccount, expect, loginThroughUi, test } from '../helpers/auth.js'
+import { bearer, createPost, tokenOf } from '../helpers/posts.js'
 
 // Bài mẫu trong dữ liệu seed của backend E2E. Mỗi test mở một bài riêng vì các test chạy
 // song song, mở chung một bài sẽ làm lệch số lượt xem mà test kia đang kiểm tra
@@ -7,6 +8,10 @@ const FOUND_TITLE = 'Nhặt được chìa khóa nhà có móc hình ngôi nhà'
 // Bài của tài khoản seed user01 (mật khẩu cố định trong backend/src/seeds/userSeed.js)
 const OWN_TITLE = 'Mất thẻ sinh viên trong bao nhựa trắng, dây đeo họa tiết lá'
 const SEED_USER = { email: 'user@lostlink.vn', password: 'User@1234' }
+const BACKOFFICE = [
+  { role: 'admin', email: 'admin@lostlink.vn', password: 'Admin@123' },
+  { role: 'moderator', email: 'mod@lostlink.vn', password: 'Mod@1234' },
+]
 
 const findCard = async (api, title) => {
   const res = await api.get(`posts?${new URLSearchParams({ q: title, range: '30d' })}`)
@@ -105,4 +110,69 @@ test.describe('UC04 - Xem chi tiết bài đăng', () => {
     // Khối manh mối (gợi ý ghép cặp) chỉ hiện với bài của chính mình
     await expect(page.getByRole('heading', { name: 'Manh mối' })).toBeVisible()
   })
+
+  for (const [index, manager] of BACKOFFICE.entries()) {
+    test(`${manager.role} xem bài chờ duyệt, lịch sử và thao tác kiểm duyệt trên trang chi tiết`, async ({
+      page,
+      api,
+    }) => {
+      const owner = await createAccount(api)
+      const ownerToken = await tokenOf(api, owner)
+      const title = `Bài chờ duyệt ${manager.role} ${Date.now().toString(36)}`
+      const post = await createPost(api, ownerToken, { title, approve: false })
+
+      await page.goto('/login')
+      await loginThroughUi(page, manager)
+      const navigationName = manager.role === 'admin' ? 'Điều hướng admin' : 'Điều hướng moderator'
+      await expect(page.getByRole('navigation', { name: navigationName })).toBeVisible()
+      await page.goto(`/mat-do/${post.slug}`)
+
+      await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible()
+      const actions = page.getByRole('region', { name: 'Thao tác kiểm duyệt' })
+      await expect(actions.getByRole('button', { name: 'Duyệt', exact: true })).toBeVisible()
+      await expect(actions.getByRole('button', { name: 'Từ chối', exact: true })).toBeVisible()
+      await expect(page.getByRole('region', { name: 'Lịch sử trạng thái' })).toContainText(
+        'Chờ xét duyệt'
+      )
+
+      const isApprove = index === 0
+      const endpoint = `/api/backoffice/posts/${post.id}/${isApprove ? 'approve' : 'reject'}`
+      const responsePromise = page.waitForResponse(
+        (response) => response.url().endsWith(endpoint) && response.request().method() === 'POST'
+      )
+      await actions
+        .getByRole('button', { name: isApprove ? 'Duyệt' : 'Từ chối', exact: true })
+        .click()
+      const dialog = page.getByRole('dialog', { name: 'Xác nhận' })
+      if (isApprove) {
+        await dialog.getByRole('button', { name: 'Duyệt', exact: true }).click()
+      } else {
+        await dialog.getByRole('combobox', { name: 'Lý do từ chối' }).selectOption('other')
+        await dialog
+          .getByRole('textbox', { name: 'Lý do từ chối' })
+          .fill('Ảnh chưa thể hiện rõ món đồ')
+        await dialog.getByRole('button', { name: 'Từ chối', exact: true }).click()
+      }
+      const response = await responsePromise
+      expect(response.status()).toBe(200)
+      if (!isApprove) {
+        expect(response.request().postDataJSON()).toEqual({ reason: 'Ảnh chưa thể hiện rõ món đồ' })
+      }
+
+      const managerToken = await tokenOf(api, manager)
+      const saved = await api.get(`backoffice/posts/${post.id}`, {
+        headers: bearer(managerToken),
+      })
+      expect(saved.status()).toBe(200)
+      expect((await saved.json()).data.status).toBe(isApprove ? 'searching' : 'rejected')
+      await expect(page.getByRole('region', { name: 'Lịch sử trạng thái' })).toContainText(
+        isApprove ? 'Đang tìm' : 'Đã từ chối'
+      )
+      if (!isApprove) {
+        await expect(page.getByRole('region', { name: 'Lịch sử trạng thái' })).toContainText(
+          'Lý do: Ảnh chưa thể hiện rõ món đồ'
+        )
+      }
+    })
+  }
 })

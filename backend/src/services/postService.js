@@ -163,7 +163,11 @@ const toPostCard = (post) => ({
   timeTo: post.timeTo,
   createdAt: post.createdAt,
   author: toAuthor(post.owner),
-  counts: { likes: post.likeCount, comments: post.commentCount, views: post.viewCount },
+  counts: {
+    likes: post.likeCount ?? 0,
+    comments: post.commentCount ?? 0,
+    views: post.viewCount ?? 0,
+  },
 })
 
 // Gắn trạng thái Thích, Lưu, Theo dõi của người xem vào card (Guest không có)
@@ -252,7 +256,7 @@ const listPublicPosts = async (params, viewer = null) => {
 const postNotFound = () => new ApiError(404, POST_NOT_FOUND, undefined, 'POST_NOT_FOUND')
 
 // Dữ liệu trang chi tiết. Vẫn không trả vị trí chính xác (chỉ vị trí đã làm lệch), đồ bên trong
-// (dùng để xác minh chủ sở hữu), lịch sử trạng thái, lý do ẩn hay email của người đăng
+// (dùng để xác minh chủ sở hữu), lý do ẩn hay email của người đăng
 const toPostDetail = (post, comments, viewer) => ({
   id: post._id,
   slug: post.slug,
@@ -285,7 +289,11 @@ const toPostDetail = (post, comments, viewer) => ({
         returnCount: post.owner.returnCount,
       }
     : null,
-  counts: { likes: post.likeCount, comments: post.commentCount, views: post.viewCount },
+  counts: {
+    likes: post.likeCount ?? 0,
+    comments: post.commentCount ?? 0,
+    views: post.viewCount ?? 0,
+  },
   comments: comments.map((comment) => ({
     id: comment._id,
     body: comment.body,
@@ -383,17 +391,24 @@ const getPostDetail = async ({ type, slug }, viewer = null) => {
     .populate('owner', 'username avatarUrl reputationScore returnCount')
     .populate('attributes.attribute', 'name')
     .populate('attributes.attributeValue', 'value')
+    .populate({ path: 'statusHistory.changedBy', select: 'username role' })
     .lean()
   if (!post) throw postNotFound()
 
   const isOwner = Boolean(viewer && post.owner?._id.equals(viewer._id))
-  if (!isOwner && !isPublic(post, Date.now())) throw postNotFound()
+  const isBackofficeViewer = ['admin', 'moderator'].includes(viewer?.role)
+  if (!isOwner && !isBackofficeViewer && !isPublic(post, Date.now())) throw postNotFound()
   // Người dùng đã chặn người đăng thì coi như bài không tồn tại, giống danh sách công khai
-  const blocked = viewer ? await UserBlock.find({ blocker: viewer._id }).distinct('blocked') : []
-  if (post.owner && blocked.some((id) => id.equals(post.owner._id))) throw postNotFound()
+  const blocked =
+    viewer && !isBackofficeViewer
+      ? await UserBlock.find({ blocker: viewer._id }).distinct('blocked')
+      : []
+  if (!isBackofficeViewer && post.owner && blocked.some((id) => id.equals(post.owner._id))) {
+    throw postNotFound()
+  }
 
   // Chủ bài tự xem bài của mình không tính lượt xem
-  if (!isOwner && (await recordView(post._id, viewer))) {
+  if (!isOwner && !isBackofficeViewer && (await recordView(post._id, viewer))) {
     await Post.updateOne(
       { _id: post._id },
       { $inc: { viewCount: 1, hotScore: Post.hotScoreDelta({ views: 1 }) } }
@@ -411,7 +426,18 @@ const getPostDetail = async ({ type, slug }, viewer = null) => {
     viewerState(post, viewer, isOwner),
   ])
 
-  return toPostDetail(post, comments, viewerInfo)
+  const detail = toPostDetail(post, comments, viewerInfo)
+  if (isOwner || isBackofficeViewer) {
+    detail.statusHistory = (post.statusHistory || []).map(
+      ({ status, note, changedAt, changedBy }) => ({
+        status,
+        note: note || '',
+        changedAt,
+        changedBy: changedBy?.username || null,
+      })
+    )
+  }
+  return detail
 }
 
 // ----- Đăng bài mất đồ / nhặt được

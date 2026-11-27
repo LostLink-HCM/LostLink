@@ -6,6 +6,24 @@ export const STATUS_LABELS = {
   returned: 'Đã trao trả',
   closed: 'Đã đóng',
 }
+
+const ALLOWED_STATUS_TRANSITIONS = {
+  pending: ['searching', 'rejected'],
+  searching: ['rejected'],
+  contacted: ['rejected'],
+  rejected: [],
+  returned: [],
+  closed: [],
+}
+
+export function canTransitionPostStatus(currentStatus, nextStatus) {
+  return ALLOWED_STATUS_TRANSITIONS[currentStatus]?.includes(nextStatus) ?? false
+}
+
+export function getAllowedPostStatusTransitions(currentStatus) {
+  return ALLOWED_STATUS_TRANSITIONS[currentStatus] || []
+}
+
 export const EMPTY_FILTERS = {
   status: '',
   category: '',

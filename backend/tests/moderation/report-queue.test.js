@@ -315,14 +315,12 @@ describe('Hàng đợi report của Moderator - API', () => {
     assert.equal(savedPost.isHidden, true)
     assert.equal(savedPost.hiddenReason, 'Thông tin cần xác minh')
     assert.equal(await AuditLog.countDocuments({ entityType: 'Post', action: 'hide' }), 1)
-    const notice = await Notification.findOne({ user: owner._id, type: 'warning' }).lean()
+    const notice = await Notification.findOne({ user: owner._id, type: 'post_hidden' }).lean()
     assert.ok(notice)
     assert.equal(notice.refType, 'Post')
     assert.equal(String(notice.refId), String(post.id))
-    assert.match(
-      notice.preview,
-      /Bài đăng Bài đăng bị báo cáo của bạn đã bị ẩn\. Lý do: Thông tin cần xác minh/
-    )
+    assert.equal(notice.preview, 'Thông tin cần xác minh')
+    assert.equal(notice.body, 'Thông tin cần xác minh')
     assert.equal((await Report.findById(report.id)).status, 'resolved')
   })
 

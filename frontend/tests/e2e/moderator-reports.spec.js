@@ -11,6 +11,8 @@ const postReport = (overrides = {}) => ({
   target: {
     id: 'post-1',
     code: 'F181126001',
+    type: 'found',
+    slug: 'nhat-duoc-vi-quan-1',
     title: 'Nhặt được ví ở Quận 1',
     isHidden: false,
     owner: { id: 'owner-1', username: 'reportowner', role: 'user', status: 'active' },
@@ -179,6 +181,19 @@ test.describe('Hàng đợi report của moderator', () => {
       table(page).getByRole('link', { name: second.target.username, exact: true })
     ).toBeVisible()
     expect(mocked.requests.some(({ query }) => query?.page === '2')).toBeTruthy()
+  })
+
+  test('click đối tượng bài đăng mở chi tiết ở tab mới', async ({ page }) => {
+    const report = postReport()
+    await mockReports(page, { items: [report], detail: report })
+    await openReports(page)
+    await filters(page).getByRole('combobox', { name: 'Loại Report' }).selectOption('post')
+
+    const detailPromise = page.waitForEvent('popup')
+    await table(page).getByRole('link', { name: report.target.title, exact: true }).click()
+    const detail = await detailPromise
+    await expect(detail).toHaveURL(`/nhat-duoc/${report.target.slug}`)
+    await detail.close()
   })
 
   test('mở chi tiết và hiển thị nội dung, ảnh bằng chứng, lịch sử report', async ({ page }) => {

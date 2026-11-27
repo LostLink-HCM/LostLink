@@ -612,18 +612,23 @@ const resolveReport = async (id, moderator, action, reason = '') => {
         updatedReport.targetType === 'post' ? updatedReport.targetPost : updatedReport.targetUser,
     })
     try {
-      if (action === 'warn' || action === 'lock' || action === 'hide') {
+      if (action === 'warn' || action === 'lock') {
         await notify([targetUser._id], {
           type: 'warning',
           actor: moderator._id,
-          refType: action === 'hide' ? 'Post' : 'User',
-          refId: action === 'hide' ? targetPost._id : targetUser._id,
-          text:
-            action === 'lock'
-              ? `Tài khoản của bạn đã bị khóa. Lý do: ${reason}`
-              : action === 'hide'
-                ? `Bài đăng ${targetPost.title} của bạn đã bị ẩn. Lý do: ${reason}`
-                : reason,
+          refType: 'User',
+          refId: targetUser._id,
+          text: action === 'lock' ? `Tài khoản của bạn đã bị khóa. Lý do: ${reason}` : reason,
+        })
+      }
+      if (action === 'hide') {
+        await notify([targetUser._id], {
+          type: 'post_hidden',
+          actor: moderator._id,
+          refType: 'Post',
+          refId: targetPost._id,
+          text: reason,
+          body: reason,
         })
       }
       await notify(reporterIds, {

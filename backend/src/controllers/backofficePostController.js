@@ -3,6 +3,7 @@ const { matchedData } = require('express-validator')
 const asyncHandler = require('../utils/asyncHandler')
 const { formatVnDateTime, sendCsv } = require('../utils/csv')
 const backofficePostService = require('../services/backofficePostService')
+const moderationService = require('../services/moderationService')
 
 const listPosts = asyncHandler(async (req, res) => {
   const filters = matchedData(req, { locations: ['query'] })
@@ -87,4 +88,25 @@ const updateVisibility = asyncHandler(async (req, res) => {
   res.json({ success: true, data })
 })
 
-module.exports = { listPosts, exportPosts, getPost, updateStatus, updateVisibility }
+const approvePendingPost = asyncHandler(async (req, res) => {
+  const { id } = matchedData(req, { locations: ['params'] })
+  const data = await moderationService.approvePendingPost(id, req.user)
+  res.json({ success: true, data })
+})
+
+const rejectPendingPost = asyncHandler(async (req, res) => {
+  const { id } = matchedData(req, { locations: ['params'] })
+  const { reason } = matchedData(req, { locations: ['body'] })
+  const data = await moderationService.rejectPendingPost(id, req.user, reason)
+  res.json({ success: true, data })
+})
+
+module.exports = {
+  listPosts,
+  exportPosts,
+  getPost,
+  updateStatus,
+  updateVisibility,
+  approvePendingPost,
+  rejectPendingPost,
+}

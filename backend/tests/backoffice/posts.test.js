@@ -39,13 +39,14 @@ const idsOf = (res) => res.body.data.items.map((post) => post.id)
 
 describe('Quản lý tất cả bài đăng - moderator và admin', () => {
   test('Guest và chủ bài thường không có quyền; cả moderator và admin được xem, đổi trạng thái, ẩn/hiện', async () => {
-    const post = await makePost(owner, wallet.category)
+    const post = await makePost(owner, wallet.category, { status: 'pending' })
     const session = await loginAs(owner.email)
     const ordinary = authed(session.client, session.accessToken)
     const guest = newClient()
     const guestApi = {
       get: (url) => guest.get(url),
       patch: (url, body) => guest.patch(url).send(body),
+      post: (url, body) => guest.post(url).send(body),
     }
     for (const [client, expected] of [
       [guestApi, 401],
@@ -62,15 +63,20 @@ describe('Quản lý tất cả bài đăng - moderator và admin', () => {
           .status,
         expected
       )
+      assert.equal((await client.post(`${path}/${post.id}/approve`)).status, expected)
+      assert.equal(
+        (await client.post(`${path}/${post.id}/reject`, { reason: 'Ảnh không rõ' })).status,
+        expected
+      )
     }
-    assert.equal((await Post.findById(post.id)).status, 'searching')
+    assert.equal((await Post.findById(post.id)).status, 'pending')
     assert.equal((await Post.findById(post.id)).isHidden, false)
 
     for (const actor of actors) {
       assert.equal((await actor.api.get(path)).status, 200, actor.user.role)
       assert.equal((await actor.api.get(`${path}/${post.id}`)).status, 200)
       assert.equal(
-        (await actor.api.patch(`${path}/${post.id}/status`, { status: 'contacted' })).status,
+        (await actor.api.patch(`${path}/${post.id}/status`, { status: 'searching' })).status,
         200
       )
       assert.equal(
@@ -83,6 +89,63 @@ describe('Quản lý tất cả bài đăng - moderator và admin', () => {
         200
       )
     }
+  })
+
+  test('admin và moderator duyệt/từ chối bài chờ duyệt từ trang chi tiết, lưu lịch sử và thông báo', async () => {
+    const approved = await makePost(owner, wallet.category, {
+      status: 'pending',
+      statusHistory: [{ status: 'pending', changedBy: owner._id }],
+    })
+    const rejected = await makePost(owner, wallet.category, {
+      status: 'pending',
+      statusHistory: [{ status: 'pending', changedBy: owner._id }],
+    })
+
+    const approval = await actors[0].api.post(`${path}/${approved.id}/approve`)
+    assert.equal(approval.status, 200)
+    assert.equal(approval.body.data.status, 'searching')
+
+    const reason = 'Ảnh chưa thể hiện rõ món đồ'
+    const denial = await actors[1].api.post(`${path}/${rejected.id}/reject`, { reason })
+    assert.equal(denial.status, 200)
+    assert.equal(denial.body.data.status, 'rejected')
+
+    const [savedApproved, savedRejected] = await Promise.all([
+      Post.findById(approved.id),
+      Post.findById(rejected.id),
+    ])
+    assert.equal(savedApproved.statusHistory.at(-1).status, 'searching')
+    assert.equal(String(savedApproved.statusHistory.at(-1).changedBy), actors[0].user.id)
+    assert.equal(savedRejected.statusHistory.at(-1).status, 'rejected')
+    assert.equal(savedRejected.statusHistory.at(-1).note, reason)
+    assert.equal(String(savedRejected.statusHistory.at(-1).changedBy), actors[1].user.id)
+
+    const notices = await Notification.find({ refId: { $in: [approved.id, rejected.id] } }).lean()
+    assert.equal(notices.length, 2)
+    assert.deepEqual(
+      notices
+        .map(({ refId, type, actor, preview }) => ({
+          refId: String(refId),
+          type,
+          actor: String(actor),
+          preview,
+        }))
+        .sort((a, b) => a.refId.localeCompare(b.refId)),
+      [
+        {
+          refId: approved.id,
+          type: 'post_approved',
+          actor: actors[0].user.id,
+          preview: approved.title,
+        },
+        {
+          refId: rejected.id,
+          type: 'post_rejected',
+          actor: actors[1].user.id,
+          preview: reason,
+        },
+      ].sort((a, b) => a.refId.localeCompare(b.refId))
+    )
   })
 
   test('danh sách gồm đủ sáu trạng thái và bài bị ẩn, xếp mới nhất trước; hết bài trả danh sách rỗng', async () => {
@@ -274,33 +337,43 @@ describe('Quản lý tất cả bài đăng - moderator và admin', () => {
     }
   })
 
-  test('cả hai vai trò đổi được sáu trạng thái, lưu đúng người xử lý và giữ mã, slug, trạng thái hiển thị', async () => {
+  test('admin và moderator chỉ cập nhật trạng thái theo các chuyển đổi được phép', async () => {
+    const transitions = [
+      { from: 'pending', to: 'searching', allowed: true },
+      { from: 'pending', to: 'rejected', allowed: true },
+      { from: 'searching', to: 'rejected', allowed: true },
+      { from: 'contacted', to: 'rejected', allowed: true },
+      { from: 'searching', to: 'contacted', allowed: false },
+      { from: 'contacted', to: 'searching', allowed: false },
+      { from: 'searching', to: 'returned', allowed: false },
+      { from: 'contacted', to: 'closed', allowed: false },
+      { from: 'rejected', to: 'searching', allowed: false },
+      { from: 'returned', to: 'searching', allowed: false },
+      { from: 'closed', to: 'searching', allowed: false },
+    ]
+
     for (const actor of actors) {
-      const post = await makePost(owner, wallet.category, { type: 'found', isHidden: true })
-      for (const status of [
-        'pending',
-        'rejected',
-        'searching',
-        'contacted',
-        'returned',
-        'closed',
-      ]) {
-        const res = await actor.api.patch(`${path}/${post.id}/status`, {
-          status,
-          reason: '  Cần xác minh  ',
+      for (const { from, to, allowed } of transitions) {
+        const post = await makePost(owner, wallet.category, {
+          type: 'found',
+          status: from,
+          isHidden: true,
         })
-        assert.equal(res.status, 200, `${actor.user.role}: ${status}`)
-        assert.equal(res.body.data.status, status)
-        assert.equal(res.body.data.code, post.code)
-        assert.ok(res.body.data.changedAt)
-      }
-      const saved = await Post.findById(post.id)
-      assert.equal(saved.slug, post.slug)
-      assert.equal(saved.isHidden, true)
-      assert.equal(saved.statusHistory.length, 6)
-      for (const entry of saved.statusHistory) {
-        assert.equal(String(entry.changedBy), actor.user.id)
-        assert.equal(entry.note, 'Cần xác minh')
+        const response = await actor.api.patch(`${path}/${post.id}/status`, {
+          status: to,
+          reason: 'Cần xác minh',
+        })
+        assert.equal(response.status, allowed ? 200 : 409, `${actor.user.role}: ${from} -> ${to}`)
+
+        const saved = await Post.findById(post.id)
+        assert.equal(saved.slug, post.slug)
+        assert.equal(saved.isHidden, true)
+        assert.equal(saved.status, allowed ? to : from)
+        assert.equal(saved.statusHistory.length, allowed ? 1 : 0)
+        if (allowed) {
+          assert.equal(String(saved.statusHistory[0].changedBy), actor.user.id)
+          assert.equal(saved.statusHistory[0].note, 'Cần xác minh')
+        }
       }
     }
   })
@@ -334,7 +407,7 @@ describe('Quản lý tất cả bài đăng - moderator và admin', () => {
     assert.equal((await Post.findById(post.id)).statusHistory.at(-1).note, reason)
   })
 
-  test('đóng bài làm hết hạn ghép nối, từ chối yêu cầu đang chờ, báo người theo dõi; gửi lại không lặp tác động', async () => {
+  test('admin và moderator không thể tự đóng bài; các giao dịch và thông báo được giữ nguyên', async () => {
     const follower = await createUser({ username: 'theodoi', email: 'follower@example.com' })
     const post = await makePost(owner, wallet.category)
     const found = await makePost(follower, wallet.category, { type: 'found' })
@@ -348,37 +421,31 @@ describe('Quản lý tất cả bài đăng - moderator và admin', () => {
       { post: post._id, user: follower._id },
       { post: post._id, user: actors[0].user._id },
     ])
-    const first = await api.patch(`${path}/${post.id}/status`, { status: 'closed' })
-    assert.equal(first.status, 200)
-    assert.equal((await MatchSuggestion.findById(match.id)).state, 'stale')
-    assert.equal((await Claim.findById(claim.id)).status, 'expired')
-    const notices = await Notification.find({ refId: post.id }).lean()
-    assert.deepEqual(notices.map((item) => item.type).sort(), ['post_closed', 'trade_ended'])
-    assert.ok(notices.every((item) => String(item.user) === follower.id))
-    assert.ok(notices.every((item) => String(item.actor) === actors[0].user.id))
-
-    const repeated = await api.patch(`${path}/${post.id}/status`, { status: 'closed' })
-    assert.equal(repeated.status, 200)
-    assert.equal(repeated.body.data.changedAt, first.body.data.changedAt)
-    assert.equal((await Post.findById(post.id)).statusHistory.length, 1)
-    assert.equal(await Notification.countDocuments({ refId: post.id }), 2)
+    const response = await api.patch(`${path}/${post.id}/status`, { status: 'closed' })
+    assert.equal(response.status, 409)
+    assert.equal((await Post.findById(post.id)).status, 'searching')
+    assert.equal((await Post.findById(post.id)).statusHistory.length, 0)
+    assert.equal((await MatchSuggestion.findById(match.id)).state, 'pending')
+    assert.equal((await Claim.findById(claim.id)).status, 'pending')
+    assert.equal(await Notification.countDocuments({ refId: post.id }), 0)
   })
 
-  test('đánh dấu Đã trao trả chỉ tính lần trao trả hai bên đã xác nhận, hoàn tác tính lại đúng', async () => {
+  test('admin và moderator không thể tự chuyển bài sang Đã trao trả', async () => {
     const outside = await makePost(owner, wallet.category, { type: 'found' })
-    await actors[1].api.patch(`${path}/${outside.id}/status`, { status: 'returned' })
+    const outsideResponse = await actors[1].api.patch(`${path}/${outside.id}/status`, {
+      status: 'returned',
+    })
+    assert.equal(outsideResponse.status, 409)
     assert.equal((await User.findById(owner.id)).returnCount, 0)
 
     const post = await makePost(owner, wallet.category, { type: 'found' })
     const receiver = await createUser({ username: 'nguoinhan', email: 'nhan@example.com' })
     await makeConfirmedTrade(post, receiver)
     const returned = await actors[1].api.patch(`${path}/${post.id}/status`, { status: 'returned' })
-    assert.equal(returned.status, 200)
-    assert.equal((await User.findById(owner.id)).returnCount, 1)
-    const restored = await api.patch(`${path}/${post.id}/status`, { status: 'searching' })
-    assert.equal(restored.status, 200)
+    assert.equal(returned.status, 409)
     assert.equal((await User.findById(owner.id)).returnCount, 0)
-    assert.equal((await Post.findById(post.id)).statusHistory.length, 2)
+    assert.equal((await Post.findById(post.id)).status, 'searching')
+    assert.equal((await Post.findById(post.id)).statusHistory.length, 0)
   })
 
   test('ẩn/hiện độc lập với trạng thái, lưu lý do đã trim và tác động đúng bài công khai cho cả hai vai trò', async () => {

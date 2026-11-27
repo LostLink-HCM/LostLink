@@ -121,39 +121,48 @@ export default function BackofficeLayout({
         </div>
 
         <nav aria-label={sidebarLabel} className="flex min-h-0 flex-1 flex-col gap-1">
-          {navigation.map((item) => (
-            <NavLink
-              key={item.path}
-              to={`${basePath}${item.path}`}
-              end
-              aria-label={item.label}
-              title={item.label}
-              className={({ isActive }) =>
-                cx(
-                  'flex items-center gap-3 rounded-lg border-l-3 px-3 py-2.75 text-caption font-semibold transition-colors',
-                  isActive
-                    ? 'border-l-focus bg-white/8 text-white'
-                    : 'border-transparent text-sidebar-ink hover:bg-white/5 hover:text-white',
-                  collapsed && 'lg:justify-center lg:pr-0.75 lg:pl-0',
-                  focusRing
-                )
-              }
-              onClick={(event) => navigateFromSidebar(event, `${basePath}${item.path}`)}
-            >
-              <Icon name={item.icon} />
-              <span className={cx('min-w-0 truncate', collapsed && 'lg:hidden')}>{item.label}</span>
-              {(pendingCounts[item.path] ?? (item.path === pendingPath ? pendingCount : 0)) > 0 && (
-                <span
-                  className={cx(
-                    'ml-auto rounded-md bg-white/10 px-1.5 text-caption text-red-400',
-                    collapsed && 'lg:hidden'
-                  )}
-                >
-                  {pendingCounts[item.path] ?? (item.path === pendingPath ? pendingCount : 0)}
+          {navigation.map((item) => {
+            const count = pendingCounts[item.path] ?? (item.path === pendingPath ? pendingCount : 0)
+            const countLabel =
+              item.path === '/review'
+                ? `${count} bài chờ duyệt`
+                : `${count} ${item.path === '/messages' ? 'tin nhắn' : 'thông báo'} chưa đọc`
+            return (
+              <NavLink
+                key={item.path}
+                to={`${basePath}${item.path}`}
+                end
+                aria-label={count > 0 ? `${item.label}, ${countLabel}` : item.label}
+                title={item.label}
+                className={({ isActive }) =>
+                  cx(
+                    'flex items-center gap-3 rounded-lg border-l-3 px-3 py-2.75 text-caption font-semibold transition-colors',
+                    isActive
+                      ? 'border-l-focus bg-white/8 text-white'
+                      : 'border-transparent text-sidebar-ink hover:bg-white/5 hover:text-white',
+                    collapsed && 'lg:justify-center lg:pr-0.75 lg:pl-0',
+                    focusRing
+                  )
+                }
+                onClick={(event) => navigateFromSidebar(event, `${basePath}${item.path}`)}
+              >
+                <Icon name={item.icon} />
+                <span className={cx('min-w-0 truncate', collapsed && 'lg:hidden')}>
+                  {item.label}
                 </span>
-              )}
-            </NavLink>
-          ))}
+                {count > 0 && (
+                  <span
+                    className={cx(
+                      'ml-auto grid size-5 shrink-0 place-items-center rounded-full bg-danger text-[10px] leading-none font-bold text-white',
+                      collapsed && 'lg:hidden'
+                    )}
+                  >
+                    {count > 99 ? '99+' : count}
+                  </span>
+                )}
+              </NavLink>
+            )
+          })}
         </nav>
 
         <div
