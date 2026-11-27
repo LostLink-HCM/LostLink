@@ -127,7 +127,7 @@ test.describe('UC27 - Đóng bài / đánh dấu đã trao trả', () => {
     await dialog.getByRole('button', { name: 'Xác nhận' }).click()
 
     await expect(page.getByText('Cập nhật trạng thái bài thành công.')).toBeVisible()
-    await expect(page.getByText('Đã đóng', { exact: true })).toBeVisible()
+    await expect(cardOf(page, title).getByText('Đã đóng', { exact: true })).toBeVisible()
     await expect(
       (await openPostMenu(page, title)).getByRole('menuitem', { name: 'Đóng bài' })
     ).toHaveCount(0)

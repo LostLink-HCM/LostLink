@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import BackofficeLayout from '../../components/backoffice/BackofficeLayout'
 import { createEmptyMessageState } from '../../lib/backoffice/messages'
 import useBackofficeUnreadCount from '../../hooks/useBackofficeUnreadCount'
+import useBackofficeMessageUnreadCount from '../../hooks/useBackofficeMessageUnreadCount'
 import useSystemSettings from '../../hooks/useSystemSettings'
 
 const navigation = [
@@ -30,8 +31,9 @@ export default function AdminLayout() {
   const [messageState, setMessageState] = useState(createEmptyMessageState)
   const { unreadCount: unreadNotifications, setUnreadCount: setNotificationUnreadCount } =
     useBackofficeUnreadCount()
+  const { unreadCount: unreadMessages, refreshUnreadCount: refreshMessageUnreadCount } =
+    useBackofficeMessageUnreadCount()
   const settings = useSystemSettings()
-  const unreadMessages = messageState.threads.reduce((total, thread) => total + thread.unread, 0)
 
   return (
     <BackofficeLayout
@@ -49,6 +51,7 @@ export default function AdminLayout() {
         requestSettingsNavigation,
         messageState,
         setMessageState,
+        refreshMessageUnreadCount,
         setNotificationUnreadCount,
         ...settings,
       }}

@@ -32,7 +32,7 @@ export function toBackofficePost(post) {
     id: post.id,
     postCode: post.code || '',
     slug: post.slug || '',
-    publicDetailAvailable: Boolean(post.publicDetailAvailable),
+    detailAvailable: Boolean(post.detailAvailable),
     title: post.title || '',
     category: category.name || '',
     categorySlug: category.slug || '',
@@ -46,10 +46,11 @@ export function toBackofficePost(post) {
     desc: post.description || '',
     images: Array.isArray(post.images) ? post.images : post.coverImage ? [post.coverImage] : [],
     statusHistory: Array.isArray(post.statusHistory)
-      ? post.statusHistory.map(({ status, note, changedAt }) => ({
+      ? post.statusHistory.map(({ status, note, changedAt, changedBy }) => ({
           status,
           dateTime: formatDateTime(changedAt),
           reason: note || '',
+          changedBy: changedBy || 'Hệ thống',
         }))
       : [],
     views: counts.views ?? 0,
@@ -109,6 +110,18 @@ export async function getBackofficePost(id) {
 export async function updateBackofficePostStatus(id, status, reason = '') {
   const response = await api.patch('/backoffice/posts/' + encodeURIComponent(id) + '/status', {
     status,
+    reason,
+  })
+  return response.data
+}
+
+export async function approveBackofficePendingPost(id) {
+  const response = await api.post('/backoffice/posts/' + encodeURIComponent(id) + '/approve', {})
+  return response.data
+}
+
+export async function rejectBackofficePendingPost(id, reason) {
+  const response = await api.post('/backoffice/posts/' + encodeURIComponent(id) + '/reject', {
     reason,
   })
   return response.data

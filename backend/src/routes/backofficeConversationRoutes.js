@@ -20,6 +20,7 @@ router.use(protect, requireRole('admin', 'moderator'), backofficeInteractiveLimi
 
 router.get('/', listRules, validate, ctrl.list)
 router.get('/contacts', contactsRules, validate, ctrl.contacts)
+router.get('/unread-count', ctrl.unreadCount)
 router.post('/', targetRules, validate, ctrl.open)
 
 const byId = [conversationIdRules, rejectInvalidConversationId]

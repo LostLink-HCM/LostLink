@@ -17,6 +17,8 @@ import ActionLockNotice from './ActionLockNotice'
 import {
   EMPTY_FILTERS,
   STATUS_LABELS,
+  canTransitionPostStatus,
+  getAllowedPostStatusTransitions,
   hasInvalidRange,
   validateHideReason,
 } from '../../lib/backoffice/posts'
@@ -33,6 +35,7 @@ import useBackofficePageSize from '../../hooks/useBackofficePageSize'
 import useLinkedHighlight from '../../hooks/useLinkedHighlight'
 import useBackofficeActionLock from '../../hooks/useBackofficeActionLock'
 import { cx, linkedHighlight } from './classes'
+import { REJECT_REASONS } from '../../lib/moderator/moderation'
 
 const STATUS_TONES = {
   pending: 'warning',
@@ -253,6 +256,7 @@ export default function PostsWorkspace() {
   const [modal, setModal] = useState(null)
   const [nextStatus, setNextStatus] = useState('')
   const [statusReason, setStatusReason] = useState('')
+  const [customStatusReason, setCustomStatusReason] = useState('')
   const [statusReasonError, setStatusReasonError] = useState('')
   const statusReasonRef = useRef(null)
   const [actionError, setActionError] = useState('')
@@ -344,6 +348,7 @@ export default function PostsWorkspace() {
   )
   const actionLockNotice = lockRequired ? actionLock.notice : ''
   const canMutate = !lockRequired || actionLock.canAct
+  const allowedStatusTransitions = getAllowedPostStatusTransitions(selected?.status)
   const detailLoading = Boolean(detailId && !detailIsCurrent)
   const detailError = detailIsCurrent ? detailState.error : ''
   const matchingPosts = detailPost ? getMatchesForPost(detailPost) : []
@@ -483,7 +488,12 @@ export default function PostsWorkspace() {
       setActionError('Vui lòng chọn trạng thái khác với trạng thái hiện tại.')
       return
     }
-    const normalizedReason = statusReason.trim()
+    if (!canTransitionPostStatus(selected.status, nextStatus)) {
+      setActionError('Không thể chuyển bài đăng sang trạng thái đã chọn.')
+      return
+    }
+    const normalizedReason =
+      statusReason === 'other' ? customStatusReason.trim() : statusReason.trim()
     if (nextStatus === 'rejected' && !normalizedReason) {
       setStatusReasonError('Vui lòng nhập lý do từ chối.')
       statusReasonRef.current?.focus()
@@ -738,31 +748,29 @@ export default function PostsWorkspace() {
             )}
           >
             <td className={cell}>
-              {post.publicDetailAvailable && post.slug ? (
+              <span className="whitespace-nowrap text-caption font-semibold text-primary">
+                {post.postCode}
+              </span>
+            </td>
+            <td className={cell}>
+              {post.detailAvailable && post.slug ? (
                 <Link
                   to={postPath(post)}
-                  className="whitespace-nowrap text-caption font-semibold text-primary hover:underline underline-offset-4"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mb-1.5 block cursor-pointer text-left text-small font-semibold leading-relaxed text-ink hover:text-primary hover:underline underline-offset-4"
                 >
-                  {post.postCode}
+                  {post.title}
                 </Link>
               ) : (
                 <button
                   type="button"
-                  className="cursor-pointer whitespace-nowrap text-caption font-semibold text-primary hover:underline underline-offset-4"
+                  className="mb-1.5 block cursor-pointer text-left text-small font-semibold leading-relaxed text-ink hover:text-primary hover:underline underline-offset-4"
                   onClick={showUnavailablePostToast}
                 >
-                  {post.postCode}
+                  {post.title}
                 </button>
               )}
-            </td>
-            <td className={cell}>
-              <button
-                type="button"
-                className="mb-1.5 block cursor-pointer text-left text-small font-semibold leading-relaxed text-ink hover:text-primary hover:underline underline-offset-4"
-                onClick={() => openDetail(post.id)}
-              >
-                {post.title}
-              </button>
               <Badge>{post.category}</Badge>
             </td>
             <td className={cell}>
@@ -810,7 +818,8 @@ export default function PostsWorkspace() {
                   label="Cập nhật trạng thái bài đăng"
                   onClick={() => {
                     setNextStatus(post.status)
-                    setStatusReason('')
+                    setStatusReason(REJECT_REASONS[0])
+                    setCustomStatusReason('')
                     setStatusReasonError('')
                     setActionError('')
                     setModal({ kind: 'edit', id: post.id })
@@ -1102,7 +1111,12 @@ export default function PostsWorkspace() {
               <Button
                 variant="primary"
                 onClick={saveStatus}
-                disabled={actionPending || !canMutate || nextStatus === selected.status}
+                disabled={
+                  actionPending ||
+                  !canMutate ||
+                  nextStatus === selected.status ||
+                  !canTransitionPostStatus(selected.status, nextStatus)
+                }
               >
                 {actionPending ? (
                   <span
@@ -1136,20 +1150,39 @@ export default function PostsWorkspace() {
               {Object.entries(STATUS_LABELS).map(([value, label]) => (
                 <label
                   key={value}
-                  className="flex cursor-pointer items-center gap-3 rounded-lg border border-line p-2.5 has-checked:border-primary has-checked:bg-primary-subtle has-focus-visible:outline-2 has-focus-visible:outline-focus"
+                  className={`flex items-center gap-3 rounded-lg border p-2.5 transition-colors has-focus-visible:outline-2 has-focus-visible:outline-focus ${
+                    canTransitionPostStatus(selected.status, value)
+                      ? 'cursor-pointer border-primary/40 bg-primary-subtle/55 shadow-[0_2px_8px_rgba(25,52,82,0.08)] hover:border-primary/70 hover:bg-primary-subtle has-checked:border-primary has-checked:bg-primary-subtle'
+                      : 'cursor-not-allowed border-line bg-surface'
+                  }`}
                 >
                   <input
                     type="radio"
                     name="postStatus"
                     value={value}
                     checked={nextStatus === value}
+                    disabled={!canTransitionPostStatus(selected.status, value)}
                     onChange={() => {
                       setNextStatus(value)
-                      if (value !== 'rejected') setStatusReason('')
+                      if (value !== 'rejected') {
+                        setStatusReason(REJECT_REASONS[0])
+                        setCustomStatusReason('')
+                      }
                       setStatusReasonError('')
                       setActionError('')
                     }}
-                    className="accent-primary"
+                    className="size-4 shrink-0 appearance-none rounded-full border-2 border-ink-muted bg-white transition-colors checked:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed"
+                    style={{
+                      opacity:
+                        canTransitionPostStatus(selected.status, value) || nextStatus === value
+                          ? 1
+                          : 0.35,
+                      ...(nextStatus === value && {
+                        borderColor: 'var(--color-primary)',
+                        background:
+                          'radial-gradient(circle, var(--color-primary) 0 42%, white 46%)',
+                      }),
+                    }}
                   />
                   <Badge tone={STATUS_TONES[value]}>
                     <span className="text-primary">{label}</span>
@@ -1158,31 +1191,60 @@ export default function PostsWorkspace() {
               ))}
             </div>
           </fieldset>
+          {allowedStatusTransitions.length === 0 && (
+            <p className="mt-3 text-small text-ink-muted">
+              {selected.status === 'rejected'
+                ? 'Người đăng cần chỉnh sửa và gửi lại bài để tiếp tục xét duyệt.'
+                : 'Bài đăng đã kết thúc; không thể đổi trạng thái tại đây.'}
+            </p>
+          )}
           {nextStatus === 'rejected' && (
-            <Field
-              label="Lý do từ chối"
-              required
-              error={statusReasonError}
-              hint={`${statusReason.length}/1000 ký tự`}
-              className="mt-3"
-            >
-              {(a) => (
-                <Textarea
-                  {...a}
-                  ref={statusReasonRef}
-                  rows={4}
-                  maxLength={1000}
-                  value={statusReason}
-                  disabled={actionPending || !canMutate}
-                  onChange={(event) => {
-                    setStatusReason(event.target.value)
-                    setStatusReasonError('')
-                    setActionError('')
-                  }}
-                  placeholder="Nhập lý do từ chối bài đăng…"
-                />
+            <div className="mt-3">
+              <Field label="Lý do từ chối">
+                {(a) => (
+                  <Select
+                    {...a}
+                    value={statusReason}
+                    disabled={actionPending || !canMutate}
+                    onChange={(event) => {
+                      setStatusReason(event.target.value)
+                      setStatusReasonError('')
+                      setActionError('')
+                    }}
+                  >
+                    {REJECT_REASONS.map((reason) => (
+                      <option key={reason}>{reason}</option>
+                    ))}
+                    <option value="other">Lý do khác</option>
+                  </Select>
+                )}
+              </Field>
+              {statusReason === 'other' && (
+                <Field
+                  error={statusReasonError}
+                  hint={`${customStatusReason.length}/1000 ký tự`}
+                  className="mt-3"
+                >
+                  {(a) => (
+                    <Textarea
+                      {...a}
+                      ref={statusReasonRef}
+                      aria-label="Lý do từ chối"
+                      rows={4}
+                      maxLength={1000}
+                      value={customStatusReason}
+                      disabled={actionPending || !canMutate}
+                      onChange={(event) => {
+                        setCustomStatusReason(event.target.value)
+                        setStatusReasonError('')
+                        setActionError('')
+                      }}
+                      placeholder="Nhập lý do không duyệt bài đăng…"
+                    />
+                  )}
+                </Field>
               )}
-            </Field>
+            </div>
           )}
         </Dialog>
       )}

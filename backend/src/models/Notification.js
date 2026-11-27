@@ -21,6 +21,8 @@ const NOTIFICATION_TYPES = [
   'comment',
   'post_approved',
   'post_rejected',
+  'post_hidden',
+  'post_unhidden',
   'category_archived',
   // Đóng bài (gửi người theo dõi), xoá bài (gửi người đang trao đổi)
   'post_closed',
@@ -35,6 +37,8 @@ const NOTIFICATION_TYPES = [
   // Gửi Moderator khi một tài khoản bị nhiều người báo cáo
   'report_flagged',
   'account_restricted',
+  'moderator_granted',
+  'moderator_revoked',
   'warning',
   'badge',
   'tip',

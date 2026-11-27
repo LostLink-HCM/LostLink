@@ -54,7 +54,10 @@ export function timeAgo(iso, now = Date.now()) {
   return new Date(iso).toLocaleDateString('vi-VN')
 }
 
-export const formatCount = (value) => value.toLocaleString('vi-VN')
+export const formatCount = (value) => {
+  const count = Number(value)
+  return (Number.isFinite(count) ? count : 0).toLocaleString('vi-VN')
+}
 
 // Không có địa điểm thì chỉ hiện khu vực; tên địa điểm chưa kèm quận thì ghép thêm
 export const placeLabel = (post) => {
@@ -118,6 +121,22 @@ const vnClock = (date) =>
     hour12: false,
   }).format(date)
 
+const formatVnDateTime = (value) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: VN_TIME_ZONE,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date)
+  const fields = Object.fromEntries(parts.map(({ type, value: part }) => [type, part]))
+  return `${fields.day}/${fields.month}/${fields.year} ${fields.hour}:${fields.minute}`
+}
+
 function vnDayLabel(date, now) {
   const key = vnDayKey(date)
   if (key === vnDayKey(now)) return 'Hôm nay'
@@ -155,9 +174,9 @@ export const toFeedPost = (card, now = Date.now()) => ({
   author: card.author?.username ?? '',
   authorAvatar: card.author?.avatarUrl ?? null,
   createdAt: card.createdAt,
-  likes: card.counts.likes,
-  views: card.counts.views,
-  commentCount: card.counts.comments,
+  likes: card.counts?.likes ?? 0,
+  views: card.counts?.views ?? 0,
+  commentCount: card.counts?.comments ?? 0,
   images: card.coverImage ? [card.coverImage] : [],
   // Trạng thái của người xem, Guest không có
   viewer: card.viewer ?? null,
@@ -187,9 +206,17 @@ export const toDetailPost = (detail, now = Date.now()) => ({
     reputation: detail.author?.reputationScore ?? 0,
     returned: detail.author?.returnCount ?? 0,
   },
-  likes: detail.counts.likes,
-  views: detail.counts.views,
-  commentCount: detail.counts.comments,
+  likes: detail.counts?.likes ?? 0,
+  views: detail.counts?.views ?? 0,
+  commentCount: detail.counts?.comments ?? 0,
+  statusHistory: Array.isArray(detail.statusHistory)
+    ? detail.statusHistory.map(({ status, note, changedAt, changedBy }) => ({
+        status,
+        dateTime: formatVnDateTime(changedAt),
+        reason: note || '',
+        changedBy: changedBy || 'Hệ thống',
+      }))
+    : [],
   comments: detail.comments.map((comment) => ({
     id: comment.id,
     author: comment.author?.username ?? 'Người dùng LostLink',

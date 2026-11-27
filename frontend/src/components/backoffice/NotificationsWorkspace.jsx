@@ -309,7 +309,7 @@ export default function NotificationsWorkspace({ onUnreadCountChange, role }) {
             >
               {label}
               {value === 'unread' && (
-                <span className="ml-1.5 rounded-full bg-primary-soft px-1.5 py-0.5 text-[10px]">
+                <span className="ml-1.5 inline-flex size-4 items-center justify-center rounded-full bg-danger p-0 text-center text-[9px] leading-none font-bold text-white">
                   {unreadCount}
                 </span>
               )}
@@ -390,7 +390,6 @@ export default function NotificationsWorkspace({ onUnreadCountChange, role }) {
           <strong className="text-ink">{currentResult ? total : 0}</strong> thông báo
           {filter === 'unread' ? ' chưa đọc' : filter === 'pinned' ? ' đã ghim' : ''}
         </span>
-        <span>{unreadCount} chưa đọc</span>
       </div>
 
       {isLoading && (

@@ -11,12 +11,7 @@ const CORS = {
   'Access-Control-Allow-Credentials': 'true',
 }
 const table = (page) => page.getByRole('table', { name: 'Danh sách bài đăng của cộng đồng' })
-const rowOf = (page, title) =>
-  table(page)
-    .getByRole('row')
-    .filter({
-      has: page.getByRole('button', { name: title, exact: true }),
-    })
+const rowOf = (page, title) => table(page).getByRole('row').filter({ hasText: title })
 const searchFor = async (page, title) => {
   await page.getByRole('searchbox', { name: 'Tìm kiếm' }).fill(title)
   await expect(rowOf(page, title)).toBeVisible()
@@ -51,6 +46,25 @@ test('người dùng thường không được truy cập trang quản lý bài 
 // Hai trang dùng chung workspace. Mỗi kịch bản đều chạy với cả hai tài khoản và dữ liệu riêng.
 for (const manager of MANAGERS) {
   test.describe(`Quản lý tất cả bài đăng - ${manager.role}`, () => {
+    test('tiêu đề mở trang chi tiết trong tab mới, kể cả bài đang chờ duyệt', async ({
+      page,
+      api,
+    }) => {
+      const post = await preparePost(api, 'Bài chờ duyệt xem chi tiết')
+      await openWorkspace(page, manager)
+      await searchFor(page, post.title)
+
+      const detailPromise = page.waitForEvent('popup')
+      await rowOf(page, post.title).getByRole('link', { name: post.title, exact: true }).click()
+      const detail = await detailPromise
+      await expect(detail).toHaveURL(
+        new RegExp(`/${post.type === 'lost' ? 'mat-do' : 'nhat-duoc'}/${post.slug}$`)
+      )
+      await expect(detail.getByRole('heading', { level: 1, name: post.title })).toBeVisible()
+      await expect(detail.getByRole('region', { name: 'Thao tác kiểm duyệt' })).toBeVisible()
+      await detail.close()
+    })
+
     test('tìm kiếm, lọc trạng thái và Đã ẩn, danh mục, loại tin, khu vực; báo rỗng và đặt lại', async ({
       page,
       api,
@@ -114,6 +128,7 @@ for (const manager of MANAGERS) {
       const edit = page.getByRole('dialog', { name: 'Cập nhật trạng thái', exact: true })
       await expect(edit.getByRole('button', { name: 'Cập nhật', exact: true })).toBeDisabled()
       await edit.getByRole('radio', { name: 'Đã từ chối', exact: true }).check()
+      await edit.getByRole('combobox', { name: 'Lý do từ chối' }).selectOption('other')
       await edit.getByRole('button', { name: 'Cập nhật', exact: true }).click()
       await expect(edit.getByText('Vui lòng nhập lý do từ chối.', { exact: true })).toBeVisible()
       await edit.getByRole('textbox', { name: 'Lý do từ chối' }).fill('  Ảnh không rõ món đồ  ')
@@ -123,16 +138,14 @@ for (const manager of MANAGERS) {
 
       await page.reload()
       await searchFor(page, post.title)
-      await expect(
-        rowOf(page, post.title).getByRole('button', { name: 'Xem chi tiết bài đăng', exact: true })
-      ).toHaveCount(0)
-      await rowOf(page, post.title).getByRole('button', { name: post.title, exact: true }).click()
-      const detail = page.getByRole('dialog', { name: 'Chi tiết bài đăng' })
-      await expect(detail.getByText('Ví da màu nâu, bên trong có thẻ sinh viên.')).toBeVisible()
-      await detail.getByRole('button', { name: 'Xem lịch sử trạng thái' }).click()
+      const detailPromise = page.waitForEvent('popup')
+      await rowOf(page, post.title).getByRole('link', { name: post.title, exact: true }).click()
+      const detail = await detailPromise
+      await expect(detail.getByRole('heading', { level: 1, name: post.title })).toBeVisible()
       const history = detail.getByRole('region', { name: 'Lịch sử trạng thái' })
       await expect(history.getByText('Đã từ chối', { exact: true })).toBeVisible()
       await expect(history.getByText('Lý do: Ảnh không rõ món đồ', { exact: true })).toBeVisible()
+      await detail.close()
     })
 
     test('hủy ẩn không đổi bài, ẩn bắt buộc lý do và hiện lại giữ nguyên trạng thái', async ({
@@ -164,14 +177,10 @@ for (const manager of MANAGERS) {
 
       await page.reload()
       await searchFor(page, post.title)
-      await rowOf(page, post.title).getByRole('button', { name: post.title, exact: true }).click()
-      const detail = page.getByRole('dialog', { name: 'Chi tiết bài đăng' })
-      await expect(
-        detail
-          .getByRole('region', { name: 'Lý do ẩn bài đăng' })
-          .getByText('Chứa thông tin cá nhân')
-      ).toBeVisible()
-      await detail.getByRole('button', { name: 'Đóng', exact: true }).last().click()
+      const token = await tokenOf(api, manager)
+      const savedPost = await api.get(`backoffice/posts/${post.id}`, { headers: bearer(token) })
+      expect(savedPost.status()).toBe(200)
+      expect((await savedPost.json()).data.hiddenReason).toBe('Chứa thông tin cá nhân')
       await rowOf(page, post.title)
         .getByRole('button', { name: 'Hiện lại bài đăng', exact: true })
         .click()
@@ -211,7 +220,7 @@ for (const manager of MANAGERS) {
         .getByRole('button', { name: 'Cập nhật trạng thái bài đăng' })
         .click()
       const edit = page.getByRole('dialog', { name: 'Cập nhật trạng thái', exact: true })
-      await edit.getByRole('radio', { name: 'Đã đóng', exact: true }).check()
+      await edit.getByRole('radio', { name: 'Đang tìm', exact: true }).check()
       await edit.getByRole('button', { name: 'Cập nhật', exact: true }).click()
       await expect(edit.getByRole('alert')).toHaveText('Chưa cập nhật được trạng thái.')
       const token = await tokenOf(api, manager)
@@ -222,7 +231,7 @@ for (const manager of MANAGERS) {
       await page.unroute(statusUrl)
       await edit.getByRole('button', { name: 'Cập nhật', exact: true }).click()
       await expect(page.getByText(`Đã cập nhật trạng thái bài ${post.code}.`)).toBeVisible()
-      await expect(rowOf(page, post.title).getByText('Đã đóng', { exact: true })).toBeVisible()
+      await expect(rowOf(page, post.title).getByText('Đang tìm', { exact: true })).toBeVisible()
     })
 
     test('hủy cập nhật giữ trạng thái; lưu trạng thái mới làm bài rời bộ lọc cũ và xuất hiện trong bộ lọc mới', async ({
@@ -241,7 +250,7 @@ for (const manager of MANAGERS) {
         .getByRole('button', { name: 'Cập nhật trạng thái bài đăng' })
         .click()
       const edit = page.getByRole('dialog', { name: 'Cập nhật trạng thái', exact: true })
-      await edit.getByRole('radio', { name: 'Đã đóng', exact: true }).check()
+      await edit.getByRole('radio', { name: 'Đang tìm', exact: true }).check()
       await edit.getByRole('button', { name: 'Hủy', exact: true }).click()
       await expect(
         rowOf(page, post.title).getByText('Chờ xét duyệt', { exact: true })
@@ -254,13 +263,13 @@ for (const manager of MANAGERS) {
       await rowOf(page, post.title)
         .getByRole('button', { name: 'Cập nhật trạng thái bài đăng' })
         .click()
-      await edit.getByRole('radio', { name: 'Đã đóng', exact: true }).check()
+      await edit.getByRole('radio', { name: 'Đang tìm', exact: true }).check()
       await edit.getByRole('button', { name: 'Cập nhật', exact: true }).click()
       await expect(page.getByText(`Đã cập nhật trạng thái bài ${post.code}.`)).toBeVisible()
       await expect(rowOf(page, post.title)).toHaveCount(0)
       await expect(page.getByText('Không tìm thấy bài đăng phù hợp', { exact: true })).toBeVisible()
-      await statusFilter.selectOption('closed')
-      await expect(rowOf(page, post.title).getByText('Đã đóng', { exact: true })).toBeVisible()
+      await statusFilter.selectOption('searching')
+      await expect(rowOf(page, post.title).getByText('Đang tìm', { exact: true })).toBeVisible()
     })
   })
 }

@@ -21,6 +21,7 @@ const formatDateTime = (value) => {
 const toReviewPost = (post) => ({
   id: post.id,
   postCode: post.code,
+  slug: post.slug,
   title: post.title,
   category: post.category?.name ?? '',
   categorySlug: post.category?.slug ?? '',

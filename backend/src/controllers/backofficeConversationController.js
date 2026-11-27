@@ -10,6 +10,7 @@ const send = (handler, status = 200) =>
 const idOf = (req) => matchedData(req, { locations: ['params'] }).id
 
 module.exports = {
+  unreadCount: send((req) => service.unreadMessagesCount(req.user)),
   list: send((req) =>
     service.listConversations(req.user, matchedData(req, { locations: ['query'] }))
   ),

@@ -1,6 +1,7 @@
 const { AuditLog, Notification, Session, User } = require('../models')
 const ApiError = require('../utils/ApiError')
 const { escapeRegex, normalizeText } = require('../utils/text')
+const { notify } = require('./notificationService')
 
 const SORTS = {
   newest: { createdAt: -1, _id: -1 },
@@ -244,6 +245,20 @@ const manageUser = async (id, actor, action, reason = '') => {
       await change
     } finally {
       if (standaloneChanges.get(id) === change) standaloneChanges.delete(id)
+    }
+  }
+  if (action === 'grant' || action === 'revoke') {
+    try {
+      await notify([id], {
+        type: action === 'grant' ? 'moderator_granted' : 'moderator_revoked',
+        actor: actor._id,
+        refType: 'User',
+        refId: id,
+        text: reason,
+        body: reason,
+      })
+    } catch (error) {
+      console.error('Không lưu được thông báo thay đổi quyền Moderator', error)
     }
   }
   return getUser(id)

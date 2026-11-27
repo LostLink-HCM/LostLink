@@ -208,6 +208,7 @@ export default function MessagesWorkspace({
   workspaceRole,
   user,
   quickReplies = EMPTY_QUICK_REPLIES,
+  refreshUnreadMessageCount,
 }) {
   const peerRoles =
     workspaceRole === 'admin'
@@ -439,7 +440,9 @@ export default function MessagesWorkspace({
     setMobileConversation(true)
     setAnnouncement('')
     setActionError('')
-    void loadThread(id).catch((error) => setActionError(error.message))
+    void loadThread(id)
+      .then(() => refreshUnreadMessageCount?.())
+      .catch((error) => setActionError(error.message))
   }
 
   const startThread = async (contactId) => {
@@ -447,6 +450,7 @@ export default function MessagesWorkspace({
     try {
       const data = await openBackofficeConversation(contactId)
       setMessageState((previous) => mergeConversation(previous, data.thread))
+      refreshUnreadMessageCount?.()
       setRemoteInbox(null)
       setNewConversation(false)
       setRole(workspaceRole === 'admin' ? 'moderator' : '')
@@ -531,23 +535,36 @@ export default function MessagesWorkspace({
   }
 
   const markUnread = async () => {
-    if (!active || !contact) return
+    if (!active || !contact || active.unread > 0) return
+    const conversationId = active.id
+    const conversationLabel = contactName(contact)
+    const wasMobileConversation = mobileConversation
+    activeIdRef.current = null
+    setMessageState((previous) => ({ ...previous, activeId: null }))
+    setMobileConversation(false)
+    setShowReplies(false)
+    setActionError('')
     try {
-      await markBackofficeConversationUnread(active.id)
-      setMessageState((previous) => markThreadUnread(previous, active.id))
-      setAnnouncement(`Đã đánh dấu hội thoại với ${contactName(contact)} là chưa đọc.`)
-      leaveConversation()
-      void refreshFilteredInbox()
+      await markBackofficeConversationUnread(conversationId)
+      setMessageState((previous) => markThreadUnread(previous, conversationId))
+      setAnnouncement(`Đã đánh dấu hội thoại với ${conversationLabel} là chưa đọc.`)
+      void refreshInboxView()
+      void refreshUnreadMessageCount?.()
     } catch (error) {
+      activeIdRef.current = conversationId
+      setMessageState((previous) => ({ ...previous, activeId: conversationId }))
+      setMobileConversation(wasMobileConversation)
       setActionError(error.message)
     }
   }
 
   const leaveConversation = () => {
+    activeIdRef.current = null
+    setMessageState((previous) => ({ ...previous, activeId: null }))
     setMobileConversation(false)
-    if (window.matchMedia('(max-width: 700px)').matches) {
-      setMessageState((previous) => ({ ...previous, activeId: null }))
-    }
+    setShowReplies(false)
+    setShowInfo(false)
+    setActionError('')
   }
 
   const chooseImage = (file) => {
@@ -676,6 +693,7 @@ export default function MessagesWorkspace({
               const peer = visibleContacts.find((entry) => entry.id === thread.contactId)
               const last = thread.messages.at(-1) || thread.lastMessage
               const isActive = messageState.activeId === thread.id
+              const isAdminConversation = workspaceRole === 'moderator' && peer?.role === 'admin'
               return (
                 <button
                   type="button"
@@ -685,7 +703,9 @@ export default function MessagesWorkspace({
                     'relative mb-1 flex w-full items-start gap-2.5 rounded-lg',
                     'px-2.5 py-3.5 text-left',
                     'transition-colors hover:bg-slate-100',
-                    !isActive && thread.unread && 'bg-primary-soft',
+                    !isActive && thread.unread && !isAdminConversation && 'bg-primary-soft',
+                    isAdminConversation &&
+                      'border border-violet-300 bg-violet-50 shadow-sm hover:bg-violet-100',
                     thread.unread && 'font-semibold'
                   )}
                   onClick={() => openThread(thread.id)}
@@ -693,13 +713,23 @@ export default function MessagesWorkspace({
                   {isActive && (
                     <span
                       aria-hidden="true"
-                      className="absolute inset-y-2 left-0 w-1 rounded-full bg-primary"
+                      className={cx(
+                        'absolute inset-y-2 left-0 w-1 rounded-full',
+                        isAdminConversation ? 'bg-violet-600' : 'bg-primary'
+                      )}
                     />
                   )}
                   <Avatar contact={peer} />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-baseline justify-between gap-1.5">
-                      <strong className="min-w-0 truncate text-small">{contactName(peer)}</strong>
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <strong className="min-w-0 truncate text-small">{contactName(peer)}</strong>
+                        {isAdminConversation && (
+                          <small className="shrink-0 rounded-full bg-violet-100 px-1.5 py-0.5 text-[9px] leading-none font-semibold text-violet-800">
+                            Nội bộ
+                          </small>
+                        )}
+                      </span>
                       <time
                         className="shrink-0 text-[10px] text-ink-subtle"
                         dateTime={last?.createdAt || thread.createdAt}
@@ -780,12 +810,7 @@ export default function MessagesWorkspace({
               className="flex items-center gap-3 border-b border-line-strong px-5 py-4
                 max-xl:px-4 max-sm:px-3"
             >
-              <IconButton
-                icon="back"
-                label="Về danh sách hội thoại"
-                className="hidden max-[700px]:inline-flex"
-                onClick={leaveConversation}
-              />
+              <IconButton icon="back" label="Về danh sách hội thoại" onClick={leaveConversation} />
               <Avatar contact={contact} />
               <div className="min-w-0 flex-1">
                 <strong className="block min-w-0 truncate text-lead font-semibold text-ink">

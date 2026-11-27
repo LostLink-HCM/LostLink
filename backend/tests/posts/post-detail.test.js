@@ -218,6 +218,66 @@ describe('UC04 - Xem chi tiết bài đăng', () => {
     }
   })
 
+  test('admin và moderator xem được mọi trạng thái cùng lịch sử, không làm tăng lượt xem', async () => {
+    const managers = [
+      await createMember('moderatorview', { role: 'moderator' }),
+      await createMember('adminview', { role: 'admin' }),
+    ]
+    const posts = []
+
+    for (const [index, status] of [
+      'pending',
+      'rejected',
+      'searching',
+      'contacted',
+      'returned',
+      'closed',
+    ].entries()) {
+      const history = [{ status: 'pending', changedBy: owner._id, changedAt: new Date() }]
+      if (status !== 'pending') {
+        history.push({
+          status,
+          changedBy: owner._id,
+          note: status === 'rejected' ? 'Ảnh chưa rõ' : '',
+          changedAt: status === 'returned' ? new Date(Date.now() - 8 * 24 * HOUR) : new Date(),
+        })
+      }
+      posts.push(
+        await makePost({
+          title: `Bài trạng thái ${index}`,
+          status,
+          viewCount: 4,
+          statusHistory: history,
+        })
+      )
+    }
+    posts.push(
+      await makePost({
+        title: 'Bài đang tìm đã ẩn',
+        status: 'searching',
+        isHidden: true,
+        viewCount: 4,
+        statusHistory: [{ status: 'searching', changedBy: owner._id }],
+      })
+    )
+
+    for (const manager of managers) {
+      const getAsManager = await asUser(manager.email)
+      for (const post of posts) {
+        const res = await getAsManager(`/api/posts/${post.type}/${post.slug}`)
+        assert.equal(res.status, 200, `${manager.role}: ${post.status}, hidden=${post.isHidden}`)
+        assert.equal(res.body.data.status, post.status)
+        assert.ok(Array.isArray(res.body.data.statusHistory))
+        assert.equal(res.body.data.statusHistory.at(-1).changedBy, owner.username)
+        assert.equal(res.body.data.counts.views, 4)
+      }
+    }
+
+    for (const post of posts) {
+      assert.equal((await Post.findById(post.id)).viewCount, 4)
+    }
+  })
+
   test('bài Đã đóng và bài vừa trao trả vẫn xem được qua liên kết', async () => {
     const closed = await makePost({ title: 'Đã đóng', status: 'closed' })
     const returned = await makePost({

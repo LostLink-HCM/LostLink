@@ -7,6 +7,11 @@ export const NOTIFICATION_GROUPS = {
 }
 
 const quote = (text) => (text ? `“${text}”` : '')
+const hiddenPostReason = (text = '') => {
+  const legacyMarker = ' của bạn đã bị ẩn. Lý do: '
+  const legacyStart = text.startsWith('Bài đăng ') ? text.indexOf(legacyMarker) : -1
+  return legacyStart < 0 ? text : text.slice(legacyStart + legacyMarker.length)
+}
 
 // Lời hiển thị theo loại thông báo, loại khác dùng đoạn trích server gửi
 const DESCRIBE = {
@@ -30,6 +35,34 @@ const DESCRIBE = {
     rejected: true,
     title: 'Bài của bạn bị từ chối',
     body: item.text ? `Lý do: ${item.text}` : (item.post?.title ?? ''),
+  }),
+  post_hidden: (item) => ({
+    kind: 'post',
+    title: 'Bài của bạn bị ẩn',
+    body: item.text ? `Lý do: ${hiddenPostReason(item.text)}` : '',
+  }),
+  post_unhidden: (item) => ({
+    kind: 'post',
+    title: 'Bài của bạn đã được hiện lại',
+    body: item.post?.title ?? item.text,
+  }),
+  warning: (item) =>
+    item.post
+      ? {
+          kind: 'post',
+          title: 'Bài của bạn bị ẩn',
+          body: item.text ? `Lý do: ${hiddenPostReason(item.text)}` : '',
+        }
+      : { kind: 'report', title: item.text || 'Thông báo mới', body: '' },
+  moderator_granted: (item) => ({
+    kind: 'report',
+    title: 'Bạn đã được cấp quyền Moderator',
+    body: item.text ? `Lý do: ${item.text}` : '',
+  }),
+  moderator_revoked: (item) => ({
+    kind: 'report',
+    title: 'Quyền Moderator của bạn đã bị thu hồi',
+    body: item.text ? `Lý do: ${item.text}` : '',
   }),
   category_archived: (item) => ({
     kind: 'post',
@@ -144,8 +177,11 @@ const GROUP_OF = {
   counterpart_ask: 'trade',
   review: 'trade',
   contact_12h: 'trade',
+  post_unhidden: 'post',
   report_result: 'system',
   report_flagged: 'system',
+  moderator_granted: 'system',
+  moderator_revoked: 'system',
   warning: 'system',
   badge: 'system',
   tip: 'system',
@@ -160,6 +196,8 @@ const VISUALS = {
   like: { icon: 'heart', tone: 'from-[#ffa3b8] to-[#ff5c82] shadow-[#ff5c82]/30' },
   post_approved: { icon: 'check', tone: 'from-[#6ee7b4] to-[#22c784] shadow-[#22c784]/30' },
   post_rejected: { icon: 'warning', tone: 'from-[#ffb199] to-[#ff6f4e] shadow-[#ff6f4e]/30' },
+  post_hidden: { icon: 'eyeOff', tone: 'from-[#ffb199] to-[#ff6f4e] shadow-[#ff6f4e]/30' },
+  post_unhidden: { icon: 'eyeCheck', tone: 'from-[#6ee7b4] to-[#22c784] shadow-[#22c784]/30' },
   category_archived: { icon: 'warning', tone: 'from-[#ffb199] to-[#ff6f4e] shadow-[#ff6f4e]/30' },
   post_closed: { icon: 'lock', tone: 'from-[#c3cbd8] to-[#8e9bb0] shadow-[#8e9bb0]/30' },
   returned: { icon: 'gift', tone: 'from-[#b9adff] to-[#8572ff] shadow-[#8572ff]/30' },

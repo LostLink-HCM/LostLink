@@ -130,7 +130,7 @@ export default function useBackofficeActionLock(
     canAct: current.status === 'owned',
     notice:
       current.status === 'busy'
-        ? 'Bạn không thể thực hiện thao tác. Moderator khác đang chỉnh sửa.'
+        ? 'Bạn không thể thực hiện thao tác. Người dùng khác đang chỉnh sửa.'
         : current.status === 'checking'
           ? 'Đang kiểm tra trạng thái chỉnh sửa…'
           : current.status === 'error'

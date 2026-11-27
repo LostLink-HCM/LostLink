@@ -92,6 +92,9 @@ async function mockMessagesApi(page, { contacts = [], threads = [] } = {}) {
         pagination: { page: 1, limit: 100, total: inbox.length, pages: inbox.length ? 1 : 0 },
       })
     }
+    if (path === '/api/backoffice/conversations/unread-count' && method === 'GET') {
+      return send({ unreadCount: inbox.reduce((total, item) => total + item.unread, 0) })
+    }
     if (path === '/api/backoffice/conversations/contacts' && method === 'GET') {
       const role = url.searchParams.get('peerRole')
       const q = (url.searchParams.get('q') || '').toLocaleLowerCase('vi')
@@ -237,7 +240,16 @@ test.describe('Tin nhắn của Admin và Moderator', () => {
     await page.getByRole('button', { name: 'Soạn tin mới' }).click()
     const dialog = page.getByRole('dialog', { name: 'Cuộc trò chuyện mới' })
     await dialog.getByRole('button', { name: 'Người dùng', exact: true }).click()
+    const contactsResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/backoffice/conversations/contacts?') &&
+        response.url().includes('peerRole=user') &&
+        response.url().includes('q=user.support') &&
+        response.request().method() === 'GET'
+    )
     await dialog.getByRole('textbox', { name: 'Tìm người nhận' }).fill('user.support')
+    await contactsResponse
+    await expect(dialog.getByRole('button', { name: /user\.support/ })).toBeVisible()
     await dialog.getByRole('button', { name: /user.support/ }).click()
     await expect(page.getByRole('region', { name: /Trò chuyện với user.support/ })).toBeVisible()
     expect(
