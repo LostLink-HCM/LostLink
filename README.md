@@ -8,6 +8,12 @@ LostLink connects two groups of people: those who **lost** something and those w
 
 Matching is built on three data axes — **location**, **time**, and **item attributes** — plus a layer of community trust (reputation scores, ownership verification, and moderation).
 
+<p align="center">
+  <img src="docs/assets/images/auth-themes.gif" alt="LostLink sign-in page cycling through its day, dusk and night themes" width="860">
+  <br>
+  <sub>The sign-in scene follows the user's local time: day, dusk and night.</sub>
+</p>
+
 ## Key features
 
 - **LOST / FOUND posts** with flexible categories, dynamic attributes, photos.

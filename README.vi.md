@@ -8,6 +8,12 @@ LostLink kết nối hai nhóm người: người **làm mất** đồ và ngư�
 
 Việc ghép cặp dựa trên ba trục dữ liệu là **vị trí**, **thời gian** và **thuộc tính món đồ**, cộng thêm một lớp tin cậy cộng đồng gồm điểm uy tín, xác minh chủ sở hữu và kiểm duyệt.
 
+<p align="center">
+  <img src="docs/assets/images/auth-themes.gif" alt="Trang đăng nhập LostLink lần lượt chuyển qua chủ đề sáng, chiều tà và đêm" width="860">
+  <br>
+  <sub>Khung cảnh trang đăng nhập đổi theo giờ máy người dùng: sáng, chiều tà và đêm.</sub>
+</p>
+
 ## Tính năng chính
 
 - **Bài đăng MẤT / NHẶT ĐƯỢC** với danh mục linh hoạt, thuộc tính động và hình ảnh.
