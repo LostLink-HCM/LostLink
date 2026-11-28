@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef } from 'react'
 import { Link } from 'react-router-dom'
 import Icon from '../../common/Icon'
 import Button from '../Button'
@@ -12,31 +12,6 @@ const iconButton = cx(
   focusRing
 )
 
-function useSecondsLeft(until) {
-  const [now, setNow] = useState(Date.now)
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(timer)
-  }, [until])
-  return Math.max(0, Math.ceil((until - now) / 1000))
-}
-function DeclinedUndo({ until, onUndo }) {
-  const seconds = useSecondsLeft(until)
-  return (
-    <div className="flex flex-wrap items-center gap-3 border-t border-line bg-surface-muted px-4 py-3.5 sm:px-5">
-      <p className="m-0 flex min-w-0 flex-1 items-center gap-2 text-caption text-ink-muted">
-        <Icon name="lock" size={15} className="shrink-0" />
-        Bạn đã từ chối yêu cầu trò chuyện.
-      </p>
-      <Button onClick={onUndo}>
-        <Icon name="reset" size={14} />
-        Hoàn tác
-        <span className="font-normal text-ink-subtle tabular-nums">{seconds}s</span>
-      </Button>
-    </div>
-  )
-}
-
 export default function Composer({
   thread,
   busy = false,
@@ -49,7 +24,6 @@ export default function Composer({
   onPickImage,
   onAccept,
   onDecline,
-  onUndoDecline,
   onReopen,
 }) {
   const galleryRef = useRef(null)
@@ -97,10 +71,6 @@ export default function Composer({
         </div>
       </div>
     )
-  }
-
-  if (status === 'declined' && thread.undoUntil) {
-    return <DeclinedUndo until={thread.undoUntil} onUndo={onUndoDecline} />
   }
 
   if (status === 'declined' || status === 'expired') {
