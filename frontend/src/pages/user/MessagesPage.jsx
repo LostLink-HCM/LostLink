@@ -4,7 +4,7 @@ import {
   acquireBackofficeActionLock,
   releaseBackofficeActionLock,
 } from '../../api/backofficeActionLocks'
-import { acceptClaim, sendContactRequest } from '../../api/claims'
+import { acceptClaim, declineClaim, sendContactRequest } from '../../api/claims'
 import {
   answerCounterpart,
   closeConversation,
@@ -460,8 +460,17 @@ export default function MessagesPage() {
     if (err) failRespond(err)
   }
 
-  // Từ chối chưa gửi ngay: thanh dưới hội thoại có nút Hoàn tác, hết hạn mới gửi lên server
-  const decline = () => inbox.declineLater(active.claimId, failRespond)
+  // Từ chối không hoàn tác được nên hỏi lại trước khi gửi
+  const decline = async () => {
+    const target = dialog.target
+    setDialog(null)
+    const err = await run(async () => {
+      const { data } = await declineClaim(target.claimId)
+      inbox.putClaim(data)
+      notify(`Đã từ chối yêu cầu trò chuyện của ${target.peer.name}.`)
+    })
+    if (err) failRespond(err)
+  }
 
   // Thao tác trên hội thoại (xác nhận, đóng, mở lại): server trả hội thoại mới
   const act = async (request, onDone, target = active) => {
@@ -739,8 +748,7 @@ export default function MessagesPage() {
               onSend={send}
               onPickImage={sendImage}
               onAccept={accept}
-              onDecline={decline}
-              onUndoDecline={() => inbox.undoDecline(active.claimId)}
+              onDecline={() => openDialog('decline')}
               onReopen={reopen}
             />
           </section>
@@ -809,6 +817,30 @@ export default function MessagesPage() {
             )}
             Bên kia vẫn nhắn được nhưng bạn sẽ không nhận thông báo. Bạn có thể mở lại bất cứ lúc
             nào ở mục Đã đóng.
+          </p>
+        </Dialog>
+      )}
+
+      {dialog?.kind === 'decline' && (
+        <Dialog
+          title="Từ chối yêu cầu trò chuyện?"
+          size="sm"
+          onClose={() => setDialog(null)}
+          footer={
+            <>
+              <Button onClick={() => setDialog(null)} data-autofocus>
+                Huỷ
+              </Button>
+              <Button variant="danger" onClick={decline}>
+                Từ chối
+              </Button>
+            </>
+          }
+        >
+          <p className="m-0 text-small leading-relaxed text-ink-secondary">
+            {dialogTarget.peer.name} sẽ không nhắn được cho bạn về bài{' '}
+            <strong className="text-ink">“{dialogTarget.post.title}”</strong>. Thao tác này không
+            hoàn tác được.
           </p>
         </Dialog>
       )}

@@ -55,8 +55,14 @@ const formatMatchingPercent = (score) =>
 const mapUrl = (place) =>
   `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`
 
-const pageClass = 'mx-auto max-w-360 px-4 pt-5 pb-10 sm:px-6 lg:px-10 lg:pt-7'
+const pageFrame = 'mx-auto max-w-360 px-4 pt-5 sm:px-6 lg:px-10 lg:pt-7'
+const pageClass = `${pageFrame} pb-10`
 const LOAD_ERROR = 'Không thể tải bài đăng, vui lòng thử lại.'
+// Nút trên thanh duyệt bài nổi, màu gradient thêm ở từng nút
+const reviewButton = cx(
+  'inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-full border-0 bg-linear-to-b px-5 text-caption font-semibold whitespace-nowrap transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45',
+  focusRing
+)
 
 // Lưu ý trạng thái bài cho chủ bài
 function ownerNotice(post) {
@@ -444,7 +450,8 @@ function PostDetail({ post, onChanged }) {
       ].filter(Boolean)
 
   return (
-    <div className={pageClass}>
+    // Chừa chỗ dưới cùng để thanh duyệt bài nổi không che ô bình luận
+    <div className={cx(pageFrame, canReviewPendingPost ? 'pb-28 max-lg:pb-40' : 'pb-10')}>
       <BackToList />
 
       {/* Mobile: ảnh, thông tin rồi bình luận, hành động nằm trong nút ⋯; desktop: cột phải dính bên cạnh */}
@@ -563,31 +570,6 @@ function PostDetail({ post, onChanged }) {
                 <span className="sr-only">(mở bản đồ trong tab mới)</span>
               </a>
             </div>
-
-            {canReviewPendingPost && (
-              <section aria-label="Thao tác kiểm duyệt" className="mb-3">
-                <BackofficeActionLockNotice message={reviewLock.notice} />
-                <div className="flex flex-wrap justify-end gap-2">
-                  <BackofficeButton
-                    variant="success"
-                    disabled={reviewLoading}
-                    onClick={() => {
-                      setReviewActionError('')
-                      setReviewDialog('approve')
-                    }}
-                  >
-                    Duyệt
-                  </BackofficeButton>
-                  <BackofficeButton
-                    variant="danger"
-                    disabled={reviewLoading}
-                    onClick={openRejectReview}
-                  >
-                    Từ chối
-                  </BackofficeButton>
-                </div>
-              </section>
-            )}
 
             {/* Hàng nút tương tác: Thích, số bình luận, chia sẻ. Lưu và Theo dõi ở menu ⋯ */}
             <div className="flex flex-wrap items-center gap-1 border-t border-line-subtle pt-3">
@@ -894,6 +876,52 @@ function PostDetail({ post, onChanged }) {
       )}
       {dialog === 'likers' && (
         <LikersDialog postId={post.id} count={likeCount} onClose={() => setDialog(null)} />
+      )}
+      {/* Thanh duyệt bài nổi giữa đáy màn hình, trên mobile nằm trên thanh tab */}
+      {canReviewPendingPost && (
+        <section
+          aria-label="Thao tác kiểm duyệt"
+          className="fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] left-1/2 z-40 flex -translate-x-1/2 flex-col items-center gap-2 max-lg:bottom-[calc(5rem+env(safe-area-inset-bottom))]"
+        >
+          {reviewLock.notice && (
+            <p
+              role="status"
+              aria-live="polite"
+              className="m-0 rounded-full border border-warning/30 bg-surface px-4 py-1.5 text-caption font-semibold text-warning shadow-md"
+            >
+              {reviewLock.notice}
+            </p>
+          )}
+          <div className="flex items-center gap-1.5 rounded-full border border-line bg-surface/90 p-1 shadow-[0_12px_32px_-10px_rgb(5_11_22/0.35)] backdrop-blur-md">
+            <button
+              type="button"
+              disabled={reviewLoading}
+              onClick={() => {
+                setReviewActionError('')
+                setReviewDialog('approve')
+              }}
+              className={cx(
+                reviewButton,
+                'from-emerald-500 to-emerald-600 text-white shadow-[0_8px_20px_-10px_rgb(5_150_105/0.6)]'
+              )}
+            >
+              <Icon name="check" size={14} />
+              Duyệt
+            </button>
+            <button
+              type="button"
+              disabled={reviewLoading}
+              onClick={openRejectReview}
+              className={cx(
+                reviewButton,
+                'from-rose-500 to-rose-600 text-white shadow-[0_8px_20px_-10px_rgb(225_29_72/0.6)]'
+              )}
+            >
+              <Icon name="close" size={14} />
+              Từ chối
+            </button>
+          </div>
+        </section>
       )}
       {reviewDialog === 'approve' && (
         <BackofficeDialog

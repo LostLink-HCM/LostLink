@@ -131,15 +131,15 @@ describe('UC41 - danh sách hội thoại', () => {
     expect(threads.map((thread) => thread.id)).toEqual(['request-p3', 'c1', 'claim-k1'])
   })
 
-  it('yêu cầu vừa bấm Từ chối (chưa gửi lên server) hiện như đã từ chối, hoàn tác thì trở lại', () => {
-    const incoming = claim({ direction: 'incoming' })
-    const build = (declining) =>
-      buildThreads({ conversations: [], claims: [incoming], requests: [], declining })
-    const declining = build({ k1: 1_000 })[0]
-    expect(declining.status).toBe('declined')
-    expect(declining.undoUntil).toBe(1_000)
-    expect(build({})[0].status).toBe('incoming')
-    expect(build(undefined)[0].undoUntil).toBeUndefined()
+  it('yêu cầu đến đang chờ hiện để trả lời, đã bị từ chối thì khoá lại', () => {
+    const build = (status) =>
+      buildThreads({
+        conversations: [],
+        claims: [claim({ direction: 'incoming', status })],
+        requests: [],
+      })[0].status
+    expect(build('pending')).toBe('incoming')
+    expect(build('rejected')).toBe('declined')
   })
 
   it('xem trước tin cuối, tìm theo tên hoặc tiêu đề', () => {

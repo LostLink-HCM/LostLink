@@ -2,9 +2,6 @@ import { normalize } from './homeFeed'
 
 export const MESSAGE_LIMIT = 2000
 
-// Bấm Từ chối yêu cầu trò chuyện: chờ chừng này mới gửi lên server để còn kịp hoàn tác
-export const DECLINE_UNDO_MS = 15_000
-
 const PHONE = /(?:\+84|\b0)(?:[\s.-]?\d){9}\b/
 const EMAIL = /\S+@\S+\.\S+/
 const ADDRESS = /\d+\/\d+|\b(?:so nha|hem|ngo|ngach|kiet|duong so)\s*\d+/
@@ -150,18 +147,9 @@ export function requestThread(post, now = Date.now()) {
 
 // Gộp ba nguồn thành danh sách hội thoại. Yêu cầu đã được đồng ý có hội thoại riêng nên bỏ qua;
 // lời giới thiệu đang soạn chỉ giữ khi bài đó chưa có yêu cầu hay hội thoại nào
-// declining: yêu cầu vừa bấm Từ chối (id → hạn hoàn tác), chưa gửi lên server nhưng hiện như
-// đã từ chối, kèm undoUntil để hiện nút Hoàn tác
-export function buildThreads({ conversations, claims, requests, declining = {} }) {
+export function buildThreads({ conversations, claims, requests }) {
   const fromConversations = conversations.map(conversationThread)
-  const fromClaims = claims
-    .filter((claim) => claim.status !== 'linked')
-    .map((claim) => {
-      const until = declining[claim.id]
-      return until
-        ? { ...claimThread({ ...claim, status: 'rejected' }), undoUntil: until }
-        : claimThread(claim)
-    })
+  const fromClaims = claims.filter((claim) => claim.status !== 'linked').map(claimThread)
   const taken = new Set(
     [...fromConversations, ...fromClaims].map((thread) => thread.post?.id).filter(Boolean)
   )
