@@ -13,6 +13,7 @@ import {
   inboxUnread,
   pendingTrades,
   samePeerThreads,
+  supportSubtitle,
   threadNotes,
   threadPreview,
   toMessage,
@@ -95,6 +96,32 @@ describe('UC41 - danh sách hội thoại', () => {
     expect(canClose(thread)).toBe(false)
   })
 
+  it('Moderator được giao thấy người cần hỗ trợ, trao đổi nội bộ thấy Admin bên kia', () => {
+    const support = (fields) =>
+      conversation({ kind: 'support', post: null, receiver: null, ...fields })
+    const handler = conversationThread(
+      support({
+        support: 'handler',
+        peer: { username: 'user01', avatarUrl: '/a.png', role: 'user' },
+      })
+    )
+    expect(handler.peer).toMatchObject({ name: 'user01', avatarUrl: '/a.png' })
+    expect(handler.peer.label).toBeUndefined()
+    expect(supportSubtitle(handler)).toBe('Yêu cầu hỗ trợ')
+
+    const internal = conversationThread(
+      support({ support: 'internal', peer: { username: 'admin', role: 'admin' } })
+    )
+    expect(internal.peer).toMatchObject({ name: 'admin', role: 'admin' })
+    expect(supportSubtitle(internal)).toBe('Trao đổi nội bộ · Admin')
+
+    const requester = conversationThread(
+      support({ support: 'requester', peer: { username: 'mod1' } })
+    )
+    expect(requester.peer.label).toBe('Hỗ trợ LostLink')
+    expect(conversationThread(conversation()).support).toBeNull()
+  })
+
   it('gộp hội thoại, yêu cầu chờ và lời giới thiệu đang soạn; bỏ yêu cầu đã được đồng ý', () => {
     const threads = buildThreads({
       conversations: [conversation()],
@@ -102,6 +129,17 @@ describe('UC41 - danh sách hội thoại', () => {
       requests: [{ ...POST, id: 'p3' }, POST],
     })
     expect(threads.map((thread) => thread.id)).toEqual(['request-p3', 'c1', 'claim-k1'])
+  })
+
+  it('yêu cầu vừa bấm Từ chối (chưa gửi lên server) hiện như đã từ chối, hoàn tác thì trở lại', () => {
+    const incoming = claim({ direction: 'incoming' })
+    const build = (declining) =>
+      buildThreads({ conversations: [], claims: [incoming], requests: [], declining })
+    const declining = build({ k1: 1_000 })[0]
+    expect(declining.status).toBe('declined')
+    expect(declining.undoUntil).toBe(1_000)
+    expect(build({})[0].status).toBe('incoming')
+    expect(build(undefined)[0].undoUntil).toBeUndefined()
   })
 
   it('xem trước tin cuối, tìm theo tên hoặc tiêu đề', () => {
@@ -234,7 +272,7 @@ describe('UC41 - gom hội thoại theo người', () => {
   })
 
   it('câu hỏi bài đối ứng hiện ở mọi hội thoại với cùng người', () => {
-    const ask = { id: 'p9', slug: 'mat-vi', type: 'lost', title: 'Mất ví' }
+    const ask = [{ id: 'p9', slug: 'mat-vi', type: 'lost', title: 'Mất ví' }]
     const returned = conversationThread(
       conversation({ returned: true, post: { ...POST, status: 'returned' }, counterpartAsk: ask })
     )
@@ -244,6 +282,13 @@ describe('UC41 - gom hội thoại theo người', () => {
     ])
     expect(counterpartAsks([returned, newer, other], other)).toEqual([])
     expect(conversationThread(conversation()).counterpartAsk).toBeNull()
+  })
+
+  it('bài đối ứng (đi từ manh mối) luôn khác phía với bài chung', () => {
+    const counterpart = { id: 'p8', slug: 'mat-vi', type: 'lost', title: 'Mất ví' }
+    const thread = conversationThread(conversation({ counterpart }))
+    expect(thread.counterpart.mine).toBe(!thread.post.mine)
+    expect(conversationThread(conversation()).counterpart).toBeNull()
   })
 })
 

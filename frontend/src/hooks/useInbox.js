@@ -1,19 +1,32 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { listClaims } from '../api/claims'
+import { declineClaim, listClaims } from '../api/claims'
 import { listConversations } from '../api/conversations'
-import { applyIncoming, buildThreads } from '../lib/user/messages'
+import { DECLINE_UNDO_MS, applyIncoming, buildThreads } from '../lib/user/messages'
 import { disconnectSocket, onSocket } from '../lib/socket'
 
-const EMPTY = { conversations: [], claims: [], requests: [], drafts: {}, activeId: null }
+const EMPTY = {
+  conversations: [],
+  claims: [],
+  requests: [],
+  declining: {},
+  drafts: {},
+  activeId: null,
+}
 
 export function useInbox(user) {
   const [state, setState] = useState(EMPTY)
-  const activeRef = useRef(null)
+  // Hội thoại đang hiện trên trang Tin nhắn (null khi ở trang khác): tin mới của nó không tính chưa đọc
+  const viewingRef = useRef(null)
+  // Lượt từ chối đang chờ gửi: id yêu cầu → { timer }
+  const declineTimers = useRef(new Map())
   const me = user?.username
 
+  // Hội thoại đã có trong danh sách, để biết tin mới thuộc hội thoại chưa tải
+  const knownRef = useRef(new Set())
+
   useEffect(() => {
-    activeRef.current = state.activeId
-  }, [state.activeId])
+    knownRef.current = new Set(state.conversations.map((item) => item.id))
+  }, [state.conversations])
 
   const reload = useCallback(async () => {
     const [conversations, claims] = await Promise.all([listConversations(), listClaims()])
@@ -40,24 +53,41 @@ export function useInbox(user) {
         )
         .catch(() => {})
     load()
+    const probed = new Set()
     const off = [
-      onSocket('message:new', (message) =>
+      onSocket('message:new', (message) => {
+        // Tin của hội thoại chưa có trong danh sách (vừa được mở ở nơi khác): tải lại để đếm đúng.
+        // Moderator còn nhận tin hỗ trợ không giao cho mình, nên mỗi hội thoại lạ chỉ tải lại một lần
+        if (!knownRef.current.has(message.conversationId)) {
+          if (!probed.has(message.conversationId)) {
+            probed.add(message.conversationId)
+            load()
+          }
+          return
+        }
         setState((prev) => ({
           ...prev,
           conversations: applyIncoming(
             prev.conversations,
             message,
             me,
-            activeRef.current === message.conversationId
+            viewingRef.current === message.conversationId
           ),
         }))
-      ),
+      }),
       // Hội thoại mới mở, đổi trạng thái hoặc yêu cầu liên hệ thay đổi thì tải lại danh sách
       onSocket('conversation:updated', load),
       onSocket('claim:updated', load),
     ]
+    const timers = declineTimers.current
     return () => {
       active = false
+      // Đăng xuất hay rời khu người dùng: gửi luôn các lượt từ chối đang chờ
+      timers.forEach(({ timer }, id) => {
+        clearTimeout(timer)
+        declineClaim(id).catch(() => {})
+      })
+      timers.clear()
       off.forEach((unsubscribe) => unsubscribe())
       disconnectSocket()
       setState(EMPTY)
@@ -120,6 +150,59 @@ export function useInbox(user) {
     })
   }, [])
 
+  const stopDeclining = useCallback(
+    (id) =>
+      setState((prev) => {
+        const { [id]: _until, ...declining } = prev.declining
+        return { ...prev, declining }
+      }),
+    []
+  )
+
+  // Từ chối yêu cầu sau DECLINE_UNDO_MS, trong lúc chờ hiện như đã từ chối và có nút Hoàn tác.
+  // Hẹn giờ sống theo layout nên chuyển trang rồi quay lại vẫn hoàn tác được nếu còn hạn
+  const declineLater = useCallback(
+    (id, onError) => {
+      const timers = declineTimers.current
+      if (timers.has(id)) return
+      const until = Date.now() + DECLINE_UNDO_MS
+      setState((prev) => ({ ...prev, declining: { ...prev.declining, [id]: until } }))
+      const timer = setTimeout(async () => {
+        timers.delete(id)
+        try {
+          const { data } = await declineClaim(id)
+          setState((prev) => ({
+            ...prev,
+            claims: prev.claims.map((item) => (item.id === id ? data : item)),
+          }))
+        } catch (error) {
+          onError?.(error)
+        } finally {
+          stopDeclining(id)
+        }
+      }, DECLINE_UNDO_MS)
+      timers.set(id, { timer })
+    },
+    [stopDeclining]
+  )
+
+  // Hủy lượt từ chối còn trong hạn; true nếu kịp hủy trước khi gửi
+  const undoDecline = useCallback(
+    (id) => {
+      const pending = declineTimers.current.get(id)
+      if (!pending) return false
+      clearTimeout(pending.timer)
+      declineTimers.current.delete(id)
+      stopDeclining(id)
+      return true
+    },
+    [stopDeclining]
+  )
+
+  const setViewing = useCallback((id) => {
+    viewingRef.current = id
+  }, [])
+
   return {
     threads,
     activeId: state.activeId,
@@ -130,5 +213,8 @@ export function useInbox(user) {
     setDraft,
     putConversation,
     putClaim,
+    declineLater,
+    undoDecline,
+    setViewing,
   }
 }

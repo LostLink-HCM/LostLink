@@ -4,6 +4,8 @@ const {
   CategoryAttribute,
   CategoryMatchRelation,
   CategoryMatchRelationMember,
+  Claim,
+  Conversation,
   MatchSuggestion,
   Notification,
   Post,
@@ -21,6 +23,8 @@ const VISIBLE_STATES = ['pending', 'confirmed_one', 'confirmed_both']
 const ACTIVE_STATES = ['pending', 'confirmed_one']
 // Đã có kết luận cuối thì không chấm lại
 const SETTLED_STATES = ['rejected', 'confirmed_both', 'failed']
+// Trang Manh mối hiện thêm gợi ý bị từ chối
+const LISTED_STATES = [...VISIBLE_STATES, 'rejected']
 // Bài dùng để tính IDF: mọi bài đã được duyệt
 const CORPUS_STATUSES = ['searching', 'contacted', 'returned', 'closed']
 
@@ -470,6 +474,56 @@ const traitsOf = async (posts) => {
       .filter((item) => item.name && item.value)
 }
 
+const contactSteps = async (user, pairs) => {
+  if (!pairs.length) return new Map()
+  const postIds = pairs.flatMap(({ mine, other }) => [mine._id, other._id])
+  const [conversations, claims] = await Promise.all([
+    Conversation.find({ kind: 'trade', post: { $in: postIds }, 'participants.user': user._id })
+      .select('post participants')
+      .lean(),
+    Claim.find({ post: { $in: postIds } })
+      .select('post claimant status introMessage')
+      .lean(),
+  ])
+  const same = (a, b) => String(a) === String(b)
+  const key = (mine, other) => `${mine._id}:${other._id}`
+
+  return new Map(
+    pairs.map(({ mine, other }) => {
+      const peer = other.owner._id
+      const onPair = (doc) => same(doc.post, mine._id) || same(doc.post, other._id)
+      const chat = conversations.find(
+        (item) => onPair(item) && item.participants.some((member) => same(member.user, peer))
+      )
+      if (chat) return [key(mine, other), { step: 'chat', conversationId: chat._id }]
+
+      // Yêu cầu mình gửi tới bài của họ, yêu cầu họ gửi tới bài của mình
+      const sent = claims.find(
+        (item) => same(item.post, other._id) && same(item.claimant, user._id)
+      )
+      const received = claims.find(
+        (item) =>
+          same(item.post, mine._id) &&
+          same(item.claimant, peer) &&
+          item.status === 'pending' &&
+          item.introMessage
+      )
+      let contact = { step: 'start' }
+      if (sent?.introMessage && sent.status === 'pending') {
+        contact = { step: 'requested', claimId: sent._id }
+      } else if (received) {
+        contact = { step: 'incoming', claimId: received._id }
+      } else if (sent?.introMessage) {
+        contact = { step: 'declined', claimId: sent._id }
+      } else if (sent?.status === 'rejected') {
+        // Trả lời sai câu hỏi xác minh: không còn cách liên hệ qua bài này
+        contact = { step: 'verify_failed' }
+      }
+      return [key(mine, other), contact]
+    })
+  )
+}
+
 // Bài của tôi còn nhận gợi ý, mỗi bài kèm gợi ý xếp theo khả năng khớp giảm dần
 const listMyMatches = async (user) => {
   const config = await loadConfig()
@@ -481,7 +535,7 @@ const listMyMatches = async (user) => {
   ).lean()
   const myIds = myPosts.map((post) => post._id)
   const suggestions = await MatchSuggestion.find({
-    state: { $in: VISIBLE_STATES },
+    state: { $in: LISTED_STATES },
     score: { $gte: config.weak },
     $or: [{ postLost: { $in: myIds } }, { postFound: { $in: myIds } }],
   })
@@ -501,6 +555,21 @@ const listMyMatches = async (user) => {
       .map((post) => [String(post._id), post])
   )
   const traits = await traitsOf([...myPosts, ...visibleOthers.values()])
+  const myPostOf = new Map(myPosts.map((post) => [String(post._id), post]))
+  const confirmedPairs = suggestions
+    .filter(
+      (match) =>
+        match.state !== 'rejected' &&
+        (mine.has(String(match.postLost)) ? match.confirmedLost : match.confirmedFound)
+    )
+    .map((match) => ({
+      mine: myPostOf.get(
+        String(mine.has(String(match.postLost)) ? match.postLost : match.postFound)
+      ),
+      other: visibleOthers.get(String(otherIdOf(match))),
+    }))
+    .filter((pair) => pair.other)
+  const contacts = await contactSteps(user, confirmedPairs)
 
   const groups = myPosts.map((post) => {
     const isLost = post.type === 'lost'
@@ -516,6 +585,17 @@ const listMyMatches = async (user) => {
             strong: match.score >= config.strong,
             state: match.state,
             confirmed: isLost ? match.confirmedLost : match.confirmedFound,
+            // Bị từ chối: me (mình bấm Không phải), peer (bên kia), unknown (dữ liệu cũ)
+            rejectedBy:
+              match.state !== 'rejected'
+                ? null
+                : !match.rejectedSide
+                  ? 'unknown'
+                  : match.rejectedSide === post.type
+                    ? 'me'
+                    : 'peer',
+            // Chỉ có khi mình đã xác nhận: bước liên hệ tiếp theo
+            contact: contacts.get(`${post._id}:${other._id}`) ?? null,
             evidence: (match.evidence ?? []).map(toEvidence),
             createdAt: match.createdAt,
             post: { ...toPostCard(other), traits: traits(other) },
@@ -631,10 +711,12 @@ const confirmMatch = async (id, user) => {
 
 // Không phải: gợi ý bị từ chối, không gợi ý lại cặp này
 const rejectMatch = async (id, user) => {
-  const { match } = await findOwnMatch(id, user)
+  const { match, side } = await findOwnMatch(id, user)
+  // Đã bị từ chối thì giữ phía từ chối đầu tiên
+  if (match.state === 'rejected') return { id: match._id, state: match.state }
   const updated = await MatchSuggestion.findOneAndUpdate(
     { _id: match._id, state: { $ne: 'confirmed_both' } },
-    { $set: { state: 'rejected' } },
+    { $set: { state: 'rejected', rejectedSide: side } },
     { returnDocument: 'after' }
   ).lean()
   if (!updated) {
@@ -642,6 +724,32 @@ const rejectMatch = async (id, user) => {
   }
   await syncMatchNotices([updated._id])
   return { id: updated._id, state: updated.state }
+}
+
+// Hội thoại đóng vì món đồ không khớp: mọi manh mối giữa bài của hội thoại và bài của người còn lại
+// (otherId, người không đăng bài đó) thành Không phải. side: phía của người đóng (lost/found)
+const rejectBetween = async (post, otherId, side) => {
+  const peerPosts = await Post.find({
+    owner: otherId,
+    type: post.type === 'lost' ? 'found' : 'lost',
+  })
+    .select('_id')
+    .lean()
+  if (!peerPosts.length) return
+  const peerIds = peerPosts.map((item) => item._id)
+  const filter = {
+    ...(post.type === 'lost'
+      ? { postLost: post._id, postFound: { $in: peerIds } }
+      : { postFound: post._id, postLost: { $in: peerIds } }),
+    state: { $nin: ['confirmed_both', 'rejected'] },
+  }
+  const ids = await MatchSuggestion.find(filter).distinct('_id')
+  if (!ids.length) return
+  await MatchSuggestion.updateMany(
+    { _id: { $in: ids }, state: { $nin: ['confirmed_both', 'rejected'] } },
+    { $set: { state: 'rejected', rejectedSide: side } }
+  )
+  await syncMatchNotices(ids)
 }
 
 module.exports = {
@@ -653,6 +761,7 @@ module.exports = {
   countPendingMatches,
   confirmMatch,
   rejectMatch,
+  rejectBetween,
   syncMatchNotices,
   syncPostMatchNotices,
 }

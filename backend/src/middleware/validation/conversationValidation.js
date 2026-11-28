@@ -27,6 +27,8 @@ const messageRules = [
     .bail()
     .isLength({ max: MESSAGE_MAX })
     .withMessage('Tin nhắn tối đa 2.000 ký tự.'),
+  // Moderator trả lời yêu cầu hỗ trợ trong hàng chờ chung: mã nhận xử lý
+  body('lockToken').optional().isString().isLength({ min: 16, max: 100 }),
 ]
 
 const reviewRules = [
@@ -48,6 +50,7 @@ const reviewRules = [
 
 const counterpartRules = [
   body('same').isBoolean({ strict: true }).withMessage('Giá trị không hợp lệ.'),
+  body('post').optional().isMongoId().withMessage('Bài không hợp lệ.'),
 ]
 
 module.exports = {

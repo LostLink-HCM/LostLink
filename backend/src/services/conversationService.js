@@ -1,6 +1,7 @@
 const { Claim, Conversation, MatchSuggestion, Message, Post, Review, User } = require('../models')
 const { emitToUsers, emitToUsersAndRole } = require('../socket')
 const { createMessage } = require('./messageWriteService')
+const backofficeConversations = require('./backofficeConversationService')
 const {
   userSupportKey,
   upsertSupportConversation,
@@ -10,6 +11,7 @@ const { notify } = require('./notificationService')
 const { notifyUserSupportMessage } = require('./backofficeNotificationEvents')
 const { afterPostEnded } = require('./postManageService')
 const { CLOSABLE_STATUSES, invalidField, toAuthor } = require('./postService')
+const { rejectBetween } = require('./matchingService')
 const reputationService = require('./reputationService')
 const returnService = require('./returnService')
 const ApiError = require('../utils/ApiError')
@@ -32,18 +34,25 @@ const PRAISES = [
 const conversationNotFound = () =>
   new ApiError(404, 'Hội thoại không tồn tại.', undefined, 'CONVERSATION_NOT_FOUND')
 
+const POST_POPULATE = {
+  select: POST_FIELDS,
+  populate: [
+    { path: 'owner', select: 'username' },
+    { path: 'category', select: 'name slug' },
+  ],
+}
+const ASK_FIELDS = 'owner type status title slug'
 const POPULATE = [
-  {
-    path: 'post',
-    select: POST_FIELDS,
-    populate: [
-      { path: 'owner', select: 'username' },
-      { path: 'category', select: 'name' },
-    ],
-  },
+  { path: 'post', ...POST_POPULATE },
+  { path: 'counterpart', ...POST_POPULATE },
   { path: 'participants.user', select: 'username avatarUrl role' },
-  { path: 'counterpartAsk', select: 'owner type status title slug' },
+  { path: 'counterpartAsk', select: ASK_FIELDS },
+  { path: 'counterpartOptions', select: ASK_FIELDS },
 ]
+// Tối đa số bài cho người liên hệ chọn trong câu hỏi cùng món
+const ASK_MAX = 5
+const LIVE_MATCH = { state: { $nin: ['rejected', 'failed'] } }
+const oppositeType = (type) => (type === 'lost' ? 'found' : 'lost')
 
 // Bài Đang tìm chuyển Đã liên hệ, bài đã Đã liên hệ thì giữ nguyên
 const markContacted = (postId, changedBy, note) =>
@@ -83,6 +92,8 @@ const toPostSnapshot = (post) =>
         status: post.status,
         title: post.title,
         category: post.category?.name ?? '',
+        // Bài không có ảnh thì giao diện dùng ảnh danh mục
+        categorySlug: post.category?.slug ?? null,
         area: post.area,
         image: [...(post.images ?? [])].sort((a, b) => a.order - b.order)[0]?.url ?? null,
         author: post.owner?.username ?? null,
@@ -98,11 +109,27 @@ const toMessage = (message, sender) => ({
   sentAt: message.sentAt,
 })
 
+const askOptionsOf = (conversation) =>
+  conversation.counterpartOptions?.length
+    ? conversation.counterpartOptions
+    : [conversation.counterpartAsk].filter(Boolean)
+
+// Bài của mình còn chọn được trong câu hỏi cùng món, null nếu không có câu hỏi
 const counterpartAskOf = (conversation, user) => {
-  const ask = conversation.counterpartAsk
-  if (!ask?.owner || idOf(ask.owner) !== String(user._id)) return null
-  if (!CLOSABLE_STATUSES.includes(ask.status)) return null
-  return { id: ask._id, slug: ask.slug, type: ask.type, title: ask.title }
+  const options = askOptionsOf(conversation).filter(
+    (ask) =>
+      ask?.owner && idOf(ask.owner) === String(user._id) && CLOSABLE_STATUSES.includes(ask.status)
+  )
+  if (!options.length) return null
+  return options.map((ask) => ({ id: ask._id, slug: ask.slug, type: ask.type, title: ask.title }))
+}
+
+// Vai trò của mình trong hội thoại hỗ trợ: requester (mình nhờ LostLink hỗ trợ),
+// handler (Moderator được giao yêu cầu), internal (trao đổi giữa Admin và Moderator)
+const supportSideOf = (conversation, user) => {
+  if (conversation.kind !== 'support') return null
+  if (conversation.supportType === 'internal') return 'internal'
+  return idOf(conversation.participants[0]?.user) === String(user._id) ? 'requester' : 'handler'
 }
 
 // Hội thoại nhìn từ phía người xem: "me" là mình, "peer" là người còn lại
@@ -115,8 +142,11 @@ const toConversation = (conversation, user, extra = {}) => {
   return {
     id: conversation._id,
     kind: conversation.kind,
+    support: supportSideOf(conversation, user),
     status: conversation.status,
     post: toPostSnapshot(post),
+    // Bài của người liên hệ cùng món (đi từ manh mối), null nếu chỉ có bài chung
+    counterpart: toPostSnapshot(conversation.counterpart),
     peer: peer ? { ...toAuthor(peer), role: peer.role } : null,
     receiver,
     closedBy: closedBy(conversation, user),
@@ -134,8 +164,40 @@ const toConversation = (conversation, user, extra = {}) => {
   }
 }
 
+const SHARED_SUPPORT = {
+  kind: 'support',
+  $or: [{ supportType: 'user' }, { supportType: { $exists: false } }],
+}
+const isSharedSupport = (conversation) =>
+  conversation.kind === 'support' && (conversation.supportType ?? 'user') === 'user'
+const handlesShared = (conversation, user) =>
+  user.role === 'moderator' &&
+  isSharedSupport(conversation) &&
+  idOf(conversation.participants[0]?.user) !== String(user._id)
+
+// Hội thoại mình xem được: của mình, Moderator thêm hàng chờ hỗ trợ chung
+const visibleTo = (user) =>
+  user.role === 'moderator'
+    ? { $or: [{ 'participants.user': user._id }, SHARED_SUPPORT] }
+    : { 'participants.user': user._id }
+
+const moderatorStateOf = (conversation, user) =>
+  (conversation.moderatorStates ?? []).find((item) => idOf(item.moderator) === String(user._id))
+
+// Hàng chờ chung: tin của người cần hỗ trợ gửi sau lần đọc gần nhất của Moderator này
+const sharedUnreadOf = async (conversation, user) => {
+  const state = moderatorStateOf(conversation, user)
+  const count = await Message.countDocuments({
+    conversation: conversation._id,
+    sender: idOf(conversation.participants[0]?.user),
+    ...(state?.lastReadAt && { sentAt: { $gt: state.lastReadAt } }),
+  })
+  return state?.markedUnread ? Math.max(count, 1) : count
+}
+
 // Tin chưa đọc: tin của người kia gửi sau lần đọc gần nhất của mình
 const unreadOf = (conversation, user) => {
+  if (handlesShared(conversation, user)) return sharedUnreadOf(conversation, user)
   const me = meOf(conversation, user)
   return Message.countDocuments({
     conversation: conversation._id,
@@ -176,9 +238,90 @@ const toLastMessage = (message, user) =>
       }
     : null
 
+const claimantOf = (conversation) => {
+  if (!conversation.post?.owner) return null
+  const ownerId = idOf(conversation.post.owner)
+  return (
+    conversation.participants
+      .filter((item) => item.user)
+      .map((item) => idOf(item.user))
+      .find((id) => id !== ownerId) ?? null
+  )
+}
+
+const inferCounterparts = async (conversations) => {
+  const pending = conversations.filter(
+    (item) => item.kind === 'trade' && item.post && !item.counterpart && claimantOf(item)
+  )
+  if (!pending.length) return new Map()
+  const postIds = pending.map((item) => item.post._id)
+  const claimants = [...new Set(pending.map(claimantOf))]
+  const [settled, matches] = await Promise.all([
+    Post.find({ returnedWith: { $in: postIds }, owner: { $in: claimants } })
+      .select('owner returnedWith')
+      .lean(),
+    MatchSuggestion.find({
+      ...LIVE_MATCH,
+      $or: [{ postLost: { $in: postIds } }, { postFound: { $in: postIds } }],
+    })
+      .select('postLost postFound')
+      .lean(),
+  ])
+  const live = await Post.find({
+    _id: { $in: matches.flatMap((match) => [match.postLost, match.postFound]) },
+    owner: { $in: claimants },
+    status: { $in: CLOSABLE_STATUSES },
+  })
+    .select('owner')
+    .lean()
+  const ownerOf = new Map(live.map((item) => [String(item._id), idOf(item.owner)]))
+  // Bài phía bên kia của manh mối so với bài của hội thoại
+  const otherSide = (match, postId) => {
+    if (String(match.postLost) === postId) return match.postFound
+    if (String(match.postFound) === postId) return match.postLost
+    return null
+  }
+
+  const found = new Map()
+  for (const conversation of pending) {
+    const postId = String(conversation.post._id)
+    const claimant = claimantOf(conversation)
+    const returned = settled.find(
+      (item) => String(item.returnedWith) === postId && idOf(item.owner) === claimant
+    )
+    if (returned) {
+      found.set(String(conversation._id), String(returned._id))
+      continue
+    }
+    const matched = new Set(
+      matches
+        .map((match) => otherSide(match, postId))
+        .filter((id) => id && ownerOf.get(String(id)) === claimant)
+        .map(String)
+    )
+    if (matched.size === 1) found.set(String(conversation._id), [...matched][0])
+  }
+  if (!found.size) return new Map()
+  const posts = await Post.find({ _id: { $in: [...found.values()] } })
+    .select(POST_FIELDS)
+    .populate(POST_POPULATE.populate)
+    .lean()
+  const byId = new Map(posts.map((item) => [String(item._id), item]))
+  return new Map([...found].map(([conversationId, postId]) => [conversationId, byId.get(postId)]))
+}
+
+// Gắn bài đối ứng suy ra vào hội thoại đã tải (không ghi DB)
+const withCounterparts = async (conversations) => {
+  const inferred = await inferCounterparts(conversations)
+  for (const conversation of conversations) {
+    const post = inferred.get(String(conversation._id))
+    if (post) conversation.counterpart = post
+  }
+}
+
 // Hội thoại của mình, mới hoạt động trước. Tìm kiếm và tách mục Đang mở/Đã đóng làm ở trình duyệt
 const listConversations = async (user) => {
-  const conversations = await Conversation.find({ 'participants.user': user._id })
+  const conversations = await Conversation.find(visibleTo(user))
     .sort({ lastMessageAt: -1, updatedAt: -1 })
     .limit(LIST_MAX)
     .populate(POPULATE)
@@ -188,6 +331,7 @@ const listConversations = async (user) => {
     openingsOf(ids),
     lastMessagesOf(ids),
     Promise.all(conversations.map((item) => unreadOf(item, user))),
+    withCounterparts(conversations),
   ])
   return {
     items: conversations.map((item, index) =>
@@ -201,8 +345,10 @@ const listConversations = async (user) => {
 }
 
 // Hội thoại có mình tham gia, của người khác coi như không tồn tại
-const findMine = async (id, user, { populate = false } = {}) => {
-  const query = Conversation.findOne({ _id: id, 'participants.user': user._id })
+// shared: Moderator mở được cả yêu cầu hỗ trợ trong hàng chờ chung (xem, đọc, trả lời)
+const findMine = async (id, user, { populate = false, shared = false } = {}) => {
+  const scope = shared ? visibleTo(user) : { 'participants.user': user._id }
+  const query = Conversation.findOne({ _id: id, ...scope })
   const conversation = await (populate ? query.populate(POPULATE).lean() : query)
   if (!conversation) throw conversationNotFound()
   return conversation
@@ -214,6 +360,34 @@ const markRead = (id, user) =>
     { $set: { 'participants.$.lastReadAt': new Date(), 'participants.$.markedUnread': false } }
   )
 
+// Moderator đọc yêu cầu trong hàng chờ chung: ghi vào trạng thái riêng, đồng bộ với backoffice
+const markSharedRead = async (id, user) => {
+  await Conversation.updateOne(
+    { _id: id, 'moderatorStates.moderator': { $ne: user._id } },
+    {
+      $push: {
+        moderatorStates: {
+          moderator: user._id,
+          lastReadAt: null,
+          markedUnread: false,
+          isFlagged: false,
+        },
+      },
+    }
+  )
+  await Conversation.updateOne(
+    { _id: id, 'moderatorStates.moderator': user._id },
+    {
+      $set: { 'moderatorStates.$.lastReadAt': new Date(), 'moderatorStates.$.markedUnread': false },
+    }
+  )
+}
+
+const readFor = (conversation, user) =>
+  handlesShared(conversation, user)
+    ? markSharedRead(conversation._id, user)
+    : markRead(conversation._id, user)
+
 const reviewOf = (conversationId, user) =>
   Review.findOne({ conversation: conversationId, reviewer: user._id })
     .select('rating praises comment isPublic createdAt')
@@ -221,7 +395,8 @@ const reviewOf = (conversationId, user) =>
 
 // Chi tiết kèm tin nhắn (mới nhất, before để tải tin cũ hơn). Mở xem là đã đọc
 const getConversation = async (id, user, { before } = {}) => {
-  const conversation = await findMine(id, user, { populate: true })
+  const conversation = await findMine(id, user, { populate: true, shared: true })
+  await withCounterparts([conversation])
   const messages = await Message.find({
     conversation: conversation._id,
     ...(before && { sentAt: { $lt: before } }),
@@ -236,7 +411,7 @@ const getConversation = async (id, user, { before } = {}) => {
   const [openings, review] = await Promise.all([
     openingsOf([conversation._id]),
     reviewOf(conversation._id, user),
-    before ? null : markRead(conversation._id, user),
+    before ? null : readFor(conversation, user),
   ])
   return toConversation(conversation, user, {
     opened: openings.get(String(conversation._id)) ?? null,
@@ -248,8 +423,8 @@ const getConversation = async (id, user, { before } = {}) => {
 }
 
 const readConversation = async (id, user) => {
-  await findMine(id, user)
-  await markRead(id, user)
+  const conversation = await findMine(id, user, { shared: true })
+  await readFor(conversation, user)
   return { read: true }
 }
 
@@ -265,8 +440,13 @@ const freshConversation = (id, user) => getConversation(id, user)
 
 // ----- Nhắn tin
 
-const sendMessage = async (id, user, { body = '' }, file) => {
-  const conversation = await findMine(id, user)
+const sendMessage = async (id, user, { body = '', lockToken }, file) => {
+  const conversation = await findMine(id, user, { shared: true })
+  // Moderator trả lời hàng chờ chung: cần đang nhận xử lý (lockToken), dùng chung luồng backoffice
+  if (handlesShared(conversation, user)) {
+    if (!body.trim() && !file) throw invalidField('body', 'Vui lòng nhập nội dung tin nhắn.')
+    return backofficeConversations.sendMessage(id, user, { body: body.trim(), lockToken }, file)
+  }
   if (conversation.status === 'locked') {
     throw ApiError.conflict('Không thể nhắn tin trong hội thoại này.', 'CONVERSATION_LOCKED')
   }
@@ -331,7 +511,8 @@ const releasePostIfIdle = async (postId, actorId) => {
 const cannotClose = () => ApiError.conflict('Không thể đóng hội thoại.', 'CANNOT_CLOSE')
 
 // Đóng khi món đồ không khớp. Kiểm tra và đổi trong một lệnh: chưa ai đóng, chưa trao trả
-const closeConversation = async (id, user) => {
+// notMatch: đóng vì món đồ không khớp, manh mối giữa hai bài cũng thành Không phải
+const closeConversation = async (id, user, { notMatch = false } = {}) => {
   const conversation = await findMine(id, user, { populate: true })
   if (conversation.kind !== 'trade') throw cannotClose()
   const now = new Date()
@@ -354,6 +535,14 @@ const closeConversation = async (id, user) => {
   const peer = peerOf(conversation, user)
   await Promise.all([
     post ? releasePostIfIdle(post._id, user._id) : null,
+    notMatch && post
+      ? // Bài đối ứng thuộc người không đăng bài của hội thoại; người nhận đồ đứng ở phía Mất đồ
+        rejectBetween(
+          post,
+          idOf(post.owner) === String(user._id) ? peer.user._id : user._id,
+          isReceiver(post, user) ? 'lost' : 'found'
+        )
+      : null,
     notify([peer.user._id], {
       type: 'conversation_closed',
       actor: user._id,
@@ -399,21 +588,40 @@ const reopenConversation = async (id, user) => {
 
 const cannotConfirm = (message, code) => ApiError.conflict(message, code)
 
-const counterpartOf = async (post, ownerId, otherId) => {
+// Bài đang mở của người liên hệ (otherId) và các bài trong đó có manh mối với bài này
+const matchedPostsOf = async (post, otherId) => {
   const ids = await Post.find({
     owner: otherId,
-    type: post.type === 'lost' ? 'found' : 'lost',
+    type: oppositeType(post.type),
     status: { $in: CLOSABLE_STATUSES },
   }).distinct('_id')
-  if (!ids.length) return null
-
+  if (!ids.length) return { ids, matched: [] }
   const [mine, theirs] =
     post.type === 'lost' ? ['postLost', 'postFound'] : ['postFound', 'postLost']
   const matched = await MatchSuggestion.find({
     [mine]: post._id,
     [theirs]: { $in: ids },
-    state: { $nin: ['rejected', 'failed'] },
+    ...LIVE_MATCH,
   }).distinct(theirs)
+  return { ids, matched }
+}
+
+// Mở hội thoại từ yêu cầu liên hệ: có manh mối với đúng một bài của người liên hệ thì ghi bài đó
+const linkCounterpart = async (conversation, post, claimantId) => {
+  if (conversation.counterpart) return conversation
+  const { matched } = await matchedPostsOf(post, claimantId)
+  if (matched.length !== 1) return conversation
+  await Conversation.updateOne(
+    { _id: conversation._id, counterpart: null },
+    { $set: { counterpart: matched[0] } }
+  )
+  conversation.counterpart = matched[0]
+  return conversation
+}
+
+const counterpartOf = async (post, ownerId, otherId) => {
+  const { ids, matched } = await matchedPostsOf(post, otherId)
+  if (!ids.length) return null
   if (matched.length) return matched.length === 1 ? matched[0] : null
 
   const talked = await Conversation.find({
@@ -447,59 +655,83 @@ const settleWith = async (counterpartId, post, actorId, skip) => {
   return settled
 }
 
-const askCandidateOf = async (post, otherId) => {
-  const candidates = await Post.find({
+// Bài đang mở cùng danh mục của người liên hệ, để hỏi bài nào cùng món
+const askCandidatesOf = (post, otherId) =>
+  Post.find({
     owner: otherId,
-    type: post.type === 'lost' ? 'found' : 'lost',
+    type: oppositeType(post.type),
     category: idOf(post.category),
     status: { $in: CLOSABLE_STATUSES },
   })
+    .sort({ createdAt: -1, _id: -1 })
     .select('title')
-    .limit(2)
+    .limit(ASK_MAX)
     .lean()
-  return candidates.length === 1 ? candidates[0] : null
-}
 
+// Trao trả xong: bài đối ứng đã ghi (hoặc suy ra được) theo sang Đã trao trả. Không có thì hỏi
+// người liên hệ bài nào cùng món: một bài thì hỏi Đúng/Không, nhiều bài thì chọn một hoặc bỏ qua
 const settleCounterpart = async (post, conversation, actorId) => {
   const ownerId = idOf(post.owner)
-  const otherId = conversation.participants
-    .map((item) => idOf(item.user))
-    .find((id) => id !== ownerId)
+  const otherId = claimantOf({ ...conversation, post })
   if (!otherId) return
-  const counterpartId = await counterpartOf(post, ownerId, otherId)
+  const counterpartId = conversation.counterpart
+    ? idOf(conversation.counterpart)
+    : await counterpartOf(post, ownerId, otherId)
   if (counterpartId) {
+    await Conversation.updateOne(
+      { _id: conversation._id, counterpart: null },
+      { $set: { counterpart: counterpartId } }
+    )
     await settleWith(counterpartId, post, actorId, [ownerId, otherId])
     return
   }
 
-  const candidate = await askCandidateOf(post, otherId)
-  if (!candidate) return
+  const candidates = await askCandidatesOf(post, otherId)
+  if (!candidates.length) return
   await Conversation.updateOne(
     { _id: conversation._id },
-    { $set: { counterpartAsk: candidate._id } }
+    { $set: { counterpartOptions: candidates.map((item) => item._id), counterpartAsk: null } }
   )
   await notify([otherId], {
     type: 'counterpart_ask',
     refType: 'Post',
     refId: post._id,
-    text: `Bài "${candidate.title}" của bạn có phải cùng món với bài "${post.title}" vừa trao trả không?`,
+    text:
+      candidates.length === 1
+        ? `Bài "${candidates[0].title}" của bạn có phải cùng món với bài "${post.title}" vừa trao trả không?`
+        : `Bạn có bài nào cùng món với bài "${post.title}" vừa trao trả không? Chọn bài đó để chuyển sang Đã trao trả.`,
   })
 }
 
-const answerCounterpart = async (id, user, { same }) => {
+// Trả lời câu hỏi cùng món: same=false là bỏ qua; same=true kèm post (bắt buộc khi có nhiều bài)
+const answerCounterpart = async (id, user, { same, post: chosenId }) => {
   const conversation = await findMine(id, user, { populate: true })
-  const ask = counterpartAskOf(conversation, user)
+  const options = counterpartAskOf(conversation, user)
   const gone = () => ApiError.conflict('Câu hỏi này không còn hiệu lực.', 'COUNTERPART_ASK_GONE')
-  if (!ask) throw gone()
+  if (!options) throw gone()
+  let chosen = null
+  if (same && chosenId) chosen = options.find((item) => String(item.id) === String(chosenId))
+  else if (same && options.length === 1) chosen = options[0]
+  if (same && !chosen) throw invalidField('post', 'Vui lòng chọn bài cùng món.')
+
   const { modifiedCount } = await Conversation.updateOne(
-    { _id: conversation._id, counterpartAsk: ask.id },
-    { $set: { counterpartAsk: null } }
+    {
+      _id: conversation._id,
+      $or: [{ counterpartAsk: { $ne: null } }, { 'counterpartOptions.0': { $exists: true } }],
+    },
+    {
+      $set: {
+        counterpartAsk: null,
+        counterpartOptions: [],
+        ...(chosen && { counterpart: chosen.id }),
+      },
+    }
   )
   if (!modifiedCount) throw gone()
 
-  if (same) {
+  if (chosen) {
     const { post } = conversation
-    await settleWith(ask.id, post, user._id, [idOf(post.owner), String(user._id)])
+    await settleWith(chosen.id, post, user._id, [idOf(post.owner), String(user._id)])
   }
   broadcastUpdate(conversation)
   return freshConversation(id, user)
@@ -685,6 +917,7 @@ const openSupport = async (user) => {
 
 module.exports = {
   PRAISES,
+  linkCounterpart,
   markContacted,
   reopenTrade,
   listConversations,

@@ -55,7 +55,7 @@ describe('UC20 - Xem hồ sơ người dùng khác', () => {
     }
   })
 
-  test('chỉ hiện bài công khai, mới nhất trước, không có quyền quản lý bài', async () => {
+  test('chỉ hiện bài Đang tìm, Đã liên hệ (kể cả vừa trao trả cũng ẩn), mới nhất trước', async () => {
     const make = (title, fields = {}) => makePost(owner, wallet.category, { title, ...fields })
     await make('Đang tìm')
     await make('Đã liên hệ', { status: 'contacted' })
@@ -77,7 +77,7 @@ describe('UC20 - Xem hồ sơ người dùng khác', () => {
 
     assert.deepEqual(
       posts.map((post) => post.title),
-      ['Vừa trao trả', 'Đã liên hệ', 'Đang tìm']
+      ['Đã liên hệ', 'Đang tìm']
     )
     assert.equal('manage' in posts[0], false)
     assert.equal('locExact' in posts[0], false)

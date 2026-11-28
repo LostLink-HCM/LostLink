@@ -9,19 +9,21 @@ export const getConversation = (id, before) =>
 
 export const markConversationRead = (id) => api.patch(`/conversations/${id}/read`)
 
-// Văn bản hoặc một ảnh, gửi dạng FormData giống đăng bài
-export const sendMessage = (id, { body = '', image = null }) => {
+export const sendMessage = (id, { body = '', image = null, lockToken }) => {
   const form = new FormData()
-  form.append('data', JSON.stringify({ body }))
+  form.append('data', JSON.stringify({ body, ...(lockToken && { lockToken }) }))
   if (image) form.append('image', image)
   return api.post(`/conversations/${id}/messages`, form)
 }
 
-export const closeConversation = (id) => api.post(`/conversations/${id}/close`)
+// notMatch: đóng vì món đồ không khớp, manh mối giữa hai bài cũng thành Không phải
+export const closeConversation = (id, { notMatch = false } = {}) =>
+  api.post(`/conversations/${id}/close`, notMatch ? { notMatch: true } : undefined)
 export const reopenConversation = (id) => api.post(`/conversations/${id}/reopen`)
 export const confirmReturn = (id) => api.post(`/conversations/${id}/confirm`)
-export const answerCounterpart = (id, same) =>
-  api.post(`/conversations/${id}/counterpart`, { same })
+// Câu hỏi cùng món: same=false là bỏ qua; same=true kèm post khi có nhiều bài để chọn
+export const answerCounterpart = (id, same, post) =>
+  api.post(`/conversations/${id}/counterpart`, { same, ...(post && { post }) })
 
 // { rating, praises, comment, isPublic }
 export const reviewConversation = (id, review) => api.post(`/conversations/${id}/review`, review)

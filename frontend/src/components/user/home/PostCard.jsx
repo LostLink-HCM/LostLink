@@ -29,7 +29,6 @@ function RankBadge({ rank }) {
   )
 }
 
-// Cả thẻ bấm được nhờ link phủ toàn thẻ; nút Thích, tags, menu ⋯, footer nằm trên lớp link
 export default function PostCard({
   post,
   commentCount,
@@ -44,8 +43,10 @@ export default function PostCard({
   tags,
   menu,
   footer,
+  faded,
 }) {
   const comments = commentCount ?? 0
+  const dim = faded && 'opacity-55'
   const { pathname, search } = useLocation()
 
   return (
@@ -55,7 +56,7 @@ export default function PostCard({
         'relative flex gap-3.5 p-3.5 transition hover:border-line-strong hover:shadow-[0_10px_28px_-14px_rgb(22_35_58/0.25)] sm:gap-4.5 sm:p-4'
       )}
     >
-      <div className="flex w-24 shrink-0 flex-col gap-2.5 sm:w-40">
+      <div className={cx('flex w-24 shrink-0 flex-col gap-2.5 sm:w-40', dim)}>
         <div className={cx('relative min-h-24 flex-1 sm:min-h-28', seen && 'opacity-75')}>
           {post.images[0] ? (
             <img
@@ -90,7 +91,7 @@ export default function PostCard({
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Thông tin bên trái tự xuống dòng khi hẹp, nhãn loại tin luôn nằm ở góc phải */}
         <div className="mb-2 flex items-start gap-2 text-tiny text-ink-subtle">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+          <div className={cx('flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1', dim)}>
             {rank && <RankBadge rank={rank} />}
             {/* Nằm trên lớp link phủ cả thẻ để bấm được vào tên người đăng */}
             <Link
@@ -128,7 +129,7 @@ export default function PostCard({
               </span>
             )}
             {/* Cùng chiều rộng với "Nhặt được" để nhãn Đã xem thẳng cột giữa các card */}
-            <TypeTag type={post.type} className="w-24 justify-center" />
+            <TypeTag type={post.type} className={cx('w-24 justify-center', dim)} />
             {tags}
             {menu}
           </span>
@@ -138,7 +139,8 @@ export default function PostCard({
         <h3
           className={cx(
             'm-0 mb-2 text-lead leading-snug font-bold tracking-tight sm:text-title',
-            seen ? 'text-ink-muted' : 'text-ink'
+            seen ? 'text-ink-muted' : 'text-ink',
+            dim
           )}
         >
           <Link
@@ -153,11 +155,16 @@ export default function PostCard({
             {post.title}
           </Link>
         </h3>
-        <p className="m-0 mb-3 line-clamp-2 text-small leading-relaxed text-ink-muted">
+        <p className={cx('m-0 mb-3 line-clamp-2 text-small leading-relaxed text-ink-muted', dim)}>
           {post.desc}
         </p>
 
-        <div className="mt-auto flex min-h-8 items-center gap-x-2.5 gap-y-1.5 text-tiny text-ink-subtle max-sm:flex-wrap sm:gap-x-4">
+        <div
+          className={cx(
+            'mt-auto flex min-h-8 items-center gap-x-2.5 gap-y-1.5 text-tiny text-ink-subtle max-sm:flex-wrap sm:gap-x-4',
+            dim
+          )}
+        >
           {post.timeWindow && (
             <EventTime type={post.type} value={post.timeWindow} className="shrink-0" />
           )}

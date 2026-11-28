@@ -9,14 +9,14 @@ import EmptyState from '../../components/user/EmptyState'
 import Icon from '../../components/common/Icon'
 import IconButton from '../../components/user/IconButton'
 import { cx } from '../../components/user/classes'
-import MatchCard from '../../components/user/matches/MatchCard'
+import MatchCard, { MyPostCard } from '../../components/user/matches/MatchCard'
 import PostPicker from '../../components/user/matches/PostPicker'
 import useMediaQuery from '../../hooks/useMediaQuery'
 import { useProfileData } from '../../hooks/useProfileData'
 import { toFeedPost } from '../../lib/user/homeFeed'
-import { findGroup, sortGroups } from '../../lib/user/matches'
+import { contactThreadId, findGroup, rejectedLast, sortGroups } from '../../lib/user/matches'
 
-const pageClass = 'mx-auto max-w-270 px-4 pt-5 pb-10 sm:px-6 lg:px-10 lg:pt-7'
+const pageClass = 'mx-auto max-w-360 px-4 pt-5 pb-10 sm:px-6 lg:px-10 lg:pt-7'
 const titleClass = 'm-0 text-title font-bold tracking-tight text-ink sm:text-heading'
 const ERROR_MESSAGE = 'Đã có lỗi xảy ra, vui lòng thử lại.'
 
@@ -33,12 +33,13 @@ const toGroups = (data, now) =>
   }))
 
 export default function MatchesPage() {
-  const { now, claimPost, notify, refreshPendingMatches } = useOutletContext()
+  const { now, claimPost, notify, refreshPendingMatches, inbox } = useOutletContext()
   const [params, setParams] = useSearchParams()
   const { data, error, loading, reload } = useProfileData(listMatches)
   const [rejecting, setRejecting] = useState(null)
   const [busy, setBusy] = useState(null)
-  const [hidden, setHidden] = useState(() => new Set())
+  // Gợi ý vừa bấm Không phải: vẫn hiện nhưng làm mờ, không tải lại
+  const [rejected, setRejected] = useState(() => new Set())
   // Gợi ý vừa xác nhận (id → trạng thái), cập nhật thẻ mà không tải lại
   const [confirmed, setConfirmed] = useState(() => new Map())
   // Điện thoại: chưa chọn bài thì chỉ hiện danh sách bài, chọn bài mới hiện manh mối
@@ -77,7 +78,11 @@ export default function MatchesPage() {
     toGroups(data, now).map((group) => ({
       ...group,
       items: group.items
-        .filter((item) => !hidden.has(item.match.id))
+        .map((item) =>
+          rejected.has(item.match.id)
+            ? { ...item, match: { ...item.match, state: 'rejected', rejectedBy: 'me' } }
+            : item
+        )
         .map((item) =>
           confirmed.has(item.match.id)
             ? {
@@ -113,17 +118,18 @@ export default function MatchesPage() {
 
   const lost = current.post.type === 'lost'
 
-  // Gợi ý mạnh lên trước, gợi ý yếu xuống dưới để người dùng xem kỹ hơn
+  // Gợi ý mạnh lên trước, gợi ý yếu xuống dưới để người dùng xem kỹ hơn.
+  // Trong mỗi mục, manh mối đã bị từ chối xuống cuối
   const sections = [
     {
       key: 'strong',
       title: 'Khả năng cao',
-      items: current.items.filter((item) => item.match.strong),
+      items: rejectedLast(current.items.filter((item) => item.match.strong)),
     },
     {
       key: 'possible',
       title: 'Có thể khớp',
-      items: current.items.filter((item) => !item.match.strong),
+      items: rejectedLast(current.items.filter((item) => !item.match.strong)),
     },
   ].filter((section) => section.items.length)
 
@@ -147,13 +153,29 @@ export default function MatchesPage() {
     }
   }
 
+  // Đã xác nhận: mở hội thoại hoặc yêu cầu sẵn có, chưa liên hệ thì đi tiếp luồng nhận đồ
+  const contact = async (item) => {
+    const threadId = contactThreadId(item.match.contact)
+    if (!threadId) {
+      setBusy(item.match.id)
+      await claimPost(item.post)
+      setBusy(null)
+      return
+    }
+    await inbox.reload().catch(() => {})
+    inbox.open(threadId)
+    navigate('/messages', { state: { openConversation: true } })
+  }
+
   const reject = async () => {
     const { id } = rejecting
     setRejecting(null)
     setBusy(id)
     try {
       await rejectMatch(id)
-      setHidden((prev) => new Set(prev).add(id))
+      // Bài bớt manh mối chưa phản hồi sẽ đổi chỗ trong danh sách: giữ bài đang xem trên URL
+      if (!params.get('post')) setParams({ post: String(current.post.id) }, { replace: true })
+      setRejected((prev) => new Set(prev).add(id))
       refreshPendingMatches()
     } catch (err) {
       notify(err.status === 409 ? err.message : ERROR_MESSAGE)
@@ -177,7 +199,9 @@ export default function MatchesPage() {
     <div
       className={cx(
         pageClass,
-        picking && 'lg:grid lg:grid-cols-[17rem_minmax(0,1fr)] lg:items-start lg:gap-6'
+        // Hai cột có độ rộng cố định và nằm giữa màn hình, hai mép cách đều
+        picking &&
+          'lg:grid lg:grid-cols-[21rem_minmax(0,50rem)] lg:items-start lg:justify-center lg:gap-8'
       )}
     >
       {listOnly && <h1 className={cx(titleClass, 'mb-4')}>Manh mối</h1>}
@@ -188,21 +212,27 @@ export default function MatchesPage() {
       )}
 
       {!listOnly && (
-        <div className="min-w-0">
-          <div className="mb-5 flex items-center gap-1">
-            {picking && !isDesktop && (
-              <IconButton
-                icon="back"
-                label="Quay lại danh sách bài"
-                size={36}
-                className="-ml-2 shrink-0 text-ink-secondary"
-                onClick={backToList}
-              />
-            )}
-            <h1 className={titleClass}>
-              {lost ? 'Có thể đây là đồ của bạn?' : 'Có thể đây là món người khác đang tìm?'}
-            </h1>
+        // Giới hạn chiều rộng cột manh mối để thẻ không bị kéo quá dài trên màn rộng
+        <div className="mx-auto w-full max-w-200 min-w-0">
+          {/* Điện thoại: nút quay lại danh sách bài giữ ở trên cùng */}
+          {picking && !isDesktop && (
+            <IconButton
+              icon="back"
+              label="Quay lại danh sách bài"
+              size={36}
+              className="-ml-2 mb-2 shrink-0 text-ink-secondary"
+              onClick={backToList}
+            />
+          )}
+
+          {/* Bài của tôi trước, câu hỏi ngay trên các manh mối để đọc liền mạch */}
+          <div className="mb-6">
+            <MyPostCard post={current.post} now={now} />
           </div>
+
+          <h1 className={cx(titleClass, 'mb-5')}>
+            {lost ? 'Có thể đây là đồ của bạn?' : 'Có thể đây là món người khác đang tìm?'}
+          </h1>
 
           {sections.length ? (
             <div className="flex flex-col gap-7">
@@ -226,6 +256,7 @@ export default function MatchesPage() {
                           busy={busy === item.match.id}
                           onConfirm={() => confirm(item)}
                           onReject={() => setRejecting(item.match)}
+                          onContact={() => contact(item)}
                         />
                       </li>
                     ))}
@@ -256,13 +287,15 @@ export default function MatchesPage() {
                 Giữ lại
               </Button>
               <Button variant="danger" size="lg" onClick={reject}>
-                Ẩn manh mối
+                Xác nhận không phải
               </Button>
             </>
           }
         >
           <p className="m-0 text-small leading-relaxed text-ink-secondary">
-            Manh mối này sẽ bị ẩn khỏi danh sách và LostLink sẽ không gợi ý lại bài này cho bạn.
+            Manh mối sẽ được làm mờ ở cuối danh sách, bạn vẫn có thể xem lại. Người đăng bài kia
+            cũng thấy manh mối này đã được xác nhận không phải, và LostLink sẽ không gợi ý lại bài
+            này.
           </p>
         </Dialog>
       )}

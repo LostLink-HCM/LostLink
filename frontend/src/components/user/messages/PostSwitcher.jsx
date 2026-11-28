@@ -7,7 +7,7 @@ export default function PostSwitcher({ threads, activeId, onSelect }) {
     <div
       role="group"
       aria-label="Các bài đang trao đổi với người này"
-      className="flex gap-1.5 overflow-x-auto border-b border-line px-4 py-2 [scrollbar-width:none] sm:px-5"
+      className="flex gap-1.5 overflow-x-auto border-b border-line px-4 py-1.5 [scrollbar-width:none] sm:px-5"
     >
       {threads.map((thread) => {
         const active = thread.id === activeId
@@ -19,7 +19,7 @@ export default function PostSwitcher({ threads, activeId, onSelect }) {
             aria-pressed={active}
             onClick={() => onSelect(thread.id)}
             className={cx(
-              'flex max-w-60 shrink-0 cursor-pointer items-center gap-2 rounded-full border py-1 pr-1.5 pl-3 text-caption transition-colors',
+              'flex max-w-60 shrink-0 cursor-pointer items-center gap-2 rounded-full border py-0.5 pr-1 pl-3 text-caption transition-colors',
               active
                 ? 'border-primary/35 bg-primary-soft font-semibold text-primary'
                 : 'border-line bg-surface font-medium text-ink-secondary hover:bg-surface-muted',

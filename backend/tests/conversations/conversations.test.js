@@ -192,6 +192,57 @@ describe('UC44 - Đóng và mở lại hội thoại', () => {
     assert.equal(saved.statusHistory.at(-1).note, 'Mở lại hội thoại')
   })
 
+  test('đóng vì không phải đồ của mình: manh mối giữa hai bài thành Không phải, mở lại vẫn giữ', async () => {
+    const lost = await makePost(loser, wallet.category, { title: 'Mất ví' })
+    const other = await makePost(loser, wallet.category, { title: 'Mất ví khác' })
+    const third = await createUser({ username: 'nguoithu3', email: 'third@example.com' })
+    const strangers = await makePost(third, wallet.category, { title: 'Ví người khác' })
+    const match = await MatchSuggestion.create({
+      postLost: lost._id,
+      postFound: post._id,
+      score: 0.9,
+    })
+    const confirmed = await MatchSuggestion.create({
+      postLost: other._id,
+      postFound: post._id,
+      score: 0.9,
+      state: 'confirmed_both',
+    })
+    const unrelated = await MatchSuggestion.create({
+      postLost: strangers._id,
+      postFound: post._id,
+      score: 0.9,
+    })
+
+    // Đóng thường không đụng tới manh mối
+    await loserApi.post(`${path()}/close`)
+    assert.equal((await MatchSuggestion.findById(match._id)).state, 'pending')
+    await loserApi.post(`${path()}/reopen`)
+
+    assert.equal((await loserApi.post(`${path()}/close`, { notMatch: true })).status, 200)
+    const rejected = await MatchSuggestion.findById(match._id)
+    assert.equal(rejected.state, 'rejected')
+    assert.equal(rejected.rejectedSide, 'lost')
+    assert.equal((await MatchSuggestion.findById(confirmed._id)).state, 'confirmed_both')
+    assert.equal((await MatchSuggestion.findById(unrelated._id)).state, 'pending')
+
+    await loserApi.post(`${path()}/reopen`)
+    assert.equal((await MatchSuggestion.findById(match._id)).state, 'rejected')
+  })
+
+  test('chủ bài đóng vì không phải chủ món đồ: manh mối ghi phía của chủ bài', async () => {
+    const lost = await makePost(loser, wallet.category, { title: 'Mất ví' })
+    const match = await MatchSuggestion.create({
+      postLost: lost._id,
+      postFound: post._id,
+      score: 0.9,
+    })
+    assert.equal((await finderApi.post(`${path()}/close`, { notMatch: true })).status, 200)
+    const rejected = await MatchSuggestion.findById(match._id)
+    assert.equal(rejected.state, 'rejected')
+    assert.equal(rejected.rejectedSide, 'found')
+  })
+
   test('đã trao trả thì không đóng được', async () => {
     await Conversation.updateOne(
       { _id: conversation._id },
@@ -253,6 +304,75 @@ describe('UC43 - Xác nhận đã trao trả', () => {
   })
 })
 
+describe('Bài đính kèm trong hội thoại: đi từ manh mối hoặc claim đơn phương', () => {
+  test('claim đơn phương (người liên hệ không có bài): chỉ có bài chung', async () => {
+    const data = (await loserApi.get(path())).body.data
+    assert.equal(String(data.post.id), String(post._id))
+    assert.equal(data.counterpart, null)
+    // Có slug danh mục để giao diện dùng ảnh danh mục khi bài không có ảnh
+    const category = await Category.findById(post.category).lean()
+    assert.equal(data.post.categorySlug, category.slug)
+  })
+
+  test('hội thoại cũ có manh mối với đúng một bài: hai bên cùng thấy cả hai bài', async () => {
+    const lost = await makePost(loser, wallet.category, { title: 'Mất ví' })
+    await makePost(loser, wallet.category, { title: 'Mất ví không có manh mối' })
+    await MatchSuggestion.create({ postLost: lost._id, postFound: post._id, score: 0.9 })
+
+    for (const api of [loserApi, finderApi]) {
+      const detail = (await api.get(path())).body.data
+      assert.equal(String(detail.counterpart.id), String(lost._id))
+      assert.equal(detail.counterpart.author, loser.username)
+      const listed = (await api.get('/api/conversations')).body.data.items[0]
+      assert.equal(String(listed.counterpart.id), String(lost._id))
+    }
+  })
+
+  test('manh mối bị Không phải hoặc có nhiều manh mối thì không suy ra bài đối ứng', async () => {
+    const a = await makePost(loser, wallet.category, { title: 'Mất ví A' })
+    const b = await makePost(loser, wallet.category, { title: 'Mất ví B' })
+    await MatchSuggestion.create({
+      postLost: a._id,
+      postFound: post._id,
+      score: 0.9,
+      state: 'rejected',
+    })
+    assert.equal((await loserApi.get(path())).body.data.counterpart, null)
+
+    await MatchSuggestion.updateOne({ postLost: a._id }, { state: 'pending' })
+    await MatchSuggestion.create({ postLost: b._id, postFound: post._id, score: 0.8 })
+    assert.equal((await loserApi.get(path())).body.data.counterpart, null)
+  })
+
+  test('liên hệ từ manh mối: ghi bài đối ứng khi mở hội thoại, trao trả xong cả hai bài Đã trao trả', async () => {
+    await Conversation.deleteMany()
+    await Post.updateOne({ _id: post._id }, { status: 'searching' })
+    const lost = await makePost(loser, wallet.category, { title: 'Mất ví' })
+    // Bài cùng danh mục khác không làm lệch bài đối ứng
+    await makePost(loser, wallet.category, { title: 'Mất ví khác' })
+    await MatchSuggestion.create({ postLost: lost._id, postFound: post._id, score: 0.9 })
+
+    const claim = await loserApi.post(`/api/posts/${post._id}/claim/request`, {
+      message: 'Ví này là của mình, bên trong có thẻ sinh viên.',
+    })
+    assert.ok([200, 201].includes(claim.status), JSON.stringify(claim.body))
+    const pending = await Claim.findOne({ post: post._id })
+    assert.equal((await finderApi.post(`/api/claims/${pending._id}/accept`)).status, 200)
+    const saved = await Conversation.findOne({ post: post._id })
+    assert.equal(String(saved.counterpart), String(lost._id))
+
+    const talk = `/api/conversations/${saved._id}`
+    await loserApi.post(`${talk}/confirm`)
+    await finderApi.post(`${talk}/confirm`)
+    assert.equal((await Post.findById(post._id)).status, 'returned')
+    const settled = await Post.findById(lost._id)
+    assert.equal(settled.status, 'returned')
+    assert.equal(String(settled.returnedWith), String(post._id))
+    assert.equal(await Post.countDocuments({ owner: loser._id, status: 'returned' }), 1)
+    assert.equal(String((await loserApi.get(talk)).body.data.counterpart.id), String(lost._id))
+  })
+})
+
 describe('UC43 - Trao trả xong thì bài đối ứng và các liên hệ khác kết thúc theo', () => {
   const confirmBoth = async () => {
     await loserApi.post(`${path()}/confirm`)
@@ -288,7 +408,7 @@ describe('UC43 - Trao trả xong thì bài đối ứng và các liên hệ khá
     assert.equal(await Notification.countDocuments({ type: 'trade_ended' }), 0)
   })
 
-  test('không có manh mối và có hơn một bài đối ứng thì không tự đổi bài nào', async () => {
+  test('không có manh mối và có nhiều bài cùng danh mục: không tự đổi, cho chọn một trong các bài', async () => {
     const lostPosts = []
     for (const title of ['Mất ví', 'Mất ví khác']) {
       lostPosts.push(await makePost(loser, wallet.category, { title, status: 'contacted' }))
@@ -304,7 +424,40 @@ describe('UC43 - Trao trả xong thì bài đối ứng và các liên hệ khá
     await confirmBoth()
     const after = await Post.find({ _id: { $in: lostPosts.map((lost) => lost._id) } }).lean()
     assert.ok(after.every((item) => item.status === 'contacted' && !item.returnedWith))
-    assert.equal((await loserApi.get(path())).body.data.counterpartAsk, null)
+    const ask = (await loserApi.get(path())).body.data.counterpartAsk
+    assert.deepEqual(ask.map((item) => item.title).sort(), ['Mất ví', 'Mất ví khác'])
+    const notice = await Notification.findOne({ type: 'counterpart_ask' }).lean()
+    assert.match(notice.preview, /Chọn bài đó/)
+
+    // Nhiều bài thì phải chọn bài, bài ngoài danh sách không hợp lệ
+    expectError(await loserApi.post(`${path()}/counterpart`, { same: true }), 422)
+    expectError(
+      await loserApi.post(`${path()}/counterpart`, { same: true, post: String(post._id) }),
+      422
+    )
+
+    const chosen = lostPosts[1]
+    const res = await loserApi.post(`${path()}/counterpart`, {
+      same: true,
+      post: String(chosen._id),
+    })
+    assert.equal(res.status, 200, JSON.stringify(res.body))
+    assert.equal(res.body.data.counterpartAsk, null)
+    assert.equal(String(res.body.data.counterpart.id), String(chosen._id))
+    assert.equal((await Post.findById(chosen._id)).status, 'returned')
+    assert.equal((await Post.findById(lostPosts[0]._id)).status, 'contacted')
+  })
+
+  test('nhiều bài cùng danh mục, chọn Bỏ qua thì không bài nào đổi', async () => {
+    await makePost(loser, wallet.category, { title: 'Mất ví' })
+    await makePost(loser, wallet.category, { title: 'Mất ví khác' })
+    await confirmBoth()
+    assert.equal((await loserApi.get(path())).body.data.counterpartAsk.length, 2)
+    const res = await loserApi.post(`${path()}/counterpart`, { same: false })
+    assert.equal(res.status, 200)
+    assert.equal(res.body.data.counterpartAsk, null)
+    assert.equal(res.body.data.counterpart, null)
+    assert.equal(await Post.countDocuments({ owner: loser._id, status: 'returned' }), 0)
   })
 
   test('không có manh mối, người kia có đúng một bài cùng danh mục: hỏi, trả lời Đúng thì bài theo sang', async () => {
@@ -315,7 +468,10 @@ describe('UC43 - Trao trả xong thì bài đối ứng và các liên hệ khá
     const notice = await Notification.findOne({ type: 'counterpart_ask' }).lean()
     assert.equal(String(notice.user), String(loser._id))
     assert.match(notice.preview, /có phải cùng món/)
-    assert.equal(String((await loserApi.get(path())).body.data.counterpartAsk.id), String(lost._id))
+    assert.deepEqual(
+      (await loserApi.get(path())).body.data.counterpartAsk.map((item) => String(item.id)),
+      [String(lost._id)]
+    )
     assert.equal((await finderApi.get(path())).body.data.counterpartAsk, null)
     expectError(await finderApi.post(`${path()}/counterpart`, { same: true }), 409)
     expectError(await loserApi.post(`${path()}/counterpart`, { same: 'true' }), 422)
@@ -343,7 +499,10 @@ describe('UC43 - Trao trả xong thì bài đối ứng và các liên hệ khá
     const lost = await makePost(loser, wallet.category)
     await confirmBoth()
 
-    assert.equal(String((await loserApi.get(path())).body.data.counterpartAsk.id), String(lost._id))
+    assert.deepEqual(
+      (await loserApi.get(path())).body.data.counterpartAsk.map((item) => String(item.id)),
+      [String(lost._id)]
+    )
     const res = await loserApi.post(`${path()}/counterpart`, { same: false })
     assert.equal(res.status, 200)
     assert.equal(res.body.data.counterpartAsk, null)
@@ -457,6 +616,7 @@ describe('UC42 - Liên hệ Moderator', () => {
     const res = await loserApi.post('/api/conversations/support')
     assert.equal(res.status, 200, JSON.stringify(res.body))
     assert.equal(res.body.data.kind, 'support')
+    assert.equal(res.body.data.support, 'requester')
     assert.equal(res.body.data.peer.username, 'mod2')
     const again = await loserApi.post('/api/conversations/support')
     assert.equal(again.body.data.id, res.body.data.id)
@@ -468,10 +628,89 @@ describe('UC42 - Liên hệ Moderator', () => {
     const mod = await loginAs('mod2@example.com')
     const modList = (await authed(mod.client, mod.accessToken).get('/api/conversations')).body.data
     assert.equal(modList.items[0].unread, 1)
+    // Moderator được giao thấy người cần hỗ trợ, không phải nhãn Hỗ trợ LostLink
+    assert.equal(modList.items[0].support, 'handler')
+    assert.equal(modList.items[0].peer.username, loser.username)
     assert.equal(
       String(free._id),
       String((await Conversation.findById(res.body.data.id)).participants[1].user)
     )
+  })
+
+  test('mọi Moderator thấy và trả lời được yêu cầu hỗ trợ trong hàng chờ chung, Admin thì không', async () => {
+    await createUser({ username: 'mod1', email: 'mod1@example.com', role: 'moderator' })
+    await createUser({ username: 'mod2', email: 'mod2@example.com', role: 'moderator' })
+    await createUser({ username: 'quantri', email: 'admin@example.com', role: 'admin' })
+    const support = (await loserApi.post('/api/conversations/support')).body.data
+    await loserApi.postForm(`/api/conversations/${support.id}/messages`, { body: 'Cần hỗ trợ' })
+
+    // Moderator không được gán vẫn thấy, đếm chưa đọc theo trạng thái riêng của mình
+    const assigned = String((await Conversation.findById(support.id)).participants[1].user)
+    const otherEmail =
+      assigned === String((await User.findOne({ username: 'mod1' }))._id)
+        ? 'mod2@example.com'
+        : 'mod1@example.com'
+    const other = await loginAs(otherEmail)
+    const otherApi = authed(other.client, other.accessToken)
+    const listed = (await otherApi.get('/api/conversations')).body.data.items
+    const item = listed.find((entry) => entry.id === support.id)
+    assert.equal(item.support, 'handler')
+    assert.equal(item.peer.username, loser.username)
+    assert.equal(item.unread, 1)
+
+    const admin = await loginAs('admin@example.com')
+    const adminList = (await authed(admin.client, admin.accessToken).get('/api/conversations')).body
+      .data.items
+    assert.equal(adminList.length, 0)
+
+    // Mở hội thoại thì hết chưa đọc của riêng Moderator này
+    assert.equal((await otherApi.get(`/api/conversations/${support.id}`)).status, 200)
+    const after = (await otherApi.get('/api/conversations')).body.data.items
+    assert.equal(after.find((entry) => entry.id === support.id).unread, 0)
+
+    // Trả lời cần nhận xử lý trước, dùng chung khoá với backoffice
+    expectError(
+      await otherApi.postForm(`/api/conversations/${support.id}/messages`, { body: 'Chào bạn' }),
+      409,
+      'CONVERSATION_LOCK_REQUIRED'
+    )
+    const token = 'token-nhan-xu-ly-0001'
+    const lock = await otherApi.post('/api/backoffice/action-locks/acquire', {
+      resourceType: 'conversation',
+      resourceId: support.id,
+      token,
+    })
+    assert.equal(lock.body.data.acquired, true, JSON.stringify(lock.body))
+    const reply = await otherApi.postForm(`/api/conversations/${support.id}/messages`, {
+      body: 'Chào bạn, mình hỗ trợ ngay',
+      lockToken: token,
+    })
+    assert.equal(reply.status, 201, JSON.stringify(reply.body))
+    const seen = (await loserApi.get(`/api/conversations/${support.id}`)).body.data.messages
+    assert.equal(seen.at(-1).body, 'Chào bạn, mình hỗ trợ ngay')
+  })
+
+  test('hội thoại nội bộ giữa Admin và Moderator có vai trò internal, hội thoại thường không có', async () => {
+    const admin = await createUser({
+      username: 'quantri',
+      email: 'admin@example.com',
+      role: 'admin',
+    })
+    const mod = await createUser({ username: 'mod1', email: 'mod1@example.com', role: 'moderator' })
+    await Conversation.create({
+      kind: 'support',
+      supportType: 'internal',
+      participants: [{ user: admin._id }, { user: mod._id }],
+    })
+    const session = await loginAs('mod1@example.com')
+    const [item] = (await authed(session.client, session.accessToken).get('/api/conversations'))
+      .body.data.items
+    assert.equal(item.support, 'internal')
+    assert.equal(item.peer.username, 'quantri')
+    assert.equal(item.peer.role, 'admin')
+
+    const trade = (await loserApi.get('/api/conversations')).body.data.items[0]
+    assert.equal(trade.support, null)
   })
 
   test('chưa có Moderator thì báo lỗi', async () => {

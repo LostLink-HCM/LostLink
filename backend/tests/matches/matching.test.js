@@ -7,6 +7,8 @@ const {
   CategoryAttribute,
   CategoryMatchRelation,
   CategoryMatchRelationMember,
+  Claim,
+  Conversation,
   MatchSuggestion,
   Notification,
   Post,
@@ -389,6 +391,53 @@ describe('UC36 - Xem và phản hồi gợi ý ghép cặp', () => {
     assert.equal(both.body.data.post.id, lost.id)
   })
 
+  test('đã xác nhận thì kèm bước liên hệ: chưa liên hệ, đã gửi yêu cầu, được gửi yêu cầu, bị từ chối, đã có hội thoại', async () => {
+    const contactOf = async (api) =>
+      (await api.get('/api/matches')).body.data.groups[0].items[0].contact
+
+    assert.equal(await contactOf(loserApi), null)
+    await loserApi.post(`/api/matches/${match.id}/confirm`)
+    assert.deepEqual(await contactOf(loserApi), { step: 'start' })
+
+    // Người mất gửi lời giới thiệu tới bài nhặt được
+    const sent = await loserApi.post(`/api/posts/${found.id}/claim/request`, {
+      message: 'Ví này của mình, có CCCD bên trong',
+    })
+    assert.equal(sent.status, 201)
+    const claimId = sent.body.data.id
+    assert.deepEqual(await contactOf(loserApi), { step: 'requested', claimId })
+
+    // Người nhặt xác nhận: yêu cầu của người mất đang chờ mình trả lời
+    await finderApi.post(`/api/matches/${match.id}/confirm`)
+    assert.deepEqual(await contactOf(finderApi), { step: 'incoming', claimId })
+
+    await finderApi.post(`/api/claims/${claimId}/decline`)
+    assert.deepEqual(await contactOf(loserApi), { step: 'declined', claimId })
+    assert.deepEqual(await contactOf(finderApi), { step: 'start' })
+
+    // Hội thoại nằm ở bài của người mất vẫn tính cho cả hai bên
+    const conversation = await Conversation.create({
+      kind: 'trade',
+      post: lost._id,
+      participants: [{ user: loser._id }, { user: finder._id }],
+    })
+    const chat = { step: 'chat', conversationId: conversation.id }
+    assert.deepEqual(await contactOf(loserApi), chat)
+    assert.deepEqual(await contactOf(finderApi), chat)
+  })
+
+  test('trả lời sai câu hỏi xác minh thì bước liên hệ là không thể liên hệ', async () => {
+    await loserApi.post(`/api/matches/${match.id}/confirm`)
+    await Claim.create({
+      post: found._id,
+      claimant: loser._id,
+      kind: 'is_mine',
+      status: 'rejected',
+    })
+    const [item] = (await loserApi.get('/api/matches')).body.data.groups[0].items
+    assert.deepEqual(item.contact, { step: 'verify_failed' })
+  })
+
   test('hai bên xác nhận cùng lúc thì gợi ý thành Cả hai đã xác nhận', async () => {
     const results = await Promise.all([
       loserApi.post(`/api/matches/${match.id}/confirm`),
@@ -426,12 +475,21 @@ describe('UC36 - Xem và phản hồi gợi ý ghép cặp', () => {
     assert.equal((await MatchSuggestion.findById(match.id)).state, 'stale')
   })
 
-  test('Không phải: gợi ý bị từ chối và biến mất khỏi danh sách của cả hai bên', async () => {
+  test('Không phải: gợi ý bị từ chối vẫn hiện ở cả hai bên kèm phía đã từ chối', async () => {
     const res = await finderApi.post(`/api/matches/${match.id}/reject`)
     assert.equal(res.status, 200)
     assert.equal(res.body.data.state, 'rejected')
-    assert.equal((await loserApi.get('/api/matches')).body.data.groups[0].items.length, 0)
+    const itemOf = async (api) => (await api.get('/api/matches')).body.data.groups[0].items[0]
+    const theirs = await itemOf(loserApi)
+    assert.equal(theirs.state, 'rejected')
+    assert.equal(theirs.rejectedBy, 'peer')
+    assert.equal(theirs.contact, null)
+    assert.equal((await itemOf(finderApi)).rejectedBy, 'me')
     assert.equal((await loserApi.post(`/api/matches/${match.id}/confirm`)).status, 409)
+
+    // Bên kia bấm lại không đổi phía đã từ chối
+    assert.equal((await loserApi.post(`/api/matches/${match.id}/reject`)).status, 200)
+    assert.equal((await itemOf(loserApi)).rejectedBy, 'peer')
   })
 
   test('số gợi ý chưa phản hồi giảm khi mình xác nhận, từ chối hoặc bài đối ứng bị ẩn', async () => {

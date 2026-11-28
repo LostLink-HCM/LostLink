@@ -25,6 +25,7 @@ import { PROFILE_TABS, profileStats, toProfileView } from '../../lib/user/profil
 
 // Tất cả, Mất đồ, Nhặt được gồm cả bài chờ duyệt; Chờ duyệt gồm Chờ duyệt và Bị từ chối
 const REVIEWING_STATUSES = ['pending', 'rejected']
+const FINISHED_STATUSES = ['returned', 'closed']
 // Chờ duyệt đứng ngay sau Tất cả
 const [ALL_TAB, ...TYPE_TABS] = PROFILE_TABS
 const MY_TABS = [ALL_TAB, { value: 'reviewing', label: 'Chờ duyệt' }, ...TYPE_TABS]
@@ -84,6 +85,8 @@ export default function MyProfilePage() {
   const posts = [...data.posts, ...data.reviewingPosts]
     .map((card) => toMyPost(card, now))
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+  // Đã trao trả, Đã đóng: cuối danh sách, mờ đi
+  const finished = (data.finishedPosts ?? []).map((card) => toMyPost(card, now))
 
   const closeDialog = () => setDialog(null)
   const done = (message) => {
@@ -118,12 +121,13 @@ export default function MyProfilePage() {
       }
       tags={myPostTags(post)}
       footer={rejectReasonOf(post)}
+      faded={FINISHED_STATUSES.includes(post.status)}
     />
   )
 
   // Chưa đăng bài nào thì gợi ý đăng bài, ở mọi tab
   const empty = (current) =>
-    posts.length === 0 ? (
+    posts.length + finished.length === 0 ? (
       <div className="pb-8">
         <EmptyState icon="compose" title="Bạn chưa có bài đăng nào" />
         <div className="flex justify-center">
@@ -173,6 +177,8 @@ export default function MyProfilePage() {
           tab={tab}
           onTab={setTab}
           posts={posts}
+          finished={finished}
+          finishedLabel="Đã trao trả hoặc đã đóng"
           inTab={inTab}
           renderPost={renderPost}
           note={

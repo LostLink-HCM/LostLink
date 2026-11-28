@@ -10,7 +10,7 @@ const {
 } = require('../models')
 const env = require('../config/env')
 const emailService = require('./emailService')
-const { markContacted, reopenTrade } = require('./conversationService')
+const { linkCounterpart, markContacted, reopenTrade } = require('./conversationService')
 const { notify } = require('./notificationService')
 const { invalidField, isPublic, postNotFound, toAuthor } = require('./postService')
 const ApiError = require('../utils/ApiError')
@@ -41,6 +41,7 @@ const toPostSnapshot = (post) => ({
   status: post.status,
   title: post.title,
   category: post.category?.name ?? '',
+  categorySlug: post.category?.slug ?? null,
   area: post.area,
   image: [...(post.images ?? [])].sort((a, b) => a.order - b.order)[0]?.url ?? null,
   author: post.owner?.username ?? null,
@@ -59,7 +60,7 @@ const loadClaimablePost = async (postId, user) => {
   const post = await Post.findById(postId)
     .select(POST_FIELDS)
     .populate('owner', 'username avatarUrl email emailOptIn lastActiveAt')
-    .populate('category', 'name')
+    .populate('category', 'name slug')
   if (!post || !post.owner || !isPublic(post, Date.now())) throw postNotFound()
   if (post.owner._id.equals(user._id)) {
     throw ApiError.forbidden('Bạn không thể nhận đồ từ bài của chính mình.', 'OWN_POST')
@@ -79,13 +80,17 @@ const loadClaimablePost = async (postId, user) => {
 const tradeOf = (postId, a, b) =>
   Conversation.findOne({ kind: 'trade', post: postId, 'participants.user': { $all: [a, b] } })
 
-const openTrade = async (post, claimantId) =>
-  (await tradeOf(post._id, post.owner._id, claimantId)) ??
-  Conversation.create({
-    kind: 'trade',
-    post: post._id,
-    participants: [{ user: post.owner._id }, { user: claimantId }],
-  })
+// Có manh mối giữa bài này và đúng một bài của người liên hệ thì ghi luôn bài đối ứng
+const openTrade = async (post, claimantId) => {
+  const conversation =
+    (await tradeOf(post._id, post.owner._id, claimantId)) ??
+    (await Conversation.create({
+      kind: 'trade',
+      post: post._id,
+      participants: [{ user: post.owner._id }, { user: claimantId }],
+    }))
+  return linkCounterpart(conversation, post, claimantId)
+}
 
 const toQuestion = (challenge) => ({
   text: challenge.question,
@@ -220,6 +225,7 @@ const answerQuestion = async (postId, optionId, user) => {
     }),
     remindOwnerByEmail(post),
   ])
+  emitToUsers([post.owner._id], 'conversation:updated', { conversationId: conversation._id })
   return { correct: true, claimId: claim._id, conversationId: conversation._id }
 }
 
@@ -231,7 +237,7 @@ const CLAIM_POPULATE = [
     select: POST_FIELDS,
     populate: [
       { path: 'owner', select: 'username avatarUrl' },
-      { path: 'category', select: 'name' },
+      { path: 'category', select: 'name slug' },
     ],
   },
   { path: 'claimant', select: 'username avatarUrl' },

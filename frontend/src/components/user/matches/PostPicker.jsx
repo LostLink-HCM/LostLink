@@ -2,6 +2,7 @@ import { TYPE_LABELS } from '../../../lib/user/homeFeed'
 import CountBadge from '../CountBadge'
 import { cardClass } from '../Card'
 import { cx, focusRing } from '../classes'
+import TypeTag from '../home/TypeTag'
 
 function Thumb({ post }) {
   const image = post.images[0]
@@ -54,9 +55,8 @@ export default function PostPicker({ groups, current, onSelect }) {
                   >
                     {post.title}
                   </span>
-                  <span className="mt-0.5 block text-micro text-ink-subtle">
-                    {TYPE_LABELS[post.type]}
-                  </span>
+                  {/* Nhãn màu giống Trang chủ */}
+                  <TypeTag type={post.type} className="mt-1" />
                 </span>
                 {pending > 0 && <CountBadge count={pending > 9 ? '9+' : pending} />}
               </button>

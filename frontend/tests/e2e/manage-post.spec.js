@@ -86,7 +86,7 @@ test.describe('UC13 - Xem hồ sơ cá nhân', () => {
 })
 
 test.describe('UC27 - Đóng bài / đánh dấu đã trao trả', () => {
-  test('đánh dấu đã trao trả từ trang cá nhân: bài rời danh sách, chưa cộng lần trao trả khi chưa có hai bên xác nhận', async ({
+  test('đánh dấu đã trao trả từ trang cá nhân: bài xuống nhóm đã kết thúc, chưa cộng lần trao trả khi chưa có hai bên xác nhận', async ({
     page,
     api,
   }) => {
@@ -103,7 +103,10 @@ test.describe('UC27 - Đóng bài / đánh dấu đã trao trả', () => {
     await dialog.getByRole('button', { name: 'Xác nhận' }).click()
 
     await expect(page.getByText('Cập nhật trạng thái bài thành công.')).toBeVisible()
-    await expect(cardOf(page, title)).toHaveCount(0)
+    // Bài chuyển xuống nhóm đã kết thúc ở cuối danh sách, chỉ còn Xóa bài
+    const finished = page.getByRole('region', { name: /^Đã trao trả hoặc đã đóng/ })
+    await expect(cardOf(finished, title).getByText('Đã trao trả', { exact: true })).toBeVisible()
+    await expect((await openPostMenu(page, title)).getByRole('menuitem')).toHaveText(['Xóa bài'])
     const me = await (await api.get('users/me', { headers: bearer(token) })).json()
     expect(me.data.profile.returnCount).toBe(0)
   })

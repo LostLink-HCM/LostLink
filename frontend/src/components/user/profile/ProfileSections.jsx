@@ -52,8 +52,20 @@ const tabClass = (active) =>
   )
 
 // Mục Bài đăng: tab lọc kèm số bài, danh sách và nội dung khi trống (empty)
-export function ProfilePosts({ tabs, tab, onTab, posts, inTab, renderPost, note, empty }) {
+export function ProfilePosts({
+  tabs,
+  tab,
+  onTab,
+  posts,
+  finished = [],
+  finishedLabel,
+  inTab,
+  renderPost,
+  note,
+  empty,
+}) {
   const shown = posts.filter((post) => inTab(post, tab))
+  const shownFinished = finished.filter((post) => inTab(post, tab))
   return (
     <section aria-labelledby="profile-posts" className="min-w-0">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -71,7 +83,7 @@ export function ProfilePosts({ tabs, tab, onTab, posts, inTab, renderPost, note,
             >
               {item.label}
               <span className="opacity-70">
-                {posts.filter((post) => inTab(post, item.value)).length}
+                {[...posts, ...finished].filter((post) => inTab(post, item.value)).length}
               </span>
             </button>
           ))}
@@ -79,11 +91,20 @@ export function ProfilePosts({ tabs, tab, onTab, posts, inTab, renderPost, note,
       </div>
 
       {shown.length > 0 && note}
-      {shown.length > 0 ? (
-        <div className="flex flex-col gap-4">{shown.map(renderPost)}</div>
-      ) : (
-        <Card>{empty(tab)}</Card>
+      {shown.length > 0 && <div className="flex flex-col gap-4">{shown.map(renderPost)}</div>}
+      {shownFinished.length > 0 && (
+        <section aria-labelledby="profile-finished" className={cx(shown.length > 0 && 'mt-7')}>
+          <h3
+            id="profile-finished"
+            className="m-0 mb-3 flex items-center gap-3 text-caption font-semibold text-ink-muted"
+          >
+            {finishedLabel} ({shownFinished.length})
+            <span aria-hidden="true" className="h-px flex-1 bg-line" />
+          </h3>
+          <div className="flex flex-col gap-4">{shownFinished.map(renderPost)}</div>
+        </section>
       )}
+      {shown.length + shownFinished.length === 0 && <Card>{empty(tab)}</Card>}
     </section>
   )
 }

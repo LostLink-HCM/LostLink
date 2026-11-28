@@ -17,6 +17,7 @@ const { seedMemberReputation, seedReputation } = require('./reputationSeed')
 const { seedReviews } = require('./reviewSeed')
 const { seedSystemSettings } = require('./systemSettingsSeed')
 const { seedTradePair } = require('./tradePairSeed')
+const { seedMatchTrades } = require('./matchTradeSeed')
 const {
   seedMemberStatuses,
   seedMissingMembers,
@@ -41,58 +42,63 @@ const dashboardOnly = process.argv.includes('--dashboard-only')
 const avatarsOnly = process.argv.includes('--avatars-only')
 const leaderboardOnly = process.argv.includes('--leaderboard-only')
 const tradePairOnly = process.argv.includes('--trade-pair-only')
-const seeders = tradePairOnly
-  ? [seedTradePair]
-  : leaderboardOnly
-    ? [seedMemberStatuses, seedReviews, seedMemberReputation]
-    : dashboardOnly
-      ? [seedAdminDashboard]
-      : categoryMOnly
-        ? [seedCategoryMReliability]
-        : categoriesOnly
-          ? [seedCategories]
-          : messagesOnly
-            ? [seedBackofficeMessages]
-            : backofficeNotificationsOnly
-              ? [seedBackofficeNotifications]
-              : reportsOnly
-                ? [seedReports]
-                : auditOnly
-                  ? [seedAuditLogs]
-                  : avatarsOnly
-                    ? [seedAvatars]
-                    : settingsOnly
-                      ? [seedSystemSettings]
-                      : demo
-                        ? [
-                            seedMissingMembers,
-                            seedMemberStatuses,
-                            seedCategories,
-                            seedPosts,
-                            seedReviews,
-                            seedMemberReputation,
-                            seedNotifications,
-                          ]
-                        : [
-                            seedUsers,
-                            seedAvatars,
-                            seedSystemSettings,
-                            seedCategories,
-                            seedPosts,
-                            seedAdminDashboard,
-                            seedReports,
-                            seedConversations,
-                            seedTradePair,
-                            // Lời cảm ơn gắn với cuộc trao đổi đã seed, điểm uy tín tính sau khi có lời cảm ơn
-                            seedReviews,
-                            seedReputation,
-                            seedBackofficeMessages,
-                            seedNotifications,
-                            seedBackofficeNotifications,
-                            seedUserActivityDates,
-                            seedUserUpdateDates,
-                            seedAuditLogs,
-                          ]
+// Hai hội thoại đi từ manh mối (bài đính kèm có cả bài của hai bên)
+const matchTradesOnly = process.argv.includes('--match-trades-only')
+const seeders = matchTradesOnly
+  ? [seedMatchTrades]
+  : tradePairOnly
+    ? [seedTradePair]
+    : leaderboardOnly
+      ? [seedMemberStatuses, seedReviews, seedMemberReputation]
+      : dashboardOnly
+        ? [seedAdminDashboard]
+        : categoryMOnly
+          ? [seedCategoryMReliability]
+          : categoriesOnly
+            ? [seedCategories]
+            : messagesOnly
+              ? [seedBackofficeMessages]
+              : backofficeNotificationsOnly
+                ? [seedBackofficeNotifications]
+                : reportsOnly
+                  ? [seedReports]
+                  : auditOnly
+                    ? [seedAuditLogs]
+                    : avatarsOnly
+                      ? [seedAvatars]
+                      : settingsOnly
+                        ? [seedSystemSettings]
+                        : demo
+                          ? [
+                              seedMissingMembers,
+                              seedMemberStatuses,
+                              seedCategories,
+                              seedPosts,
+                              seedReviews,
+                              seedMemberReputation,
+                              seedNotifications,
+                            ]
+                          : [
+                              seedUsers,
+                              seedAvatars,
+                              seedSystemSettings,
+                              seedCategories,
+                              seedPosts,
+                              seedAdminDashboard,
+                              seedReports,
+                              seedConversations,
+                              seedTradePair,
+                              seedMatchTrades,
+                              // Lời cảm ơn gắn với cuộc trao đổi đã seed, điểm uy tín tính sau khi có lời cảm ơn
+                              seedReviews,
+                              seedReputation,
+                              seedBackofficeMessages,
+                              seedNotifications,
+                              seedBackofficeNotifications,
+                              seedUserActivityDates,
+                              seedUserUpdateDates,
+                              seedAuditLogs,
+                            ]
 
 // Kiểm tra tài khoản không tự tạo được trước khi ghi, thiếu thì dừng khi chưa đổi gì trong DB.
 // Tác giả bài mẫu còn thiếu sẽ do seedMissingMembers tạo, findSeedAccounts kiểm lại trong seedPosts
@@ -102,6 +108,12 @@ const checkAccounts = async () => {
 }
 
 async function run() {
+  if (matchTradesOnly && process.argv.slice(2).some((arg) => arg !== '--match-trades-only')) {
+    throw new Error('Không kết hợp --match-trades-only với chế độ seed khác')
+  }
+  if (matchTradesOnly && env.nodeEnv === 'production') {
+    throw new Error('Không chạy seed hội thoại manh mối trên production')
+  }
   if (tradePairOnly && process.argv.slice(2).some((arg) => arg !== '--trade-pair-only')) {
     throw new Error('Không kết hợp --trade-pair-only với chế độ seed khác')
   }
@@ -199,31 +211,33 @@ async function run() {
 
   await connectDatabase()
   const { host, name } = mongoose.connection
-  const mode = tradePairOnly
-    ? 'cặp bài trao đổi'
-    : leaderboardOnly
-      ? 'bảng vinh danh'
-      : dashboardOnly
-        ? 'Dashboard admin'
-        : backofficeNotificationsOnly
-          ? 'backoffice notifications'
-          : categoriesOnly
-            ? 'danh mục'
-            : categoryMOnly
-              ? 'dữ liệu độ tin cậy m'
-              : reportsOnly
-                ? 'báo cáo'
-                : messagesOnly
-                  ? 'tin nhắn backoffice'
-                  : auditOnly
-                    ? 'nhật ký thao tác'
-                    : avatarsOnly
-                      ? 'ảnh đại diện'
-                      : settingsOnly
-                        ? 'cấu hình hệ thống'
-                        : demo
-                          ? 'demo'
-                          : 'đầy đủ'
+  const mode = matchTradesOnly
+    ? 'hội thoại đi từ manh mối'
+    : tradePairOnly
+      ? 'cặp bài trao đổi'
+      : leaderboardOnly
+        ? 'bảng vinh danh'
+        : dashboardOnly
+          ? 'Dashboard admin'
+          : backofficeNotificationsOnly
+            ? 'backoffice notifications'
+            : categoriesOnly
+              ? 'danh mục'
+              : categoryMOnly
+                ? 'dữ liệu độ tin cậy m'
+                : reportsOnly
+                  ? 'báo cáo'
+                  : messagesOnly
+                    ? 'tin nhắn backoffice'
+                    : auditOnly
+                      ? 'nhật ký thao tác'
+                      : avatarsOnly
+                        ? 'ảnh đại diện'
+                        : settingsOnly
+                          ? 'cấu hình hệ thống'
+                          : demo
+                            ? 'demo'
+                            : 'đầy đủ'
   console.log(`Seed ${mode} vào ${host}/${name}`)
 
   if (demo || leaderboardOnly) await checkAccounts()
