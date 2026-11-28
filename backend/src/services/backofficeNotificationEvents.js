@@ -102,6 +102,95 @@ const suppressReportNotifications = async (reportFilter) => {
   await Promise.all(users.map((user) => emitUnreadCount(user)))
 }
 
+const syncOverdueReportNotifications = async (groups, now = new Date()) => {
+  const moderators = await activeUsers('moderator')
+  const suppressedNotifications = await Notification.find({
+    type: 'report_overdue',
+    isSuppressed: true,
+  })
+    .select('_id user')
+    .lean()
+  if (suppressedNotifications.length) {
+    await Notification.updateMany(
+      { _id: { $in: suppressedNotifications.map((item) => item._id) } },
+      { $set: { isSuppressed: false } }
+    )
+    const recipientIds = [...new Set(suppressedNotifications.map((item) => String(item.user)))]
+    const recipients = await User.find({ _id: { $in: recipientIds } })
+      .select('_id role')
+      .lean()
+    await Promise.all(recipients.map((user) => emitUnreadCount(user)))
+  }
+
+  for (const group of groups) {
+    const refType = group.targetType === 'post' ? 'Post' : 'User'
+    const identity = {
+      type: 'report_overdue',
+      refType,
+      refId: group.targetId,
+    }
+    for (const moderator of moderators) {
+      const notificationIdentity = { ...identity, user: moderator._id }
+      const preview = previewOf(group.preview)
+      const existing = await Notification.findOne(notificationIdentity)
+        .select('isSuppressed preview isRead')
+        .lean()
+
+      if (existing?.isSuppressed) {
+        const result = await Notification.updateOne(
+          { ...notificationIdentity, isSuppressed: true },
+          {
+            $set: {
+              preview,
+              isRead: false,
+              isSuppressed: false,
+              createdAt: now,
+              updatedAt: now,
+            },
+          },
+          { timestamps: false }
+        )
+        if (result.modifiedCount) await emitUnreadCount(moderator)
+        continue
+      }
+
+      if (existing) {
+        const notifyAgain = existing.isRead && existing.preview !== preview
+        await Notification.updateOne(
+          notificationIdentity,
+          {
+            $set: {
+              preview,
+              updatedAt: now,
+              ...(notifyAgain && { isRead: false }),
+            },
+          },
+          { timestamps: false }
+        )
+        if (notifyAgain) await emitUnreadCount(moderator)
+        continue
+      }
+
+      const result = await Notification.updateOne(
+        notificationIdentity,
+        {
+          $set: { preview, updatedAt: now },
+          $setOnInsert: {
+            ...notificationIdentity,
+            actor: null,
+            isRead: false,
+            isSuppressed: false,
+            isPinned: false,
+            createdAt: now,
+          },
+        },
+        { upsert: true, timestamps: false }
+      )
+      if (result.upsertedCount) await emitUnreadCount(moderator)
+    }
+  }
+}
+
 const notifyReportQueue = async (reportId) => {
   try {
     const report = await Report.findById(reportId)
@@ -257,6 +346,7 @@ const notifyUserSupportMessage = async ({ conversation, message, sender }) => {
 module.exports = {
   notifyPendingPost,
   notifyReportQueue,
+  syncOverdueReportNotifications,
   suppressPendingPost,
   suppressReportGroup,
   notifyAdminAccountRestricted,

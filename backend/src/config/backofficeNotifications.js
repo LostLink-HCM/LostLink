@@ -1,6 +1,7 @@
 const CATEGORY_BY_TYPE = {
   post_pending: 'review',
   report_queue: 'report',
+  report_overdue: 'report',
   report_flagged: 'report',
   backoffice_message: 'system',
   account_restricted: 'warning',
@@ -8,7 +9,7 @@ const CATEGORY_BY_TYPE = {
 
 const TYPES_BY_ROLE = {
   admin: ['account_restricted'],
-  moderator: ['post_pending', 'report_queue', 'backoffice_message'],
+  moderator: ['post_pending', 'report_queue', 'report_overdue', 'backoffice_message'],
 }
 
 const CATEGORIES = ['review', 'warning', 'report', 'system']

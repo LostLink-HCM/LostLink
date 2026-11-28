@@ -146,6 +146,11 @@ const DESCRIBE = {
     title: `${item.actor?.username ?? 'Ai đó'} đã trả lời đúng câu hỏi xác minh`,
     body: item.post?.title ?? item.text,
   }),
+  contact_12h: (item) => ({
+    kind: 'contact',
+    title: 'Bạn có yêu cầu liên hệ đang chờ',
+    body: item.text,
+  }),
 }
 
 // Thông báo về yêu cầu liên hệ, xác minh: bấm vào mở trang Tin nhắn thay vì bài đăng
@@ -154,6 +159,7 @@ const MESSAGE_TYPES = [
   'contact_accepted',
   'contact_declined',
   'verification_passed',
+  'contact_12h',
   'conversation_closed',
   'return_reminder',
   'trade_reminder',

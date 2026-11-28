@@ -1,9 +1,13 @@
 const accountService = require('../services/accountService')
 const categoryFrequencyService = require('../services/categoryFrequencyService')
+const contactReminderService = require('../services/contactReminderService')
+const reportOverdueService = require('../services/reportOverdueService')
 const tradeReminderService = require('../services/tradeReminderService')
 const { onFrequencyInputsChanged, offFrequencyInputsChanged } = require('../utils/frequencyEvents')
 const PURGE_INTERVAL_MS = 15 * 60 * 1000
 const TRADE_REMINDER_INTERVAL_MS = 60 * 60 * 1000
+const REPORT_OVERDUE_INTERVAL_MS = 60 * 60 * 1000
+const CONTACT_REMINDER_INTERVAL_MS = 60 * 1000
 const CATEGORY_FREQUENCY_INTERVAL_MS = 15 * 60 * 1000
 const CATEGORY_FREQUENCY_DEBOUNCE_MS = 1000
 
@@ -16,6 +20,10 @@ let frequencyRequestedWhileRunning = false
 let jobsStarted = false
 let reminderTimer = null
 let reminderRunning = false
+let reportOverdueTimer = null
+let reportOverdueRunning = false
+let contactReminderTimer = null
+let contactReminderRunning = false
 
 const purgeAccounts = async () => {
   if (running) return
@@ -40,6 +48,33 @@ const remindOpenTrades = async () => {
     console.error('Trade reminder failed:', err)
   } finally {
     reminderRunning = false
+  }
+}
+
+const remindOverdueReports = async () => {
+  if (reportOverdueRunning) return
+  reportOverdueRunning = true
+  try {
+    const notifiedGroups = await reportOverdueService.remindOverdueReports()
+    if (notifiedGroups)
+      console.log(`Synced overdue report notifications for ${notifiedGroups} target(s)`)
+  } catch (err) {
+    console.error('Overdue report notification failed:', err)
+  } finally {
+    reportOverdueRunning = false
+  }
+}
+
+const remindInactiveContactOwners = async () => {
+  if (contactReminderRunning) return
+  contactReminderRunning = true
+  try {
+    const reminded = await contactReminderService.remindInactiveOwners()
+    if (reminded) console.log(`Sent delayed contact reminders for ${reminded} claim(s)`)
+  } catch (err) {
+    console.error('Delayed contact reminder failed:', err)
+  } finally {
+    contactReminderRunning = false
   }
 }
 
@@ -91,6 +126,12 @@ const startJobs = () => {
   remindOpenTrades()
   reminderTimer = setInterval(remindOpenTrades, TRADE_REMINDER_INTERVAL_MS)
   reminderTimer.unref()
+  remindOverdueReports()
+  reportOverdueTimer = setInterval(remindOverdueReports, REPORT_OVERDUE_INTERVAL_MS)
+  reportOverdueTimer.unref()
+  remindInactiveContactOwners()
+  contactReminderTimer = setInterval(remindInactiveContactOwners, CONTACT_REMINDER_INTERVAL_MS)
+  contactReminderTimer.unref()
 }
 
 const stopJobs = () => {
@@ -102,6 +143,10 @@ const stopJobs = () => {
   frequencyTimer = null
   clearInterval(reminderTimer)
   reminderTimer = null
+  clearInterval(reportOverdueTimer)
+  reportOverdueTimer = null
+  clearInterval(contactReminderTimer)
+  contactReminderTimer = null
   offFrequencyInputsChanged(scheduleCategoryFrequencyRecalculation)
   clearTimeout(frequencyDebounceTimer)
   frequencyDebounceTimer = null

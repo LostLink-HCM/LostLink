@@ -22,6 +22,7 @@ const baseFilterFor = (user) => ({
 const titleFor = (item) => {
   if (item.type === 'post_pending') return 'Bài đăng đang chờ kiểm duyệt'
   if (item.type === 'report_queue') return 'Report cần được xử lý'
+  if (item.type === 'report_overdue') return 'Report quá hạn xử lý'
   if (item.type === 'report_flagged') return 'Tài khoản có nhiều báo cáo'
   if (item.type === 'account_restricted') return 'Tài khoản tự động bị hạn chế'
   if (item.type === 'backoffice_message') {
@@ -39,7 +40,11 @@ const actionFor = (item, role) => {
       href: `/moderator/review?post=${encodeURIComponent(String(item.refId || ''))}`,
     }
   }
-  if (item.type === 'report_queue' || item.type === 'report_flagged') {
+  if (
+    item.type === 'report_queue' ||
+    item.type === 'report_overdue' ||
+    item.type === 'report_flagged'
+  ) {
     const targetType = item.refType === 'Post' ? 'post' : 'user'
     const params = new URLSearchParams({
       targetType,

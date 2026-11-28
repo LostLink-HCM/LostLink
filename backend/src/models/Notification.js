@@ -32,6 +32,7 @@ const NOTIFICATION_TYPES = [
   'following_post',
   'post_pending',
   'report_queue',
+  'report_overdue',
   'backoffice_message',
   'report_result',
   // Gửi Moderator khi một tài khoản bị nhiều người báo cáo

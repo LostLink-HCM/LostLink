@@ -22,6 +22,9 @@ const claimSchema = new Schema(
     // Tin nhắn giới thiệu duy nhất khi gửi yêu cầu liên hệ
     introMessage: { type: String, default: '', maxlength: 2000 },
     respondedAt: { type: Date, default: null },
+    // Scheduled reminder after a successful verification answer.
+    contactReminderDueAt: { type: Date, default: null },
+    contactReminderSentAt: { type: Date, default: null },
 
     // Đến từ gợi ý ghép cặp, null nếu nhận đồ trực tiếp từ bài đăng
     match: { type: Schema.Types.ObjectId, ref: 'MatchSuggestion', default: null },

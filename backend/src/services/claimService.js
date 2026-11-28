@@ -135,12 +135,27 @@ const contactHours = async () => {
   return hours > 0 ? hours : DEFAULT_CONTACT_HOURS
 }
 
-// Người nhặt không hoạt động quá ngưỡng và có bật nhận email thì gửi email nhắc. Lỗi chỉ ghi log
-const remindOwnerByEmail = async (post) => {
+// Keep the current immediate notification and email behavior when verification succeeds.
+const remindOwnerAfterContact = async (post, claimant) => {
   const { owner } = post
+  const hours = await contactHours()
+  const threshold = Date.now() - hours * HOUR
+  if (owner.lastActiveAt && new Date(owner.lastActiveAt).getTime() > threshold) return
+
+  try {
+    await notify([owner._id], {
+      type: 'contact_12h',
+      actor: claimant._id,
+      refType: 'Post',
+      refId: post._id,
+      text: `Có yêu cầu liên hệ mới về bài "${post.title}".`,
+      body: `Có người đã trả lời đúng câu hỏi xác minh cho bài "${post.title}". Bạn đã không hoạt động trong ít nhất ${hours} giờ; hãy mở Tin nhắn để liên hệ.`,
+    })
+  } catch (error) {
+    console.error('Không gửi được thông báo nhắc liên hệ', error)
+  }
+
   if (!owner.emailOptIn || !owner.email) return
-  const threshold = Date.now() - (await contactHours()) * HOUR
-  if (owner.lastActiveAt && owner.lastActiveAt.getTime() > threshold) return
   try {
     await emailService.sendContactReminder({
       to: owner.email,
@@ -196,6 +211,7 @@ const answerQuestion = async (postId, optionId, user) => {
   }
 
   const conversation = await openTrade(post, user._id)
+  const reminderDueAt = new Date(now.getTime() + (await contactHours()) * HOUR)
   const claim = await Claim.findOneAndUpdate(
     claimFilter,
     {
@@ -204,6 +220,8 @@ const answerQuestion = async (postId, optionId, user) => {
         verificationAttempt: attempt._id,
         conversation: conversation._id,
         respondedAt: now,
+        contactReminderDueAt: reminderDueAt,
+        contactReminderSentAt: null,
       },
       $setOnInsert: { kind: 'is_mine' },
     },
@@ -218,7 +236,7 @@ const answerQuestion = async (postId, optionId, user) => {
       refId: post._id,
       text: `${user.username} đã trả lời đúng câu hỏi xác minh của bài "${post.title}".`,
     }),
-    remindOwnerByEmail(post),
+    remindOwnerAfterContact(post, user),
   ])
   return { correct: true, claimId: claim._id, conversationId: conversation._id }
 }

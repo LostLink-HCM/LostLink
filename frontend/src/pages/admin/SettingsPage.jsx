@@ -993,8 +993,8 @@ function SettingsEditor({ initialSettings, onSaved, registerNavigationGuard, rea
                   <div className="grid gap-x-[18px] border-t border-primary-muted pt-5 min-[601px]:grid-cols-2">
                     {field(
                       'contactHours',
-                      'Thời gian không hoạt động trước khi gửi email nhắc',
-                      'Tính từ lần hoạt động gần nhất.',
+                      'Thời gian chờ nhắc liên hệ',
+                      'Tính từ lúc có người trả lời đúng câu hỏi xác minh; gửi email nếu người đăng chưa truy cập lại.',
                       'giờ',
                       { min: 1, max: 72, step: 1 }
                     )}
